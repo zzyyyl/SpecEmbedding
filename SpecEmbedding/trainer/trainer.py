@@ -21,6 +21,8 @@ from SpecEmbedding.type import (
     CustomMetricConfig
 )
 
+import logging
+
 def set_seed(seed):
     np.random.seed(seed)
     random.seed(seed)
@@ -254,7 +256,7 @@ class Trainer:
             )
 
             if self.custom_metric_config is not None:
-                print(
+                logging.info(
                     self.desc_config["train"].format(
                         epoch + 1,
                         train_loss,
@@ -263,7 +265,7 @@ class Trainer:
                     )
                 )
             else:
-                print(
+                logging.info(
                     self.desc_config["train"].format(
                         epoch + 1,
                         train_loss
@@ -282,7 +284,7 @@ class Trainer:
                     best_epoch = epoch
                     best_model_loss = val_loss
                     best_custom_metric = val_custom_metric
-                    print(
+                    logging.info(
                         self.desc_config["val"].format(
                             epoch + 1,
                             val_loss,
@@ -298,7 +300,7 @@ class Trainer:
                     early_stop = 0
                     best_epoch = epoch
                     best_model_loss = val_loss
-                    print(
+                    logging.info(
                         self.desc_config["val"].format(
                             epoch + 1,
                             val_loss
@@ -312,13 +314,20 @@ class Trainer:
             loss_metrics['validation'].append(val_loss)
             custom_metrics["train"].append(train_custom_metric)
             custom_metrics["validation"].append(val_custom_metric)
+            
+            # Save metrics at the end of every epoch to prevent data loss upon interruption
+            np.save(self.storage_config["loss"], loss_metrics)
+            np.save(self.storage_config["custom"], custom_metrics)
+            np.save(self.storage_config["lr"], self._lr_seq)
+            np.save(self.storage_config["step_loss"], self._step_loss_seq)
+
             if early_stop == self.trainer_config["early_stop"]:
-                print(f"early stop at epoch {epoch}")
+                logging.info(f"early stop at epoch {epoch}")
                 break
 
-        print(f"best model saved in epoch {best_epoch}")
+        logging.info(f"best model saved in epoch {best_epoch}")
         if self.custom_metric_config is not None:
-            print(
+            logging.info(
                 self.desc_config["end"].format(
                     best_model_loss,
                     self.custom_metric_config["name"],
@@ -326,17 +335,12 @@ class Trainer:
                 )
             )
         else:
-            print(
+            logging.info(
                 self.desc_config["end"].format(
                     best_model_loss,
                 )
             )
-
-        print("store train metrics")
-        np.save(self.storage_config["loss"], loss_metrics)
-        np.save(self.storage_config["custom"], custom_metrics)
-        np.save(self.storage_config["lr"], self._lr_seq)
-        np.save(self.storage_config["step_loss"], self._step_loss_seq)
+        logging.info("Training complete. Metrics are fully synced.")
 
 class ModelTester:
     def __init__(
