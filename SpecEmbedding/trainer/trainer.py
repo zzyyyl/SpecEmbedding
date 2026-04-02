@@ -161,7 +161,7 @@ class Trainer:
 
         pbar = dataloader
         if self.trainer_config["show_progress_bar"]:
-            pbar = tqdm(dataloader, total=len(dataloader))
+            pbar = tqdm(dataloader, total=len(dataloader), ascii=True)
             if is_train:
                 pbar.set_description(
                     f"Train: Epoch [{epoch + 1}/{self.trainer_config['n_epoch']}]")
@@ -356,7 +356,7 @@ class ModelTester:
             pbar = dataloader
             if self.show_prgress_bar:
                 pbar = tqdm(dataloader, total=len(
-                    dataloader), desc="embedding")
+                    dataloader), desc="embedding", ascii=True)
             for x in pbar:
                 x = [d.to(self.device) for d in x]
                 pred: torch.Tensor = self.model(*x)

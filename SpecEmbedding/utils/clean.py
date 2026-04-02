@@ -179,12 +179,12 @@ def get_ref_query(
     reference = []
     smiles_metadata = defaultdict(list)
 
-    for s in tqdm(spectrums, "seek for target_spectrums"):
+    for s in tqdm(spectrums, "seek for target_spectrums", ascii=True):
         smiles = s.get("smiles")
         if smiles in targets:
             smiles_metadata[smiles].append(s)
 
-    for smiles, metadata in tqdm(smiles_metadata.items(), "split query and reference set"):
+    for smiles, metadata in tqdm(smiles_metadata.items(), "split query and reference set", ascii=True):
         if len(metadata) == 1:
             reference.append(metadata[0])
         else:
@@ -232,7 +232,7 @@ def get_classified_tokenset(
     pbar = sequences
     if show_progress_bar:
         pbar = tqdm(sequences, total=len(sequences),
-                    desc="classify the dataset")
+                    desc="classify the dataset", ascii=True)
     for seq in pbar:
         label = np.where(unique_smiles == seq["smiles"])[0][0]
         label2sequences[label].append(seq)
@@ -243,7 +243,7 @@ def get_classified_tokenset(
 def get_smiles(sequences: list[TokenSequence], show_progress_bar: bool = True):
     pbar = sequences
     if show_progress_bar:
-        pbar = tqdm(sequences, total=len(sequences), desc="get smiles")
+        pbar = tqdm(sequences, total=len(sequences), desc="get smiles", ascii=True)
 
     smiles_seq = []
     for sequence in pbar:

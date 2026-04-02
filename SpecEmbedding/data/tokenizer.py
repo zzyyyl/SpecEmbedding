@@ -57,7 +57,7 @@ class Tokenizer:
         sequences: list[TokenSequence] = []
         pbar = spectra
         if self.show_progress_bar:
-            pbar = tqdm(spectra, total=len(spectra), desc="tokenization")
+            pbar = tqdm(spectra, total=len(spectra), desc="tokenization", ascii=True)
         for s in pbar:
             sequences.append(self.tokenize(s))
 

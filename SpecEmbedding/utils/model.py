@@ -114,7 +114,7 @@ def metric(
     pbar = zip(start_seq, end_seq)
     if show_progress_bar:
         pbar = tqdm(pbar, total=len(start_seq),
-                    desc="calculate hit and recall count")
+                    desc="calculate hit and recall count", ascii=True)
 
     for start, end in pbar:
         score = cosine_similarity(query_embedding[start:end], ref_embedding)
@@ -293,7 +293,7 @@ def most_similar(
     pbar = zip(start_seq, end_seq)
     if show_progress_bar:
         pbar = tqdm(pbar, total=len(start_seq),
-                    desc="processing")
+                    desc="processing", ascii=True)
 
     scores = []
     most_similar_indices = []
