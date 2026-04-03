@@ -40,6 +40,13 @@ class GINEEncoder(nn.Module):
             
         self.bond_proj = nn.Linear(total_bond_feat_dim, emb_dim)
 
+        # 原子量特征，使用简单的标量投影
+        self.mass_projection = nn.Sequential(
+            nn.Linear(1, emb_dim // 4),
+            nn.ReLU(),
+            nn.Linear(emb_dim // 4, emb_dim)
+        )
+
         self.convs = nn.ModuleList()
         self.norms = nn.ModuleList()
         for _ in range(n_layers):
@@ -56,7 +63,7 @@ class GINEEncoder(nn.Module):
 
         self.fc = nn.Linear(emb_dim, emb_dim)
 
-    def forward(self, x, edge_index, edge_attr, batch):
+    def forward(self, x, edge_index, edge_attr, batch, node_mass):
         # 1. 节点与边特征的拼接与投影
         h_node = torch.cat([
             emb(x[:, i]) for i, emb in enumerate(self.atom_embeddings)
@@ -67,6 +74,12 @@ class GINEEncoder(nn.Module):
             emb(edge_attr[:, i]) for i, emb in enumerate(self.bond_embeddings)
         ], dim=-1)
         h_edge = self.bond_proj(h_edge)
+
+        # 节点信息融入原子量特征
+        # node_mass 形状为 [num_all_nodes]，增加通道维 [num_all_nodes, 1]
+        # 缩放 0.01 (100 Da -> 1.0) 保持输入数值在合理范围
+        h_mass = self.mass_projection(node_mass.unsqueeze(-1) * 0.01)
+        h_node += h_mass
 
         # 2. Transformer 消息传递
         for conv, norm in zip(self.convs, self.norms):
@@ -123,7 +136,8 @@ class SpecMolAlignModel(nn.Module):
             mol_graph.x, 
             mol_graph.edge_index, 
             mol_graph.edge_attr, 
-            mol_graph.batch
+            mol_graph.batch,
+            mol_graph.node_mass
         )
 
         # 投影层

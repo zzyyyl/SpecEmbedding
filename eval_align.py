@@ -176,6 +176,7 @@ def main():
                 mol_graph.edge_index,
                 mol_graph.edge_attr,
                 mol_graph.batch,
+                mol_graph.node_mass,
             )
             f_mol = model.mol_proj(f_mol)
             f_mol = F.normalize(f_mol, dim=-1)

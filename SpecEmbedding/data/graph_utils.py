@@ -77,8 +77,14 @@ def smiles_to_graph(smiles: str):
         return None
     
     # 提取节点特征
-    node_features = [get_atom_features(atom) for atom in mol.GetAtoms()]
+    node_features = []
+    node_masses = []
+    for atom in mol.GetAtoms():
+        node_features.append(get_atom_features(atom))
+        node_masses.append(atom.GetMass()) # 获取原子量 (含同位素权重)
+        
     x = torch.tensor(node_features, dtype=torch.long)
+    node_mass = torch.tensor(node_masses, dtype=torch.float)
     
     # 提取边特征 (无向图)
     edge_indices = []
@@ -97,4 +103,4 @@ def smiles_to_graph(smiles: str):
         edge_index = torch.empty((2, 0), dtype=torch.long)
         edge_attr = torch.empty((0, len(BOND_FEATURES)), dtype=torch.long)
         
-    return Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
+    return Data(x=x, edge_index=edge_index, edge_attr=edge_attr, node_mass=node_mass)
