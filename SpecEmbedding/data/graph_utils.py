@@ -9,15 +9,11 @@ ATOM_FEATURES = {
         'Cl', 'F', 'Br', 'I', 'Si', 'B', 'As', 'Se',
         'unknown'
     ],
-    'formal_charge': [-1, 0, 1, 'unknown'],      # 形式电荷
-    'degree': [0, 1, 2, 3, 4, 5, 6, 'unknown'],  # 原子度数
-    'num_hs': [0, 1, 2, 3, 4, 'unknown'],        # 氢原子数
-    'is_aromatic': [0, 1],            # 是否芳香性
-    'is_in_ring': [0, 1],             # 是否在环内
-    'ring_size_3': [0, 1],            # 3元环
-    'ring_size_4': [0, 1],            # 4元环
-    'ring_size_5': [0, 1],            # 5元环
-    'ring_size_6': [0, 1]             # 6元环
+    'degree': [0, 1, 2, 3, 4, 5, 6, 'unknown'],      # 原子度数
+    'num_hs': [0, 1, 2, 3, 4, 'unknown'],            # 氢原子数
+    'is_aromatic': [0, 1],                           # 是否芳香性
+    'ring_info': [0, 3, 4, 5, 6, '7+'],              # 在几元环内
+    'formal_charge': ['<-2', -2, -1, 0, 1, 2, '>2'], # 形式电荷
 }
 
 # 键特征
@@ -39,19 +35,30 @@ def safe_index(feature_list, value):
     except ValueError:
         return len(feature_list) - 1
 
+def get_atom_ring_info(atom):
+    if not atom.IsInRing(): return 0
+    if atom.IsInRingSize(3): return 3
+    if atom.IsInRingSize(4): return 4
+    if atom.IsInRingSize(5): return 5
+    if atom.IsInRingSize(6): return 6
+    return '7+'
+
+def get_atom_formal_charge(atom):
+    charge = atom.GetFormalCharge()
+    if charge < -2: return '<-2'
+    if charge > 2: return '>2'
+    return charge
+
 def get_atom_features(atom):
     """提取单个原子的特征向量"""
+
     return [
         safe_index(ATOM_FEATURES['symbol'], atom.GetSymbol()),
-        safe_index(ATOM_FEATURES['formal_charge'], atom.GetFormalCharge()),
         safe_index(ATOM_FEATURES['degree'], atom.GetDegree()),
         safe_index(ATOM_FEATURES['num_hs'], atom.GetTotalNumHs()),
         int(atom.GetIsAromatic()),
-        int(atom.IsInRing()),
-        int(atom.IsInRingSize(3)),
-        int(atom.IsInRingSize(4)),
-        int(atom.IsInRingSize(5)),
-        int(atom.IsInRingSize(6))
+        safe_index(ATOM_FEATURES['ring_info'], get_atom_ring_info(atom)),
+        safe_index(ATOM_FEATURES['formal_charge'], get_atom_formal_charge(atom)),
     ]
 
 def get_bond_features(bond):
