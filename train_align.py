@@ -1,6 +1,7 @@
 import argparse
 import os
 import logging
+import pickle
 from pathlib import Path
 
 import torch
@@ -59,23 +60,44 @@ def main():
     logging.info(f"Loaded {len(train_raw)} train records and {len(val_raw)} val records.")
 
     # ---------------------------------------------------------
-    # 2. Tokenize 处理
+    # 2. Tokenize & Classify 处理 (带缓存逻辑)
     # ---------------------------------------------------------
-    tokenizer_config = TokenizerConfig(max_len=100, show_progress_bar=True)
-    tokenizer = Tokenizer(**tokenizer_config)
+    cache_dir = Path("data/train_cache")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_file = cache_dir / f"tokenset_{args.dataset_type}.pkl"
     
-    train_spectra = dict_to_spectrum(train_raw)
-    val_spectra = dict_to_spectrum(val_raw)
-    
-    train_sequences = tokenizer.tokenize_sequence(train_spectra)
-    val_sequences = tokenizer.tokenize_sequence(val_spectra)
+    if cache_file.exists():
+        logging.info(f"Loading cached TokenSet from {cache_file}...")
+        with open(cache_file, "rb") as f:
+            cache_data = pickle.load(f)
+            train_data = cache_data['train_data']
+            train_keys = cache_data['train_keys']
+            val_data = cache_data['val_data']
+            val_keys = cache_data['val_keys']
+    else:
+        logging.info("No cache found. Processing dataset (Tokenize & Classify)...")
+        tokenizer_config = TokenizerConfig(max_len=100, show_progress_bar=True)
+        tokenizer = Tokenizer(**tokenizer_config)
+        
+        train_spectra = dict_to_spectrum(train_raw)
+        val_spectra = dict_to_spectrum(val_raw)
+        
+        train_sequences = tokenizer.tokenize_sequence(train_spectra)
+        val_sequences = tokenizer.tokenize_sequence(val_spectra)
 
-    # ---------------------------------------------------------
-    # 3. 按 SMILES 分组，并获取训练/验证的 TokenSet 和 Keys
-    # ---------------------------------------------------------
-    all_smiles = np.unique([s['smiles'] for s in train_raw] + [s['smiles'] for s in val_raw])
-    train_data, train_keys = get_classified_tokenset(all_smiles, train_sequences)
-    val_data, val_keys = get_classified_tokenset(all_smiles, val_sequences)
+        # 按 SMILES 分组
+        all_smiles = np.unique([s['smiles'] for s in train_raw] + [s['smiles'] for s in val_raw])
+        train_data, train_keys = get_classified_tokenset(all_smiles, train_sequences)
+        val_data, val_keys = get_classified_tokenset(all_smiles, val_sequences)
+        
+        logging.info(f"Saving TokenSet cache to {cache_file}...")
+        with open(cache_file, "wb") as f:
+            pickle.dump({
+                'train_data': train_data,
+                'train_keys': train_keys,
+                'val_data': val_data,
+                'val_keys': val_keys
+            }, f)
 
     # ---------------------------------------------------------
     # 4. 检查预训练权重

@@ -227,6 +227,9 @@ def get_classified_tokenset(
     sequences: list[TokenSequence],
     show_progress_bar: bool = True
 ):
+    # 优化：将列表搜索改为字典查找，复杂度从 O(N*M) 降为 O(M)
+    smiles_to_label = {smiles: i for i, smiles in enumerate(unique_smiles)}
+    
     label2sequences: dict[int, list[TokenSequence]] = defaultdict(list)
     labels = []
     pbar = sequences
@@ -234,9 +237,12 @@ def get_classified_tokenset(
         pbar = tqdm(sequences, total=len(sequences),
                     desc="classify the dataset", ascii=True)
     for seq in pbar:
-        label = np.where(unique_smiles == seq["smiles"])[0][0]
-        label2sequences[label].append(seq)
-        labels.append(label)
+        smiles = seq["smiles"]
+        if smiles in smiles_to_label:
+            label = smiles_to_label[smiles]
+            label2sequences[label].append(seq)
+            labels.append(label)
+            
     return dict(label2sequences), np.sort(np.unique(labels))
 
 
