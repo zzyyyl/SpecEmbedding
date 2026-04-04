@@ -2,12 +2,16 @@ import torch
 from rdkit import Chem
 from torch_geometric.data import Data
 
-# 简化后的原子特征 (针对质谱任务优化)
+# 原子特征
 ATOM_FEATURES = {
-    'symbol': ['H', 'C', 'O', 'N', 'P', 'S', 'Cl', 'F', 'Br', 'I', 'Si', 'B', 'As', 'Se'],
-    'formal_charge': [-1, 0, 1],      # 形式电荷
-    'degree': [0, 1, 2, 3, 4, 5, 6],  # 原子度数
-    'num_hs': [0, 1, 2, 3, 4],        # 氢原子数
+    'symbol': [
+        'H', 'C', 'O', 'N', 'P', 'S',
+        'Cl', 'F', 'Br', 'I', 'Si', 'B', 'As', 'Se',
+        'unknown'
+    ],
+    'formal_charge': [-1, 0, 1, 'unknown'],      # 形式电荷
+    'degree': [0, 1, 2, 3, 4, 5, 6, 'unknown'],  # 原子度数
+    'num_hs': [0, 1, 2, 3, 4, 'unknown'],        # 氢原子数
     'is_aromatic': [0, 1],            # 是否芳香性
     'is_in_ring': [0, 1],             # 是否在环内
     'ring_size_3': [0, 1],            # 3元环
@@ -16,24 +20,24 @@ ATOM_FEATURES = {
     'ring_size_6': [0, 1]             # 6元环
 }
 
-# 简化后的键特征
+# 键特征
 BOND_FEATURES = {
     'bond_type': [
         Chem.rdchem.BondType.SINGLE,
         Chem.rdchem.BondType.DOUBLE,
         Chem.rdchem.BondType.TRIPLE,
-        Chem.rdchem.BondType.AROMATIC
+        Chem.rdchem.BondType.AROMATIC,
+        'unknown'
     ],
     'is_conjugated': [0, 1], # 是否共轭
     'is_in_ring': [0, 1]     # 是否在环内
 }
 
 def safe_index(feature_list, value):
-    """安全获取索引，若不在列表中则返回列表长度（作为'其他'类别）"""
     try:
         return feature_list.index(value)
     except ValueError:
-        return len(feature_list)
+        return len(feature_list) - 1
 
 def get_atom_features(atom):
     """提取单个原子的特征向量"""
