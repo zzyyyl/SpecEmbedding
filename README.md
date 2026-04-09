@@ -24,7 +24,25 @@ PyTorch: 2.6.0 with CUDA 12.4
 
 > ⚠️ Note for Windows Users: When running on Windows, you may encounter numerical errors during cosine similarity computation. This is caused by @njit decorators from the numba library. You can fix it by commenting out all @njit decorators in the code.
 
-### 2. Demo
+### 2. Molecular Graph Features
+
+For spectrum-molecule alignment tasks, SpecEmbedding uses a Graph Isomorphism Network (GINE) to encode molecular structures. To capture the chemical nuances critical for Mass Spectrometry (MS) fragmentation prediction, we employ a streamlined set of atom and bond features:
+
+#### Atom Features (Node)
+- **Atomic Number**: Identity of the atom (B, C, N, O, F, Si, P, S, Cl, Br, I, or others).
+- **Formal Charge**: Electrical state, which dictates ionization and fragmentation.
+- **Degree**: Number of neighboring atoms, reflecting connectivity.
+- **Total Hydrogens**: Number of implicit and explicit hydrogens.
+- **Aromaticity**: Indicates if an atom is part of an aromatic system.
+- **Ring Membership**: Whether the atom is part of a cyclic structure.
+- **Ring Sizes (3-6)**: Specific flags for 3, 4, 5, and 6-membered rings (critical for fragmentation energy).
+
+#### Bond Features (Edge)
+- **Bond Type**: Single, Double, Triple, or Aromatic.
+- **Conjugation**: Whether the bond is part of a conjugated system.
+- **In Ring**: Whether the bond is part of a ring.
+
+### 3. Demo
 
 #### 2.1 Compute Cosine Similarity Matrix Between Query and Reference Spectra
 
