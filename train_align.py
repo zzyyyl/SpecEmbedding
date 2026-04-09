@@ -1,107 +1,148 @@
 import argparse
 import os
 import logging
-import pickle
 from pathlib import Path
 
 import torch
-import numpy as np
+import torch.optim as optim
+from torch.utils.data import DataLoader
 
-# 导入原来项目里的功能模块
-from data_provider import MSPProvider, MassSpecGymProvider
-from train import dict_to_spectrum, setup_logging
-from SpecEmbedding.data.tokenizer import Tokenizer
-from SpecEmbedding.utils.clean import get_classified_tokenset
-from SpecEmbedding.type import TokenizerConfig
+from SpecEmbedding.trainer.trainer_align import TrainerAlign
+from SpecEmbedding.trainer.trainer import set_seed
+from SpecEmbedding.models_align import SpecMolAlignModel, GINEEncoder
+from SpecEmbedding.utils.model import SiameseModel
+from SpecEmbedding.data.datasets_align import AlignGraphDataset, align_collate_fn
 
-# 导入咱们新的流水线模块
-from SpecEmbedding.run_align_pipeline import run_two_stage_training
+from train import (
+    setup_logging,
+    startup_logging,
+    add_base_argument,
+    get_classified_data
+)
+
+def train_align(
+    train_data: dict,
+    train_keys: list,
+    val_data: dict,
+    val_keys: list,
+    spec_encoder: SiameseModel,
+    batch_size: int = 256,
+    epochs_stage1: int = 20,
+    epochs_stage2: int = 30,
+    spec_dim: int = 512, # 预训练模型的输出维度
+    mol_emb_dim: int = 128,
+    mol_n_layers: int = 4,
+    final_dim: int = 512,
+    dropout_rate: float = 0.2,
+    tau: float = 0.07,
+    lr: float = 5e-5,
+    device_name: str = "cuda" if torch.cuda.is_available() else "cpu",
+    save_dir: str = "./checkpoints"
+):
+    device = torch.device(device_name)
+
+    logging.info("1. 初始化数据集与 DataLoader...")
+    # 使用自定义的 AlignGraphDataset (继承自 TrainDataset)
+    train_dataset = AlignGraphDataset(data=train_data, keys=train_keys, n_views=1, is_augment=True)
+    val_dataset = AlignGraphDataset(data=val_data, keys=val_keys, n_views=1, is_augment=False)
+
+    # 必须使用 align_collate_fn 来组装 PyG 的 Graph Batch
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=align_collate_fn, num_workers=4)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn=align_collate_fn, num_workers=4)
+
+    logging.info("2. 初始化模型...")
+
+    # 实例化新的分子图编码器
+    mol_encoder = GINEEncoder(emb_dim=mol_emb_dim, n_layers=mol_n_layers)
+
+    # 实例化双塔对齐模型
+    model = SpecMolAlignModel(
+        spec_encoder,
+        mol_encoder,
+        spec_dim=spec_dim,
+        final_dim=final_dim,
+        dropout_rate=dropout_rate,
+        tau=tau
+    )
+    trainer = TrainerAlign(
+        model,
+        train_loader,
+        val_loader,
+        device,
+        save_dir=save_dir
+    )
+
+    # ==========================================
+    # 阶段一：冻结质谱特征，仅训练分子编码器与投影头
+    # ==========================================
+    logging.info("\n" + "="*50)
+    logging.info("Stage 1: Frozen MS Encoder, Train Mol Encoder & Projection Heads")
+    logging.info("="*50)
+
+    for param in model.spec_encoder.parameters():
+        param.requires_grad = False
+
+    stage1_params = [
+        {'params': model.mol_encoder.parameters(), 'lr': lr * 10}, # 1e-3
+        {'params': model.spec_proj.parameters(), 'lr': lr * 10},
+        {'params': model.mol_proj.parameters(), 'lr': lr * 10},
+        {'params': [model.logit_scale], 'lr': lr * 10}
+    ]
+
+    optimizer1 = optim.AdamW(stage1_params, weight_decay=1e-4)
+    trainer.fit(epochs=epochs_stage1, optimizer=optimizer1, stage_name="stage1", patience=5)
+
+    # ==========================================
+    # 阶段二：解冻所有参数，端到端微调
+    # ==========================================
+    logging.info("\n" + "="*50)
+    logging.info("Stage 2: Unfreeze All, End-to-End Fine-tuning")
+    logging.info("="*50)
+
+    for param in model.spec_encoder.parameters():
+        param.requires_grad = True
+
+    stage2_params = [
+        {'params': model.spec_encoder.parameters(), 'lr': lr / 10}, # 预训练模型用极小学习率
+        {'params': model.mol_encoder.parameters(), 'lr': lr},
+        {'params': model.spec_proj.parameters(), 'lr': lr},
+        {'params': model.mol_proj.parameters(), 'lr': lr},
+        {'params': [model.logit_scale], 'lr': lr}
+    ]
+
+    optimizer2 = optim.AdamW(stage2_params, weight_decay=1e-4)
+    scheduler2 = optim.lr_scheduler.CosineAnnealingLR(optimizer2, T_max=epochs_stage2)
+
+    trainer.fit(epochs=epochs_stage2, optimizer=optimizer2, scheduler=scheduler2, stage_name="stage2", patience=5)
+
+    logging.info("\nTwo-stage training completed successfully.")
+    return model
 
 def main():
     parser = argparse.ArgumentParser(description="Two-Stage Cross-Modal Alignment Training for SpecEmbedding")
-    parser.add_argument("--dataset_type", type=str, choices=["local", "massspecgym"], required=True, help="Dataset type")
-    parser.add_argument("--data_path", type=str, help="Path to .msp file (required for local dataset)")
-    parser.add_argument("--save_dir", type=str, default="./checkpoints_align", help="Directory to save model and logs")
+    add_base_argument(parser)
     parser.add_argument("--batch_size", type=int, default=128, help="Batch size for alignment training")
     parser.add_argument("--epochs_stage1", type=int, default=20, help="Number of epochs for Stage 1 (Frozen MS Encoder)")
     parser.add_argument("--epochs_stage2", type=int, default=30, help="Number of epochs for Stage 2 (End-to-End Fine-tuning)")
     parser.add_argument("--lr", type=float, default=1e-4, help="Base learning rate")
-    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu", help="Device to use")
     parser.add_argument("--pretrained_spec", type=str, help="Path to your pre-trained SpecEmbedding model weights")
-    
+
     args = parser.parse_args()
-    
-    # 初始化日志记录
+
     save_path = Path(args.save_dir)
     save_path.mkdir(parents=True, exist_ok=True)
     setup_logging(save_path / "align_train.log")
-    
-    device = args.device
-    logging.info(f"Using device: {device}")
+    startup_logging(args)
+    set_seed(args.seed)
+    device = torch.device(args.device)
 
-    # ---------------------------------------------------------
-    # 1. 加载数据 (与原始 train.py 完全一致)
-    # ---------------------------------------------------------
-    if args.dataset_type == "local":
-        if not args.data_path:
-            raise ValueError("--data_path is required for local dataset")
-        provider = MSPProvider(args.data_path)
-        train_raw = provider.load_data(mode='train')
-        val_raw = provider.load_data(mode='val')
-    else:
-        provider = MassSpecGymProvider()
-        train_raw = provider.load_data(mode='train')
-        val_raw = provider.load_data(mode='val')
+    classified_data = get_classified_data(dataset_type=args.dataset_type, data_path=args.data_path)
+    train_data = classified_data['train_data']
+    train_keys = classified_data['train_keys']
+    val_data = classified_data['val_data']
+    val_keys = classified_data['val_keys']
 
-    if not train_raw:
-        logging.error("No training data loaded. Check your data paths or internet connection.")
-        return
-
-    logging.info(f"Loaded {len(train_raw)} train records and {len(val_raw)} val records.")
-
-    # ---------------------------------------------------------
-    # 2. Tokenize & Classify 处理 (带缓存逻辑)
-    # ---------------------------------------------------------
-    cache_dir = Path("data/train_cache")
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_file = cache_dir / f"tokenset_{args.dataset_type}.pkl"
-    
-    if cache_file.exists():
-        logging.info(f"Loading cached TokenSet from {cache_file}...")
-        with open(cache_file, "rb") as f:
-            cache_data = pickle.load(f)
-            train_data = cache_data['train_data']
-            train_keys = cache_data['train_keys']
-            val_data = cache_data['val_data']
-            val_keys = cache_data['val_keys']
-    else:
-        logging.info("No cache found. Processing dataset (Tokenize & Classify)...")
-        tokenizer_config = TokenizerConfig(max_len=100, show_progress_bar=True)
-        tokenizer = Tokenizer(**tokenizer_config)
-        
-        train_spectra = dict_to_spectrum(train_raw)
-        val_spectra = dict_to_spectrum(val_raw)
-        
-        train_sequences = tokenizer.tokenize_sequence(train_spectra)
-        val_sequences = tokenizer.tokenize_sequence(val_spectra)
-
-        # 按 SMILES 分组
-        all_smiles = np.unique([s['smiles'] for s in train_raw] + [s['smiles'] for s in val_raw])
-        train_data, train_keys = get_classified_tokenset(all_smiles, train_sequences)
-        val_data, val_keys = get_classified_tokenset(all_smiles, val_sequences)
-        
-        logging.info(f"Saving TokenSet cache to {cache_file}...")
-        with open(cache_file, "wb") as f:
-            pickle.dump({
-                'train_data': train_data,
-                'train_keys': train_keys,
-                'val_data': val_data,
-                'val_keys': val_keys
-            }, f)
-
-    # ---------------------------------------------------------
-    # 4. 检查预训练权重
-    # ---------------------------------------------------------
+    # 检查预训练权重
     pretrained_spec_path = args.pretrained_spec
     if pretrained_spec_path and not os.path.exists(pretrained_spec_path):
         logging.warning(f"Pretrained SpecEmbedding not found at {pretrained_spec_path}.")
@@ -110,27 +151,46 @@ def main():
     elif not pretrained_spec_path:
         logging.warning("No --pretrained_spec provided. MS Encoder will train from scratch.")
 
-    # ---------------------------------------------------------
-    # 5. 启动两阶段对齐训练流水线
-    # ---------------------------------------------------------
+    # 实例化预训练的质谱编码器，参数需与之前的 train.py 参数完全一致
+    spec_dim = 512
+    spec_encoder = SiameseModel(
+        embedding_dim=spec_dim,
+        n_head=16,
+        n_layer=4,
+        dim_feedward=512,
+        dim_target=512,
+        feedward_activation="selu"
+    )
+
+    if pretrained_spec_path:
+        logging.info(f"Loading pretrained SpecEmbedding from {pretrained_spec_path}")
+        spec_encoder.load_state_dict(torch.load(pretrained_spec_path, map_location=device))
+
+    # 启动两阶段对齐训练流水线
     logging.info("\nStarting the two-stage cross-modal alignment training pipeline...")
-    
-    final_model = run_two_stage_training(
+
+    final_model = train_align(
         train_data=train_data,
         train_keys=train_keys,
         val_data=val_data,
         val_keys=val_keys,
-        pretrained_spec_path=pretrained_spec_path,
+        spec_encoder=spec_encoder,
         batch_size=args.batch_size,
         epochs_stage1=args.epochs_stage1,
         epochs_stage2=args.epochs_stage2,
+        spec_dim=spec_dim,
+        mol_emb_dim=128,
+        mol_n_layers=4,
+        final_dim=512,
+        dropout_rate=0.2,
+        tau=0.07,
         lr=args.lr,
         device_name=device,
         save_dir=args.save_dir
     )
-    
+
     logging.info("\nTraining complete! The final aligned model is returned and ready for evaluation/inference.")
-    
+
     # 最终保存
     final_model_path = os.path.join(args.save_dir, "final_aligned_model.pth")
     torch.save(final_model.state_dict(), final_model_path)

@@ -62,29 +62,35 @@ class GINEEncoder(nn.Module):
 
 class SpecMolAlignModel(nn.Module):
     """质谱-分子对齐模型：双塔结构 (Spec Siamese + Mol GINE)"""
-    def __init__(self, spec_encoder: SiameseModel, mol_encoder: GINEEncoder, projection_dim: int = 512):
+    def __init__(
+        self,
+        spec_encoder: SiameseModel,
+        mol_encoder: GINEEncoder,
+        spec_dim: int,
+        hidden_dim: int = 512,
+        final_dim: int = 512,
+        dropout_rate = 0.2,
+        tau = 0.07
+    ):
         super().__init__()
         self.spec_encoder = spec_encoder
         self.mol_encoder = mol_encoder
 
-        # 获取 SiameseModel 最后的特征维度
-        spec_dim = spec_encoder._decoder._layers[-1].out_features if hasattr(spec_encoder._decoder._layers[-1], 'out_features') else 512
-
         self.spec_proj = nn.Sequential(
-            nn.Linear(spec_dim, projection_dim),
+            nn.Linear(spec_dim, hidden_dim),
             nn.ReLU(),
-            nn.Dropout(p=0.2),
-            nn.Linear(projection_dim, projection_dim)
+            nn.Dropout(p=dropout_rate),
+            nn.Linear(hidden_dim, final_dim)
         )
 
         self.mol_proj = nn.Sequential(
-            nn.Linear(mol_encoder.emb_dim, projection_dim),
+            nn.Linear(mol_encoder.emb_dim, hidden_dim),
             nn.ReLU(),
-            nn.Dropout(p=0.2),
-            nn.Linear(projection_dim, projection_dim)
+            nn.Dropout(p=dropout_rate),
+            nn.Linear(hidden_dim, final_dim)
         )
 
-        self.logit_scale = nn.Parameter(torch.ones([]) * torch.log(torch.tensor(1 / 0.07)))
+        self.logit_scale = nn.Parameter(torch.ones([]) * torch.log(torch.tensor(1 / tau)))
 
     def forward(self, spec_mz, spec_intensity, spec_mask, mol_graph):
         # 质谱特征提取

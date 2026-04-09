@@ -12,24 +12,18 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader, Dataset
 from torch_geometric.data import Batch
 
-# Reuse existing imports and utilities
-from data_provider import MassSpecGymProvider
-from train_align import dict_to_spectrum
 from SpecEmbedding.data.tokenizer import Tokenizer
 from SpecEmbedding.type import TokenizerConfig
 from SpecEmbedding.models import SiameseModel
 from SpecEmbedding.models_align import SpecMolAlignModel, GINEEncoder
 from SpecEmbedding.data.graph_utils import smiles_to_graph
 
-def setup_logging(log_file):
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_file, encoding='utf-8'),
-            logging.StreamHandler()
-        ]
-    )
+from data_provider import MassSpecGymProvider
+from train import (
+    setup_logging,
+    startup_logging,
+    dict_to_spectrum
+)
 
 # ----------------- Spectra Dataset -----------------
 class EvalSpecDataset(Dataset):
@@ -83,15 +77,9 @@ def main():
     args = parser.parse_args()
 
     checkpoint_path = Path(args.checkpoint)
-    setup_logging(checkpoint_path.parent / "eval_align_efficient.log")
-    
-    logging.info("="*50)
-    logging.info("Starting EFFICIENT Cross-Modal Evaluation")
-    logging.info(f"Arguments: {args}")
-    logging.info("="*50)
-    
+    setup_logging(checkpoint_path.parent / "eval_align.log")
+    startup_logging(args, "Start Cross-Modal Evaluation")
     device = torch.device(args.device)
-    logging.info(f"Using device: {device}")
 
     # 1. Initialize Dual-Encoder Model
     logging.info("Initializing SpecMolAlignModel...")
@@ -103,8 +91,15 @@ def main():
         dim_target=512, 
         feedward_activation="selu"
     )
-    mol_encoder = GINEEncoder(emb_dim=256, n_layers=4)
-    model = SpecMolAlignModel(spec_encoder, mol_encoder, projection_dim=512)
+    mol_encoder = GINEEncoder(emb_dim=128, n_layers=4)
+    model = SpecMolAlignModel(
+        spec_encoder,
+        mol_encoder,
+        spec_dim=512,
+        final_dim=512,
+        dropout_rate=0.2,
+        tau=0.07
+    )
     state_dict = torch.load(args.checkpoint, map_location=device, weights_only=True)
     model.load_state_dict(state_dict, strict=True)
     model = model.to(device)

@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 
 import torch
+import pickle
 import numpy as np
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
@@ -39,6 +40,27 @@ def setup_logging(log_file):
         ]
     )
 
+def startup_logging(args, message: str = "Start training"):
+    logging.info("=" * 50)
+    logging.info(message)
+    logging.info("=" * 50)
+    logging.info("Parsed Arguments:")
+    for k, v in vars(args).items():
+        logging.info(f"  {k}: {v}")
+
+    device = torch.device(args.device)
+    if device.type == 'cuda':
+        logging.info(f"Using device: {device} ({torch.cuda.get_device_name(device)})")
+    else:
+        logging.info(f"Using device: {device}")
+
+def add_base_argument(parser):
+    parser.add_argument("--dataset_type", type=str, choices=["local", "massspecgym"], required=True, help="Dataset type")
+    parser.add_argument("--data_path", type=str, help="Path to .msp file (required for local dataset)")
+    parser.add_argument("--save_dir", type=str, default="./checkpoints", help="Directory to save model and logs")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu", help="Device to use")
+
 def dict_to_spectrum(data_list):
     """Convert dictionary records from data_provider to matchms.Spectrum objects."""
     spectra = []
@@ -52,43 +74,11 @@ def dict_to_spectrum(data_list):
         spectra.append(spec)
     return spectra
 
-def main():
-    parser = argparse.ArgumentParser(description="Train SpecEmbedding model on small molecule data.")
-    parser.add_argument("--dataset_type", type=str, choices=["local", "massspecgym"], required=True, help="Dataset type")
-    parser.add_argument("--data_path", type=str, help="Path to .msp file (required for local dataset)")
-    parser.add_argument("--save_dir", type=str, default="./checkpoints", help="Directory to save model and logs")
-    parser.add_argument("--batch_size", type=int, default=512, help="Batch size")
-    parser.add_argument("--epochs", type=int, default=50, help="Number of epochs")
-    parser.add_argument("--lr", type=float, default=7.5e-5, help="Learning rate")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu", help="Device to use")
-    parser.add_argument("--resume", type=str, help="Path to checkpoint to resume training from")
-    
-    args = parser.parse_args()
-    
-    save_path = Path(args.save_dir)
-    save_path.mkdir(parents=True, exist_ok=True)
-    setup_logging(save_path / "train.log")
-    
-    logging.info("=" * 50)
-    logging.info("Starting SpecEmbedding Pre-training")
-    logging.info("=" * 50)
-    logging.info("Parsed Arguments:")
-    for k, v in vars(args).items():
-        logging.info(f"  {k}: {v}")
-    
-    set_seed(args.seed)
-    device = torch.device(args.device)
-    if device.type == 'cuda':
-        logging.info(f"Using device: {device} ({torch.cuda.get_device_name(device)})")
-    else:
-        logging.info(f"Using device: {device}")
-
-    # 1. Load data
-    if args.dataset_type == "local":
-        if not args.data_path:
+def load_data(dataset_type, data_path):
+    if dataset_type == "local":
+        if not data_path:
             raise ValueError("--data_path is required for local dataset")
-        provider = MSPProvider(args.data_path)
+        provider = MSPProvider(data_path)
         train_raw = provider.load_data(mode='train')
         val_raw = provider.load_data(mode='val')
     else:
@@ -101,26 +91,77 @@ def main():
         return
 
     logging.info(f"Loaded {len(train_raw)} train records and {len(val_raw)} val records.")
+    return train_raw, val_raw
 
-    # 2. Convert to Spectrum objects and Tokenize
-    tokenizer_config = TokenizerConfig(max_len=100, show_progress_bar=True)
-    tokenizer = Tokenizer(**tokenizer_config)
-    
-    logging.info("Tokenizing spectra sequences...")
-    train_spectra = dict_to_spectrum(train_raw)
-    val_spectra = dict_to_spectrum(val_raw)
-    
-    train_sequences = tokenizer.tokenize_sequence(train_spectra)
-    val_sequences = tokenizer.tokenize_sequence(val_spectra)
-    logging.info(f"Tokenized {len(train_sequences)} train sequences and {len(val_sequences)} val sequences.")
+def get_classified_data(dataset_type, data_path, cache_path="data/train_cache"):
+    # Tokenize & Classify 处理 (带缓存逻辑)
+    cache_dir = Path(cache_path)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_file = cache_dir / f"tokenset_{dataset_type}.pkl"
 
-    # 3. Prepare Dataset
-    # Get all unique SMILES to establish consistent labeling
-    all_smiles = np.unique([s['smiles'] for s in train_raw] + [s['smiles'] for s in val_raw])
-    logging.info(f"Extracted {len(all_smiles)} unique SMILES across train and val sets.")
+    if cache_file.exists():
+        logging.info(f"Loading cached TokenSet from {cache_file}...")
+        with open(cache_file, "rb") as f:
+            classified_data = pickle.load(f)
+    else:
+        logging.info("No cache found. Processing dataset (Tokenize & Classify)...")
+        # 1. Load data
+        train_raw, val_raw = load_data(dataset_type=dataset_type, data_path=data_path)
+
+        # 2. Convert to Spectrum objects and Tokenize
+        tokenizer_config = TokenizerConfig(max_len=100, show_progress_bar=True)
+        tokenizer = Tokenizer(**tokenizer_config)
+
+        logging.info("Tokenizing spectra sequences...")
+        train_spectra = dict_to_spectrum(train_raw)
+        val_spectra = dict_to_spectrum(val_raw)
+
+        train_sequences = tokenizer.tokenize_sequence(train_spectra)
+        val_sequences = tokenizer.tokenize_sequence(val_spectra)
+        logging.info(f"Tokenized {len(train_sequences)} train sequences and {len(val_sequences)} val sequences.")
+
+        # 3. Prepare Dataset
+        # Get all unique SMILES to establish consistent labeling
+        all_smiles = np.unique([s['smiles'] for s in train_raw] + [s['smiles'] for s in val_raw])
+        logging.info(f"Extracted {len(all_smiles)} unique SMILES across train and val sets.")
+        
+        train_data, train_keys = get_classified_tokenset(all_smiles, train_sequences)
+        val_data, val_keys = get_classified_tokenset(all_smiles, val_sequences)
+
+        classified_data = {
+            'train_data': train_data,
+            'train_keys': train_keys,
+            'val_data': val_data,
+            'val_keys': val_keys
+        }
+        logging.info(f"Saving TokenSet cache to {cache_file}...")
+        with open(cache_file, "wb") as f:
+            pickle.dump(classified_data, f)
+
+    return classified_data
+
+def main():
+    parser = argparse.ArgumentParser(description="Train SpecEmbedding model on small molecule data.")
+    add_base_argument(parser)
+    parser.add_argument("--batch_size", type=int, default=512, help="Batch size")
+    parser.add_argument("--epochs", type=int, default=50, help="Number of epochs")
+    parser.add_argument("--lr", type=float, default=7.5e-5, help="Learning rate")
+    parser.add_argument("--resume", type=str, help="Path to checkpoint to resume training from")
     
-    train_data, train_keys = get_classified_tokenset(all_smiles, train_sequences)
-    val_data, val_keys = get_classified_tokenset(all_smiles, val_sequences)
+    args = parser.parse_args()
+    
+    save_path = Path(args.save_dir)
+    save_path.mkdir(parents=True, exist_ok=True)
+    setup_logging(save_path / "train.log")
+    startup_logging(args, "Start SpecEmbedding Pre-training")
+    set_seed(args.seed)
+    device = torch.device(args.device)
+
+    classified_data = get_classified_data(dataset_type=args.dataset_type, data_path=args.data_path)
+    train_data = classified_data['train_data']
+    train_keys = classified_data['train_keys']
+    val_data = classified_data['val_data']
+    val_keys = classified_data['val_keys']
 
     augment_config = AugmentationConfig(
         prob=0.5, 

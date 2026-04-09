@@ -1,15 +1,12 @@
 import os
 import logging
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from copy import deepcopy
 
-from SpecEmbedding.models_align import SpecMolAlignModel, GINEEncoder
-from SpecEmbedding.models import SiameseModel
+from SpecEmbedding.models_align import SpecMolAlignModel
 from SpecEmbedding.loss_align import ContrastiveAlignmentLoss
-from SpecEmbedding.data.datasets_align import AlignGraphDataset, align_collate_fn
 
 class TrainerAlign:
     """质谱-分子图对齐训练器"""
