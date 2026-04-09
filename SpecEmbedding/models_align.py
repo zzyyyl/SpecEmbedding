@@ -12,16 +12,28 @@ class GINEEncoder(nn.Module):
         super().__init__()
         self.emb_dim = emb_dim
 
-        # 节点与边特征嵌入层 (根据 graph_utils.py 动态初始化)
-        self.atom_embedding = nn.ModuleList([
-            nn.Embedding(len(values), emb_dim) 
-            for values in ATOM_FEATURES.values()
-        ])
+        # 1. 节点特征嵌入：根据类别数分配较小维度，拼接后投影 (避免维度冗余)
+        self.atom_embeddings = nn.ModuleList()
+        atom_emb_dim = 0
+        for values in ATOM_FEATURES.values():
+            n_cat = len(values)
+            # 布尔型/极小类给 8 维，中等类 16 维，大类 32 维
+            dim = 8 if n_cat <= 2 else (16 if n_cat <= 10 else 32)
+            self.atom_embeddings.append(nn.Embedding(n_cat, dim))
+            atom_emb_dim += dim
+        
+        self.atom_proj = nn.Linear(atom_emb_dim, emb_dim)
 
-        self.bond_embedding = nn.ModuleList([
-            nn.Embedding(len(values), emb_dim) 
-            for values in BOND_FEATURES.values()
-        ])
+        # 2. 边特征嵌入
+        self.bond_embeddings = nn.ModuleList()
+        total_bond_feat_dim = 0
+        for values in BOND_FEATURES.values():
+            n_cat = len(values)
+            dim = 8 if n_cat <= 2 else (16 if n_cat <= 10 else 32)
+            self.bond_embeddings.append(nn.Embedding(n_cat, dim))
+            total_bond_feat_dim += dim
+            
+        self.bond_proj = nn.Linear(total_bond_feat_dim, emb_dim)
 
         self.convs = nn.ModuleList()
         self.norms = nn.ModuleList()
@@ -38,14 +50,16 @@ class GINEEncoder(nn.Module):
         self.fc = nn.Linear(emb_dim, emb_dim)
 
     def forward(self, x, edge_index, edge_attr, batch):
-        # 1. 节点与边特征的 Embedding 汇总
-        h_node = 0
-        for i, embedding in enumerate(self.atom_embedding):
-            h_node += embedding(x[:, i])
+        # 1. 节点与边特征的拼接与投影
+        h_node = torch.cat([
+            emb(x[:, i]) for i, emb in enumerate(self.atom_embeddings)
+        ], dim=-1)
+        h_node = self.atom_proj(h_node)
 
-        h_edge = 0
-        for i, embedding in enumerate(self.bond_embedding):
-            h_edge += embedding(edge_attr[:, i])
+        h_edge = torch.cat([
+            emb(edge_attr[:, i]) for i, emb in enumerate(self.bond_embeddings)
+        ], dim=-1)
+        h_edge = self.bond_proj(h_edge)
 
         # 2. GINE 消息传递
         for conv, norm in zip(self.convs, self.norms):
