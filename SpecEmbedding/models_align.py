@@ -104,7 +104,7 @@ class SpecMolAlignModel(nn.Module):
             nn.Linear(hidden_dim, final_dim)
         )
 
-        self.logit_scale = nn.Parameter(torch.ones([]) * torch.log(torch.tensor(1 / tau)))
+        self.tau = tau
 
     def forward(self, spec_mz, spec_intensity, spec_mask, mol_graph):
         # 质谱特征提取
@@ -126,7 +126,4 @@ class SpecMolAlignModel(nn.Module):
         f_spec = F.normalize(f_spec, dim=-1)
         f_mol = F.normalize(f_mol, dim=-1)
 
-        # 限制温度系数上限，防止过于 confident 导致过拟合
-        scale = torch.clamp(self.logit_scale.exp(), max=100.0)
-
-        return f_spec, f_mol, scale
+        return f_spec, f_mol, 1 / self.tau
