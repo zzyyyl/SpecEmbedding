@@ -91,11 +91,12 @@ def main():
         dim_target=512, 
         feedward_activation="selu"
     )
-    mol_encoder = GINEEncoder(emb_dim=128, n_layers=4)
+    mol_encoder = GINEEncoder(emb_dim=128, n_layers=4, dropout_rate=0.2)
     model = SpecMolAlignModel(
         spec_encoder,
         mol_encoder,
         spec_dim=512,
+        hidden_dim=512,
         final_dim=512,
         dropout_rate=0.2,
         tau=0.07

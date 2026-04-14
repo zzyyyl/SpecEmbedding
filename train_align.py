@@ -32,7 +32,7 @@ def train_align(
     spec_dim: int = 512, # 预训练模型的输出维度
     mol_emb_dim: int = 128,
     mol_n_layers: int = 4,
-    final_dim: int = 512,
+    align_final_dim: int = 512,
     dropout_rate: float = 0.2,
     tau: float = 0.07,
     lr: float = 5e-5,
@@ -53,14 +53,19 @@ def train_align(
     logging.info("2. 初始化模型...")
 
     # 实例化新的分子图编码器
-    mol_encoder = GINEEncoder(emb_dim=mol_emb_dim, n_layers=mol_n_layers)
+    mol_encoder = GINEEncoder(
+        emb_dim=mol_emb_dim,
+        n_layers=mol_n_layers,
+        dropout_rate=dropout_rate,
+    )
 
     # 实例化双塔对齐模型
     model = SpecMolAlignModel(
-        spec_encoder,
-        mol_encoder,
+        spec_encoder=spec_encoder,
+        mol_encoder=mol_encoder,
         spec_dim=spec_dim,
-        final_dim=final_dim,
+        hidden_dim=align_final_dim,
+        final_dim=align_final_dim,
         dropout_rate=dropout_rate,
         tau=tau
     )
@@ -181,7 +186,7 @@ def main():
         spec_dim=spec_dim,
         mol_emb_dim=128,
         mol_n_layers=4,
-        final_dim=512,
+        align_final_dim=512,
         dropout_rate=0.2,
         tau=0.07,
         lr=args.lr,

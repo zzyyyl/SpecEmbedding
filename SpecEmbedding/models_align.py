@@ -8,17 +8,22 @@ from SpecEmbedding.data.graph_utils import ATOM_FEATURES, BOND_FEATURES
 
 class GINEEncoder(nn.Module):
     """基于 GINE (Graph Isomorphism Network with Edge features) 的分子编码器"""
-    def __init__(self, emb_dim: int = 256, n_layers: int = 4):
+    def __init__(
+        self,
+        emb_dim: int,
+        n_layers: int,
+        dropout_rate: float
+    ):
         super().__init__()
         self.emb_dim = emb_dim
+        self.dropout_rate = dropout_rate
 
         # 1. 节点特征嵌入：根据类别数分配较小维度，拼接后投影 (避免维度冗余)
         self.atom_embeddings = nn.ModuleList()
         atom_emb_dim = 0
         for values in ATOM_FEATURES.values():
             n_cat = len(values)
-            # 布尔型/极小类给 8 维，中等类 16 维，大类 32 维
-            dim = 8 if n_cat <= 2 else (16 if n_cat <= 10 else 32)
+            dim = 4 if n_cat <= 2 else 20
             self.atom_embeddings.append(nn.Embedding(n_cat, dim))
             atom_emb_dim += dim
         
@@ -29,7 +34,7 @@ class GINEEncoder(nn.Module):
         total_bond_feat_dim = 0
         for values in BOND_FEATURES.values():
             n_cat = len(values)
-            dim = 8 if n_cat <= 2 else (16 if n_cat <= 10 else 32)
+            dim = 4 if n_cat <= 2 else 20
             self.bond_embeddings.append(nn.Embedding(n_cat, dim))
             total_bond_feat_dim += dim
             
@@ -68,7 +73,7 @@ class GINEEncoder(nn.Module):
             h_node = norm(h_node)
             h_node = F.relu(h_node)
             h_node = h_node + h_res # 残差相加
-            h_node = F.dropout(h_node, p=0.1, training=self.training)
+            h_node = F.dropout(h_node, p=self.dropout_rate, training=self.training)
 
         # 3. 全局池化 (Graph-level representation)
         graph_repr = global_add_pool(h_node, batch)
@@ -81,10 +86,10 @@ class SpecMolAlignModel(nn.Module):
         spec_encoder: SiameseModel,
         mol_encoder: GINEEncoder,
         spec_dim: int,
-        hidden_dim: int = 512,
-        final_dim: int = 512,
-        dropout_rate = 0.2,
-        tau = 0.07
+        hidden_dim: int,
+        final_dim: int,
+        dropout_rate: float,
+        tau: float
     ):
         super().__init__()
         self.spec_encoder = spec_encoder
