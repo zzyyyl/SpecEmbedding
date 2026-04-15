@@ -71,7 +71,8 @@ def get_bond_features(bond):
 
 def smiles_to_graph(smiles: str):
     """将 SMILES 转换为 PyG 图数据对象"""
-    mol = Chem.MolFromSmiles(smiles)
+    mol = Chem.MolFromSmiles(smiles, sanitize=False)
+    mol.UpdatePropertyCache(strict=False)
     if mol is None:
         return None
     
