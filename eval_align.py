@@ -5,12 +5,15 @@ import pickle
 from pathlib import Path
 from collections import defaultdict
 
+import pulp
 import numpy as np
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 from torch.utils.data import DataLoader, Dataset
 from torch_geometric.data import Batch
+from myopic_mces.myopic_mces import MCES
+from concurrent.futures import ProcessPoolExecutor
 
 from SpecEmbedding.data.tokenizer import Tokenizer
 from SpecEmbedding.type import TokenizerConfig
@@ -24,6 +27,25 @@ from train import (
     startup_logging,
     dict_to_spectrum
 )
+
+def mces_worker(smiles_pair):
+    s1, s2 = smiles_pair
+    solver_options=dict(msg=0)
+    try:
+        # Re-initialize for each worker to be safe with pulp solvers
+        # solver = pulp.listSolvers(onlyAvailable=True)[0]
+        solver = "MOSEK"
+        retval = MCES(
+            smiles1=s1,
+            smiles2=s2,
+            threshold=15,
+            always_stronger_bound=True,
+            solver=solver,
+            solver_options=solver_options
+        )
+        return retval[1], False
+    except Exception:
+        return 0.0, True # Return value and error flag
 
 # ----------------- Spectra Dataset -----------------
 class EvalSpecDataset(Dataset):
@@ -140,7 +162,7 @@ def main():
     
     # We allocate a tensor for all possible embeddings in Float16 to save RAM
     global_mol_embs = torch.zeros((num_unique_mols, 512), dtype=torch.float16)
-    
+
     with torch.no_grad():
         for batch in tqdm(mol_loader, desc="Mol Embeddings", ascii=True):
             if batch is None: continue
@@ -183,6 +205,7 @@ def main():
     hits = {k: 0 for k in args.top_k}
     valid_queries = 0
     mrr_sum = 0.0
+    mces_pairs = []
 
     logging.info("Computing Spectrum Embeddings and Evaluating Top-K...")
     with torch.no_grad():
@@ -251,6 +274,12 @@ def main():
                         hits[k] += 1
                 
                 mrr_sum += 1.0 / rank
+
+                # Collect for parallel MCES calculation
+                top1_idx_global = cand_indices[sorted_idx_relative[0]]
+                top1_smiles = unique_candidate_list[top1_idx_global]
+                mces_pairs.append((top1_smiles, true_smiles))
+
                 valid_queries += 1
 
     # 6. Output Results to log
@@ -269,6 +298,30 @@ def main():
         
     mrr = mrr_sum / valid_queries
     logging.info(f"Mean Reciprocal Rank (MRR): {mrr:.4f}")
+
+    # 7. Parallel MCES Calculation
+    mces_sum = 0.0
+    mces_errors = 0
+    if mces_pairs:
+        logging.info(f"Computing MCES for {len(mces_pairs)} pairs in parallel...")
+        # Use a fraction of CPUs to avoid overwhelming the system
+        max_workers = min(os.cpu_count() or 1, 16)
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            mces_results = list(tqdm(
+                executor.map(mces_worker, mces_pairs), 
+                total=len(mces_pairs), 
+                desc="MCES Calc", 
+                ascii=True
+            ))
+        mces_sum = sum(res[0] for res in mces_results)
+        mces_errors = sum(res[1] for res in mces_results)
+
+    top1_mces = mces_sum / valid_queries
+    logging.info(f"Top-1 MCES Similarity : {top1_mces:.4f}")
+    
+    if mces_errors > 0:
+        logging.warning(f"MCES Calculation Errors: {mces_errors} out of {len(mces_pairs)}")
+
     logging.info("="*40)
 
 if __name__ == "__main__":
