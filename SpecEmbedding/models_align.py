@@ -1,13 +1,13 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GINEConv, global_add_pool
+from torch_geometric.nn import TransformerConv, global_add_pool
 from typing import Tuple, Union, Iterable
 from SpecEmbedding.models import SiameseModel
 from SpecEmbedding.data.graph_utils import ATOM_FEATURES, BOND_FEATURES
 
 class GINEEncoder(nn.Module):
-    """基于 GINE (Graph Isomorphism Network with Edge features) 的分子编码器"""
+    """基于 TransformerConv 的分子编码器 (取代了之前的 GINE)"""
     def __init__(
         self,
         emb_dim: int,
@@ -18,7 +18,7 @@ class GINEEncoder(nn.Module):
         self.emb_dim = emb_dim
         self.dropout_rate = dropout_rate
 
-        # 1. 节点特征嵌入：根据类别数分配较小维度，拼接后投影 (避免维度冗余)
+        # 1. 节点特征嵌入
         self.atom_embeddings = nn.ModuleList()
         atom_emb_dim = 0
         for values in ATOM_FEATURES.values():
@@ -43,13 +43,15 @@ class GINEEncoder(nn.Module):
         self.convs = nn.ModuleList()
         self.norms = nn.ModuleList()
         for _ in range(n_layers):
-            # GINEConv 需要一个 MLP 
-            mlp = nn.Sequential(
-                nn.Linear(emb_dim, emb_dim * 2),
-                nn.ReLU(),
-                nn.Linear(emb_dim * 2, emb_dim)
-            )
-            self.convs.append(GINEConv(nn=mlp, train_eps=True))
+            # 使用 TransformerConv 代替 GINEConv
+            # heads=4, out_channels=emb_dim//4 拼接后维度仍为 emb_dim
+            self.convs.append(TransformerConv(
+                in_channels=emb_dim,
+                out_channels=emb_dim // 4,
+                heads=4,
+                dropout=dropout_rate,
+                edge_dim=emb_dim # 传入投影后的化学键特征维度
+            ))
             self.norms.append(nn.LayerNorm(emb_dim))
 
         self.fc = nn.Linear(emb_dim, emb_dim)
@@ -66,16 +68,17 @@ class GINEEncoder(nn.Module):
         ], dim=-1)
         h_edge = self.bond_proj(h_edge)
 
-        # 2. GINE 消息传递
+        # 2. Transformer 消息传递
         for conv, norm in zip(self.convs, self.norms):
-            h_res = h_node # 保存残差
+            h_res = h_node 
+            # TransformerConv 接收 edge_attr 作为边特征
             h_node = conv(h_node, edge_index, edge_attr=h_edge)
             h_node = norm(h_node)
             h_node = F.relu(h_node)
-            h_node = h_node + h_res # 残差相加
+            h_node = h_node + h_res # 残差
             h_node = F.dropout(h_node, p=self.dropout_rate, training=self.training)
 
-        # 3. 全局池化 (Graph-level representation)
+        # 3. 全局池化
         graph_repr = global_add_pool(h_node, batch)
         return F.relu(self.fc(graph_repr))
 
