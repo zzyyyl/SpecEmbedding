@@ -112,6 +112,9 @@ class AugmentationConfig(TypedDict):
     removal_max: float
     removal_intensity: float
     rate_intensity: float
+    # [新增] 图结构扰动参数
+    node_drop_rate: float  # 随机丢弃节点的比例
+    edge_mask_rate: float  # 随机丢弃边的比例
 
 
 DefaultAugmentationConifg = AugmentationConfig(
@@ -119,4 +122,6 @@ DefaultAugmentationConifg = AugmentationConfig(
     removal_max=0.2,
     removal_intensity=0.3,
     rate_intensity=0.15,
+    node_drop_rate=0.1,    # 默认丢弃 10% 的原子
+    edge_mask_rate=0.1,    # 默认丢弃 10% 的化学键
 )
