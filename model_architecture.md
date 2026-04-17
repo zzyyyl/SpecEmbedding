@@ -36,8 +36,11 @@ graph TD
         end
         
         M3a --> G_In
-        G5 --> |循环结束，输出最终 H_N| M6[Global Add Pool]
-        M6 --> M7[全连接层 FC + ReLU]
+        G5 --> |输出 H_N| M6a[Global Add Pool]
+        G5 --> |输出 H_N| M6b[Global Mean Pool]
+        M6a --> M6c[Concat 拼接]
+        M6b --> M6c
+        M6c --> M7[全连接层 FC + ReLU]
     end
 
     S7 --> P1["Spec Projector (Linear-ReLU-Dropout-Linear)"]
@@ -45,7 +48,7 @@ graph TD
 
     P1 --> D[L2 归一化 & 余弦相似度计算]
     P2 --> D
-    
+
     D --> L[对比损失函数 Contrastive Loss / InfoNCE]
 ```
 
@@ -69,8 +72,7 @@ graph TD
 *   **训练优化**: 
     *   **残差连接 (Residual Connection)**: `h = norm(conv(h)) + h`。
     *   **层归一化 (LayerNorm)**: 提高深层网络的训练稳定性。
-*   **全局池化**: 使用 `global_add_pool` 将所有原子特征加和，得到整个分子的全局图表示。
-
+*   **多重池化 (Multiple Pooling)**: 模型采用了一种混合池化策略。将 `global_add_pool` (捕获绝对尺寸/质量分布) 和 `global_mean_pool` (捕获相对结构/平均密度分布) 的结果在特征维度上进行**拼接 (Concat)**，然后通过全连接层进行融合。这既保留了质量等关键先验，又通过尺度不变性缓解了过拟合，大大增强了图表示的表达能力。
 ### 2.3 投影与对齐 (SpecMolAlignModel)
 *   **双塔投影 (Projectors)**: 为了对齐两个模态的维度，两个编码器的输出分别进入一个独立的 MLP 投影层（线性 -> ReLU -> Dropout -> 线性）。
 *   **归一化**: 在计算相似度之前，对投影后的向量进行 L2 归一化，将特征映射到单位超球面上。
