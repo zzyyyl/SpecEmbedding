@@ -31,10 +31,10 @@ from train import (
 def mces_worker(smiles_pair):
     s1, s2 = smiles_pair
     solver_options=dict(msg=0)
+    solvers = pulp.listSolvers(onlyAvailable=True)
+    solver = "MOSEK" if "MOSEK" in solvers else solvers[0]
     try:
         # Re-initialize for each worker to be safe with pulp solvers
-        # solver = pulp.listSolvers(onlyAvailable=True)[0]
-        solver = "MOSEK"
         retval = MCES(
             smiles1=s1,
             smiles2=s2,
