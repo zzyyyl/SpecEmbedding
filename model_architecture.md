@@ -1,52 +1,80 @@
-# SpecEmbedding & SpecMolAlign 模型结构示意图
+# SpecEmbedding & SpecMolAlign 模型结构说明
 
-根据对代码库中 `SiameseModel`（质谱编码器）和 `SpecMolAlignModel`（对齐模型）的分析，该模型采用了经典的**双塔对齐架构（Contrastive Learning / CLIP-style）**，将质谱数据和分子结构映射到同一个高维特征空间进行匹配。
+本项目的核心是一个跨模态对齐模型，旨在将**质谱数据 (Mass Spectrometry)** 和 **分子结构 (Molecular Structure)** 映射到同一个高维连续向量空间，从而实现质谱检索、分子识别等任务。
 
-## 1. 模型结构图 (Mermaid)
+## 1. 模型架构图 (Mermaid)
 
 ```mermaid
 graph TD
-    subgraph "左塔：质谱编码器 (Spectrum Tower)"
-        S1[输入：质谱峰 MZ & Intensity] --> S2[正弦 MZ 嵌入 + MLP]
-        S2 --> S3[质谱峰嵌入 PeaksEmbedding]
-        S3 --> S4[Transformer Encoder]
-        S4 --> S5[均值池化 Mean Pooling]
-        S5 --> S6[MLP 解码器]
-        S6 --> S7[质谱投影层 Spec Projector]
+    subgraph "左塔：质谱编码器 (Spectrum Tower / SiameseModel)"
+        S1[输入：MZ & Intensity] --> S2[Sinusoidal MZ 编码]
+        S2 --> S3[MZ 嵌入 MLP]
+        S3 --> S4[拼接 Intensity + 峰嵌入 MLP]
+        S4 --> S5[Transformer Encoder]
+        S5 --> S6[Masked Mean Pooling]
+        S6 --> S7[MLP 解码器 + ReLU]
     end
 
-    subgraph "右塔：分子编码器 (Molecule Tower)"
-        M1[输入：分子图 Graph] --> M2[原子 & 键 特征嵌入]
-        M2 --> M3[GINEConv 图卷积层]
-        M3 --> M4[全局加和池化 Global Add Pool]
-        M4 --> M5[全连接层 FC Layer]
-        M5 --> M6[分子投影层 Mol Projector]
+    subgraph "右塔：分子编码器 (Molecule Tower / GINEEncoder)"
+        M1[输入：分子图 Graph] --> M2a[原子类别特征嵌入]
+        M1 --> M2b[化学键类别特征嵌入]
+        M2a --> M3a[原子投影层 Atom Proj]
+        M2b --> M3b[化学键投影层 Bond Proj]
+        
+        M3b -.-> |全局共享辅助信息| G_Edge
+
+        subgraph "GINE Block (内部循环 N 次)"
+            direction TB
+            G_In[输入节点特征 H_i] --> G1[GINEConv 消息传递]
+            G_Edge[边特征 E - 保持不变] --> G1
+            G_In --> |Skip Connection| G4((+))
+            G1 --> G2[LayerNorm]
+            G2 --> G3[ReLU]
+            G3 --> G4
+            G4 --> G5[Dropout]
+            G5 -.-> |"H_{i+1} 作为下一层输入"| G_In
+        end
+        
+        M3a --> G_In
+        G5 --> |循环结束，输出最终 H_N| M6[Global Add Pool]
+        M6 --> M7[全连接层 FC + ReLU]
     end
 
-    S7 --> D[L2 归一化 & 余弦相似度计算]
-    M6 --> D
+    S7 --> P1["Spec Projector (Linear-ReLU-Dropout-Linear)"]
+    M7 --> P2["Mol Projector (Linear-ReLU-Dropout-Linear)"]
+
+    P1 --> D[L2 归一化 & 余弦相似度计算]
+    P2 --> D
     
-    D --> L[对比损失函数 Contrastive Loss]
+    D --> L[对比损失函数 Contrastive Loss / InfoNCE]
 ```
 
-## 2. 结构要点说明
+## 2. 核心组件详解
 
-### 2.1 质谱编码器 (SpecEmbedding / SiameseModel)
-*   **PeaksEmbedding**: 这是模型的核心输入层。它首先利用正弦/余弦函数对 `m/z`（质荷比）进行位置编码（类似 Transformer 的 Position Encoding），然后将 `m/z` 嵌入与强度（Intensity）拼接，通过 MLP 得到每个峰的向量表示。
-*   **Transformer Encoder**: 利用多头注意力机制捕获质谱中不同碎片峰之间的相互关系。
-*   **池化与解码**: 通过对所有有效峰的 Embedding 进行均值池化（Mean Pooling），将变长的峰序列压缩为固定长度的特征向量，最后由 MLP 解码器输出质谱指纹。
+### 2.1 质谱编码器 (SiameseModel)
+*   **SinusodialMz**: 将连续的 `m/z` 值转换为正弦/余弦位置编码，使其能够捕捉不同尺度下的碎片特征。
+*   **PeaksEmbedding**: 
+    1. 首先通过一个 MLP 对 `m/z` 的位置编码进行投影。
+    2. 将投影后的 MZ 特征与原始强度 (Intensity) 拼接。
+    3. 再次通过一个 MLP 融合两者的信息，得到每个峰的 Embedding。
+*   **Transformer Encoder**: 使用标准的多头自注意力机制，对一个光谱内的所有有效峰进行建模，学习碎片之间的关联规律。
+*   **Pooling & Decoder**: 通过 `mask` 屏蔽掉填充峰，进行均值池化（Mean Pooling），随后经过一个 MLP 解码器输出质谱的特征向量。
 
 ### 2.2 分子编码器 (GINEEncoder)
-*   **图神经网络**: 采用 **GINE (Graph Isomorphism Network with Edge features)**，这是一种改进的图同构网络，能够同时考虑原子（节点）和化学键（边）的特征。
-*   **全局池化**: 将整个分子图的所有节点信息通过 `global_add_pool` 汇总，形成分子的全局表征向量。
+*   **多维度特征嵌入**: 
+    *   **原子特征**: 包括元素符号、度数、隐式氢原子数、芳香性、环信息、形式电荷。
+    *   **化学键特征**: 包括键型、是否共轭、是否在环内。
+    *   所有类别特征先经过 `nn.Embedding`，再通过各自的 `Proj` 层对齐维度。
+*   **GINEConv**: 采用 Graph Isomorphism Network with Edge features。每个卷积层内部包含一个双层 MLP。
+*   **训练优化**: 
+    *   **残差连接 (Residual Connection)**: `h = norm(conv(h)) + h`。
+    *   **层归一化 (LayerNorm)**: 提高深层网络的训练稳定性。
+*   **全局池化**: 使用 `global_add_pool` 将所有原子特征加和，得到整个分子的全局图表示。
 
-### 2.3 对齐机制 (SpecMolAlignModel)
-*   **共享表征空间**: 两个塔的输出分别通过各自的线性投影层（Projector），映射到统一的投影维度（如 512 维）。
-*   **归一化与对比**: 对两个塔输出的向量进行 L2 归一化，通过计算余弦相似度并乘以可学习的温度系数（logit_scale）来衡量匹配程度。
-*   **训练目标**: 使得匹配的“质谱-分子对”相似度得分最高，在特征空间中距离最近。
+### 2.3 投影与对齐 (SpecMolAlignModel)
+*   **双塔投影 (Projectors)**: 为了对齐两个模态的维度，两个编码器的输出分别进入一个独立的 MLP 投影层（线性 -> ReLU -> Dropout -> 线性）。
+*   **归一化**: 在计算相似度之前，对投影后的向量进行 L2 归一化，将特征映射到单位超球面上。
+*   **温度系数 (Tau)**: 引入可学习的倒数温度系数 $1/\tau$，用于在对比学习中调节相似度得分的分布。
 
-## 3. 应用场景
-这种双塔结构使得模型非常适合以下任务：
-1.  **库检索**: 将查询质谱与已知分子库中的指纹进行相似度比对。
-2.  **跨模态学习**: 学习质谱碎片规律与分子亚结构之间的对应关系。
-3.  **零样本识别**: 对训练集中未出现的分子进行潜在的质谱匹配。
+## 3. 训练目标
+模型通过 **InfoNCE 损失函数** 进行训练，使得同一对“质谱-分子”的余弦相似度最大化，同时最小化与批次内其他非匹配对的相似度。这种方法学习到的嵌入空间具有很好的判别性，支持高效的跨模态检索。
