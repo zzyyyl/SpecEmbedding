@@ -2,7 +2,17 @@ import os
 import pickle
 import logging
 import random
-from utils import is_valid_smiles
+from rdkit import Chem
+
+def is_valid_smiles(smiles):
+    """校验 SMILES 的合法性"""
+    if not smiles or smiles.upper() in ['N/A', 'NA']:
+        return False
+
+    mol = Chem.MolFromSmiles(smiles)
+    if mol:
+        return True
+    return False
 
 class MSPProvider:
     """NIST format (.msp) 数据解析器，支持数据划分（Train/Val/Test）、Pickle 缓存与加速读取"""
