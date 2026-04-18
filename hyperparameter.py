@@ -36,6 +36,7 @@ from SpecEmbedding.utils.clean import get_classified_tokenset
 from SpecEmbedding.loss import SupConLossWithTanimotoScore, SupConLoss, TanimotoScoreLoss
 from SpecEmbedding.utils.model import embedding, metric
 from SpecEmbedding.const import gnps
+from SpecEmbedding.config import config
 
 
 def objective(
@@ -309,7 +310,7 @@ if __name__ == '__main__':
         "--seed",
         type=int,
         help="random seed",
-        default=42
+        default=config.general.seed
     )
     parser.add_argument(
         "--model",
@@ -350,7 +351,7 @@ if __name__ == '__main__':
     print("read raw spectra success")
 
     tokenizer_config = TokenizerConfig(
-        max_len=100,
+        max_len=config.data.tokenizer.max_len,
         show_progress_bar=show_progress_bar
     )
     tokenizer = Tokenizer(**tokenizer_config)

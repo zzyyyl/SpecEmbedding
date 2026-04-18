@@ -20,6 +20,7 @@ from SpecEmbedding.type import TokenizerConfig
 from SpecEmbedding.models import SiameseModel
 from SpecEmbedding.models_align import SpecMolAlignModel, GINEEncoder
 from SpecEmbedding.data.graph_utils import smiles_to_graph
+from SpecEmbedding.config import config
 
 from data_provider import MassSpecGymProvider
 from train import (
@@ -92,16 +93,13 @@ def main():
     parser = argparse.ArgumentParser(description="Efficient Evaluate SpecMolAlignModel on Cross-Modal Retrieval.")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to best aligned model checkpoint")
     parser.add_argument("--dataset_type", type=str, choices=["local", "massspecgym"], default="massspecgym", help="Dataset type")
-    parser.add_argument("--batch_size", type=int, default=256, help="Batch size for embedding calculation")     
-    parser.add_argument("--top_k", type=int, nargs="+", default=[1, 5, 10, 20], help="Top-k metrics to calculate")
-    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu", help="Device to use")
 
     args = parser.parse_args()
 
     checkpoint_path = Path(args.checkpoint)
     setup_logging(checkpoint_path.parent / "eval_align.log")
     startup_logging(args, "Start Cross-Modal Evaluation")
-    device = torch.device(args.device)
+    device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
 
     # 1. Initialize Dual-Encoder Model
     logging.info("Initializing SpecMolAlignModel...")
@@ -157,7 +155,7 @@ def main():
     # 4. Generate Molecule Embeddings
     logging.info("Computing Molecule Embeddings dynamically...")
     mol_dataset = DynamicMolDataset(unique_candidate_list)
-    mol_loader = DataLoader(mol_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=mol_collate_fn, num_workers=4)
+    mol_loader = DataLoader(mol_dataset, batch_size=config.eval.calc_batch_size, shuffle=False, collate_fn=mol_collate_fn, num_workers=4)
     
     # Pre-allocate a contiguous tensor to store embeddings for all unique candidate molecules
     global_mol_embs = torch.zeros((num_unique_mols, 512), dtype=torch.float32, device=device)
@@ -190,9 +188,9 @@ def main():
     test_sequences = tokenizer.tokenize_sequence(test_spectra)
     
     spec_dataset = EvalSpecDataset(test_sequences)
-    spec_loader = DataLoader(spec_dataset, batch_size=args.batch_size, shuffle=False)
+    spec_loader = DataLoader(spec_dataset, batch_size=config.eval.calc_batch_size, shuffle=False)
     
-    hits = {k: 0 for k in args.top_k}
+    hits = {k: 0 for k in config.eval.top_k}
     valid_queries = 0
     mrr_sum = 0.0
     mces_pairs = []
@@ -248,7 +246,7 @@ def main():
                 rank = rank_tensor.item() + 1
                 
                 # Accumulate Top-K accuracy and MRR
-                for k in args.top_k:
+                for k in config.eval.top_k:
                     if rank <= k:
                         hits[k] += 1
                 mrr_sum += 1.0 / rank
@@ -270,7 +268,7 @@ def main():
     logging.info(f"      Total Valid Queries: {valid_queries}")
     logging.info("="*40)
     
-    for k in sorted(args.top_k):
+    for k in sorted(config.eval.top_k):
         acc = hits[k] / valid_queries
         logging.info(f"Top-{k:<2} Accuracy : {acc:.4%}  ({hits[k]}/{valid_queries})")
         

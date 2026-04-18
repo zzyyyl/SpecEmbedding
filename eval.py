@@ -9,6 +9,7 @@ from tqdm import tqdm
 from SpecEmbedding.trainer.trainer import ModelTester
 from SpecEmbedding.data.tokenizer import Tokenizer
 from SpecEmbedding.utils.model import search, load_transformer_model, SiameseModel
+from SpecEmbedding.config import config
 
 def setup_logging(log_file):
     logging.basicConfig(
@@ -25,14 +26,10 @@ def main():
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to model checkpoint. If using a pre-configured architecture via --loss_type, this parameter is ignored.")
     parser.add_argument("--data_dir", type=str, required=True, help="Directory containing the replicated .npy files (e.g. /data1/xp/data/massSpecGymData)")
     parser.add_argument("--loss_type", type=str, default="custom", choices=["custom", "TanimotoLoss", "SupConLoss", "SupConWithTanimotoLoss"], help="Type of model to load. 'custom' means load from --checkpoint directly using the default architecture.")
-    parser.add_argument("--replications", type=int, default=10, help="Number of replication loops to average over.")
-    parser.add_argument("--top_k", type=int, nargs="+", default=[1, 5, 10], help="Top-k metrics to calculate")
-    parser.add_argument("--loader_batch_size", type=int, default=1024, help="Batch size for the DataLoader")
-    parser.add_argument("--calc_batch_size", type=int, default=512, help="Batch size for Cosine Similarity calculation")
-    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu", help="Device to use")
-    
+
     args = parser.parse_args()
-    
+
+    device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
     # ---------------- Setup Logging ----------------
     checkpoint_path = Path(args.checkpoint)
     setup_logging(checkpoint_path.parent / "eval_massspecgym.log")
@@ -42,7 +39,6 @@ def main():
     logging.info(f"Arguments: {args}")
     logging.info("="*50)
     
-    device = torch.device(args.device)
     path_dir = Path(args.data_dir)
     replica_suffix = "-replication-{}.npy"
 
@@ -50,12 +46,12 @@ def main():
     if args.loss_type == "custom":
         logging.info(f"Loading custom model from {args.checkpoint}")
         model = SiameseModel(
-            embedding_dim=512, 
-            n_head=16, 
-            n_layer=4, 
-            dim_feedward=512, 
-            dim_target=512, 
-            feedward_activation="selu"
+            embedding_dim=config.model.spec_encoder.embedding_dim, 
+            n_head=config.model.spec_encoder.n_head, 
+            n_layer=config.model.spec_encoder.n_layer, 
+            dim_feedward=config.model.spec_encoder.dim_feedward, 
+            dim_target=config.model.spec_encoder.dim_target, 
+            feedward_activation=config.model.spec_encoder.feedward_activation
         )
         state_dict = torch.load(args.checkpoint, map_location=device)
         model.load_state_dict(state_dict)
@@ -69,13 +65,14 @@ def main():
     
     show_progress_bar = True
     tester = ModelTester(model, device, show_progress_bar)
-    tokenizer = Tokenizer(100, show_progress_bar)
+    tokenizer = Tokenizer(config.data.tokenizer.max_len, show_progress_bar)
     
     replica_df_seq = []
     
     # ---------------- Evaluation Loop ----------------
-    for i in range(args.replications):
-        logging.info(f"--- Starting Replication {i + 1}/{args.replications} ---")
+    replications = config.eval.replications
+    for i in range(replications):
+        logging.info(f"--- Starting Replication {i + 1}/{replications} ---")
         df_seq = []
         for instrument in ["Orbitrap", "QTOF", "all"]:
             logging.info("-" * 20 + f" {instrument} " + "-" * 20)
@@ -90,13 +87,13 @@ def main():
             df = search(
                 desc=instrument,
                 tester=tester,
-                k_metric=args.top_k,
+                k_metric=config.eval.top_k,
                 tokenizer=tokenizer,
                 query_path=query_path,
                 ref_path=ref_path,
-                loader_batch_size=args.loader_batch_size,
+                loader_batch_size=config.eval.loader_batch_size,
                 show_progress_bar=show_progress_bar,
-                batch_size=args.calc_batch_size
+                batch_size=config.eval.calc_batch_size
             )
             df_seq.append(df)
             

@@ -17,6 +17,7 @@ from SpecEmbedding.data.tokenizer import Tokenizer
 from SpecEmbedding.utils.clean import get_classified_tokenset
 from SpecEmbedding.utils.model import SiameseModel
 from SpecEmbedding.loss import SupConLoss
+from SpecEmbedding.config import config
 from SpecEmbedding.type import (
     AugmentationConfig, 
     DataLoaderConfig, 
@@ -48,18 +49,16 @@ def startup_logging(args, message: str = "Start training"):
     for k, v in vars(args).items():
         logging.info(f"  {k}: {v}")
 
-    device = torch.device(args.device)
+    device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
     if device.type == 'cuda':
         logging.info(f"Using device: {device} ({torch.cuda.get_device_name(device)})")
     else:
         logging.info(f"Using device: {device}")
 
 def add_base_argument(parser):
-    parser.add_argument("--dataset_type", type=str, choices=["local", "massspecgym"], required=True, help="Dataset type")
-    parser.add_argument("--data_path", type=str, help="Path to .msp file (required for local dataset)")
-    parser.add_argument("--save_dir", type=str, default="./checkpoints", help="Directory to save model and logs")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu", help="Device to use")
+    parser.add_argument("--dataset_type", type=str, choices=["local", "massspecgym"], default=config.data.dataset_type, help="Dataset type")
+    parser.add_argument("--data_path", type=str, default=config.data.data_path, help="Path to .msp file (required for local dataset)")
+    parser.add_argument("--save_dir", type=str, default=config.general.save_dir, help="Directory to save model and logs")
 
 def dict_to_spectrum(data_list):
     """Convert dictionary records from data_provider to matchms.Spectrum objects."""
@@ -93,7 +92,9 @@ def load_data(dataset_type, data_path):
     logging.info(f"Loaded {len(train_raw)} train records and {len(val_raw)} val records.")
     return train_raw, val_raw
 
-def get_classified_data(dataset_type, data_path, cache_path="data/train_cache"):
+def get_classified_data(dataset_type, data_path, cache_path=None):
+    if cache_path is None:
+        cache_path = config.data.cache_path
     # Tokenize & Classify 处理 (带缓存逻辑)
     cache_dir = Path(cache_path)
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -109,7 +110,10 @@ def get_classified_data(dataset_type, data_path, cache_path="data/train_cache"):
         train_raw, val_raw = load_data(dataset_type=dataset_type, data_path=data_path)
 
         # 2. Convert to Spectrum objects and Tokenize
-        tokenizer_config = TokenizerConfig(max_len=100, show_progress_bar=True)
+        tokenizer_config = TokenizerConfig(
+            max_len=config.data.tokenizer.max_len, 
+            show_progress_bar=config.data.tokenizer.show_progress_bar
+        )
         tokenizer = Tokenizer(**tokenizer_config)
 
         logging.info("Tokenizing spectra sequences...")
@@ -143,9 +147,9 @@ def get_classified_data(dataset_type, data_path, cache_path="data/train_cache"):
 def main():
     parser = argparse.ArgumentParser(description="Train SpecEmbedding model on small molecule data.")
     add_base_argument(parser)
-    parser.add_argument("--batch_size", type=int, default=512, help="Batch size")
-    parser.add_argument("--epochs", type=int, default=50, help="Number of epochs")
-    parser.add_argument("--lr", type=float, default=7.5e-5, help="Learning rate")
+    parser.add_argument("--batch_size", type=int, default=config.train.pretrain.batch_size, help="Batch size")
+    parser.add_argument("--epochs", type=int, default=config.train.pretrain.epochs, help="Number of epochs")
+    parser.add_argument("--lr", type=float, default=config.train.pretrain.lr, help="Learning rate")
     parser.add_argument("--resume", type=str, help="Path to checkpoint to resume training from")
     
     args = parser.parse_args()
@@ -154,8 +158,8 @@ def main():
     save_path.mkdir(parents=True, exist_ok=True)
     setup_logging(save_path / "train.log")
     startup_logging(args, "Start SpecEmbedding Pre-training")
-    set_seed(args.seed)
-    device = torch.device(args.device)
+    set_seed(config.general.seed)
+    device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
 
     classified_data = get_classified_data(dataset_type=args.dataset_type, data_path=args.data_path)
     train_data = classified_data['train_data']
@@ -164,10 +168,12 @@ def main():
     val_keys = classified_data['val_keys']
 
     augment_config = AugmentationConfig(
-        prob=0.5, 
-        removal_max=0.2, 
-        removal_intensity=0.3, 
-        rate_intensity=0.15
+        prob=config.augmentation.prob, 
+        removal_max=config.augmentation.removal_max, 
+        removal_intensity=config.augmentation.removal_intensity, 
+        rate_intensity=config.augmentation.rate_intensity,
+        node_drop_rate=config.augmentation.node_drop_rate,
+        edge_mask_rate=config.augmentation.edge_mask_rate
     )
     
     train_dataset = TrainDataset(
@@ -191,12 +197,12 @@ def main():
 
     # 4. Initialize Model
     model = SiameseModel(
-        embedding_dim=512, 
-        n_head=16, 
-        n_layer=4, 
-        dim_feedward=512, 
-        dim_target=512, 
-        feedward_activation="selu"
+        embedding_dim=config.model.spec_encoder.embedding_dim, 
+        n_head=config.model.spec_encoder.n_head, 
+        n_layer=config.model.spec_encoder.n_layer, 
+        dim_feedward=config.model.spec_encoder.dim_feedward, 
+        dim_target=config.model.spec_encoder.dim_target, 
+        feedward_activation=config.model.spec_encoder.feedward_activation
     ).to(device)
     
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -210,12 +216,21 @@ def main():
             logging.error(f"Checkpoint file {args.resume} not found. Starting from scratch.")
     
     # 5. Configuration
-    optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=0.1)
-    criterion = SupConLoss(device=device, temperature=0.05, base_temperature=0.05)
+    optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=config.train.pretrain.weight_decay)
+    criterion = SupConLoss(
+        device=device, 
+        temperature=config.train.pretrain.loss.temperature, 
+        base_temperature=config.train.pretrain.loss.base_temperature
+    )
     
     n_step = args.epochs * len(train_dataloader)
     scheduler_config = SchedulerConfig(warmup_steps=int(n_step * 0.1), total_steps=n_step)
-    trainer_config = TrainerConfig(n_epoch=args.epochs, device=device, early_stop=20, show_progress_bar=True)
+    trainer_config = TrainerConfig(
+        n_epoch=args.epochs, 
+        device=device, 
+        early_stop=config.train.pretrain.early_stop, 
+        show_progress_bar=True
+    )
     
     desc_config = DescriptionConfig(
         train="train, epoch={}, loss={:.4f}",

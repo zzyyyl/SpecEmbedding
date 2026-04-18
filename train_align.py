@@ -12,6 +12,7 @@ from SpecEmbedding.trainer.trainer import set_seed
 from SpecEmbedding.models_align import SpecMolAlignModel, GINEEncoder
 from SpecEmbedding.utils.model import SiameseModel
 from SpecEmbedding.data.datasets_align import AlignGraphDataset, align_collate_fn
+from SpecEmbedding.config import config
 
 from train import (
     setup_logging,
@@ -34,19 +35,19 @@ def train_align(
     val_data: dict,
     val_keys: list,
     spec_encoder: SiameseModel,
-    batch_size: int = 256,
-    epochs_stage1: int = 20,
-    epochs_stage2: int = 30,
-    spec_dim: int = 512, # 预训练模型的输出维度
-    mol_emb_dim: int = 128,
-    mol_n_layers: int = 4,
-    align_final_dim: int = 512,
-    dropout_rate: float = 0.2,
-    tau: float = 0.07,
-    lr: float = 5e-5,
-    device_name: str = "cuda" if torch.cuda.is_available() else "cpu",
-    save_dir: str = "./checkpoints",
-    seed: int = 42
+    batch_size: int = config.train.align.batch_size,
+    epochs_stage1: int = config.train.align.epochs_stage1,
+    epochs_stage2: int = config.train.align.epochs_stage2,
+    spec_dim: int = config.model.spec_encoder.dim_target, # 预训练模型的输出维度
+    mol_emb_dim: int = config.model.mol_encoder.emb_dim,
+    mol_n_layers: int = config.model.mol_encoder.n_layers,
+    align_final_dim: int = config.model.align.align_final_dim,
+    dropout_rate: float = config.model.align.dropout_rate,
+    tau: float = config.model.align.tau,
+    lr: float = config.train.align.lr,
+    device_name: str = config.general.device if torch.cuda.is_available() else "cpu",
+    save_dir: str = config.general.save_dir,
+    seed: int = config.general.seed
 ):
     device = torch.device(device_name)
 
@@ -123,8 +124,8 @@ def train_align(
         # {'params': [model.logit_scale], 'lr': lr * 10}
     ]
 
-    optimizer1 = optim.AdamW(stage1_params, weight_decay=1e-4)
-    trainer.fit(epochs=epochs_stage1, optimizer=optimizer1, stage_name="stage1", patience=5)
+    optimizer1 = optim.AdamW(stage1_params, weight_decay=config.train.align.weight_decay)
+    trainer.fit(epochs=epochs_stage1, optimizer=optimizer1, stage_name="stage1", patience=config.train.align.patience)
 
     # ==========================================
     # 阶段二：解冻所有参数，端到端微调
@@ -144,10 +145,10 @@ def train_align(
         # {'params': [model.logit_scale], 'lr': lr}
     ]
 
-    optimizer2 = optim.AdamW(stage2_params, weight_decay=1e-4)
+    optimizer2 = optim.AdamW(stage2_params, weight_decay=config.train.align.weight_decay)
     scheduler2 = optim.lr_scheduler.CosineAnnealingLR(optimizer2, T_max=epochs_stage2)
 
-    trainer.fit(epochs=epochs_stage2, optimizer=optimizer2, scheduler=scheduler2, stage_name="stage2", patience=5)
+    trainer.fit(epochs=epochs_stage2, optimizer=optimizer2, scheduler=scheduler2, stage_name="stage2", patience=config.train.align.patience)
 
     logging.info("\nTwo-stage training completed successfully.")
     return model
@@ -155,10 +156,8 @@ def train_align(
 def main():
     parser = argparse.ArgumentParser(description="Two-Stage Cross-Modal Alignment Training for SpecEmbedding")
     add_base_argument(parser)
-    parser.add_argument("--batch_size", type=int, default=128, help="Batch size for alignment training")
-    parser.add_argument("--epochs_stage1", type=int, default=20, help="Number of epochs for Stage 1 (Frozen MS Encoder)")
-    parser.add_argument("--epochs_stage2", type=int, default=30, help="Number of epochs for Stage 2 (End-to-End Fine-tuning)")
-    parser.add_argument("--lr", type=float, default=1e-4, help="Base learning rate")
+    parser.add_argument("--batch_size", type=int, default=config.train.align.batch_size, help="Batch size for alignment training")
+    parser.add_argument("--lr", type=float, default=config.train.align.lr, help="Base learning rate")
     parser.add_argument("--pretrained_spec", type=str, help="Path to your pre-trained SpecEmbedding model weights")
 
     args = parser.parse_args()
@@ -167,8 +166,8 @@ def main():
     save_path.mkdir(parents=True, exist_ok=True)
     setup_logging(save_path / "align_train.log")
     startup_logging(args)
-    set_seed(args.seed)
-    device = torch.device(args.device)
+    set_seed(config.general.seed)
+    device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
 
     classified_data = get_classified_data(dataset_type=args.dataset_type, data_path=args.data_path)
     train_data = classified_data['train_data']
@@ -186,14 +185,14 @@ def main():
         logging.warning("No --pretrained_spec provided. MS Encoder will train from scratch.")
 
     # 实例化预训练的质谱编码器，参数需与之前的 train.py 参数完全一致
-    spec_dim = 512
+    spec_dim = config.model.spec_encoder.dim_target
     spec_encoder = SiameseModel(
-        embedding_dim=spec_dim,
-        n_head=16,
-        n_layer=4,
-        dim_feedward=512,
-        dim_target=512,
-        feedward_activation="selu"
+        embedding_dim=config.model.spec_encoder.embedding_dim,
+        n_head=config.model.spec_encoder.n_head,
+        n_layer=config.model.spec_encoder.n_layer,
+        dim_feedward=config.model.spec_encoder.dim_feedward,
+        dim_target=config.model.spec_encoder.dim_target,
+        feedward_activation=config.model.spec_encoder.feedward_activation
     )
 
     if pretrained_spec_path:
@@ -210,19 +209,20 @@ def main():
         val_keys=val_keys,
         spec_encoder=spec_encoder,
         batch_size=args.batch_size,
-        epochs_stage1=args.epochs_stage1,
-        epochs_stage2=args.epochs_stage2,
+        epochs_stage1=config.train.align.epochs_stage1,
+        epochs_stage2=config.train.align.epochs_stage2,
         spec_dim=spec_dim,
-        mol_emb_dim=128,
-        mol_n_layers=4,
-        align_final_dim=512,
-        dropout_rate=0.2,
-        tau=0.07,
+        mol_emb_dim=config.model.mol_encoder.emb_dim,
+        mol_n_layers=config.model.mol_encoder.n_layers,
+        align_final_dim=config.model.align.align_final_dim,
+        dropout_rate=config.model.align.dropout_rate,
+        tau=config.model.align.tau,
         lr=args.lr,
         device_name=device,
         save_dir=args.save_dir,
-        seed=args.seed
+        seed=config.general.seed
     )
+
 
     logging.info("\nTraining complete! The final aligned model is returned and ready for evaluation/inference.")
 

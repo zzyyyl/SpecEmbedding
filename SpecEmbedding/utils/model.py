@@ -16,6 +16,7 @@ from SpecEmbedding.data.tokenizer import Tokenizer
 from SpecEmbedding.trainer.trainer import ModelTester
 from SpecEmbedding.models import SiameseModel
 from SpecEmbedding.utils.clean import get_smiles
+from SpecEmbedding.config import config
 
 def embedding(
     tester: ModelTester, tokenizer: Tokenizer,
@@ -134,14 +135,14 @@ def metric(
     return infos, values
 
 def load_tanimoto_supcon_aug_model(device):
-    model_path = "/data1/xp/data/model/transformer-SupConWithTanimotoLoss-Augmentation/model.ckpt"
+    model_path = config.paths.pretrained_models.supcon_tanimoto_aug
     model = SiameseModel(
-        embedding_dim=512,
-        n_head=16,
-        n_layer=4,
-        dim_feedward=512,
-        dim_target=512,
-        feedward_activation="selu"
+        embedding_dim=config.model.spec_encoder.embedding_dim,
+        n_head=config.model.spec_encoder.n_head,
+        n_layer=config.model.spec_encoder.n_layer,
+        dim_feedward=config.model.spec_encoder.dim_feedward,
+        dim_target=config.model.spec_encoder.dim_target,
+        feedward_activation=config.model.spec_encoder.feedward_activation
     )
     model_state = torch.load(model_path, device)
     model.load_state_dict(model_state)
@@ -150,14 +151,14 @@ def load_tanimoto_supcon_aug_model(device):
 
 
 def load_tanimoto_supcon_model(device):
-    model_path = "/data1/xp/code/specEmbedding/SpecEmbedding/model/transformer-SupConWithTanimotoLoss/model.ckpt"
+    model_path = config.paths.pretrained_models.supcon_tanimoto
     model = SiameseModel(
-        embedding_dim=512,
-        n_head=16,
-        n_layer=4,
-        dim_feedward=512,
-        dim_target=512,
-        feedward_activation="gelu"
+        embedding_dim=config.model.spec_encoder.embedding_dim,
+        n_head=config.model.spec_encoder.n_head,
+        n_layer=config.model.spec_encoder.n_layer,
+        dim_feedward=config.model.spec_encoder.dim_feedward,
+        dim_target=config.model.spec_encoder.dim_target,
+        feedward_activation="gelu" # Note: kept from original if it differs
     )
     model_state = torch.load(model_path, device)
     model.load_state_dict(model_state)
@@ -166,14 +167,14 @@ def load_tanimoto_supcon_model(device):
 
 
 def load_supcon_model(device):
-    model_path = "/data1/xp/code/specEmbedding/SpecEmbedding/model/transformer-SupConLoss/model.ckpt"
+    model_path = config.paths.pretrained_models.supcon
     model = SiameseModel(
-        embedding_dim=512,
-        n_head=16,
-        n_layer=4,
-        dim_feedward=512,
-        dim_target=200,
-        feedward_activation="relu"
+        embedding_dim=config.model.spec_encoder.embedding_dim,
+        n_head=config.model.spec_encoder.n_head,
+        n_layer=config.model.spec_encoder.n_layer,
+        dim_feedward=config.model.spec_encoder.dim_feedward,
+        dim_target=200, # Note: kept from original
+        feedward_activation="relu" # Note: kept from original
     )
     model_state = torch.load(model_path, device)
     model.load_state_dict(model_state)
@@ -182,14 +183,14 @@ def load_supcon_model(device):
 
 
 def load_tanimoto_model(device):
-    model_path = "/data1/xp/code/specEmbedding/SpecEmbedding/model/transformer-TanimotoLoss/model.ckpt"
+    model_path = config.paths.pretrained_models.tanimoto
     model = SiameseModel(
-        512,
-        16,
-        2,
-        512,
-        500,
-        feedward_activation="selu",
+        config.model.spec_encoder.embedding_dim,
+        config.model.spec_encoder.n_head,
+        2, # Note: kept from original
+        config.model.spec_encoder.dim_feedward,
+        500, # Note: kept from original
+        feedward_activation=config.model.spec_encoder.feedward_activation,
     )
     model_state = torch.load(model_path, map_location=device)
     model.load_state_dict(model_state)
