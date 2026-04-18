@@ -20,6 +20,14 @@ from train import (
     get_classified_data
 )
 
+import random
+import numpy as np
+
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
+
 def train_align(
     train_data: dict,
     train_keys: list,
@@ -37,7 +45,8 @@ def train_align(
     tau: float = 0.07,
     lr: float = 5e-5,
     device_name: str = "cuda" if torch.cuda.is_available() else "cpu",
-    save_dir: str = "./checkpoints"
+    save_dir: str = "./checkpoints",
+    seed: int = 42
 ):
     device = torch.device(device_name)
 
@@ -46,9 +55,29 @@ def train_align(
     train_dataset = AlignGraphDataset(data=train_data, keys=train_keys, n_views=1, is_augment=True)
     val_dataset = AlignGraphDataset(data=val_data, keys=val_keys, n_views=1, is_augment=False)
 
+    # 为了确保可复现性，设置 Generator 和 worker_init_fn
+    g = torch.Generator()
+    g.manual_seed(seed)
+
     # 必须使用 align_collate_fn 来组装 PyG 的 Graph Batch
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=align_collate_fn, num_workers=4)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn=align_collate_fn, num_workers=4)
+    train_loader = DataLoader(
+        train_dataset, 
+        batch_size=batch_size, 
+        shuffle=True, 
+        collate_fn=align_collate_fn, 
+        num_workers=4,
+        worker_init_fn=seed_worker,
+        generator=g
+    )
+    val_loader = DataLoader(
+        val_dataset, 
+        batch_size=batch_size, 
+        shuffle=False, 
+        collate_fn=align_collate_fn, 
+        num_workers=4,
+        worker_init_fn=seed_worker,
+        generator=g
+    )
 
     logging.info("2. 初始化模型...")
 
@@ -191,7 +220,8 @@ def main():
         tau=0.07,
         lr=args.lr,
         device_name=device,
-        save_dir=args.save_dir
+        save_dir=args.save_dir,
+        seed=args.seed
     )
 
     logging.info("\nTraining complete! The final aligned model is returned and ready for evaluation/inference.")
