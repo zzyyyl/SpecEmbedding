@@ -7,7 +7,7 @@ __pycache__/
 *.log
 *.ckpt
 *.yaml
-*.sh
+# *.sh
 test*.py
 
 *.zarr
