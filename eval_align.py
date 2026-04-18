@@ -154,23 +154,22 @@ def main():
     # Fast map: SMILES -> int Index
     smiles_to_idx = {s: i for i, s in enumerate(unique_candidate_list)}
 
-    # 4. Generate Molecule Embeddings (No caching, as they depend on the model weights)
+    # 4. Generate Molecule Embeddings
     logging.info("Computing Molecule Embeddings dynamically...")
     mol_dataset = DynamicMolDataset(unique_candidate_list)
-    # Using num_workers > 0 speeds up RDKit parsing
     mol_loader = DataLoader(mol_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=mol_collate_fn, num_workers=4)
     
-    # We allocate a tensor for all possible embeddings in Float16 to save RAM
-    global_mol_embs = torch.zeros((num_unique_mols, 512), dtype=torch.float16)
+    # Pre-allocate a contiguous tensor to store embeddings for all unique candidate molecules
+    global_mol_embs = torch.zeros((num_unique_mols, 512), dtype=torch.float32, device=device)
 
     with torch.no_grad():
         for batch in tqdm(mol_loader, desc="Mol Embeddings", ascii=True):
             if batch is None: continue
             
             mol_graph = batch['mol_graph'].to(device)
-            indices = batch['indices']
+            indices = torch.tensor(batch['indices'], dtype=torch.long, device=device)
             
-            # Forward pass
+            # Forward pass to get molecule representations
             f_mol = model.mol_encoder(
                 mol_graph.x,
                 mol_graph.edge_index,
@@ -180,19 +179,10 @@ def main():
             f_mol = model.mol_proj(f_mol)
             f_mol = F.normalize(f_mol, dim=-1)
             
-            # Move back to CPU and cast to float16 to save system RAM
-            f_mol_fp16 = f_mol.cpu().to(torch.float16)
-            
-            # Fill the pre-allocated tensor
-            global_mol_embs[torch.tensor(indices, dtype=torch.long)] = f_mol_fp16
+            # Populate the embedding matrix using batch indices
+            global_mol_embs[indices] = f_mol
 
-
-    # Convert to float32 and move to GPU for fast evaluation if it fits.
-    # 7.5GB of embeddings might not fit on some GPUs. 
-    # If your GPU is out of memory, we can compute similarities on CPU, or batch it.
-    # For now, we will compute similarity directly on CPU or move batches.
-    
-    # 5. Compute Spectra Embeddings
+    # 5. Compute Spectra Embeddings and Evaluate
     tokenizer_config = TokenizerConfig(max_len=100, show_progress_bar=False)
     tokenizer = Tokenizer(**tokenizer_config)
     
@@ -207,7 +197,7 @@ def main():
     mrr_sum = 0.0
     mces_pairs = []
 
-    logging.info("Computing Spectrum Embeddings and Evaluating Top-K...")
+    logging.info("Computing Spectrum Embeddings and Evaluating...")
     with torch.no_grad():
         for batch in tqdm(spec_loader, desc="Evaluation", ascii=True):
             spec_mz = batch['spec_mz'].to(device)
@@ -215,68 +205,56 @@ def main():
             spec_mask = batch['spec_mask'].to(device)
             true_smiles_batch = batch['smiles']
             
-            # Spec Embeddings [Batch, 512]
+            # Generate spectrum representations [Batch, 512]
             f_spec = model.spec_encoder(spec_mz, spec_intensity, spec_mask)
             f_spec = model.spec_proj(f_spec)
             f_spec = F.normalize(f_spec, dim=-1)
             
-            # Since global_mol_embs is very large (~7.5GB), we compute similarity per spectrum
-            # but we use efficient tensor slicing instead of string dictionary lookups.
-            # We keep global_mol_embs on CPU (RAM) to prevent GPU OOM, and pull the candidates.
-            
-            # To avoid transferring f_spec to CPU for every query, we can move it to CPU once per batch.
-            f_spec_cpu = f_spec.cpu().to(torch.float32)
-
             for i in range(len(true_smiles_batch)):
                 true_smiles = true_smiles_batch[i]
                 cands = candidates_dict.get(true_smiles)
                 
-                if not cands or len(cands) == 0:
+                if not cands:
                     continue
                     
-                # We expect the true_smiles to be evaluated
                 cand_set = set(cands)
                 cand_set.add(true_smiles)
                 
-                # Fetch indices of candidates
-                cand_indices = [smiles_to_idx[c] for c in cand_set if c in smiles_to_idx]
+                # Resolve unique SMILES to their integer indices in the embedding matrix
+                cand_indices_list = [smiles_to_idx[c] for c in cand_set if c in smiles_to_idx]
                 
-                if smiles_to_idx.get(true_smiles) not in cand_indices:
-                    continue # True molecule failed to parse in RDKit
-                    
-                # [Num_Cands, 512] - Extracted directly from the contiguous memory block.
-                # Cast back to float32 for metric calculation
-                cand_embs = global_mol_embs[cand_indices].to(torch.float32) 
-                query_emb = f_spec_cpu[i].unsqueeze(0) # [1, 512]
+                if not cand_indices_list or smiles_to_idx.get(true_smiles) not in cand_indices_list:
+                    continue 
                 
-                # Compute Cosine Similarity (Dot product since both are L2 Normalized)
-                # shape: [Num_Cands]
-                sims = (query_emb @ cand_embs.T).squeeze(0) 
+                # Select the embeddings for the current candidate set
+                cand_indices = torch.tensor(cand_indices_list, dtype=torch.long, device=device)
+                cand_embs = global_mol_embs[cand_indices] 
+                query_emb = f_spec[i].unsqueeze(0) # [1, 512]
                 
-                # Sort in descending order
-                sorted_idx_relative = torch.argsort(sims, descending=True).numpy()
+                # Perform efficient similarity search via matrix multiplication
+                sims = torch.mm(query_emb, cand_embs.T).squeeze(0)
                 
-                # Find the rank
+                # Sort candidates by similarity in descending order
+                sorted_sims, sorted_rel_idx = torch.sort(sims, descending=True)
+                
+                # Identify the rank of the ground truth molecule
                 true_idx_global = smiles_to_idx[true_smiles]
+                sorted_global_indices = cand_indices[sorted_rel_idx]
                 
-                rank = -1
-                for rank_pos, rel_idx in enumerate(sorted_idx_relative):
-                    if cand_indices[rel_idx] == true_idx_global:
-                        rank = rank_pos + 1
-                        break
-                        
-                if rank == -1:
+                # Determine the index (rank) of the true SMILES in the sorted list
+                rank_tensor = (sorted_global_indices == true_idx_global).nonzero(as_tuple=True)[0]
+                if rank_tensor.numel() == 0:
                     continue
+                rank = rank_tensor.item() + 1
                 
-                # Update Metrics
+                # Accumulate Top-K accuracy and MRR
                 for k in args.top_k:
                     if rank <= k:
                         hits[k] += 1
-                
                 mrr_sum += 1.0 / rank
 
-                # Collect for parallel MCES calculation
-                top1_idx_global = cand_indices[sorted_idx_relative[0]]
+                # Store Top-1 prediction for downstream structural similarity analysis
+                top1_idx_global = sorted_global_indices[0].item()
                 top1_smiles = unique_candidate_list[top1_idx_global]
                 mces_pairs.append((top1_smiles, true_smiles))
 
