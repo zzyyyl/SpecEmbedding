@@ -77,13 +77,23 @@ class MSPProvider:
         except ImportError:
             Chem = None
 
+        def is_valid_record(record):
+            return record and \
+                'smiles' in record and \
+                'peaks' in record and \
+                'inchi' in record and \
+                is_valid_smiles(record['smiles']) and \
+                record['smiles'].upper() not in ['N/A', 'NA'] and \
+                record['peaks'] and \
+                record['inchi'].upper() not in ['N/A', 'NA']
+
         with open(self.file_path, 'r', encoding='utf-8', errors='ignore') as f:
             record = {}
             in_peaks = False
             for line in f:
                 line = line.strip()
                 if not line:
-                    if record and 'smiles' in record and record.get('peaks') and is_valid_smiles(record['smiles']):
+                    if is_valid_record(record):
                         parsed_results.append(record)
                         if self.limit and len(parsed_results) >= self.limit:
                             break
@@ -98,8 +108,9 @@ class MSPProvider:
                         value = parts[1].strip() if len(parts) > 1 else ""
                         
                         if key == 'smiles':
-                            if value and value.upper() not in ['N/A', 'NA']:
-                                record['smiles'] = value
+                            record['smiles'] = value
+                        elif key == 'inchi':
+                            record['inchi'] = value
                         elif key == 'precursormz':
                             try:
                                 record['precursor_mz'] = float(value)
@@ -118,8 +129,9 @@ class MSPProvider:
                         except ValueError:
                             continue
             
-            if record and 'smiles' in record and record.get('peaks') and is_valid_smiles(record['smiles']) and (not self.limit or len(parsed_results) < self.limit):
-                parsed_results.append(record)
+            if not self.limit or len(parsed_results) < self.limit:
+                if is_valid_record(record):
+                    parsed_results.append(record)
 
         logging.info(f"Parsing completed! Total valid training data: {len(parsed_results)}")
 
