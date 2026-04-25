@@ -140,6 +140,13 @@ def main():
 
     logging.info(f"Loaded {len(test_raw)} test spectra.")
     logging.info(f"Loaded {len(candidates_dict)} unique candidate mapping keys.")
+    
+    cand_sizes = [len(v) for v in candidates_dict.values()]
+    if cand_sizes:
+        avg_size = sum(cand_sizes) / len(cand_sizes)
+        max_size = max(cand_sizes)
+        min_size = min(cand_sizes)
+        logging.info(f"Candidate set sizes: avg={avg_size:.2f}, max={max_size}, min={min_size}")
 
     # 3. Compile unique candidate SMILES
     unique_candidate_smiles = set()
