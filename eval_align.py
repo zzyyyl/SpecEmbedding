@@ -93,6 +93,7 @@ def main():
     parser = argparse.ArgumentParser(description="Efficient Evaluate SpecMolAlignModel on Cross-Modal Retrieval.")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to best aligned model checkpoint")
     parser.add_argument("--dataset_type", type=str, choices=["local", "massspecgym"], default="massspecgym", help="Dataset type")
+    parser.add_argument("--no-mces", action="store_true", help="Disable MCES structural similaritycalculation")
 
     args = parser.parse_args()
 
@@ -283,27 +284,30 @@ def main():
     logging.info(f"Mean Reciprocal Rank (MRR): {mrr:.4f}")
 
     # 7. Parallel MCES Calculation
-    mces_sum = 0.0
-    mces_errors = 0
-    if mces_pairs:
-        logging.info(f"Computing MCES for {len(mces_pairs)} pairs in parallel...")
-        # Use a fraction of CPUs to avoid overwhelming the system
-        max_workers = min(os.cpu_count() or 1, 16)
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            mces_results = list(tqdm(
-                executor.map(mces_worker, mces_pairs), 
-                total=len(mces_pairs), 
-                desc="MCES Calc", 
-                ascii=True
-            ))
-        mces_sum = sum(res[0] for res in mces_results)
-        mces_errors = sum(res[1] for res in mces_results)
+    if not args.no_mces:
+        mces_sum = 0.0
+        mces_errors = 0
+        if mces_pairs:
+            logging.info(f"Computing MCES for {len(mces_pairs)} pairs in parallel...")
+            # Use a fraction of CPUs to avoid overwhelming the system
+            max_workers = min(os.cpu_count() or 1, 16)
+            with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                mces_results = list(tqdm(
+                    executor.map(mces_worker, mces_pairs), 
+                    total=len(mces_pairs), 
+                    desc="MCES Calc", 
+                    ascii=True
+                ))
+            mces_sum = sum(res[0] for res in mces_results)
+            mces_errors = sum(res[1] for res in mces_results)
 
-    top1_mces = mces_sum / valid_queries
-    logging.info(f"Top-1 MCES Similarity : {top1_mces:.4f}")
-    
-    if mces_errors > 0:
-        logging.warning(f"MCES Calculation Errors: {mces_errors} out of {len(mces_pairs)}")
+        top1_mces = mces_sum / valid_queries
+        logging.info(f"Top-1 MCES Similarity : {top1_mces:.4f}")
+        
+        if mces_errors > 0:
+            logging.warning(f"MCES Calculation Errors: {mces_errors} out of {len(mces_pairs)}")
+    else:
+        logging.info("MCES Calculation skipped (--no-mces is set).")
 
     logging.info("="*40)
 
