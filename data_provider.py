@@ -2,6 +2,9 @@ import os
 import pickle
 import logging
 import random
+import numpy as np
+
+from tqdm import tqdm
 from rdkit import Chem
 
 def is_valid_smiles(smiles):
@@ -195,6 +198,56 @@ class MSPProvider:
             logging.info(f"Saved to {self.train_cache_path}, {self.val_cache_path} and {self.test_cache_path}")
         except Exception as e:
             logging.error(f"Failed to save split data: {e}")
+
+    def load_candidates(self, mode='test', mz_tolerance=0.1):
+        """
+        为指定模式的数据生成候选集。
+        默认从该模式的所有唯一 SMILES 中，筛选出 precursor_mz 在容差范围内的 SMILES。
+        返回格式: {true_smiles: [cand_smiles1, cand_smiles2, ...]}
+        """
+        data = self.load_data(mode=mode)
+        if not data:
+            return {}
+
+        logging.info(f"Generating candidates for {mode} data (mz_tolerance={mz_tolerance})...")
+        
+        # 获取所有唯一的 SMILES 及其对应的典型 precursor_mz (取均值)
+        smiles_to_mz = {}
+        for item in data:
+            s = item['smiles']
+            mz = item.get('precursor_mz', 0.0)
+            if s not in smiles_to_mz:
+                smiles_to_mz[s] = []
+            smiles_to_mz[s].append(mz)
+        
+        unique_smiles_list = list(smiles_to_mz.keys())
+        avg_mzs = np.array([np.mean(smiles_to_mz[s]) for s in unique_smiles_list])
+
+        candidates_dict = {}
+        for item in tqdm(data, desc="Building candidates", ascii=True):
+            true_smiles = item['smiles']
+            query_mz = item.get('precursor_mz', 0.0)
+            
+            if query_mz <= 0:
+                # 如果没有有效的 m/z，则将所有唯一 SMILES 作为候选集
+                candidates_dict[true_smiles] = unique_smiles_list
+                continue
+
+            # 找到在容差范围内的所有 SMILES
+            diffs = np.abs(avg_mzs - query_mz)
+            mask = diffs <= mz_tolerance
+            
+            indices = np.where(mask)[0]
+            cands = [unique_smiles_list[i] for i in indices]
+            
+            # 确保正确答案在里面
+            if true_smiles not in cands:
+                cands.append(true_smiles)
+                
+            candidates_dict[true_smiles] = cands
+
+        logging.info(f"Candidates generated for {len(candidates_dict)} queries.")
+        return candidates_dict
 
 class MassSpecGymProvider:
     """MassSpecGym (HuggingFace) 数据加载器，输出格式与 MSPProvider 一致"""
