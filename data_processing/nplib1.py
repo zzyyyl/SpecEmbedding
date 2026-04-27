@@ -1,0 +1,106 @@
+import os
+import pickle
+import numpy as np
+from pathlib import Path
+
+def process_nplib1():
+    # Define paths
+    base_dir = Path("data/NPLIB1")
+    output_dir = Path("data")
+    
+    # Ensure output directory exists
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if not base_dir.exists():
+        print(f"Error: Directory {base_dir} not found.")
+        return
+
+    print("Loading original pickle files...")
+    # 1. Load data
+    try:
+        with open(base_dir / "split.pkl", "rb") as f:
+            split = pickle.load(f)
+        with open(base_dir / "data_dict.pkl", "rb") as f:
+            data_dict = pickle.load(f)
+        with open(base_dir / "inchikey_to_smiles.pkl", "rb") as f:
+            ik_to_smiles = pickle.load(f)
+        with open(base_dir / "cand_dict_large.pkl", "rb") as f:
+            cand_dict_large = pickle.load(f)
+    except FileNotFoundError as e:
+        print(f"Error loading files: {e}")
+        return
+
+    # 2. Build NPLIB1_candidates.pkl
+    # Format: { "$smiles": ["$smiles", ...] }
+    print("Generating NPLIB1_candidates.pkl...")
+    candidates_smiles = {}
+    for q_ik, cand_iks in cand_dict_large.items():
+        if q_ik not in ik_to_smiles:
+            continue
+        
+        q_smiles = ik_to_smiles[q_ik]
+        c_smiles_list = []
+        for c_ik in cand_iks:
+            if c_ik in ik_to_smiles:
+                c_smiles_list.append(ik_to_smiles[c_ik])
+        
+        if c_smiles_list:
+            # Ensure ground truth is present
+            if q_smiles not in c_smiles_list:
+                c_smiles_list.insert(0, q_smiles)
+            candidates_smiles[q_smiles] = c_smiles_list
+
+    with open(output_dir / "NPLIB1_candidates.pkl", "wb") as f:
+        pickle.dump(candidates_smiles, f)
+    print(f"Saved NPLIB1_candidates.pkl with {len(candidates_smiles)} unique SMILES.")
+
+    # 3. Build fold files
+    # Index data_dict by inchikey (handling multiple spectra per InChIKey)
+    ik_to_data_entries = {}
+    # Based on user description, data_dict is a dict: { "id": { ... } }
+    for entry_id, info in data_dict.items():
+        ik = info.get('inchikey')
+        if not ik: continue
+        if ik not in ik_to_data_entries:
+            ik_to_data_entries[ik] = []
+        ik_to_data_entries[ik].append(info)
+
+    fold_map = {"train": "train", "valid": "val", "test": "test"}
+    
+    for in_fold, out_fold in fold_map.items():
+        print(f"Processing fold: {out_fold}...")
+        fold_iks = split.get(in_fold, [])
+        processed_data = []
+        
+        for ik in fold_iks:
+            if ik not in ik_to_data_entries:
+                continue
+            
+            for info in ik_to_data_entries[ik]:
+                smiles = ik_to_smiles.get(ik)
+                if not smiles:
+                    continue
+                
+                try:
+                    precursor_mz = float(info['PrecursorMZ'])
+                except (ValueError, TypeError, KeyError):
+                    precursor_mz = 0.0
+                
+                # peaks: [int, mz] -> [mz, int]
+                # Assuming info['ms'] is a numpy array or list of pairs
+                raw_ms = info.get('ms', [])
+                peaks = [[float(p[1]), float(p[0])] for p in raw_ms]
+                
+                processed_data.append({
+                    'smiles': smiles,
+                    'precursor_mz': precursor_mz,
+                    'peaks': peaks
+                })
+        
+        out_file = output_dir / f"NPLIB1_{out_fold}.pkl"
+        with open(out_file, "wb") as f:
+            pickle.dump(processed_data, f)
+        print(f"Saved {out_file} with {len(processed_data)} spectra.")
+
+if __name__ == "__main__":
+    process_nplib1()
