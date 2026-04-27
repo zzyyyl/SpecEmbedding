@@ -82,6 +82,18 @@ def train_align(
         dropout_rate=config.model.mol_encoder.dropout_rate
     )
 
+    skip_stage1 = False
+    if not spec_encoder:
+        skip_stage1 = True
+        spec_encoder = SiameseModel(
+            embedding_dim=config.model.spec_encoder.embedding_dim,
+            n_head=config.model.spec_encoder.n_head,
+            n_layer=config.model.spec_encoder.n_layer,
+            dim_feedward=config.model.spec_encoder.dim_feedward,
+            dim_target=config.model.spec_encoder.dim_target,
+            feedward_activation=config.model.spec_encoder.feedward_activation
+        )
+
     # 实例化双塔对齐模型
     model = SpecMolAlignModel(
         spec_encoder=spec_encoder,
@@ -107,18 +119,21 @@ def train_align(
     logging.info("Stage 1: Frozen MS Encoder, Train Mol Encoder & Projection Heads")
     logging.info("="*50)
 
-    for param in model.spec_encoder.parameters():
-        param.requires_grad = False
+    if skip_stage1:
+        logging.info("No pretrained model, skipped.")
+    else:
+        for param in model.spec_encoder.parameters():
+            param.requires_grad = False
 
-    stage1_params = [
-        {'params': model.mol_encoder.parameters(), 'lr': lr * 10}, # 1e-3
-        {'params': model.spec_proj.parameters(), 'lr': lr * 10},
-        {'params': model.mol_proj.parameters(), 'lr': lr * 10},
-        # {'params': [model.logit_scale], 'lr': lr * 10}
-    ]
+        stage1_params = [
+            {'params': model.mol_encoder.parameters(), 'lr': lr * 10}, # 1e-3
+            {'params': model.spec_proj.parameters(), 'lr': lr * 10},
+            {'params': model.mol_proj.parameters(), 'lr': lr * 10},
+            # {'params': [model.logit_scale], 'lr': lr * 10}
+        ]
 
-    optimizer1 = optim.AdamW(stage1_params, weight_decay=config.train.align.weight_decay)
-    trainer.fit(epochs=epochs_stage1, optimizer=optimizer1, stage_name="stage1", patience=config.train.align.patience)
+        optimizer1 = optim.AdamW(stage1_params, weight_decay=config.train.align.weight_decay)
+        trainer.fit(epochs=epochs_stage1, optimizer=optimizer1, stage_name="stage1", patience=config.train.align.patience)
 
     # ==========================================
     # 阶段二：解冻所有参数，端到端微调
@@ -177,19 +192,19 @@ def main():
     elif not pretrained_spec_path:
         logging.warning("No --pretrained_spec provided. MS Encoder will train from scratch.")
 
-    # 实例化预训练的质谱编码器，参数需与之前的 train.py 参数完全一致
-    spec_encoder = SiameseModel(
-        embedding_dim=config.model.spec_encoder.embedding_dim,
-        n_head=config.model.spec_encoder.n_head,
-        n_layer=config.model.spec_encoder.n_layer,
-        dim_feedward=config.model.spec_encoder.dim_feedward,
-        dim_target=config.model.spec_encoder.dim_target,
-        feedward_activation=config.model.spec_encoder.feedward_activation
-    )
-
     if pretrained_spec_path:
         logging.info(f"Loading pretrained SpecEmbedding from {pretrained_spec_path}")
+        spec_encoder = SiameseModel(
+            embedding_dim=config.model.spec_encoder.embedding_dim,
+            n_head=config.model.spec_encoder.n_head,
+            n_layer=config.model.spec_encoder.n_layer,
+            dim_feedward=config.model.spec_encoder.dim_feedward,
+            dim_target=config.model.spec_encoder.dim_target,
+            feedward_activation=config.model.spec_encoder.feedward_activation
+        )
         spec_encoder.load_state_dict(torch.load(pretrained_spec_path, map_location=device))
+    else:
+        spec_encoder = None
 
     # 启动两阶段对齐训练流水线
     logging.info("\nStarting the two-stage cross-modal alignment training pipeline...")
