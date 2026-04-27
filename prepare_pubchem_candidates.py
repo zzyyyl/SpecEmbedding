@@ -145,7 +145,7 @@ class PubChemFetcher:
 
 def main():
     parser = argparse.ArgumentParser(description="Prepare PubChem structural similarity candidate sets.")
-    parser.add_argument("--input_msp", type=str, help="Path to input .msp file (for massbank datasets)")
+    parser.add_argument("--data_path", type=str, help="Dataset directory (required for massbank/nplib1)")
     parser.add_argument("--dataset", type=str, choices=["massbank", "massspecgym"], default="massbank", help="Dataset type")
     parser.add_argument("--output", type=str, required=True, help="Path to save the candidates mapping (.pkl)")
     parser.add_argument("--max_cands", type=int, default=-1, help="Maximum number of candidates to keep per SMILES")
@@ -161,9 +161,9 @@ def main():
         provider = MassSpecGymProvider()
         data = provider.load_data(mode=args.mode)
     else:
-        if not args.input_msp:
-            raise ValueError("--input_msp is required")
-        provider = MassBankProvider(args.input_msp)
+        if not args.data_path:
+            raise ValueError("--data_path is required")
+        provider = MassBankProvider(data_dir=args.data_path)
         data = provider.load_data(mode=args.mode)
 
     if not data:

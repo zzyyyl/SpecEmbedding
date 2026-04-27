@@ -93,7 +93,7 @@ def main():
     parser = argparse.ArgumentParser(description="Efficient Evaluate SpecMolAlignModel on Cross-Modal Retrieval.")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to best aligned model checkpoint")
     parser.add_argument("--dataset_type", type=str, choices=["massbank", "massspecgym", "nplib1"], default="massspecgym", help="Dataset type")
-    parser.add_argument("--data_path", type=str, help="Path to .msp file or data directory (required for massbank/nplib1)")
+    parser.add_argument("--data_path", type=str, help="Dataset directory (required for massbank/nplib1)")
     parser.add_argument("--no-mces", action="store_true", help="Disable MCES structural similaritycalculation")
 
     args = parser.parse_args()
@@ -139,11 +139,10 @@ def main():
         candidates_dict = provider.load_candidates()
     else:
         if not args.data_path:
-            raise ValueError("--data_path is required for local dataset")
-        provider = MassBankProvider(args.data_path)
+            raise ValueError("--data_path is required for massbank dataset")
+        provider = MassBankProvider(data_dir=args.data_path)
         test_raw = provider.load_data(mode='test')
-        # 为本地数据集动态生成基于 m/z 容差的候选集
-        candidates_dict = provider.load_candidates(mode='test', mz_tolerance=0.1)
+        candidates_dict = provider.load_candidates()
 
     if not test_raw:
         logging.error("No test data loaded.")

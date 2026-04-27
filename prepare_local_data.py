@@ -20,7 +20,7 @@ def setup_logging():
 
 def main():
     parser = argparse.ArgumentParser(description="Prepare MassBank evaluation datasets (Spectrum objects in .npy).")
-    parser.add_argument("--data_path", type=str, required=True, help="Path to the massbank .msp file.")
+    parser.add_argument("--data_path", type=str, required=True, help="Dataset directory (required for massbank/nplib1)")
     parser.add_argument("--save_dir", type=str, required=True, help="Directory to save the generated .npy files.")
     parser.add_argument("--replications", type=int, default=10, help="Number of replicated splits to generate.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
@@ -35,7 +35,7 @@ def main():
 
     # 1. Load massbank test data using MassBankProvider
     logging.info(f"Loading massbank test data from {args.data_path}...")
-    provider = MassBankProvider(args.data_path)
+    provider = MassBankProvider(data_dir=args.data_path)
     test_raw = provider.load_data(mode='test')
     
     if not test_raw:

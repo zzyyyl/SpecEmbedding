@@ -57,7 +57,7 @@ def startup_logging(args, message: str = "Start training"):
 
 def add_base_argument(parser):
     parser.add_argument("--dataset_type", type=str, choices=["local", "massspecgym"], default=config.data.dataset_type, help="Dataset type")
-    parser.add_argument("--data_path", type=str, default=config.data.data_path, help="Path to .msp file (required for local dataset)")
+    parser.add_argument("--data_path", type=str, default=config.data.data_path, help="Dataset directory (required for massbank/nplib1)")
     parser.add_argument("--save_dir", type=str, default=config.general.save_dir, help="Directory to save model and logs")
 
 def dict_to_spectrum(data_list):
@@ -74,10 +74,10 @@ def dict_to_spectrum(data_list):
     return spectra
 
 def load_data(dataset_type, data_path):
-    if dataset_type == "local":
+    if dataset_type == "massbank":
         if not data_path:
-            raise ValueError("--data_path is required for local dataset")
-        provider = MassBankProvider(data_path)
+            raise ValueError("--data_path is required for massbank dataset")
+        provider = MassBankProvider(data_dir=data_path)
         train_raw = provider.load_data(mode='train')
         val_raw = provider.load_data(mode='val')
     else:
