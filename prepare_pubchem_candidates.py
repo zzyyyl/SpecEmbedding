@@ -186,15 +186,12 @@ def main():
             try:
                 cands = future.result()
                 
-                if s not in cands:
-                    cands.append(s)
-                    
+                if s in cands: cands.remove(s)
+                cands = [s] + cands
+
                 if args.max_cands > 0 and len(cands) > args.max_cands:
-                    random.seed(42)
-                    cands = random.sample(cands, args.max_cands)
-                    if s not in cands:
-                        cands[0] = s
-                
+                    cands = cands[:args.max_cands]
+
                 final_mapping[s] = cands
             except Exception as e:
                 logging.error(f"Worker generated exception for {s}: {e}")
@@ -209,7 +206,7 @@ def main():
     logging.info(f"Saved {len(final_mapping)} sets to {args.output}")
     sizes = [len(v) for v in final_mapping.values()]
     if sizes:
-        logging.info(f"Avg: {np.mean(sizes):.1f}, Max: {np.max(sizes)}")
+        logging.info(f"Avg: {np.mean(sizes):.1f}, Max: {np.max(sizes)}, Min: {np.min(sizes)}")
 
 if __name__ == "__main__":
     main()
