@@ -16,6 +16,7 @@ from myopic_mces.myopic_mces import MCES
 from concurrent.futures import ProcessPoolExecutor
 
 from SpecEmbedding.data.tokenizer import Tokenizer
+from SpecEmbedding.trainer.trainer import set_seed
 from SpecEmbedding.type import TokenizerConfig
 from SpecEmbedding.models import SiameseModel
 from SpecEmbedding.models_align import SpecMolAlignModel, GINEEncoder
@@ -101,27 +102,32 @@ def main():
     checkpoint_path = Path(args.checkpoint)
     setup_logging(checkpoint_path.parent / "eval_align.log")
     startup_logging(args, "Start Cross-Modal Evaluation")
+    set_seed(config.general.seed)
     device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
 
     # 1. Initialize Dual-Encoder Model
     logging.info("Initializing SpecMolAlignModel...")
     spec_encoder = SiameseModel(
-        embedding_dim=512, 
-        n_head=16, 
-        n_layer=4, 
-        dim_feedward=512, 
-        dim_target=512, 
-        feedward_activation="selu"
+        embedding_dim=config.model.spec_encoder.embedding_dim,
+        n_head=config.model.spec_encoder.n_head,
+        n_layer=config.model.spec_encoder.n_layer,
+        dim_feedward=config.model.spec_encoder.dim_feedward,
+        dim_target=config.model.spec_encoder.dim_target,
+        feedward_activation=config.model.spec_encoder.feedward_activation
     )
-    mol_encoder = GINEEncoder(emb_dim=128, n_layers=4, dropout_rate=0.2)
+    mol_encoder = GINEEncoder(
+        emb_dim=config.model.mol_encoder.emb_dim,
+        n_layers=config.model.mol_encoder.n_layers,
+        dropout_rate=config.model.mol_encoder.dropout_rate
+    )
     model = SpecMolAlignModel(
-        spec_encoder,
-        mol_encoder,
-        spec_dim=512,
-        hidden_dim=512,
-        final_dim=512,
-        dropout_rate=0.2,
-        tau=0.07
+        spec_encoder=spec_encoder,
+        mol_encoder=mol_encoder,
+        spec_dim=config.model.spec_encoder.dim_target,
+        hidden_dim=config.model.align.final_dim,
+        final_dim=config.model.align.final_dim,
+        dropout_rate=config.model.align.dropout_rate,
+        tau=config.model.align.tau
     )
     state_dict = torch.load(args.checkpoint, map_location=device, weights_only=True)
     model.load_state_dict(state_dict, strict=True)

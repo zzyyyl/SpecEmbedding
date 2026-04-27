@@ -32,7 +32,7 @@ model:
     n_layers: 4
     dropout_rate: 0.2
   align:
-    align_final_dim: 512
+    final_dim: 512
     dropout_rate: 0.2
     tau: 0.07
 

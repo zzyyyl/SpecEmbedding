@@ -36,20 +36,13 @@ def train_align(
     val_keys: list,
     spec_encoder: SiameseModel,
     batch_size: int = config.train.align.batch_size,
-    epochs_stage1: int = config.train.align.epochs_stage1,
-    epochs_stage2: int = config.train.align.epochs_stage2,
-    spec_dim: int = config.model.spec_encoder.dim_target, # 预训练模型的输出维度
-    mol_emb_dim: int = config.model.mol_encoder.emb_dim,
-    mol_n_layers: int = config.model.mol_encoder.n_layers,
-    align_final_dim: int = config.model.align.align_final_dim,
-    dropout_rate: float = config.model.align.dropout_rate,
-    tau: float = config.model.align.tau,
     lr: float = config.train.align.lr,
-    device_name: str = config.general.device if torch.cuda.is_available() else "cpu",
     save_dir: str = config.general.save_dir,
-    seed: int = config.general.seed
 ):
-    device = torch.device(device_name)
+    device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
+    seed = config.general.seed
+    epochs_stage1 = config.train.align.epochs_stage1
+    epochs_stage2 = config.train.align.epochs_stage2
 
     logging.info("1. 初始化数据集与 DataLoader...")
     # 使用自定义的 AlignGraphDataset (继承自 TrainDataset)
@@ -84,20 +77,20 @@ def train_align(
 
     # 实例化新的分子图编码器
     mol_encoder = GINEEncoder(
-        emb_dim=mol_emb_dim,
-        n_layers=mol_n_layers,
-        dropout_rate=dropout_rate,
+        emb_dim=config.model.mol_encoder.emb_dim,
+        n_layers=config.model.mol_encoder.n_layers,
+        dropout_rate=config.model.mol_encoder.dropout_rate
     )
 
     # 实例化双塔对齐模型
     model = SpecMolAlignModel(
         spec_encoder=spec_encoder,
         mol_encoder=mol_encoder,
-        spec_dim=spec_dim,
-        hidden_dim=align_final_dim,
-        final_dim=align_final_dim,
-        dropout_rate=dropout_rate,
-        tau=tau
+        spec_dim=config.model.spec_encoder.dim_target,
+        hidden_dim=config.model.align.final_dim,
+        final_dim=config.model.align.final_dim,
+        dropout_rate=config.model.align.dropout_rate,
+        tau=config.model.align.tau
     )
     trainer = TrainerAlign(
         model,
@@ -185,7 +178,6 @@ def main():
         logging.warning("No --pretrained_spec provided. MS Encoder will train from scratch.")
 
     # 实例化预训练的质谱编码器，参数需与之前的 train.py 参数完全一致
-    spec_dim = config.model.spec_encoder.dim_target
     spec_encoder = SiameseModel(
         embedding_dim=config.model.spec_encoder.embedding_dim,
         n_head=config.model.spec_encoder.n_head,
@@ -209,18 +201,8 @@ def main():
         val_keys=val_keys,
         spec_encoder=spec_encoder,
         batch_size=args.batch_size,
-        epochs_stage1=config.train.align.epochs_stage1,
-        epochs_stage2=config.train.align.epochs_stage2,
-        spec_dim=spec_dim,
-        mol_emb_dim=config.model.mol_encoder.emb_dim,
-        mol_n_layers=config.model.mol_encoder.n_layers,
-        align_final_dim=config.model.align.align_final_dim,
-        dropout_rate=config.model.align.dropout_rate,
-        tau=config.model.align.tau,
         lr=args.lr,
-        device_name=device,
         save_dir=args.save_dir,
-        seed=config.general.seed
     )
 
 

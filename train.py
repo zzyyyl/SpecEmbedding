@@ -29,7 +29,7 @@ from SpecEmbedding.type import (
     TokenizerConfig
 )
 
-from src.data import MassBankProvider, MassSpecGymProvider
+from src.data import MassBankProvider, MassSpecGymProvider, NPLIB1Provider
 
 def setup_logging(log_file):
     logging.basicConfig(
@@ -56,7 +56,7 @@ def startup_logging(args, message: str = "Start training"):
         logging.info(f"Using device: {device}")
 
 def add_base_argument(parser):
-    parser.add_argument("--dataset_type", type=str, choices=["local", "massspecgym"], default=config.data.dataset_type, help="Dataset type")
+    parser.add_argument("--dataset_type", type=str, choices=["massbank", "massspecgym", "nplib1"], default=config.data.dataset_type, help="Dataset type")
     parser.add_argument("--data_path", type=str, default=config.data.data_path, help="Dataset directory (required for massbank/nplib1)")
     parser.add_argument("--save_dir", type=str, default=config.general.save_dir, help="Directory to save model and logs")
 
@@ -74,16 +74,17 @@ def dict_to_spectrum(data_list):
     return spectra
 
 def load_data(dataset_type, data_path):
-    if dataset_type == "massbank":
-        if not data_path:
-            raise ValueError("--data_path is required for massbank dataset")
-        provider = MassBankProvider(data_dir=data_path)
-        train_raw = provider.load_data(mode='train')
-        val_raw = provider.load_data(mode='val')
-    else:
+    if dataset_type == "massspecgym":
         provider = MassSpecGymProvider()
-        train_raw = provider.load_data(mode='train')
-        val_raw = provider.load_data(mode='val')
+    elif dataset_type == "massbank":
+        provider = MassBankProvider()
+    elif dataset_type == "nplib1":
+        provider = NPLIB1Provider()
+    else:
+        raise ValueError("--dataset_type is invalid")
+
+    train_raw = provider.load_data(mode='train')
+    val_raw = provider.load_data(mode='val')
 
     if not train_raw:
         logging.error("No training data loaded. Check your data paths or internet connection.")

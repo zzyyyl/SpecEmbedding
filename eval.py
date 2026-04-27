@@ -11,15 +11,10 @@ from SpecEmbedding.data.tokenizer import Tokenizer
 from SpecEmbedding.utils.model import search, load_transformer_model, SiameseModel
 from SpecEmbedding.config import config
 
-def setup_logging(log_file):
-    logging.basicConfig(
-        level=logging.INFO, 
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_file, encoding='utf-8'),
-            logging.StreamHandler()
-        ]
-    )
+from train import (
+    setup_logging,
+    startup_logging,
+)
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate SpecEmbedding model using MassSpecGym split logic.")
@@ -29,16 +24,13 @@ def main():
 
     args = parser.parse_args()
 
-    device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
     # ---------------- Setup Logging ----------------
     checkpoint_path = Path(args.checkpoint)
     setup_logging(checkpoint_path.parent / "eval_massspecgym.log")
-    
-    logging.info("="*50)
-    logging.info("Starting MassSpecGym Evaluation (Replication Mode)")
-    logging.info(f"Arguments: {args}")
-    logging.info("="*50)
-    
+    startup_logging(args, "Starting MassSpecGym Evaluation (Replication Mode)")
+    set_seed(config.general.seed)
+    device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
+
     path_dir = Path(args.data_dir)
     replica_suffix = "-replication-{}.npy"
 
