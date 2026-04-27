@@ -9,17 +9,21 @@ if [ -z "$COMMIT_HASH" ]; then
     COMMIT_HASH="unknown"
 fi
 
+# Set dataset type (default to massspecgym)
+DATASET_TYPE=${1:-massspecgym}
+
 # Set save directory
-SAVE_DIR="checkpoints_align/${COMMIT_HASH}"
+SAVE_DIR="checkpoints_align/${COMMIT_HASH}_${DATASET_TYPE}"
 
 echo "========================================================"
 echo "Starting Training Pipeline"
 echo "Target Directory: ${SAVE_DIR}"
+echo "Dataset Type: ${DATASET_TYPE}"
 echo "========================================================"
 
 # 1. Train the alignment model
 python train_align.py \
-    --dataset_type massspecgym \
+    --dataset_type "${DATASET_TYPE}" \
     --pretrained_spec checkpoints/model.ckpt \
     --save_dir "${SAVE_DIR}"
 
@@ -28,6 +32,6 @@ echo "========================================================"
 echo "Starting Evaluation"
 echo "========================================================"
 
-python eval_align.py --checkpoint "${SAVE_DIR}/best_model_stage1.pth"
-python eval_align.py --checkpoint "${SAVE_DIR}/best_model_stage2.pth"
-python eval_align.py --checkpoint "${SAVE_DIR}/final_aligned_model.pth"
+python eval_align.py --dataset_type "${DATASET_TYPE}" --checkpoint "${SAVE_DIR}/best_model_stage1.pth" --no-mces
+python eval_align.py --dataset_type "${DATASET_TYPE}" --checkpoint "${SAVE_DIR}/best_model_stage2.pth"
+python eval_align.py --dataset_type "${DATASET_TYPE}" --checkpoint "${SAVE_DIR}/final_aligned_model.pth" --no-mces
