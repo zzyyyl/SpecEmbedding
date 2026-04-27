@@ -94,9 +94,14 @@ def process_nplib1():
                 raw_ms = info.get('ms', [])
                 peaks = [[float(p[1]), float(p[0])] for p in raw_ms]
                 mz = [float(p[1]) for p in raw_ms]
+                if not peaks:
+                    logging.warning(f"MZ peaks of {ik} is empty, skipped")
+                    continue
+
                 if sorted(mz) != mz:
                     peaks.reverse()
                     mz.reverse()
+
                 if sorted(mz) != mz:
                     logging.warning(f"MZ peaks of {ik} is not sorted, skipped")
                     continue
