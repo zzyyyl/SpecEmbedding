@@ -10,7 +10,7 @@ from matchms import Spectrum
 from SpecEmbedding.utils.clean import (
     get_ref_query
 )
-from data_provider import MSPProvider
+from src.data import MSPProvider
 
 def setup_logging():
     logging.basicConfig(

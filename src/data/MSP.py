@@ -3,19 +3,8 @@ import pickle
 import logging
 import random
 import numpy as np
-
 from tqdm import tqdm
-from rdkit import Chem
-
-def is_valid_smiles(smiles):
-    """校验 SMILES 的合法性"""
-    if not smiles or smiles.upper() in ['N/A', 'NA']:
-        return False
-
-    mol = Chem.MolFromSmiles(smiles)
-    if mol:
-        return True
-    return False
+from .utils import is_valid_smiles
 
 class MSPProvider:
     """NIST format (.msp) 数据解析器，支持数据划分（Train/Val/Test）、Pickle 缓存与加速读取"""
@@ -214,8 +203,6 @@ class MSPProvider:
     def load_candidates(self, mode='test', mz_tolerance=0.1):
         """
         为指定模式的数据生成候选集。
-        默认从该模式的所有唯一 SMILES 中，筛选出 precursor_mz 在容差范围内的 SMILES。
-        返回格式: {true_smiles: [cand_smiles1, cand_smiles2, ...]}
         """
         data = self.load_data(mode=mode)
         if not data:
@@ -241,18 +228,15 @@ class MSPProvider:
             query_mz = item.get('precursor_mz', 0.0)
             
             if query_mz <= 0:
-                # 如果没有有效的 m/z，则将所有唯一 SMILES 作为候选集
                 candidates_dict[true_smiles] = unique_smiles_list
                 continue
 
-            # 找到在容差范围内的所有 SMILES
             diffs = np.abs(avg_mzs - query_mz)
             mask = diffs <= mz_tolerance
             
             indices = np.where(mask)[0]
             cands = [unique_smiles_list[i] for i in indices]
             
-            # 确保正确答案在里面
             if true_smiles not in cands:
                 cands.append(true_smiles)
                 
@@ -260,147 +244,3 @@ class MSPProvider:
 
         logging.info(f"Candidates generated for {len(candidates_dict)} queries.")
         return candidates_dict
-
-class MassSpecGymProvider:
-    """MassSpecGym (HuggingFace) 数据加载器，输出格式与 MSPProvider 一致"""
-    def __init__(self, repo_id="roman-bushuiev/MassSpecGym", filename="data/MassSpecGym.tsv", use_cache=True, cache_dir="data"):
-        self.repo_id = repo_id
-        self.filename = filename
-        self.use_cache = use_cache
-        self.cache_dir = cache_dir
-
-    def load_data(self, mode='train'):
-        """
-        mode: 'train', 'val', 'test'
-        """
-        if self.use_cache:
-            if not os.path.exists(self.cache_dir):
-                os.makedirs(self.cache_dir)
-            cache_path = os.path.join(self.cache_dir, f"MassSpecGym_{mode}.pkl")
-            if os.path.exists(cache_path):
-                logging.info(f"Loading MassSpecGym {mode} data from cache: {cache_path} ...")
-                try:
-                    with open(cache_path, 'rb') as f:
-                        return pickle.load(f)
-                except Exception as e:
-                    logging.warning(f"Failed to load cache {cache_path}: {e}. Downloading from HF...")
-        else:
-            cache_path = None
-
-        try:
-            import pandas as pd
-            from huggingface_hub import hf_hub_download
-        except ImportError:
-            logging.error("Please install pandas and huggingface_hub: pip install pandas huggingface_hub")
-            return []
-
-        logging.info(f"Downloading/Loading MassSpecGym dataset ({mode})...")
-        try:
-            data_path = hf_hub_download(repo_id=self.repo_id, filename=self.filename, repo_type="dataset")
-            df = pd.read_csv(data_path, sep="\t")
-            
-            # 过滤对应 fold (MassSpecGym 使用 'train', 'val', 'test')
-            df = df[df['fold'] == mode]
-            logging.info(f"MassSpecGym {mode} size: {len(df)}")
-
-            # 转换为统一格式: [{'smiles': ..., 'peaks': [[mz, int], ...]}, ...]
-            parsed_results = []
-            
-            for _, row in df.iterrows():
-                smiles = row['smiles']
-
-                if not is_valid_smiles(smiles):
-                    continue
-
-                # MassSpecGym 的峰数据是逗号分隔的字符串
-                mzs = [float(x) for x in str(row['mzs']).split(',')]
-                ints = [float(x) for x in str(row['intensities']).split(',')]
-                peaks = list(zip(mzs, ints))
-                
-                # 尝试获取 precursor_mz，如果没有则设为 0
-                pmz = row.get('precursor_mz', 0.0)
-                
-                parsed_results.append({
-                    'smiles': smiles,
-                    'peaks': peaks,
-                    'precursor_mz': pmz
-                })
-            
-            # 保存到缓存
-            if self.use_cache and cache_path:
-                logging.info(f"Saving MassSpecGym {mode} data to cache: {cache_path} ...")
-                with open(cache_path, 'wb') as f:
-                    pickle.dump(parsed_results, f)
-
-            return parsed_results
-        except Exception as e:
-            logging.error(f"Failed to load MassSpecGym data: {e}")
-            return []
-
-    def load_candidates(self, type="mass"):
-        """
-        加载 MassSpecGym 的候选集 (默认为质量过滤后的候选集)
-        type: "mass" (质量匹配), "retrieval" (检索任务)
-        """
-        if self.use_cache:
-            if not os.path.exists(self.cache_dir):
-                os.makedirs(self.cache_dir)
-            cache_path = os.path.join(self.cache_dir, f"MassSpecGym_candidates_{type}.pkl")
-            if os.path.exists(cache_path):
-                logging.info(f"Loading MassSpecGym candidates ({type}) from cache...")
-                with open(cache_path, 'rb') as f:
-                    return pickle.load(f)
-        else:
-            cache_path = None
-
-        try:
-            import json
-            from huggingface_hub import hf_hub_download
-            
-            filename = f"data/molecules/MassSpecGym_retrieval_candidates_{type}.json"
-            logging.info(f"Downloading MassSpecGym candidates: {filename}...")
-            cand_path = hf_hub_download(repo_id=self.repo_id, filename=filename, repo_type="dataset")
-            with open(cand_path, 'r') as f:
-                data = json.load(f)
-            
-            if self.use_cache and cache_path:
-                with open(cache_path, 'wb') as f:
-                    pickle.dump(data, f)
-            return data
-        except Exception as e:
-            logging.error(f"Failed to load MassSpecGym candidates: {e}")
-            return {}
-
-class MZBatchSampler:
-    """按前体离子质量 (m/z) 进行分组取样的 BatchSampler，实现 Hard Negative Mining"""
-    def __init__(self, data_list, batch_size, shuffle=True):
-        self.data_list = data_list
-        self.batch_size = batch_size
-        self.shuffle = shuffle
-        
-        # 1. 提取所有记录的 m/z 并排序，记录原始索引
-        mzs = []
-        for i, item in enumerate(data_list):
-            mzs.append((item.get('precursor_mz', 0.0), i))
-        
-        # 按 m/z 升序排列
-        mzs.sort(key=lambda x: x[0])
-        self.sorted_indices = [x[1] for x in mzs]
-        
-    def __iter__(self):
-        # 2. 将排序后的索引分块
-        batches = []
-        for i in range(0, len(self.sorted_indices), self.batch_size):
-            batch = self.sorted_indices[i : i + self.batch_size]
-            if len(batch) == self.batch_size:
-                batches.append(batch)
-        
-        # 3. 如果需要打乱，打乱的是 Batch 的顺序，而不是 Batch 内部的顺序
-        if self.shuffle:
-            random.shuffle(batches)
-            
-        for batch in batches:
-            yield batch
-
-    def __len__(self):
-        return len(self.sorted_indices) // self.batch_size

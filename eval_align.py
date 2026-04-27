@@ -22,7 +22,7 @@ from SpecEmbedding.models_align import SpecMolAlignModel, GINEEncoder
 from SpecEmbedding.data.graph_utils import smiles_to_graph
 from SpecEmbedding.config import config
 
-from data_provider import MassSpecGymProvider
+from src.data import MassSpecGymProvider
 from train import (
     setup_logging,
     startup_logging,
@@ -129,7 +129,7 @@ def main():
     model.eval()
 
     # 2. Load Data and Candidates
-    from data_provider import MSPProvider
+    from src.data import MSPProvider
     if args.dataset_type == "massspecgym":
         provider = MassSpecGymProvider()
         test_raw = provider.load_data(mode='test')

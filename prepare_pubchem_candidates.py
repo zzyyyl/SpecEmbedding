@@ -12,7 +12,7 @@ import threading
 from pathlib import Path
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from data_provider import MSPProvider, MassSpecGymProvider
+from src.data import MSPProvider, MassSpecGymProvider
 from train import setup_logging
 from rdkit import Chem
 

@@ -29,7 +29,7 @@ from SpecEmbedding.type import (
     TokenizerConfig
 )
 
-from data_provider import MSPProvider, MassSpecGymProvider
+from src.data import MSPProvider, MassSpecGymProvider
 
 def setup_logging(log_file):
     logging.basicConfig(
