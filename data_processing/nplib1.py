@@ -2,6 +2,7 @@ import os
 import pickle
 import numpy as np
 from pathlib import Path
+import logging
 
 def process_nplib1():
     # Define paths
@@ -12,10 +13,10 @@ def process_nplib1():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     if not base_dir.exists():
-        print(f"Error: Directory {base_dir} not found.")
+        logging.error(f"Directory {base_dir} not found.")
         return
 
-    print("Loading original pickle files...")
+    logging.info("Loading original pickle files...")
     # 1. Load data
     try:
         with open(base_dir / "split.pkl", "rb") as f:
@@ -27,12 +28,12 @@ def process_nplib1():
         with open(base_dir / "cand_dict_large.pkl", "rb") as f:
             cand_dict_large = pickle.load(f)
     except FileNotFoundError as e:
-        print(f"Error loading files: {e}")
+        logging.error(f"Error loading files: {e}")
         return
 
     # 2. Build NPLIB1_candidates.pkl
     # Format: { "$smiles": ["$smiles", ...] }
-    print("Generating NPLIB1_candidates.pkl...")
+    logging.info("Generating NPLIB1_candidates.pkl...")
     candidates_smiles = {}
     for q_ik, cand_iks in cand_dict_large.items():
         if q_ik not in ik_to_smiles:
@@ -52,7 +53,7 @@ def process_nplib1():
 
     with open(output_dir / "NPLIB1_candidates.pkl", "wb") as f:
         pickle.dump(candidates_smiles, f)
-    print(f"Saved NPLIB1_candidates.pkl with {len(candidates_smiles)} unique SMILES.")
+    logging.info(f"Saved NPLIB1_candidates.pkl with {len(candidates_smiles)} unique SMILES.")
 
     # 3. Build fold files
     # Index data_dict by inchikey (handling multiple spectra per InChIKey)
@@ -68,17 +69,19 @@ def process_nplib1():
     fold_map = {"train": "train", "valid": "val", "test": "test"}
     
     for in_fold, out_fold in fold_map.items():
-        print(f"Processing fold: {out_fold}...")
+        logging.info(f"Processing fold: {out_fold}...")
         fold_iks = split.get(in_fold, [])
         processed_data = []
         
         for ik in fold_iks:
             if ik not in ik_to_data_entries:
+                logging.warning(f"Unrecognized {ik}, skipped")
                 continue
             
             for info in ik_to_data_entries[ik]:
                 smiles = ik_to_smiles.get(ik)
                 if not smiles:
+                    logging.warning(f"Unrecognized smiles of {ik}, skipped")
                     continue
                 
                 try:
@@ -90,6 +93,13 @@ def process_nplib1():
                 # Assuming info['ms'] is a numpy array or list of pairs
                 raw_ms = info.get('ms', [])
                 peaks = [[float(p[1]), float(p[0])] for p in raw_ms]
+                mz = [float(p[1]) for p in raw_ms]
+                if sorted(mz) != mz:
+                    peaks.reverse()
+                    mz.reverse()
+                if sorted(mz) != mz:
+                    logging.warning(f"MZ peaks of {ik} is not sorted, skipped")
+                    continue
                 
                 processed_data.append({
                     'smiles': smiles,
@@ -100,7 +110,7 @@ def process_nplib1():
         out_file = output_dir / f"NPLIB1_{out_fold}.pkl"
         with open(out_file, "wb") as f:
             pickle.dump(processed_data, f)
-        print(f"Saved {out_file} with {len(processed_data)} spectra.")
+        logging.info(f"Saved {out_file} with {len(processed_data)} spectra.")
 
 if __name__ == "__main__":
     process_nplib1()
