@@ -6,8 +6,8 @@ import numpy as np
 from tqdm import tqdm
 from .utils import is_valid_smiles
 
-class MSPProvider:
-    """NIST format (.msp) 数据解析器，支持数据划分（Train/Val/Test）、Pickle 缓存与加速读取"""
+class MassBankProvider:
+    """NIST format (.msp) 数据解析器，专用于 MassBank 数据库，支持数据划分（Train/Val/Test）、Pickle 缓存与加速读取"""
     def __init__(self, file_path, limit=None, use_cache=True, seed=42):
         self.file_path = file_path
         self.limit = limit

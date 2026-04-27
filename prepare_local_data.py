@@ -10,7 +10,7 @@ from matchms import Spectrum
 from SpecEmbedding.utils.clean import (
     get_ref_query
 )
-from src.data import MSPProvider
+from src.data import MassBankProvider
 
 def setup_logging():
     logging.basicConfig(
@@ -19,8 +19,8 @@ def setup_logging():
     )
 
 def main():
-    parser = argparse.ArgumentParser(description="Prepare Local MSP evaluation datasets (Spectrum objects in .npy).")
-    parser.add_argument("--data_path", type=str, required=True, help="Path to the local .msp file.")
+    parser = argparse.ArgumentParser(description="Prepare MassBank evaluation datasets (Spectrum objects in .npy).")
+    parser.add_argument("--data_path", type=str, required=True, help="Path to the massbank .msp file.")
     parser.add_argument("--save_dir", type=str, required=True, help="Directory to save the generated .npy files.")
     parser.add_argument("--replications", type=int, default=10, help="Number of replicated splits to generate.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
@@ -33,9 +33,9 @@ def main():
     path_dir.mkdir(parents=True, exist_ok=True)
     replica_suffix = "-replication-{}.npy"
 
-    # 1. Load local test data using MSPProvider
-    logging.info(f"Loading local test data from {args.data_path}...")
-    provider = MSPProvider(args.data_path)
+    # 1. Load massbank test data using MassBankProvider
+    logging.info(f"Loading massbank test data from {args.data_path}...")
+    provider = MassBankProvider(args.data_path)
     test_raw = provider.load_data(mode='test')
     
     if not test_raw:

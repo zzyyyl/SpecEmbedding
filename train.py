@@ -29,7 +29,7 @@ from SpecEmbedding.type import (
     TokenizerConfig
 )
 
-from src.data import MSPProvider, MassSpecGymProvider
+from src.data import MassBankProvider, MassSpecGymProvider
 
 def setup_logging(log_file):
     logging.basicConfig(
@@ -77,7 +77,7 @@ def load_data(dataset_type, data_path):
     if dataset_type == "local":
         if not data_path:
             raise ValueError("--data_path is required for local dataset")
-        provider = MSPProvider(data_path)
+        provider = MassBankProvider(data_path)
         train_raw = provider.load_data(mode='train')
         val_raw = provider.load_data(mode='val')
     else:

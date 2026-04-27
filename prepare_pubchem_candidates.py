@@ -12,7 +12,7 @@ import threading
 from pathlib import Path
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from src.data import MSPProvider, MassSpecGymProvider
+from src.data import MassBankProvider, MassSpecGymProvider
 from train import setup_logging
 from rdkit import Chem
 
@@ -145,8 +145,8 @@ class PubChemFetcher:
 
 def main():
     parser = argparse.ArgumentParser(description="Prepare PubChem structural similarity candidate sets.")
-    parser.add_argument("--input_msp", type=str, help="Path to input .msp file (for local datasets)")
-    parser.add_argument("--dataset", type=str, choices=["local", "massspecgym"], default="local", help="Dataset type")
+    parser.add_argument("--input_msp", type=str, help="Path to input .msp file (for massbank datasets)")
+    parser.add_argument("--dataset", type=str, choices=["massbank", "massspecgym"], default="massbank", help="Dataset type")
     parser.add_argument("--output", type=str, required=True, help="Path to save the candidates mapping (.pkl)")
     parser.add_argument("--max_cands", type=int, default=-1, help="Maximum number of candidates to keep per SMILES")
     parser.add_argument("--cache_dir", type=str, default="data/pubchem_similarity_cache", help="Directory for API cache")
@@ -163,7 +163,7 @@ def main():
     else:
         if not args.input_msp:
             raise ValueError("--input_msp is required")
-        provider = MSPProvider(args.input_msp)
+        provider = MassBankProvider(args.input_msp)
         data = provider.load_data(mode=args.mode)
 
     if not data:

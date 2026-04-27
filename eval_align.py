@@ -22,7 +22,7 @@ from SpecEmbedding.models_align import SpecMolAlignModel, GINEEncoder
 from SpecEmbedding.data.graph_utils import smiles_to_graph
 from SpecEmbedding.config import config
 
-from src.data import MassSpecGymProvider, MSPProvider, NPLIB1Provider
+from src.data import MassSpecGymProvider, MassBankProvider, NPLIB1Provider
 from train import (
     setup_logging,
     startup_logging,
@@ -92,8 +92,8 @@ def mol_collate_fn(batch):
 def main():
     parser = argparse.ArgumentParser(description="Efficient Evaluate SpecMolAlignModel on Cross-Modal Retrieval.")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to best aligned model checkpoint")
-    parser.add_argument("--dataset_type", type=str, choices=["local", "massspecgym", "nplib1"], default="massspecgym", help="Dataset type")
-    parser.add_argument("--data_path", type=str, help="Path to .msp file or data directory (required for local/nplib1)")
+    parser.add_argument("--dataset_type", type=str, choices=["massbank", "massspecgym", "nplib1"], default="massspecgym", help="Dataset type")
+    parser.add_argument("--data_path", type=str, help="Path to .msp file or data directory (required for massbank/nplib1)")
     parser.add_argument("--no-mces", action="store_true", help="Disable MCES structural similaritycalculation")
 
     args = parser.parse_args()
@@ -140,7 +140,7 @@ def main():
     else:
         if not args.data_path:
             raise ValueError("--data_path is required for local dataset")
-        provider = MSPProvider(args.data_path)
+        provider = MassBankProvider(args.data_path)
         test_raw = provider.load_data(mode='test')
         # 为本地数据集动态生成基于 m/z 容差的候选集
         candidates_dict = provider.load_candidates(mode='test', mz_tolerance=0.1)
