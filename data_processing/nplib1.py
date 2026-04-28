@@ -6,7 +6,13 @@ import pickle
 import numpy as np
 from pathlib import Path
 import logging
+
 from matchms import Spectrum
+from matchms.filtering import (
+    default_filters,
+    normalize_intensities,
+    select_by_intensity,
+)
 
 from train import setup_logging
 
@@ -126,6 +132,9 @@ def process_nplib1():
                         'inchikey': ik
                     }
                 )
+                spectrum = default_filters(spectrum)
+                spectrum = normalize_intensities(spectrum)
+                spectrum = select_by_intensity(spectrum, intensity_from=0.01)
                 processed_data.append(spectrum)
         
         out_file = output_dir / f"NPLIB1_{out_fold}.pkl"
