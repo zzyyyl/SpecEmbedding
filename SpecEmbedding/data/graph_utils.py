@@ -73,8 +73,6 @@ def smiles_to_graph(smiles: str):
     """将 SMILES 转换为 PyG 图数据对象"""
     mol = Chem.MolFromSmiles(smiles, sanitize=False)
     mol.UpdatePropertyCache(strict=False)
-    if mol is None:
-        return None
     
     # 提取节点特征
     node_features = [get_atom_features(atom) for atom in mol.GetAtoms()]

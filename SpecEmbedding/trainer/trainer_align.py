@@ -32,14 +32,11 @@ class TrainerAlign:
         total_loss = 0
         pbar = tqdm(self.train_loader, desc=f"[{stage_name}] Epoch {epoch} Training", ascii=True)
         
-        for batch in pbar:
-            if batch is None:
-                continue
-                
-            spec_mz = batch["spec_mz"].to(self.device)
-            spec_intensity = batch["spec_intensity"].to(self.device)
-            spec_mask = batch["spec_mask"].to(self.device)
-            mol_graph = batch["mol_graph"].to(self.device)
+        for mzs, ints, masks, mols in pbar:
+            spec_mz = mzs.to(self.device)
+            spec_intensity = ints.to(self.device)
+            spec_mask = masks.to(self.device)
+            mol_graph = mols.to(self.device)
             
             optimizer.zero_grad()
             
@@ -61,14 +58,11 @@ class TrainerAlign:
         total_loss = 0
         pbar = tqdm(self.val_loader, desc=f"[{stage_name}] Epoch {epoch} Validation", ascii=True)
         
-        for batch in pbar:
-            if batch is None:
-                continue
-                
-            spec_mz = batch["spec_mz"].to(self.device)
-            spec_intensity = batch["spec_intensity"].to(self.device)
-            spec_mask = batch["spec_mask"].to(self.device)
-            mol_graph = batch["mol_graph"].to(self.device)
+        for mzs, ints, masks, mols in pbar:
+            spec_mz = mzs.to(self.device)
+            spec_intensity = ints.to(self.device)
+            spec_mask = masks.to(self.device)
+            mol_graph = mols.to(self.device)
             
             f_spec, f_mol, scale = self.model(spec_mz, spec_intensity, spec_mask, mol_graph)
             loss = self.criterion(f_spec, f_mol, scale)
