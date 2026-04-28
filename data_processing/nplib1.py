@@ -3,24 +3,46 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pickle
+import logging
 import numpy as np
 from pathlib import Path
-import logging
-
+from tqdm import tqdm
 from matchms import Spectrum
 from matchms.filtering import (
     default_filters,
-    normalize_intensities,
-    select_by_intensity,
 )
 
 from train import setup_logging
+
+from SpecEmbedding.utils.clean import (
+    apply_filters,
+    filter_by_precursor_mz,
+    clean_metadata,
+    clean_metadata2,
+    minimal_processing,
+    is_annotated,
+    count_annotations,
+)
+
+def filters_nplib1(spectra):
+    spectra = [default_filters(s) for s in tqdm(spectra, desc="Apply filters")]
+    spectra = [s for s in spectra if s is not None]
+    spectra = filter_by_precursor_mz(spectra)
+    count_annotations(spectra, "10 < precursor_mz < 1000")
+    spectra = [clean_metadata(s) for s in tqdm(spectra, desc="Clean metadata")]
+    spectra = [clean_metadata2(s) for s in tqdm(spectra, desc="Clean metadata 2")]
+    spectra = [minimal_processing(s) for s in tqdm(spectra, desc="Minimal processing")]
+    spectra = [s for s in spectra if s is not None]
+    count_annotations(spectra, "peak num >= 5")
+    spectra = is_annotated(spectra)
+    count_annotations(spectra, "annotated")
+    return spectra
 
 def process_nplib1():
     # Define paths
     base_dir = Path("data/NPLIB1")
     output_dir = Path("data")
-    
+
     # Ensure output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -50,13 +72,13 @@ def process_nplib1():
     for q_ik, cand_iks in cand_dict_large.items():
         if q_ik not in ik_to_smiles:
             continue
-        
+
         q_smiles = ik_to_smiles[q_ik]
         c_smiles_list = []
         for c_ik in cand_iks:
             if c_ik in ik_to_smiles:
                 c_smiles_list.append(ik_to_smiles[c_ik])
-        
+
         if c_smiles_list:
             # Ensure ground truth is present
             if q_smiles not in c_smiles_list:
@@ -68,9 +90,7 @@ def process_nplib1():
     logging.info(f"Saved NPLIB1_candidates.pkl with {len(candidates_smiles)} unique SMILES.")
 
     # 3. Build fold files
-    # Index data_dict by inchikey (handling multiple spectra per InChIKey)
     ik_to_data_entries = {}
-    # Based on user description, data_dict is a dict: { "id": { ... } }
     for entry_id, info in data_dict.items():
         ik = info.get('inchikey')
         if not ik: continue
@@ -79,28 +99,23 @@ def process_nplib1():
         ik_to_data_entries[ik].append(info)
 
     fold_map = {"train": "train", "valid": "val", "test": "test"}
-    
+
     for in_fold, out_fold in fold_map.items():
         logging.info(f"Processing fold: {out_fold}...")
         fold_iks = split.get(in_fold, [])
-        processed_data = []
-        
+        spectra = []
+
         for ik in fold_iks:
             if ik not in ik_to_data_entries:
                 logging.warning(f"Unrecognized {ik}, skipped")
                 continue
-            
+
             for info in ik_to_data_entries[ik]:
                 smiles = ik_to_smiles.get(ik)
                 if not smiles:
                     logging.warning(f"Unrecognized smiles of {ik}, skipped")
                     continue
-                
-                try:
-                    precursor_mz = float(info['PrecursorMZ'])
-                except (ValueError, TypeError, KeyError):
-                    precursor_mz = 0.0
-                
+
                 # peaks: [int, mz] -> [mz, int]
                 # Assuming info['ms'] is a numpy array or list of pairs
                 if 'ms' not in info:
@@ -122,25 +137,26 @@ def process_nplib1():
                 if sorted(mzs) != mzs:
                     logging.warning(f"MZ peaks of {ik} is not sorted, skipped")
                     continue
-                
+
+                metadata = info
+                metadata['precursor_type'] = metadata.pop('Precursor')
+                metadata['precursor_mz'] = metadata.pop('PrecursorMZ')
+                metadata.update({
+                    'smiles': smiles,
+                    'inchikey': ik
+                })
                 spectrum = Spectrum(
                     mz=np.array(mzs).astype(float),
                     intensities=np.array(ints).astype(float),
-                    metadata={
-                        'smiles': smiles,
-                        'precursor_mz': precursor_mz,
-                        'inchikey': ik
-                    }
+                    metadata=metadata
                 )
-                spectrum = default_filters(spectrum)
-                spectrum = normalize_intensities(spectrum)
-                spectrum = select_by_intensity(spectrum, intensity_from=0.01)
-                processed_data.append(spectrum)
-        
+                spectra.append(spectrum)
+
+        spectra = filters_nplib1(spectra)
         out_file = output_dir / f"NPLIB1_{out_fold}.pkl"
         with open(out_file, "wb") as f:
-            pickle.dump(processed_data, f)
-        logging.info(f"Saved {out_file} with {len(processed_data)} spectra.")
+            pickle.dump(spectra, f)
+        logging.info(f"Saved {out_file} with {len(spectra)} spectra.")
 
 if __name__ == "__main__":
     setup_logging()
