@@ -5,7 +5,7 @@ general:
 
 data:
   dataset_type: "massspecgym" # or "local"
-  data_path: null
+  data_path: data
   cache_path: "data/train_cache"
   tokenizer:
     max_len: 100

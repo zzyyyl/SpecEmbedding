@@ -93,7 +93,7 @@ def main():
     parser = argparse.ArgumentParser(description="Efficient Evaluate SpecMolAlignModel on Cross-Modal Retrieval.")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to best aligned model checkpoint")
     parser.add_argument("--dataset_type", type=str, choices=["massbank", "massspecgym", "nplib1"], default="massspecgym", help="Dataset type")
-    parser.add_argument("--data_path", type=str, help="Dataset directory (required for massbank/nplib1)")
+    parser.add_argument("--data_path", type=str, default=config.data.data_path, help="Dataset directory (required for massbank/nplib1)")
     parser.add_argument("--no-mces", action="store_true", help="Disable MCES structural similaritycalculation")
 
     args = parser.parse_args()
@@ -137,14 +137,12 @@ def main():
     if args.dataset_type == "massspecgym":
         provider = MassSpecGymProvider()
         test_raw = provider.load_data(mode='test')
-        candidates_dict = provider.load_candidates('mass') # Dictionary: {true_smiles: [cand1, cand2, ...]}
+        candidates_dict = provider.load_candidates('mass')
     elif args.dataset_type == "nplib1":
-        provider = NPLIB1Provider(data_dir=args.data_path or "data")
+        provider = NPLIB1Provider(data_dir=args.data_path)
         test_raw = provider.load_data(mode='test')
         candidates_dict = provider.load_candidates()
     else:
-        if not args.data_path:
-            raise ValueError("--data_path is required for massbank dataset")
         provider = MassBankProvider(data_dir=args.data_path)
         test_raw = provider.load_data(mode='test')
         candidates_dict = provider.load_candidates()
