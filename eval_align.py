@@ -9,6 +9,7 @@ import pulp
 import numpy as np
 import torch
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 from torch.utils.data import DataLoader, Dataset
 from torch_geometric.data import Batch
@@ -214,6 +215,11 @@ def main():
     mrr_sum = 0.0
     mces_pairs = []
 
+    # Initialize histograms for similarity distributions
+    sim_bins = np.arange(-1.0, 1.01, 0.01)
+    target_sim_counts = np.zeros(len(sim_bins) - 1, dtype=np.int64)
+    candidate_sim_counts = np.zeros(len(sim_bins) - 1, dtype=np.int64)
+
     logging.info("Computing Spectrum Embeddings and Evaluating...")
     with torch.no_grad():
         for batch in tqdm(spec_loader, desc="Evaluation", ascii=True):
@@ -251,11 +257,27 @@ def main():
                 # Perform efficient similarity search via matrix multiplication
                 sims = torch.mm(query_emb, cand_embs.T).squeeze(0)
                 
+                # Update similarity histograms
+                true_idx_global = smiles_to_idx[true_smiles]
+                true_rel_idx = (cand_indices == true_idx_global).nonzero(as_tuple=True)[0].item()
+                sims_np = sims.cpu().numpy()
+                
+                target_sim = sims_np[true_rel_idx]
+                cand_sims = np.delete(sims_np, true_rel_idx)
+                
+                # Update target histogram
+                t_idx = np.digitize(target_sim, sim_bins) - 1
+                if 0 <= t_idx < len(target_sim_counts):
+                    target_sim_counts[t_idx] += 1
+                
+                # Update candidate histogram
+                c_counts, _ = np.histogram(cand_sims, bins=sim_bins)
+                candidate_sim_counts += c_counts
+
                 # Sort candidates by similarity in descending order
                 sorted_sims, sorted_rel_idx = torch.sort(sims, descending=True)
                 
                 # Identify the rank of the ground truth molecule
-                true_idx_global = smiles_to_idx[true_smiles]
                 sorted_global_indices = cand_indices[sorted_rel_idx]
                 
                 # Determine the index (rank) of the true SMILES in the sorted list
@@ -294,7 +316,32 @@ def main():
     mrr = mrr_sum / valid_queries
     logging.info(f"Mean Reciprocal Rank (MRR): {mrr:.4f}")
 
-    # 7. Parallel MCES Calculation
+    # 7. Plot Similarity Distribution
+    logging.info("Plotting similarity distribution...")
+    plt.figure(figsize=(10, 6))
+    bin_centers = (sim_bins[:-1] + sim_bins[1:]) / 2
+    
+    # We use bar plot to represent the histogram since we already have counts
+    plt.bar(bin_centers, candidate_sim_counts, width=0.01, alpha=0.5, label='Candidates', color='gray')
+    plt.bar(bin_centers, target_sim_counts, width=0.01, alpha=0.7, label='Targets', color='blue')
+    
+    plt.xlabel('Cosine Similarity')
+    plt.ylabel('Count')
+    plt.title(f'Cosine Similarity Distribution ({args.dataset_type})')
+    plt.legend()
+    plt.grid(True, linestyle='--', alpha=0.6)
+    
+    # Optional: use log scale for Y if candidate counts dwarf target counts
+    if candidate_sim_counts.max() > target_sim_counts.max() * 10:
+        plt.yscale('log')
+        plt.ylabel('Count (Log Scale)')
+        logging.info("Using log scale for Y-axis in plot due to large difference in counts.")
+
+    plot_path = checkpoint_path.parent / f"similarity_dist_{args.dataset_type}.png"
+    plt.savefig(plot_path)
+    logging.info(f"Similarity distribution plot saved to {plot_path}")
+
+    # 8. Parallel MCES Calculation
     if not args.no_mces:
         mces_sum = 0.0
         mces_errors = 0
