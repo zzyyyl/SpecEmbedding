@@ -5,7 +5,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pickle
 import logging
 import random
-import argparse
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
@@ -13,6 +12,17 @@ from rdkit import Chem
 from matchms import Spectrum
 
 from train import setup_logging
+
+from SpecEmbedding.utils.clean import (
+    apply_filters,
+    seperate_spectra_by_ionmode,
+    filter_by_precursor_mz,
+    clean_metadata,
+    clean_metadata2,
+    minimal_processing,
+    is_annotated,
+    count_annotations,
+)
 
 def is_valid_smiles(smiles):
     """校验 SMILES 的合法性"""
@@ -23,6 +33,21 @@ def is_valid_smiles(smiles):
         return mol is not None
     except:
         return False
+
+def filters_massbank(spectra):
+    spectra = [apply_filters(s) for s in tqdm(spectra, desc="Apply filters")]
+    spectra = [s for s in spectra if s is not None]
+    positive, _ = seperate_spectra_by_ionmode(spectra)
+    spectra = filter_by_precursor_mz(positive)
+    count_annotations(spectra, "10 < precursor_mz < 1000")
+    spectra = [clean_metadata(s) for s in tqdm(spectra, desc="Clean metadata")]
+    spectra = [clean_metadata2(s) for s in tqdm(spectra, desc="Clean metadata 2")]
+    spectra = [minimal_processing(s) for s in tqdm(spectra, desc="Minimal processing")]
+    spectra = [s for s in spectra if s is not None]
+    count_annotations(spectra, "peak num >= 5")
+    spectra = is_annotated(spectra)
+    count_annotations(spectra, "annotated")
+    return spectra
 
 def create_spectrum(record):
     if not record or 'peaks' not in record or not record['peaks']:
@@ -48,13 +73,13 @@ def is_valid_record(record):
         record['peaks'] and \
         record['inchi'].upper() not in ['N/A', 'NA']
 
-def parse_msp(file_path, limit=None):
+def parse_msp(file_path):
     """解析原始 MSP 文件"""
     if not os.path.exists(file_path):
         logging.error(f"File {file_path} does not exist.")
         return []
 
-    parsed_results = []
+    spectra = []
     logging.info(f"Starting to parse MSP file: {file_path} ...")
     
     # 预先设置 RDKit 静默模式
@@ -73,9 +98,7 @@ def parse_msp(file_path, limit=None):
                 if is_valid_record(record):
                     spectrum = create_spectrum(record)
                     if spectrum:
-                        parsed_results.append(spectrum)
-                        if limit and len(parsed_results) >= limit:
-                            break
+                        spectra.append(spectrum)
                 record = {}
                 in_peaks = False
                 continue
@@ -105,15 +128,14 @@ def parse_msp(file_path, limit=None):
                         record['peaks'].append([mz, intensity])
                     except ValueError:
                         continue
-        
-        if not limit or len(parsed_results) < limit:
-            if is_valid_record(record):
-                spectrum = create_spectrum(record)
-                if spectrum:
-                    parsed_results.append(spectrum)
 
-    logging.info(f"Parsing completed! Total valid data: {len(parsed_results)}")
-    return parsed_results
+        if is_valid_record(record):
+            spectrum = create_spectrum(record)
+            if spectrum:
+                spectra.append(spectrum)
+
+    logging.info(f"Parsing completed! Total valid data: {len(spectra)}")
+    return spectra
 
 def split_and_save(data, output_dir, train_ratio=0.8, val_ratio=0.1, seed=42):
     """
@@ -187,8 +209,9 @@ def process_massbank():
     base_dir = Path("data/MassBank")
     output_dir = Path("data")
 
-    data = parse_msp(base_dir / "MassBank_NISTformat.msp")
-    split_and_save(data, output_dir)
+    spectra = parse_msp(base_dir / "MassBank_NISTformat.msp")
+    spectra = filters_massbank(spectra)
+    split_and_save(spectra, output_dir)
 
 if __name__ == "__main__":
     setup_logging()
