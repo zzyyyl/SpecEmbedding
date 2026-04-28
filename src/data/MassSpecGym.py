@@ -1,6 +1,10 @@
 import os
 import pickle
 import logging
+import numpy as np
+from tqdm import tqdm
+from matchms import Spectrum
+
 from .utils import is_valid_smiles
 
 class MassSpecGymProvider:
@@ -45,10 +49,9 @@ class MassSpecGymProvider:
             df = df[df['fold'] == mode]
             logging.info(f"MassSpecGym {mode} size: {len(df)}")
 
-            # 转换为统一格式: [{'smiles': ..., 'peaks': [[mz, int], ...]}, ...]
             parsed_results = []
             
-            for _, row in df.iterrows():
+            for _, row in tqdm(df.iterrows(), desc="Processing spectra"):
                 smiles = row['smiles']
 
                 if not is_valid_smiles(smiles):
@@ -57,16 +60,18 @@ class MassSpecGymProvider:
                 # MassSpecGym 的峰数据是逗号分隔的字符串
                 mzs = [float(x) for x in str(row['mzs']).split(',')]
                 ints = [float(x) for x in str(row['intensities']).split(',')]
-                peaks = list(zip(mzs, ints))
-                
-                # 尝试获取 precursor_mz，如果没有则设为 0
-                pmz = row.get('precursor_mz', 0.0)
-                
-                parsed_results.append({
-                    'smiles': smiles,
-                    'peaks': peaks,
-                    'precursor_mz': pmz
-                })
+
+                metadata = row.to_dict()
+                metadata.pop('mzs', None)
+                metadata.pop('intensities', None)
+
+                spectrum = Spectrum(
+                    mz=np.array(mzs).astype(float),
+                    intensities=np.array(ints).astype(float),
+                    metadata=metadata
+                )
+
+                parsed_results.append(spectrum)
             
             # 保存到缓存
             if self.use_cache and cache_path:

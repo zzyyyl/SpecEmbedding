@@ -1,8 +1,14 @@
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import pickle
 import numpy as np
 from pathlib import Path
 import logging
+from matchms import Spectrum
+
+from train import setup_logging
 
 def process_nplib1():
     # Define paths
@@ -91,26 +97,36 @@ def process_nplib1():
                 
                 # peaks: [int, mz] -> [mz, int]
                 # Assuming info['ms'] is a numpy array or list of pairs
-                raw_ms = info.get('ms', [])
-                peaks = [[float(p[1]), float(p[0])] for p in raw_ms]
-                mz = [float(p[1]) for p in raw_ms]
-                if not peaks:
+                if 'ms' not in info:
+                    logging.warning(f"MZ peaks of {ik} not found, skipped")
+                    continue
+
+                raw_ms = info.pop('ms')
+                if raw_ms.size == 0:
                     logging.warning(f"MZ peaks of {ik} is empty, skipped")
                     continue
 
-                if sorted(mz) != mz:
-                    peaks.reverse()
-                    mz.reverse()
+                mzs = [float(p[1]) for p in raw_ms]
+                ints = [float(p[0]) for p in raw_ms]
 
-                if sorted(mz) != mz:
+                if sorted(mzs) != mzs:
+                    mzs.reverse()
+                    ints.reverse()
+
+                if sorted(mzs) != mzs:
                     logging.warning(f"MZ peaks of {ik} is not sorted, skipped")
                     continue
                 
-                processed_data.append({
-                    'smiles': smiles,
-                    'precursor_mz': precursor_mz,
-                    'peaks': peaks
-                })
+                spectrum = Spectrum(
+                    mz=np.array(mzs).astype(float),
+                    intensities=np.array(ints).astype(float),
+                    metadata={
+                        'smiles': smiles,
+                        'precursor_mz': precursor_mz,
+                        'inchikey': ik
+                    }
+                )
+                processed_data.append(spectrum)
         
         out_file = output_dir / f"NPLIB1_{out_fold}.pkl"
         with open(out_file, "wb") as f:
@@ -118,4 +134,5 @@ def process_nplib1():
         logging.info(f"Saved {out_file} with {len(processed_data)} spectra.")
 
 if __name__ == "__main__":
+    setup_logging()
     process_nplib1()

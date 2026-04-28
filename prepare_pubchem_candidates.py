@@ -170,7 +170,7 @@ def main():
         logging.error("No data loaded.")
         return
 
-    unique_smiles = sorted(list(set(item['smiles'] for item in data)))
+    unique_smiles = sorted(list(set(item.get("smiles") for item in data)))
     logging.info(f"Unique SMILES: {len(unique_smiles)}. Using {args.workers} workers.")
 
     # 2. Parallel Processing

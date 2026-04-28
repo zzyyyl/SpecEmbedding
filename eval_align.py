@@ -27,7 +27,6 @@ from src.data import MassSpecGymProvider, MassBankProvider, NPLIB1Provider
 from train import (
     setup_logging,
     startup_logging,
-    dict_to_spectrum
 )
 
 def mces_worker(smiles_pair):
@@ -206,9 +205,8 @@ def main():
     # 5. Compute Spectra Embeddings and Evaluate
     tokenizer_config = TokenizerConfig(max_len=100, show_progress_bar=False)
     tokenizer = Tokenizer(**tokenizer_config)
-    
-    test_spectra = dict_to_spectrum(test_raw)
-    test_sequences = tokenizer.tokenize_sequence(test_spectra)
+
+    test_sequences = tokenizer.tokenize_sequence(test_raw)
     
     spec_dataset = EvalSpecDataset(test_sequences)
     spec_loader = DataLoader(spec_dataset, batch_size=config.eval.calc_batch_size, shuffle=False)

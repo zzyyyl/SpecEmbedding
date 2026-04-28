@@ -1,11 +1,18 @@
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import pickle
 import logging
 import random
 import argparse
+import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 from rdkit import Chem
+from matchms import Spectrum
+
+from train import setup_logging
 
 def is_valid_smiles(smiles):
     """校验 SMILES 的合法性"""
@@ -16,6 +23,30 @@ def is_valid_smiles(smiles):
         return mol is not None
     except:
         return False
+
+def create_spectrum(record):
+    if not record or 'peaks' not in record or not record['peaks']:
+        return None
+    
+    mz, intensities = zip(*record['peaks'])
+    metadata = {k: v for k, v in record.items() if k != 'peaks'}
+    if 'precursor_mz' not in metadata.keys():
+        metadata['precursor_mz'] = 0.0
+    return Spectrum(
+        mz=np.array(mz).astype(float),
+        intensities=np.array(intensities).astype(float),
+        metadata=metadata
+    )
+
+def is_valid_record(record):
+    return record and \
+        'smiles' in record and \
+        'peaks' in record and \
+        'inchi' in record and \
+        is_valid_smiles(record['smiles']) and \
+        record['smiles'].upper() not in ['N/A', 'NA'] and \
+        record['peaks'] and \
+        record['inchi'].upper() not in ['N/A', 'NA']
 
 def parse_msp(file_path, limit=None):
     """解析原始 MSP 文件"""
@@ -33,16 +64,6 @@ def parse_msp(file_path, limit=None):
     except ImportError:
         pass
 
-    def is_valid_record(record):
-        return record and \
-            'smiles' in record and \
-            'peaks' in record and \
-            'inchi' in record and \
-            is_valid_smiles(record['smiles']) and \
-            record['smiles'].upper() not in ['N/A', 'NA'] and \
-            record['peaks'] and \
-            record['inchi'].upper() not in ['N/A', 'NA']
-
     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
         record = {}
         in_peaks = False
@@ -50,9 +71,11 @@ def parse_msp(file_path, limit=None):
             line = line.strip()
             if not line:
                 if is_valid_record(record):
-                    parsed_results.append(record)
-                    if limit and len(parsed_results) >= limit:
-                        break
+                    spectrum = create_spectrum(record)
+                    if spectrum:
+                        parsed_results.append(spectrum)
+                        if limit and len(parsed_results) >= limit:
+                            break
                 record = {}
                 in_peaks = False
                 continue
@@ -63,11 +86,7 @@ def parse_msp(file_path, limit=None):
                     key = parts[0].strip().lower()
                     value = parts[1].strip() if len(parts) > 1 else ""
                     
-                    if key == 'smiles':
-                        record['smiles'] = value
-                    elif key == 'inchi':
-                        record['inchi'] = value
-                    elif key == 'precursormz':
+                    if key == 'precursormz':
                         try:
                             record['precursor_mz'] = float(value)
                         except ValueError:
@@ -75,6 +94,8 @@ def parse_msp(file_path, limit=None):
                     elif key == 'num peaks':
                         record['peaks'] = []
                         in_peaks = True
+                    else:
+                        record[key] = value
             else:
                 parts = line.split()
                 if len(parts) >= 2:
@@ -87,7 +108,9 @@ def parse_msp(file_path, limit=None):
         
         if not limit or len(parsed_results) < limit:
             if is_valid_record(record):
-                parsed_results.append(record)
+                spectrum = create_spectrum(record)
+                if spectrum:
+                    parsed_results.append(spectrum)
 
     logging.info(f"Parsing completed! Total valid data: {len(parsed_results)}")
     return parsed_results
@@ -107,7 +130,7 @@ def split_and_save(data, output_dir, train_ratio=0.8, val_ratio=0.1, seed=42):
     
     smiles_groups = {}
     for item in data:
-        s = item['smiles']
+        s = item.get("smiles")
         if s not in smiles_groups:
             smiles_groups[s] = []
         smiles_groups[s].append(item)
@@ -168,4 +191,5 @@ def process_massbank():
     split_and_save(data, output_dir)
 
 if __name__ == "__main__":
+    setup_logging()
     process_massbank()

@@ -31,14 +31,17 @@ from SpecEmbedding.type import (
 
 from src.data import MassBankProvider, MassSpecGymProvider, NPLIB1Provider
 
-def setup_logging(log_file):
+def setup_logging(log_file=None):
+    handlers = [
+        logging.FileHandler(log_file, encoding='utf-8'),
+        logging.StreamHandler()
+    ] if log_file else [
+        logging.StreamHandler()
+    ]
     logging.basicConfig(
         level=logging.INFO, 
         format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_file, encoding='utf-8'),
-            logging.StreamHandler()
-        ]
+        handlers=handlers
     )
 
 def startup_logging(args, message: str = "Start training"):
@@ -59,19 +62,6 @@ def add_base_argument(parser):
     parser.add_argument("--dataset_type", type=str, choices=["massbank", "massspecgym", "nplib1"], default=config.data.dataset_type, help="Dataset type")
     parser.add_argument("--data_path", type=str, default=config.data.data_path, help="Dataset directory (required for massbank/nplib1)")
     parser.add_argument("--save_dir", type=str, default=config.general.save_dir, help="Directory to save model and logs")
-
-def dict_to_spectrum(data_list):
-    """Convert dictionary records from data_provider to matchms.Spectrum objects."""
-    spectra = []
-    for item in data_list:
-        mz = [p[0] for p in item['peaks']]
-        intensity = [p[1] for p in item['peaks']]
-        spec = Spectrum(mz=np.array(mz), intensities=np.array(intensity), metadata={
-            'smiles': item['smiles'],
-            'precursor_mz': item.get('precursor_mz', 0.0)
-        })
-        spectra.append(spec)
-    return spectra
 
 def load_data(dataset_type, data_path):
     if dataset_type == "massspecgym":
@@ -118,16 +108,14 @@ def get_classified_data(dataset_type, data_path, cache_path=None):
         tokenizer = Tokenizer(**tokenizer_config)
 
         logging.info("Tokenizing spectra sequences...")
-        train_spectra = dict_to_spectrum(train_raw)
-        val_spectra = dict_to_spectrum(val_raw)
 
-        train_sequences = tokenizer.tokenize_sequence(train_spectra)
-        val_sequences = tokenizer.tokenize_sequence(val_spectra)
+        train_sequences = tokenizer.tokenize_sequence(train_raw)
+        val_sequences = tokenizer.tokenize_sequence(val_raw)
         logging.info(f"Tokenized {len(train_sequences)} train sequences and {len(val_sequences)} val sequences.")
 
         # 3. Prepare Dataset
         # Get all unique SMILES to establish consistent labeling
-        all_smiles = np.unique([s['smiles'] for s in train_raw] + [s['smiles'] for s in val_raw])
+        all_smiles = np.unique([s.get("smiles") for s in train_raw] + [s.get("smiles") for s in val_raw])
         logging.info(f"Extracted {len(all_smiles)} unique SMILES across train and val sets.")
         
         train_data, train_keys = get_classified_tokenset(all_smiles, train_sequences)
