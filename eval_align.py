@@ -93,7 +93,7 @@ def mol_collate_fn(batch):
 def main():
     parser = argparse.ArgumentParser(description="Efficient Evaluate SpecMolAlignModel on Cross-Modal Retrieval.")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to best aligned model checkpoint")
-    parser.add_argument("--dataset_type", type=str, choices=["massbank", "massspecgym", "nplib1"], default="massspecgym", help="Dataset type")
+    parser.add_argument("--dataset_type", type=str, choices=["massbank", "massspecgym", "nplib1", "gnps"], default="massspecgym", help="Dataset type")
     parser.add_argument("--data_path", type=str, default=config.data.data_path, help="Dataset directory (required for massbank/nplib1)")
     parser.add_argument("--no-mces", action="store_true", help="Disable MCES structural similaritycalculation")
 
@@ -143,6 +143,13 @@ def main():
         provider = NPLIB1Provider(data_dir=args.data_path)
         test_raw = provider.load_data(mode='test')
         candidates_dict = provider.load_candidates()
+    elif args.dataset_type == "gnps":
+        from src.data import GNPSProvider
+        provider = GNPSProvider(data_dir=args.data_path)
+        test_raw = provider.load_data(mode='test')
+        # GNPS candidates are currently not fully supported in the same way as MassBank/NPLIB1
+        # If needed, load_candidates could be implemented in GNPSProvider
+        candidates_dict = {} # Fallback or implementation needed
     else:
         provider = MassBankProvider(data_dir=args.data_path)
         test_raw = provider.load_data(mode='test')

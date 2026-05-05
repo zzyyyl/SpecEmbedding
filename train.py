@@ -29,7 +29,7 @@ from SpecEmbedding.type import (
     TokenizerConfig
 )
 
-from src.data import MassBankProvider, MassSpecGymProvider, NPLIB1Provider
+from src.data import MassBankProvider, MassSpecGymProvider, NPLIB1Provider, GNPSProvider
 
 def setup_logging(log_file=None):
     handlers = [
@@ -59,7 +59,7 @@ def startup_logging(args, message: str = "Start training"):
         logging.info(f"Using device: {device}")
 
 def add_base_argument(parser):
-    parser.add_argument("--dataset_type", type=str, choices=["massbank", "massspecgym", "nplib1"], default=config.data.dataset_type, help="Dataset type")
+    parser.add_argument("--dataset_type", type=str, choices=["massbank", "massspecgym", "nplib1", "gnps"], default=config.data.dataset_type, help="Dataset type")
     parser.add_argument("--data_path", type=str, default=config.data.data_path, help="Dataset directory (required for massbank/nplib1)")
     parser.add_argument("--save_dir", type=str, default=config.general.save_dir, help="Directory to save model and logs")
 
@@ -70,6 +70,8 @@ def load_data(dataset_type, data_path):
         provider = MassBankProvider()
     elif dataset_type == "nplib1":
         provider = NPLIB1Provider()
+    elif dataset_type == "gnps":
+        provider = GNPSProvider()
     else:
         raise ValueError("--dataset_type is invalid")
 
