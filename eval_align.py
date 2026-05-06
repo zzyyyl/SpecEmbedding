@@ -30,20 +30,21 @@ from train import (
     startup_logging,
 )
 
+mces_solvers = pulp.listSolvers(onlyAvailable=True)
+mces_solver = "MOSEK" if "MOSEK" in mces_solvers else mces_solvers[0]
+
 def mces_worker(smiles_pair):
     s1, s2 = smiles_pair
-    solver_options=dict(msg=0)
-    solvers = pulp.listSolvers(onlyAvailable=True)
-    solver = "MOSEK" if "MOSEK" in solvers else solvers[0]
+    if s1 == s2:
+        return 0.0, False
     try:
-        # Re-initialize for each worker to be safe with pulp solvers
         retval = MCES(
             smiles1=s1,
             smiles2=s2,
             threshold=15,
             always_stronger_bound=True,
-            solver=solver,
-            solver_options=solver_options
+            solver=mces_solver,
+            solver_options=dict(msg=0)
         )
         return retval[1], False
     except Exception:
