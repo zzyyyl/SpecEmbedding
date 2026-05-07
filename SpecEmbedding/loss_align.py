@@ -10,7 +10,11 @@ class ContrastiveAlignmentLoss(nn.Module):
     def forward(self, f_spec, f_mol, logit_scale):
         batch_size = f_spec.size(0)
         device = f_spec.device
-        
+
+        # 归一化特征向量
+        f_spec = F.normalize(f_spec, dim=-1)
+        f_mol = F.normalize(f_mol, dim=-1)
+
         # 计算相似度矩阵 [batch, batch]
         # (batch, dim) @ (dim, batch) -> (batch, batch)
         logits = torch.matmul(f_spec, f_mol.T) * logit_scale

@@ -131,8 +131,4 @@ class SpecMolAlignModel(nn.Module):
         f_spec = self.spec_proj(f_spec)
         f_mol = self.mol_proj(f_mol)
 
-        # 归一化
-        f_spec = F.normalize(f_spec, dim=-1)
-        f_mol = F.normalize(f_mol, dim=-1)
-
         return f_spec, f_mol, 1 / self.tau
