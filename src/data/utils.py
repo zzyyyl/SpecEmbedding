@@ -1,6 +1,9 @@
 import random
 import numpy as np
+import pickle
+import logging
 from rdkit import Chem
+from pathlib import Path
 
 def is_valid_smiles(smiles):
     """校验 SMILES 的合法性"""
@@ -11,6 +14,51 @@ def is_valid_smiles(smiles):
         return mol is not None
     except:
         return False
+
+class DataProvider:
+    def __init__(self, dataset_name, base_data_dir="data/processed"):
+        self.base_data_dir = Path(base_data_dir)
+        self.dataset_name = dataset_name
+        self.data_dir = self.base_data_dir / dataset_name
+
+    def load_data(self, mode):
+        """
+        加载数据
+        mode: 'train', 'val', 'test'
+        """
+        file_path = self.data_dir / f"{mode}.pkl"
+
+        if not file_path.exists():
+            # WORKAROUND
+            if mode == 'val' and self.dataset_name == "GNPS":
+                file_path = self.data_dir / "test.pkl"
+            
+            if not file_path.exists():
+                logging.error(f"{self.dataset_name} data not found at {file_path}")
+                return []
+
+        logging.info(f"Loading {self.dataset_name} {mode} data from {file_path} ...")
+        with open(file_path, 'rb') as f:
+            data = pickle.load(f)
+        logging.info(f"Loaded {len(data)} records.")
+        return data
+
+    def load_candidates(self, type=None):
+        """候选集加载"""
+        if type:
+            file_path = self.data_dir / f"candidates_{type}.pkl"
+        else:
+            file_path = self.data_dir / "candidates.pkl"
+
+        if not file_path.exists():
+            logging.warning(f"{self.dataset_name} candidates not found at {file_path}")
+            return {}
+
+        logging.info(f"Loading candidates from {file_path} ...")
+        with open(file_path, 'rb') as f:
+            data = pickle.load(f)
+        logging.info(f"Loaded {len(data)} candidate sets.")
+        return data
 
 class MZBatchSampler:
     """按前体离子质量 (m/z) 进行分组取样的 BatchSampler，实现 Hard Negative Mining"""

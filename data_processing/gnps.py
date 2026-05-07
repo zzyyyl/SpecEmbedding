@@ -17,8 +17,8 @@ from train import setup_logging
 
 def process_gnps():
     # Define paths
-    base_dir = Path("data/GNPS")
-    output_dir = Path("data")
+    base_dir = Path("data/raw/GNPS")
+    output_dir = Path("data/processed/GNPS")
 
     if not base_dir.exists():
         logging.error(f"Directory {base_dir} not found.")
@@ -62,7 +62,7 @@ def process_gnps():
     }
 
     for out_fold, spectra in out_folds.items():
-        out_file = output_dir / f"GNPS_{out_fold}.pkl"
+        out_file = output_dir / f"{out_fold}.pkl"
         with open(out_file, "wb") as f:
             pickle.dump(spectra, f)
         logging.info(f"Saved {out_file} with {len(spectra)} spectra.")

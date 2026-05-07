@@ -177,7 +177,7 @@ def main():
     set_seed(config.general.seed)
     device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
 
-    classified_data = get_classified_data(dataset_type=args.dataset_type, data_path=args.data_path)
+    classified_data = get_classified_data(dataset_type=args.dataset_type)
     train_data = classified_data['train_data']
     train_keys = classified_data['train_keys']
     val_data = classified_data['val_data']

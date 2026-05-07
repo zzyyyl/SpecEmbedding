@@ -59,21 +59,26 @@ def startup_logging(args, message: str = "Start training"):
         logging.info(f"Using device: {device}")
 
 def add_base_argument(parser):
-    parser.add_argument("--dataset_type", type=str, choices=["massbank", "massspecgym", "nplib1", "gnps"], default=config.data.dataset_type, help="Dataset type")
-    parser.add_argument("--data_path", type=str, default=config.data.data_path, help="Dataset directory (required for massbank/nplib1)")
-    parser.add_argument("--save_dir", type=str, default=config.general.save_dir, help="Directory to save model and logs")
+    parser.add_argument(
+        "--dataset_type",
+        type=str,
+        choices=["massbank", "massspecgym", "nplib1", "gnps"],
+        default=config.data.dataset_type,
+        help="Dataset type"
+    )
+    parser.add_argument(
+        "--save_dir",
+        type=str,
+        default=config.general.save_dir,
+        help="Directory to save model and logs"
+    )
 
-def load_data(dataset_type, data_path):
-    if dataset_type == "massspecgym":
-        provider = MassSpecGymProvider()
-    elif dataset_type == "massbank":
-        provider = MassBankProvider()
-    elif dataset_type == "nplib1":
-        provider = NPLIB1Provider()
-    elif dataset_type == "gnps":
-        provider = GNPSProvider()
-    else:
-        raise ValueError("--dataset_type is invalid")
+def load_data(dataset_type):
+    if dataset_type == "massspecgym": provider = MassSpecGymProvider()
+    elif dataset_type == "massbank":  provider = MassBankProvider()
+    elif dataset_type == "nplib1":    provider = NPLIB1Provider()
+    elif dataset_type == "gnps":      provider = GNPSProvider()
+    else: raise ValueError("--dataset_type is invalid")
 
     train_raw = provider.load_data(mode='train')
     val_raw = provider.load_data(mode='val')
@@ -85,7 +90,7 @@ def load_data(dataset_type, data_path):
     logging.info(f"Loaded {len(train_raw)} train records and {len(val_raw)} val records.")
     return train_raw, val_raw
 
-def get_classified_data(dataset_type, data_path, cache_path=None):
+def get_classified_data(dataset_type, cache_path=None):
     if cache_path is None:
         cache_path = config.data.cache_path
     # Tokenize & Classify 处理 (带缓存逻辑)
@@ -100,7 +105,7 @@ def get_classified_data(dataset_type, data_path, cache_path=None):
     else:
         logging.info("No cache found. Processing dataset (Tokenize & Classify)...")
         # 1. Load data
-        train_raw, val_raw = load_data(dataset_type=dataset_type, data_path=data_path)
+        train_raw, val_raw = load_data(dataset_type=dataset_type)
 
         # 2. Convert to Spectrum objects and Tokenize
         tokenizer_config = TokenizerConfig(
@@ -152,7 +157,7 @@ def main():
     set_seed(config.general.seed)
     device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
 
-    classified_data = get_classified_data(dataset_type=args.dataset_type, data_path=args.data_path)
+    classified_data = get_classified_data(dataset_type=args.dataset_type)
     train_data = classified_data['train_data']
     train_keys = classified_data['train_keys']
     val_data = classified_data['val_data']

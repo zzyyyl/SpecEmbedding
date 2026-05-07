@@ -189,9 +189,9 @@ def split_and_save(data, output_dir, train_ratio=0.8, val_ratio=0.1, seed=42):
     logging.info(f"  Test:  {len(test_data)} records ({len(test_smiles_set)} unique SMILES)")
 
     paths = {
-        'train': output_dir / "MassBank_train.pkl",
-        'val': output_dir / "MassBank_val.pkl",
-        'test': output_dir / "MassBank_test.pkl"
+        'train': output_dir / "train.pkl",
+        'val': output_dir / "val.pkl",
+        'test': output_dir / "test.pkl"
     }
 
     try:
@@ -206,8 +206,8 @@ def split_and_save(data, output_dir, train_ratio=0.8, val_ratio=0.1, seed=42):
         logging.error(f"Failed to save split data: {e}")
 
 def process_massbank():
-    base_dir = Path("data/MassBank")
-    output_dir = Path("data")
+    base_dir = Path("data/raw/MassBank")
+    output_dir = Path("data/processed/MassBank")
 
     spectra = parse_msp(base_dir / "MassBank_NISTformat.msp")
     spectra = filters_massbank(spectra)

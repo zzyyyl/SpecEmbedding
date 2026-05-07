@@ -40,8 +40,8 @@ def filters_nplib1(spectra):
 
 def process_nplib1():
     # Define paths
-    base_dir = Path("data/NPLIB1")
-    output_dir = Path("data")
+    base_dir = Path("data/raw/NPLIB1")
+    output_dir = Path("data/processed/NPLIB1")
 
     # Ensure output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -65,9 +65,9 @@ def process_nplib1():
         logging.error(f"Error loading files: {e}")
         return
 
-    # 2. Build NPLIB1_candidates.pkl
+    # 2. Build candidates.pkl
     # Format: { "$smiles": ["$smiles", ...] }
-    logging.info("Generating NPLIB1_candidates.pkl...")
+    logging.info("Generating candidates.pkl...")
     candidates_smiles = {}
     for q_ik, cand_iks in cand_dict_large.items():
         if q_ik not in ik_to_smiles:
@@ -85,9 +85,9 @@ def process_nplib1():
                 c_smiles_list.insert(0, q_smiles)
             candidates_smiles[q_smiles] = c_smiles_list
 
-    with open(output_dir / "NPLIB1_candidates.pkl", "wb") as f:
+    with open(output_dir / "candidates.pkl", "wb") as f:
         pickle.dump(candidates_smiles, f)
-    logging.info(f"Saved NPLIB1_candidates.pkl with {len(candidates_smiles)} unique SMILES.")
+    logging.info(f"Saved candidates.pkl with {len(candidates_smiles)} unique SMILES.")
 
     # 3. Build fold files
     ik_to_data_entries = {}
@@ -153,7 +153,7 @@ def process_nplib1():
                 spectra.append(spectrum)
 
         spectra = filters_nplib1(spectra)
-        out_file = output_dir / f"NPLIB1_{out_fold}.pkl"
+        out_file = output_dir / f"{out_fold}.pkl"
         with open(out_file, "wb") as f:
             pickle.dump(spectra, f)
         logging.info(f"Saved {out_file} with {len(spectra)} spectra.")
