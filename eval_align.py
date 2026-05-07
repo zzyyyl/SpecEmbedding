@@ -24,7 +24,13 @@ from SpecEmbedding.models_align import SpecMolAlignModel, GINEEncoder
 from SpecEmbedding.data.graph_utils import smiles_to_graph
 from SpecEmbedding.config import config
 
-from src.data import MassSpecGymProvider, MassBankProvider, NPLIB1Provider
+from src.data import (
+    MassSpecGymProvider,
+    MassBankProvider,
+    NPLIB1Provider,
+    GNPSProvider,
+)
+
 from train import (
     setup_logging,
     startup_logging,
@@ -96,7 +102,6 @@ def main():
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to best aligned model checkpoint")
     parser.add_argument("--dataset_type", type=str, choices=["massbank", "massspecgym", "nplib1", "gnps"], default="massspecgym", help="Dataset type")
     parser.add_argument("--no-mces", action="store_true", help="Disable MCES structural similaritycalculation")
-
     args = parser.parse_args()
 
     checkpoint_path = Path(args.checkpoint)
@@ -105,7 +110,6 @@ def main():
     set_seed(config.general.seed)
     device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
 
-    # 1. Initialize Dual-Encoder Model
     logging.info("Initializing SpecMolAlignModel...")
     spec_encoder = SiameseModel(
         embedding_dim=config.model.spec_encoder.embedding_dim,
@@ -134,7 +138,6 @@ def main():
     model = model.to(device)
     model.eval()
 
-    # 2. Load Data and Candidates
     if args.dataset_type == "massspecgym": provider = MassSpecGymProvider()
     elif args.dataset_type == "massbank":  provider = MassBankProvider()
     elif args.dataset_type == "nplib1":    provider = NPLIB1Provider()
@@ -161,10 +164,18 @@ def main():
         min_size = min(cand_sizes)
         logging.info(f"Candidate set sizes: avg={avg_size:.2f}, max={max_size}, min={min_size}")
 
-    # 3. Compile unique candidate SMILES
+    tokenizer_config = TokenizerConfig(max_len=100, show_progress_bar=False)
+    tokenizer = Tokenizer(**tokenizer_config)
+
+    test_sequences = tokenizer.tokenize_sequence(test_raw)
+
     unique_candidate_smiles = set()
-    for s_list in candidates_dict.values():
-        unique_candidate_smiles.update(s_list)
+    for s in test_sequences:
+        true_smiles = s["smiles"]
+        unique_candidate_smiles.add(true_smiles)
+        cands = candidates_dict.get(true_smiles, [])
+        unique_candidate_smiles.update(cands)
+
     unique_candidate_list = list(unique_candidate_smiles)
     num_unique_mols = len(unique_candidate_list)
     logging.info(f"Total unique candidate SMILES to embed: {num_unique_mols}")
@@ -172,7 +183,6 @@ def main():
     # Fast map: SMILES -> int Index
     smiles_to_idx = {s: i for i, s in enumerate(unique_candidate_list)}
 
-    # 4. Generate Molecule Embeddings
     logging.info("Computing Molecule Embeddings dynamically...")
     mol_dataset = DynamicMolDataset(unique_candidate_list)
     mol_loader = DataLoader(mol_dataset, batch_size=config.eval.calc_batch_size, shuffle=False, collate_fn=mol_collate_fn, num_workers=4)
@@ -200,12 +210,7 @@ def main():
             # Populate the embedding matrix using batch indices
             global_mol_embs[indices] = f_mol
 
-    # 5. Compute Spectra Embeddings and Evaluate
-    tokenizer_config = TokenizerConfig(max_len=100, show_progress_bar=False)
-    tokenizer = Tokenizer(**tokenizer_config)
 
-    test_sequences = tokenizer.tokenize_sequence(test_raw)
-    
     spec_dataset = EvalSpecDataset(test_sequences)
     spec_loader = DataLoader(spec_dataset, batch_size=config.eval.calc_batch_size, shuffle=False)
     
@@ -298,7 +303,6 @@ def main():
 
                 valid_queries += 1
 
-    # 6. Output Results to log
     if valid_queries == 0:
         logging.error("No valid queries to evaluate (e.g., all candidates failed to parse).")
         return
@@ -315,7 +319,7 @@ def main():
     mrr = mrr_sum / valid_queries
     logging.info(f"Mean Reciprocal Rank (MRR): {mrr:.4f}")
 
-    # 7. Plot Similarity Distribution
+    # Plot Similarity Distribution
     logging.info("Plotting similarity distribution...")
     plt.figure(figsize=(10, 6))
     bin_centers = (sim_bins[:-1] + sim_bins[1:]) / 2
@@ -340,7 +344,7 @@ def main():
     plt.savefig(plot_path)
     logging.info(f"Similarity distribution plot saved to {plot_path}")
 
-    # 8. Parallel MCES Calculation
+    # Parallel MCES Calculation
     if not args.no_mces:
         mces_sum = 0.0
         mces_errors = 0
