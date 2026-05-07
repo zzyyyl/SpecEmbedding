@@ -57,7 +57,7 @@ def mces_worker(smiles_pair):
         return 0.0, True # Return value and error flag
 
 # ----------------- Spectra Dataset -----------------
-class EvalSpecDataset(Dataset):
+class SpecDataset(Dataset):
     def __init__(self, sequences):
         self.sequences = sequences
         
@@ -73,29 +73,28 @@ class EvalSpecDataset(Dataset):
             'smiles': seq['smiles']
         }
 
-# ----------------- Dynamic Mol Dataset -----------------
-# Generate graphs on the fly to avoid 25GB+ memory explosions
-class DynamicMolDataset(Dataset):
+# ----------------- Mol Dataset -----------------
+class MolDataset(Dataset):
     def __init__(self, smiles_list):
         self.smiles_list = smiles_list
-        
+
     def __len__(self):
         return len(self.smiles_list)
-        
+
     def __getitem__(self, idx):
-        s = self.smiles_list[idx]
-        graph = smiles_to_graph(s)
-        # If rdkit fails to parse, graph is None
-        return {'graph': graph, 'smiles': s, 'original_idx': idx}
+        smiles = self.smiles_list[idx]
+        return {
+            'graph': smiles_to_graph(smiles),
+            'original_idx': idx
+        }
 
 def mol_collate_fn(batch):
     # Filter out failed parsing
     batch = [b for b in batch if b['graph'] is not None]
     if not batch: return None
     graphs = Batch.from_data_list([b['graph'] for b in batch])
-    smiles = [b['smiles'] for b in batch]
     indices = [b['original_idx'] for b in batch]
-    return {'mol_graph': graphs, 'smiles': smiles, 'indices': indices}
+    return {'mol_graph': graphs, 'indices': indices}
 
 def main():
     parser = argparse.ArgumentParser(description="Efficient Evaluate SpecMolAlignModel on Cross-Modal Retrieval.")
@@ -156,39 +155,48 @@ def main():
 
     logging.info(f"Loaded {len(test_raw)} test spectra.")
     logging.info(f"Loaded {len(candidates_dict)} unique candidate mapping keys.")
-    
-    cand_sizes = [len(v) for v in candidates_dict.values()]
-    if cand_sizes:
-        avg_size = sum(cand_sizes) / len(cand_sizes)
-        max_size = max(cand_sizes)
-        min_size = min(cand_sizes)
-        logging.info(f"Candidate set sizes: avg={avg_size:.2f}, max={max_size}, min={min_size}")
 
     tokenizer_config = TokenizerConfig(max_len=100, show_progress_bar=False)
     tokenizer = Tokenizer(**tokenizer_config)
 
     test_sequences = tokenizer.tokenize_sequence(test_raw)
+    unique_test_smiles = set(s["smiles"] for s in test_sequences)
 
-    unique_candidate_smiles = set()
-    for s in test_sequences:
-        true_smiles = s["smiles"]
-        unique_candidate_smiles.add(true_smiles)
-        cands = candidates_dict.get(true_smiles, [])
-        unique_candidate_smiles.update(cands)
+    # use unique_test_smiles to filter candidates_dict
+    candidates_dict = {k: v for k, v in candidates_dict.items() if k in unique_test_smiles}
+    logging.info(f"Filtered candidates_dict to {len(candidates_dict)} entries based on test dataset.")
+    cand_sizes = np.array([len(v) for v in candidates_dict.values()])
+    logging.info(
+        f"Candidate set sizes: "
+        f"avg={cand_sizes.mean():.2f}, "
+        f"max={cand_sizes.max()}, "
+        f"min={cand_sizes.min()}"
+    )
+    del cand_sizes
 
-    unique_candidate_list = list(unique_candidate_smiles)
+    unique_candidate_list = list(unique_test_smiles.union(*candidates_dict.values()))
     num_unique_mols = len(unique_candidate_list)
     logging.info(f"Total unique candidate SMILES to embed: {num_unique_mols}")
-    
+
     # Fast map: SMILES -> int Index
     smiles_to_idx = {s: i for i, s in enumerate(unique_candidate_list)}
 
-    logging.info("Computing Molecule Embeddings dynamically...")
-    mol_dataset = DynamicMolDataset(unique_candidate_list)
-    mol_loader = DataLoader(mol_dataset, batch_size=config.eval.calc_batch_size, shuffle=False, collate_fn=mol_collate_fn, num_workers=4)
-    
+    logging.info("Computing Molecule Embeddings...")
+    mol_dataset = MolDataset(unique_candidate_list)
+    mol_loader = DataLoader(
+        mol_dataset,
+        batch_size=config.eval.calc_batch_size,
+        shuffle=False,
+        collate_fn=mol_collate_fn,
+        num_workers=4
+    )
+
     # Pre-allocate a contiguous tensor to store embeddings for all unique candidate molecules
-    global_mol_embs = torch.zeros((num_unique_mols, 512), dtype=torch.float32, device=device)
+    global_mol_embs = torch.zeros(
+        (num_unique_mols, config.model.align.final_dim),
+        dtype=torch.float32,
+        device=device
+    )
 
     with torch.no_grad():
         for batch in tqdm(mol_loader, desc="Mol Embeddings", ascii=True):
@@ -196,7 +204,7 @@ def main():
             
             mol_graph = batch['mol_graph'].to(device)
             indices = torch.tensor(batch['indices'], dtype=torch.long, device=device)
-            
+
             # Forward pass to get molecule representations
             f_mol = model.mol_encoder(
                 mol_graph.x,
@@ -210,8 +218,7 @@ def main():
             # Populate the embedding matrix using batch indices
             global_mol_embs[indices] = f_mol
 
-
-    spec_dataset = EvalSpecDataset(test_sequences)
+    spec_dataset = SpecDataset(test_sequences)
     spec_loader = DataLoader(spec_dataset, batch_size=config.eval.calc_batch_size, shuffle=False)
     
     hits = {k: 0 for k in config.eval.top_k}
@@ -324,21 +331,29 @@ def main():
     plt.figure(figsize=(10, 6))
     bin_centers = (sim_bins[:-1] + sim_bins[1:]) / 2
     
-    # We use bar plot to represent the histogram since we already have counts
-    plt.bar(bin_centers, candidate_sim_counts, width=0.01, alpha=0.5, label='Candidates', color='gray')
-    plt.bar(bin_centers, target_sim_counts, width=0.01, alpha=0.7, label='Targets', color='blue')
-    
+    target_sim_percent = target_sim_counts / target_sim_counts.sum()
+    candidate_sim_percent = candidate_sim_counts / candidate_sim_counts.sum()
+
+    plt.bar(bin_centers, target_sim_percent, width=0.01, alpha=0.5, label='Targets', color='blue')
+    plt.bar(bin_centers, candidate_sim_percent, width=0.01, alpha=0.3, label='Candidates', color='gray')
+
+    mean_target_sim = (bin_centers * target_sim_percent).sum()
+    mean_candidate_sim = (bin_centers * candidate_sim_percent).sum()
+    plt.axvline(mean_target_sim, color='red', linestyle='--', label=f'M.Target Sim={mean_target_sim:.2f}')
+    plt.axvline(mean_candidate_sim, color='green', linestyle='--', label=f'M.Candidate Sim={mean_candidate_sim:.2f}')
+
+    # Apply Gaussian smoothing for better visualization
+    from scipy.ndimage import gaussian_filter1d
+    target_smooth = gaussian_filter1d(target_sim_percent, sigma=1)
+    candidate_smooth = gaussian_filter1d(candidate_sim_percent, sigma=1)
+    plt.plot(bin_centers, target_smooth, color='blue', linestyle='-', label='Target Density')
+    plt.plot(bin_centers, candidate_smooth, color='gray', linestyle='-', label='Candidate Density')
+
     plt.xlabel('Cosine Similarity')
-    plt.ylabel('Count')
+    plt.ylabel('Percentage of Occurrence')
     plt.title(f'Cosine Similarity Distribution ({args.dataset_type})')
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.6)
-    
-    # Optional: use log scale for Y if candidate counts dwarf target counts
-    if candidate_sim_counts.max() > target_sim_counts.max() * 10:
-        plt.yscale('log')
-        plt.ylabel('Count (Log Scale)')
-        logging.info("Using log scale for Y-axis in plot due to large difference in counts.")
 
     plot_path = checkpoint_path.parent / f"similarity_dist_{args.dataset_type}.png"
     plt.savefig(plot_path)
@@ -349,7 +364,7 @@ def main():
         mces_sum = 0.0
         mces_errors = 0
         if mces_pairs:
-            logging.info(f"Computing MCES for {len(mces_pairs)} pairs in parallel...")
+            logging.info(f"Computing MCES for {len(mces_pairs)} pairs using {mces_solver} solver...")
             # Use a fraction of CPUs to avoid overwhelming the system
             max_workers = min(os.cpu_count() or 1, 16)
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
