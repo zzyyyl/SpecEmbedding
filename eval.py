@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 from SpecEmbedding.trainer.trainer import ModelTester
 from SpecEmbedding.data.tokenizer import Tokenizer
+from SpecEmbedding.trainer.trainer import set_seed
 from SpecEmbedding.utils.model import search, load_transformer_model, SiameseModel
 from SpecEmbedding.config import config
 
