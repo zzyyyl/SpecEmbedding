@@ -1,4 +1,4 @@
-from .utils import DataProvider
+from .base import DataProvider
 
 class MassBankProvider(DataProvider):
     def __init__(self):
