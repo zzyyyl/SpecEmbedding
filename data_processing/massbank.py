@@ -8,7 +8,6 @@ import random
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
-from rdkit import Chem
 from matchms import Spectrum
 
 from train import setup_logging
@@ -24,15 +23,10 @@ from SpecEmbedding.utils.clean import (
     count_annotations,
 )
 
-def is_valid_smiles(smiles):
-    """校验 SMILES 的合法性"""
-    if not smiles or smiles.upper() in ['N/A', 'NA']:
-        return False
-    try:
-        mol = Chem.MolFromSmiles(smiles)
-        return mol is not None
-    except:
-        return False
+from src.utils.clean import (
+    is_valid_smiles,
+    canonicalize_smiles,
+)
 
 def filters_massbank(spectra):
     spectra = [apply_filters(s) for s in tqdm(spectra, desc="Apply filters")]
@@ -42,6 +36,7 @@ def filters_massbank(spectra):
     count_annotations(spectra, "10 < precursor_mz < 1000")
     spectra = [clean_metadata(s) for s in tqdm(spectra, desc="Clean metadata")]
     spectra = [clean_metadata2(s) for s in tqdm(spectra, desc="Clean metadata 2")]
+    spectra = [canonicalize_smiles(spectrum=s) for s in tqdm(spectra, desc="Canonicalize SMILES")]
     spectra = [minimal_processing(s) for s in tqdm(spectra, desc="Minimal processing")]
     spectra = [s for s in spectra if s is not None]
     count_annotations(spectra, "peak num >= 5")
@@ -139,7 +134,7 @@ def parse_msp(file_path):
 
 def split_and_save(data, output_dir, train_ratio=0.8, val_ratio=0.1, seed=42):
     """
-    按 SMILES 进行分组划分（Group Split），防止数据泄露。
+    按 InchiKey 进行分组划分，防止数据泄露。
     """
     if not data:
         logging.error("No data to split.")
@@ -148,62 +143,61 @@ def split_and_save(data, output_dir, train_ratio=0.8, val_ratio=0.1, seed=42):
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    logging.info("Grouping records by SMILES for strict splitting...")
+    logging.info("Grouping records by InchiKey for strict splitting...")
     
-    smiles_groups = {}
-    for item in data:
-        s = item.get("smiles")
-        if s not in smiles_groups:
-            smiles_groups[s] = []
-        smiles_groups[s].append(item)
+    inchikey_groups = {}
+    for spectrum in data:
+        ik = spectrum.get("inchikey")[:14]
+        if ik not in inchikey_groups:
+            inchikey_groups[ik] = []
+        inchikey_groups[ik].append(spectrum)
         
-    unique_smiles = list(smiles_groups.keys())
-    logging.info(f"Total Unique SMILES: {len(unique_smiles)}")
+    full_inchikey_counts = len(set([s.get("inchikey") for s in data]))
+    logging.info(f"Total Unique InchiKeys: {full_inchikey_counts}")
+    unique_inchikeys = list(inchikey_groups.keys())
+    logging.info(f"Total Unique InchiKeys[:14]: {len(unique_inchikeys)}")
 
     random.seed(seed)
-    random.shuffle(unique_smiles)
+    random.shuffle(unique_inchikeys)
     
-    n = len(unique_smiles)
+    n = len(unique_inchikeys)
     train_end = int(n * train_ratio)
     val_end = int(n * (train_ratio + val_ratio))
     
-    train_smiles_set = set(unique_smiles[:train_end])
-    val_smiles_set = set(unique_smiles[train_end:val_end])
-    test_smiles_set = set(unique_smiles[val_end:])
+    train_inchikey_set = set(unique_inchikeys[:train_end])
+    val_inchikey_set = set(unique_inchikeys[train_end:val_end])
+    test_inchikey_set = set(unique_inchikeys[val_end:])
 
     train_data = []
     val_data = []
     test_data = []
     
-    for s, records in smiles_groups.items():
-        if s in train_smiles_set:
+    for ik, records in inchikey_groups.items():
+        if ik in train_inchikey_set:
             train_data.extend(records)
-        elif s in val_smiles_set:
+        elif ik in val_inchikey_set:
             val_data.extend(records)
         else:
             test_data.extend(records)
 
     logging.info(f"Split results by Molecule:")
-    logging.info(f"  Train: {len(train_data)} records ({len(train_smiles_set)} unique SMILES)")
-    logging.info(f"  Val:   {len(val_data)} records ({len(val_smiles_set)} unique SMILES)")
-    logging.info(f"  Test:  {len(test_data)} records ({len(test_smiles_set)} unique SMILES)")
+    logging.info(f"  Train: {len(train_data)} records ({len(train_inchikey_set)} unique InchiKeys)")
+    logging.info(f"  Val:   {len(val_data)} records ({len(val_inchikey_set)} unique InchiKeys)")
+    logging.info(f"  Test:  {len(test_data)} records ({len(test_inchikey_set)} unique InchiKeys)")
 
-    paths = {
-        'train': output_dir / "train.pkl",
-        'val': output_dir / "val.pkl",
-        'test': output_dir / "test.pkl"
+    out_folds = {
+        'train': train_data,
+        'val': val_data,
+        'test': test_data,
+        'all': train_data + val_data + test_data
     }
 
-    try:
-        with open(paths['train'], 'wb') as f:
-            pickle.dump(train_data, f)
-        with open(paths['val'], 'wb') as f:
-            pickle.dump(val_data, f)
-        with open(paths['test'], 'wb') as f:
-            pickle.dump(test_data, f)
-        logging.info(f"Saved split data to {output_dir}")
-    except Exception as e:
-        logging.error(f"Failed to save split data: {e}")
+    for out_fold, spectra in out_folds.items():
+        out_file = output_dir / f"{out_fold}.pkl"
+        with open(out_file, "wb") as f:
+            pickle.dump(spectra, f)
+        logging.info(f"Saved {out_file} with {len(spectra)} spectra.")
+
 
 def process_massbank():
     base_dir = Path("data/raw/MassBank")
@@ -214,5 +208,5 @@ def process_massbank():
     split_and_save(spectra, output_dir)
 
 if __name__ == "__main__":
-    setup_logging()
+    setup_logging("data_processing.log")
     process_massbank()
