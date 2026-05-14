@@ -86,7 +86,7 @@ def load_test_smiles(dataset_dir: Path) -> list[str]:
     if not smiles:
         raise ValueError(f"No SMILES found in {test_path}")
 
-    logging.info("Loaded %d unique test SMILES from %s", len(smiles), test_path)
+    logging.info(f"Loaded {len(smiles)} unique test SMILES from {test_path}")
     return smiles
 
 
@@ -150,12 +150,12 @@ def load_cache(cache_path: Path, cid_smiles_path: Path, rebuild_cache: bool) -> 
     if rebuild_cache or not cache_path.exists():
         return None
 
-    logging.info("Loading candidate cache from %s", cache_path)
+    logging.info(f"Loading candidate cache from {cache_path}")
     with open(cache_path, "rb") as f:
         cache = pickle.load(f)
 
     if not isinstance(cache, dict) or not cache_is_valid(cache, cid_smiles_path):
-        logging.info("Cache %s is stale and will be rebuilt.", cache_path)
+        logging.info(f"Cache {cache_path} is stale and will be rebuilt.")
         return None
 
     return cache
@@ -165,7 +165,7 @@ def save_cache(cache_path: Path, cache: dict):
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     with open(cache_path, "wb") as f:
         pickle.dump(cache, f)
-    logging.info("Saved candidate cache to %s", cache_path)
+    logging.info(f"Saved candidate cache to {cache_path}")
 
 
 def load_or_build_formula_cache(
@@ -180,7 +180,7 @@ def load_or_build_formula_cache(
     if cache is not None:
         return cache["formula_to_smiles"]
 
-    logging.info("Building formula cache with %d worker(s).", num_workers)
+    logging.info(f"Building formula cache with {num_workers} worker(s).")
     formula_to_smiles: dict[str, list[str]] = defaultdict(list)
     seen_by_formula: dict[str, set[str]] = defaultdict(set)
 
@@ -216,7 +216,7 @@ def load_or_build_mass_cache(
     if cache is not None:
         return cache["masses"], cache["smiles"]
 
-    logging.info("Building mass cache with %d worker(s).", num_workers)
+    logging.info(f"Building mass cache with {num_workers} worker(s).")
     mass_smiles: list[tuple[float, str]] = []
     seen_smiles = set()
 
@@ -257,7 +257,7 @@ def build_formula_candidates(
     for smiles in tqdm(test_smiles):
         formula = calc_formula(smiles)
         if formula is None:
-            logging.warning("Invalid test SMILES skipped: %s", smiles)
+            logging.warning(f"Invalid test SMILES skipped: {smiles}")
             continue
         candidates[smiles] = list(formula_to_smiles.get(formula, []))
 
@@ -278,7 +278,7 @@ def build_mass_candidates(
     for smiles in tqdm(test_smiles):
         mass = calc_exact_mass(smiles)
         if mass is None:
-            logging.warning("Invalid test SMILES skipped: %s", smiles)
+            logging.warning(f"Invalid test SMILES skipped: {smiles}")
             continue
         left = bisect.bisect_left(cid_masses, mass - mass_tolerance)
         right = bisect.bisect_right(cid_masses, mass + mass_tolerance)
@@ -322,12 +322,19 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Generate SMILES candidate dictionaries for test molecules."
     )
-    parser.add_argument("--dataset", required=True, help="Dataset name.")
+    parser.add_argument(
+        "--dataset",
+        action="append",
+        choices=sorted(DATASET_NAMES.keys()),
+        nargs="+",
+        help="Dataset name(s). Supports '--dataset massbank gnps' or repeated '--dataset'. If omitted, all datasets are processed.",
+    )
     parser.add_argument(
         "--type",
-        required=True,
+        action="append",
         choices=["mass", "formula"],
-        help="Candidate type: approximate exact mass or identical molecular formula.",
+        nargs="+",
+        help="Candidate type(s). Supports '--type mass formula' or repeated '--type'. If omitted, both are processed.",
     )
     parser.add_argument(
         "--cid-smiles",
@@ -382,6 +389,70 @@ def parse_args():
     return parser.parse_args()
 
 
+def save_candidates(
+    dataset: str,
+    candidate_type: str,
+    dataset_dir: Path,
+    candidates: dict[str, list[str]],
+):
+    output_path = dataset_dir / f"candidates_{candidate_type}.pkl"
+    with open(output_path, "wb") as f:
+        pickle.dump(candidates, f)
+
+    sizes = [len(values) for values in candidates.values()]
+    logging.info(
+        f"Saved {output_path} with {len(candidates)} keys. "
+        f"Candidate size min={min(sizes)} "
+        f"mean={sum(sizes) / len(sizes):.2f} "
+        f"max={max(sizes)}"
+    )
+
+
+def build_and_save_candidates(
+    dataset: str,
+    candidate_type: str,
+    args,
+    cid_smiles_path: Path,
+    cache_dir: Path,
+    num_workers: int,
+    cache_store: dict,
+):
+    dataset_dir = Path(args.processed_dir) / dataset
+    test_smiles = load_test_smiles(dataset_dir)
+    logging.info(f"Generating {candidate_type} candidates for {dataset} using {cid_smiles_path}")
+
+    if candidate_type == "formula":
+        if "formula" not in cache_store:
+            cache_store["formula"] = load_or_build_formula_cache(
+                cid_smiles_path,
+                cache_dir,
+                args.rebuild_cache,
+                num_workers,
+                args.chunk_size,
+            )
+        candidates = build_formula_candidates(test_smiles, cache_store["formula"])
+    else:
+        if "mass" not in cache_store:
+            cache_store["mass"] = load_or_build_mass_cache(
+                cid_smiles_path,
+                cache_dir,
+                args.rebuild_cache,
+                num_workers,
+                args.chunk_size,
+            )
+        cid_masses, cid_smiles = cache_store["mass"]
+        candidates = build_mass_candidates(
+            test_smiles,
+            cid_masses,
+            cid_smiles,
+            args.mass_tolerance,
+        )
+
+    ensure_true_smiles_in_candidates(candidates)
+    limit_candidate_sizes(candidates, args.max_candidates, args.seed)
+    save_candidates(dataset, candidate_type, dataset_dir, candidates)
+
+
 def main():
     args = parse_args()
 
@@ -390,12 +461,6 @@ def main():
 
     setup_logging("generate_candidates.log")
 
-    dataset_key = args.dataset.lower()
-    if dataset_key not in DATASET_NAMES:
-        raise ValueError(f"--dataset must be one of: {', '.join(sorted(DATASET_NAMES))}")
-
-    dataset = DATASET_NAMES[dataset_key]
-    dataset_dir = Path(args.processed_dir) / dataset
     cid_smiles_path = Path(args.cid_smiles)
     cache_dir = Path(args.cache_dir)
     num_workers = normalize_num_workers(args.num_workers)
@@ -406,54 +471,28 @@ def main():
     if not cid_smiles_path.exists():
         raise FileNotFoundError(f"CID-SMILES file not found: {cid_smiles_path}")
 
-    test_smiles = load_test_smiles(dataset_dir)
+    dataset_keys = [item for group in args.dataset for item in group] if args.dataset else sorted(DATASET_NAMES.keys())
+    type_keys = [item for group in args.type for item in group] if args.type else ["mass", "formula"]
+    datasets = [DATASET_NAMES[dataset_key] for dataset_key in dict.fromkeys(dataset_keys)]
+    candidate_types = list(dict.fromkeys(type_keys))
+    cache_store = {}
+
     logging.info(
-        "Generating %s candidates for %s using %s",
-        args.type,
-        dataset,
-        cid_smiles_path,
+        f"Candidate generation targets: datasets={', '.join(datasets)}, "
+        f"types={', '.join(candidate_types)}"
     )
 
-    if args.type == "formula":
-        formula_to_smiles = load_or_build_formula_cache(
-            cid_smiles_path,
-            cache_dir,
-            args.rebuild_cache,
-            num_workers,
-            args.chunk_size,
-        )
-        candidates = build_formula_candidates(test_smiles, formula_to_smiles)
-    else:
-        cid_masses, cid_smiles = load_or_build_mass_cache(
-            cid_smiles_path,
-            cache_dir,
-            args.rebuild_cache,
-            num_workers,
-            args.chunk_size,
-        )
-        candidates = build_mass_candidates(
-            test_smiles,
-            cid_masses,
-            cid_smiles,
-            args.mass_tolerance,
-        )
-
-    ensure_true_smiles_in_candidates(candidates)
-    limit_candidate_sizes(candidates, args.max_candidates, args.seed)
-
-    output_path = dataset_dir / f"candidates_{args.type}.pkl"
-    with open(output_path, "wb") as f:
-        pickle.dump(candidates, f)
-
-    sizes = [len(values) for values in candidates.values()]
-    logging.info(
-        "Saved %s with %d keys. Candidate size min=%d mean=%.2f max=%d",
-        output_path,
-        len(candidates),
-        min(sizes),
-        sum(sizes) / len(sizes),
-        max(sizes),
-    )
+    for candidate_type in candidate_types:
+        for dataset in datasets:
+            build_and_save_candidates(
+                dataset,
+                candidate_type,
+                args,
+                cid_smiles_path,
+                cache_dir,
+                num_workers,
+                cache_store,
+            )
 
 
 if __name__ == "__main__":
