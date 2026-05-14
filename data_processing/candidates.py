@@ -23,7 +23,7 @@ rdBase.DisableLog("rdApp.*")
 DATASET_NAMES = {
     "gnps": "GNPS",
     "massbank": "MassBank",
-    "massspecgym": "MassSpecGym",
+    # "massspecgym": "MassSpecGym",
     "mona": "MoNA",
     "nplib1": "NPLIB1",
 }
