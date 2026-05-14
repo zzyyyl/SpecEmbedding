@@ -100,6 +100,7 @@ def main():
     parser = argparse.ArgumentParser(description="Efficient Evaluate SpecMolAlignModel on Cross-Modal Retrieval.")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to best aligned model checkpoint")
     parser.add_argument("--dataset_type", type=str, choices=["massbank", "massspecgym", "nplib1", "gnps"], default="massspecgym", help="Dataset type")
+    parser.add_argument("--candidate_type", type=str, choices=["mass", "formula"], default="mass", help="Candidate set type to use.")
     parser.add_argument("--no-mces", action="store_true", help="Disable MCES structural similaritycalculation")
     args = parser.parse_args()
 
@@ -148,13 +149,13 @@ def main():
         logging.error("No test data loaded.")
         return
 
-    candidates_dict = provider.load_candidates()
+    candidates_dict = provider.load_candidates(type=args.candidate_type)
     if not candidates_dict:
         logging.error("No candidate loaded.")
         return
 
     logging.info(f"Loaded {len(test_raw)} test spectra.")
-    logging.info(f"Loaded {len(candidates_dict)} unique candidate mapping keys.")
+    logging.info(f"Loaded {len(candidates_dict)} unique {args.candidate_type} candidate mapping keys.")
 
     tokenizer_config = TokenizerConfig(max_len=100, show_progress_bar=False)
     tokenizer = Tokenizer(**tokenizer_config)
@@ -351,11 +352,11 @@ def main():
 
     plt.xlabel('Cosine Similarity')
     plt.ylabel('Percentage of Occurrence')
-    plt.title(f'Cosine Similarity Distribution ({args.dataset_type})')
+    plt.title(f'Cosine Similarity Distribution ({args.dataset_type}, {args.candidate_type})')
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.6)
 
-    plot_path = checkpoint_path.parent / f"similarity_dist_{args.dataset_type}.png"
+    plot_path = checkpoint_path.parent / f"similarity_dist_{args.dataset_type}_{args.candidate_type}.png"
     plt.savefig(plot_path)
     logging.info(f"Similarity distribution plot saved to {plot_path}")
 

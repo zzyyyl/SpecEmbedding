@@ -30,12 +30,9 @@ class DataProvider:
         logging.info(f"Loaded {len(data)} records.")
         return data
 
-    def load_candidates(self, type=None):
+    def load_candidates(self, type):
         """候选集加载"""
-        if type:
-            file_path = self.data_dir / f"candidates_{type}.pkl"
-        else:
-            file_path = self.data_dir / "candidates.pkl"
+        file_path = self.data_dir / f"candidates_{type}.pkl"
 
         if not file_path.exists():
             logging.warning(f"{self.dataset_name} candidates not found at {file_path}")
