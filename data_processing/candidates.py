@@ -6,6 +6,7 @@ import argparse
 import bisect
 import logging
 import pickle
+import random
 from collections import defaultdict
 from multiprocessing import Pool, cpu_count
 from pathlib import Path
@@ -15,8 +16,6 @@ from rdkit import Chem
 from rdkit import rdBase
 from rdkit.Chem import Descriptors, rdMolDescriptors
 from tqdm import tqdm
-
-from train import setup_logging
 
 rdBase.DisableLog("rdApp.*")
 
@@ -294,6 +293,31 @@ def ensure_true_smiles_in_candidates(candidates: dict[str, list[str]]):
             values.insert(0, smiles)
 
 
+def limit_candidate_sizes(
+    candidates: dict[str, list[str]],
+    max_candidates: int | None,
+    seed: int,
+):
+    if max_candidates is None:
+        return
+    if max_candidates <= 0:
+        raise ValueError("--max-candidates must be positive")
+
+    rng = random.Random(seed)
+    for smiles, values in candidates.items():
+        if len(values) <= max_candidates:
+            continue
+
+        pool = [value for value in values if value != smiles]
+        keep_count = max_candidates - 1
+        if keep_count <= 0:
+            candidates[smiles] = [smiles]
+            continue
+
+        sampled = rng.sample(pool, min(keep_count, len(pool)))
+        candidates[smiles] = [smiles] + sampled
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Generate SMILES candidate dictionaries for test molecules."
@@ -343,11 +367,26 @@ def parse_args():
         default=5000,
         help="Number of SMILES sent to each worker task while building caches.",
     )
+    parser.add_argument(
+        "--max-candidates",
+        type=int,
+        default=None,
+        help="Maximum number of candidates kept for each test SMILES.",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed used when --max-candidates truncates candidate lists.",
+    )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+
+    # Keep this import local so --help and multiprocessing workers do not load training dependencies.
+    from train import setup_logging
 
     setup_logging("generate_candidates.log")
 
@@ -400,6 +439,7 @@ def main():
         )
 
     ensure_true_smiles_in_candidates(candidates)
+    limit_candidate_sizes(candidates, args.max_candidates, args.seed)
 
     output_path = dataset_dir / f"candidates_{args.type}.pkl"
     with open(output_path, "wb") as f:
