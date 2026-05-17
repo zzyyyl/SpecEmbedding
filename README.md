@@ -24,6 +24,28 @@ PyTorch: 2.6.0 with CUDA 12.4
 
 > ⚠️ Note for Windows Users: When running on Windows, you may encounter numerical errors during cosine similarity computation. This is caused by @njit decorators from the numba library. You can fix it by commenting out all @njit decorators in the code.
 
+### 1.1 Development Tools
+
+Ruff is configured for linting and import sorting, but it is intentionally kept out of `environment.yml` so production/runtime environments do not install it by default.
+
+Install development-only tools when needed:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+Run Ruff checks:
+
+```bash
+ruff check .
+```
+
+Apply safe automatic fixes:
+
+```bash
+ruff check . --fix
+```
+
 ### 2. Molecular Graph Features
 
 For spectrum-molecule alignment tasks, SpecEmbedding uses a Graph Isomorphism Network (GINE) to encode molecular structures. To capture the chemical nuances critical for Mass Spectrometry (MS) fragmentation prediction, we employ a streamlined set of atom and bond features:
