@@ -22,6 +22,28 @@ PyTorch：2.6.0 + CUDA 12.4
 
 > ⚠️ 注意：在 Windows 系统上运行时，如发现计算余弦相似度矩阵出现异常结果，请将 @njit 装饰器注释掉（该装饰器来自 numba），即可恢复正常。
 
+### 1.1 开发工具
+
+Ruff 已在项目中用于 lint 检查和 import 排序，但它被有意保留在 `requirements-dev.txt` 中，没有加入 `environment.yml`，因此生产/运行环境默认不会安装 Ruff。
+
+需要时安装开发依赖：
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+运行 Ruff 检查：
+
+```bash
+ruff check .
+```
+
+应用 Ruff 的安全自动修复：
+
+```bash
+ruff check . --fix
+```
+
 ### 2. 分子图特征
 
 在质谱-分子对齐任务中，SpecEmbedding 使用图同构网络 (GINE) 对分子结构进行编码。为了捕捉质谱 (MS) 碎片预测所需的关键化学细节，我们采用了一套精简的原子和键特征：
