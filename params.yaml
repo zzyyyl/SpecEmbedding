@@ -5,8 +5,12 @@ general:
 
 data:
   dataset_type: "massspecgym" # or "local"
-  data_path: data
-  cache_path: "data/train_cache"
+  data_path: "/data1/zyl/SpecEmbedding/processed"
+  cache_path: "/data1/zyl/SpecEmbedding/train_cache"
+  raw_path: "/data1/zyl/SpecEmbedding/raw"
+  candidates_path: "/data1/zyl/SpecEmbedding/candidates"
+  cid_smiles_path: "/data1/zyl/SpecEmbedding/candidates/CID-SMILES"
+  pubchem_cache_path: "/data1/zyl/SpecEmbedding/pubchem_similarity_cache"
   tokenizer:
     max_len: 100
     show_progress_bar: true

@@ -100,6 +100,7 @@ def main():
     parser = argparse.ArgumentParser(description="Efficient Evaluate SpecMolAlignModel on Cross-Modal Retrieval.")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to best aligned model checkpoint")
     parser.add_argument("--dataset_type", type=str, choices=["massbank", "massspecgym", "nplib1", "gnps"], default="massspecgym", help="Dataset type")
+    parser.add_argument("--data_path", type=str, default=config.data.data_path, help="Base directory containing processed dataset folders")
     parser.add_argument("--candidate_type", type=str, choices=["mass", "formula"], default="mass", help="Candidate set type to use.")
     parser.add_argument("--no-mces", action="store_true", help="Disable MCES structural similaritycalculation")
     args = parser.parse_args()
@@ -138,10 +139,10 @@ def main():
     model = model.to(device)
     model.eval()
 
-    if args.dataset_type == "massspecgym": provider = MassSpecGymProvider()
-    elif args.dataset_type == "massbank":  provider = MassBankProvider()
-    elif args.dataset_type == "nplib1":    provider = NPLIB1Provider()
-    elif args.dataset_type == "gnps":      provider = GNPSProvider()
+    if args.dataset_type == "massspecgym": provider = MassSpecGymProvider(data_dir=args.data_path)
+    elif args.dataset_type == "massbank":  provider = MassBankProvider(data_dir=args.data_path)
+    elif args.dataset_type == "nplib1":    provider = NPLIB1Provider(data_dir=args.data_path)
+    elif args.dataset_type == "gnps":      provider = GNPSProvider(data_dir=args.data_path)
     else: raise ValueError("--dataset_type is invalid")
 
     test_raw = provider.load_data(mode='test')

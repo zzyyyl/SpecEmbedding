@@ -23,6 +23,7 @@ from SpecEmbedding.utils.clean import (
     is_annotated,
     count_annotations,
 )
+from SpecEmbedding.config import config
 
 def filters_nplib1(spectra):
     spectra = [default_filters(s) for s in tqdm(spectra, desc="Apply filters")]
@@ -40,8 +41,8 @@ def filters_nplib1(spectra):
 
 def process_nplib1():
     # Define paths
-    base_dir = Path("data/raw/NPLIB1")
-    output_dir = Path("data/processed/NPLIB1")
+    base_dir = Path(config.data.raw_path) / "NPLIB1"
+    output_dir = Path(config.data.data_path) / "NPLIB1"
 
     # Ensure output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)

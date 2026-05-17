@@ -67,17 +67,23 @@ def add_base_argument(parser):
         help="Dataset type"
     )
     parser.add_argument(
+        "--data_path",
+        type=str,
+        default=config.data.data_path,
+        help="Base directory containing processed dataset folders"
+    )
+    parser.add_argument(
         "--save_dir",
         type=str,
         default=config.general.save_dir,
         help="Directory to save model and logs"
     )
 
-def load_data(dataset_type):
-    if dataset_type == "massspecgym": provider = MassSpecGymProvider()
-    elif dataset_type == "massbank":  provider = MassBankProvider()
-    elif dataset_type == "nplib1":    provider = NPLIB1Provider()
-    elif dataset_type == "gnps":      provider = GNPSProvider()
+def load_data(dataset_type, data_path=None):
+    if dataset_type == "massspecgym": provider = MassSpecGymProvider(data_dir=data_path)
+    elif dataset_type == "massbank":  provider = MassBankProvider(data_dir=data_path)
+    elif dataset_type == "nplib1":    provider = NPLIB1Provider(data_dir=data_path)
+    elif dataset_type == "gnps":      provider = GNPSProvider(data_dir=data_path)
     else: raise ValueError("--dataset_type is invalid")
 
     train_raw = provider.load_data(mode='train')
@@ -90,7 +96,7 @@ def load_data(dataset_type):
     logging.info(f"Loaded {len(train_raw)} train records and {len(val_raw)} val records.")
     return train_raw, val_raw
 
-def get_classified_data(dataset_type, cache_path=None):
+def get_classified_data(dataset_type, data_path=None, cache_path=None):
     if cache_path is None:
         cache_path = config.data.cache_path
     # Tokenize & Classify 处理 (带缓存逻辑)
@@ -105,7 +111,7 @@ def get_classified_data(dataset_type, cache_path=None):
     else:
         logging.info("No cache found. Processing dataset (Tokenize & Classify)...")
         # 1. Load data
-        train_raw, val_raw = load_data(dataset_type=dataset_type)
+        train_raw, val_raw = load_data(dataset_type=dataset_type, data_path=data_path)
 
         # 2. Convert to Spectrum objects and Tokenize
         tokenizer_config = TokenizerConfig(
@@ -157,7 +163,7 @@ def main():
     set_seed(config.general.seed)
     device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
 
-    classified_data = get_classified_data(dataset_type=args.dataset_type)
+    classified_data = get_classified_data(dataset_type=args.dataset_type, data_path=args.data_path)
     train_data = classified_data['train_data']
     train_keys = classified_data['train_keys']
     val_data = classified_data['val_data']

@@ -9,12 +9,13 @@ from matchms.importing import load_from_msp
 
 from train import setup_logging
 from massbank import split_and_save, filters_massbank
+from SpecEmbedding.config import config
 from src.utils.clean import canonicalize_smiles
 
 def process_mona():
     # Define paths
-    base_dir = Path("data/raw/MoNA")
-    output_dir = Path("data/processed/MoNA")
+    base_dir = Path(config.data.raw_path) / "MoNA"
+    output_dir = Path(config.data.data_path) / "MoNA"
 
     if not base_dir.exists():
         logging.error(f"Directory {base_dir} not found.")

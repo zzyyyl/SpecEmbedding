@@ -2,7 +2,7 @@
 setlocal
 
 :: 设置数据路径
-set DATA_PATH=data/MassBank/MassBank.msp
+set DATA_PATH=/data1/zyl/SpecEmbedding/MassBank/MassBank.msp
 set PRETRAINED_CKPT=checkpoints/model.ckpt
 set SAVE_DIR=checkpoints_align/local_massbank
 

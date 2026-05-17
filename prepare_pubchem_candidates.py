@@ -12,6 +12,7 @@ import threading
 from pathlib import Path
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from SpecEmbedding.config import config
 from src.data import MassBankProvider, MassSpecGymProvider
 from train import setup_logging
 from rdkit import Chem
@@ -32,7 +33,9 @@ class RateLimiter:
 
 class PubChemFetcher:
     """Parallel fetcher for PubChem similarity candidates."""
-    def __init__(self, cache_dir="data/pubchem_similarity_cache", threshold=90, max_workers=10):
+    def __init__(self, cache_dir=None, threshold=90, max_workers=10):
+        if cache_dir is None:
+            cache_dir = config.data.pubchem_cache_path
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.threshold = threshold
@@ -149,7 +152,7 @@ def main():
     parser.add_argument("--dataset", type=str, choices=["massbank", "massspecgym"], default="massbank", help="Dataset type")
     parser.add_argument("--output", type=str, required=True, help="Path to save the candidates mapping (.pkl)")
     parser.add_argument("--max_cands", type=int, default=-1, help="Maximum number of candidates to keep per SMILES")
-    parser.add_argument("--cache_dir", type=str, default="data/pubchem_similarity_cache", help="Directory for API cache")
+    parser.add_argument("--cache_dir", type=str, default=config.data.pubchem_cache_path, help="Directory for API cache")
     parser.add_argument("--mode", type=str, default="all", choices=["all", "train", "val", "test"], help="Which data split to process")
     parser.add_argument("--threshold", type=int, default=90, help="PubChem Tanimoto similarity threshold (0-100), default: 90")
     parser.add_argument("--workers", type=int, default=10, help="Number of concurrent threads")

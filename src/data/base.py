@@ -3,10 +3,13 @@ import logging
 from pathlib import Path
 
 class DataProvider:
-    def __init__(self, dataset_name, base_data_dir="data/processed"):
+    def __init__(self, dataset_name, base_data_dir):
         self.base_data_dir = Path(base_data_dir)
         self.dataset_name = dataset_name
-        self.data_dir = self.base_data_dir / dataset_name
+        if self.base_data_dir.name == dataset_name:
+            self.data_dir = self.base_data_dir
+        else:
+            self.data_dir = self.base_data_dir / dataset_name
 
     def load_data(self, mode):
         """

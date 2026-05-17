@@ -12,6 +12,7 @@ from matchms import Spectrum
 
 from train import setup_logging
 
+from SpecEmbedding.config import config
 from SpecEmbedding.utils.clean import (
     apply_filters,
     seperate_spectra_by_ionmode,
@@ -200,8 +201,8 @@ def split_and_save(data, output_dir, train_ratio=0.8, val_ratio=0.1, seed=42):
 
 
 def process_massbank():
-    base_dir = Path("data/raw/MassBank")
-    output_dir = Path("data/processed/MassBank")
+    base_dir = Path(config.data.raw_path) / "MassBank"
+    output_dir = Path(config.data.data_path) / "MassBank"
 
     spectra = parse_msp(base_dir / "MassBank_NISTformat.msp")
     spectra = filters_massbank(spectra)

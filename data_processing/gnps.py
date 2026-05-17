@@ -13,12 +13,13 @@ from SpecEmbedding.utils.clean import (
     count_annotations,
     is_annotated,
 )
+from SpecEmbedding.config import config
 from train import setup_logging
 
 def process_gnps():
     # Define paths
-    base_dir = Path("data/raw/GNPS")
-    output_dir = Path("data/processed/GNPS")
+    base_dir = Path(config.data.raw_path) / "GNPS"
+    output_dir = Path(config.data.data_path) / "GNPS"
 
     if not base_dir.exists():
         logging.error(f"Directory {base_dir} not found.")

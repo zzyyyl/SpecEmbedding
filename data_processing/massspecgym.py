@@ -13,6 +13,7 @@ from huggingface_hub import hf_hub_download
 from rdkit import Chem
 from matchms import Spectrum
 
+from SpecEmbedding.config import config
 from train import setup_logging
 
 def is_valid_smiles(smiles):
@@ -26,7 +27,7 @@ def is_valid_smiles(smiles):
         return False
 
 def process_massspecgym():
-    output_dir = Path("data/processed/MassSpecGym")
+    output_dir = Path(config.data.data_path) / "MassSpecGym"
     output_dir.mkdir(parents=True, exist_ok=True)
     repo_id = "roman-bushuiev/MassSpecGym"
     candidates_filenames = {

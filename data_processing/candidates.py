@@ -17,6 +17,8 @@ from rdkit import rdBase
 from rdkit.Chem import Descriptors, rdMolDescriptors
 from tqdm import tqdm
 
+from SpecEmbedding.config import config
+
 rdBase.DisableLog("rdApp.*")
 
 
@@ -338,12 +340,12 @@ def parse_args():
     )
     parser.add_argument(
         "--cid-smiles",
-        default="data/candidates/CID-SMILES",
+        default=config.data.cid_smiles_path,
         help="Path to the PubChem CID-SMILES file.",
     )
     parser.add_argument(
         "--processed-dir",
-        default="data/processed",
+        default=config.data.data_path,
         help="Base directory containing processed datasets.",
     )
     parser.add_argument(
@@ -354,7 +356,7 @@ def parse_args():
     )
     parser.add_argument(
         "--cache-dir",
-        default="data/candidates",
+        default=config.data.candidates_path,
         help="Directory for derived CID-SMILES mass/formula caches.",
     )
     parser.add_argument(
