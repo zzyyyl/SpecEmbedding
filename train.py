@@ -29,7 +29,7 @@ from SpecEmbedding.type import (
     TokenizerConfig
 )
 
-from src.data import MassBankProvider, MassSpecGymProvider, NPLIB1Provider, GNPSProvider
+from src.data import MassBankProvider, MassSpecGymProvider, NPLIB1Provider, GNPSProvider, MoNAProvider
 
 def setup_logging(log_file=None):
     handlers = [
@@ -62,7 +62,7 @@ def add_base_argument(parser):
     parser.add_argument(
         "--dataset_type",
         type=str,
-        choices=["massbank", "massspecgym", "nplib1", "gnps"],
+        choices=["massbank", "massspecgym", "nplib1", "gnps", "mona"],
         default=config.data.dataset_type,
         help="Dataset type"
     )
@@ -84,6 +84,7 @@ def load_data(dataset_type, data_path=None):
     elif dataset_type == "massbank":  provider = MassBankProvider(data_dir=data_path)
     elif dataset_type == "nplib1":    provider = NPLIB1Provider(data_dir=data_path)
     elif dataset_type == "gnps":      provider = GNPSProvider(data_dir=data_path)
+    elif dataset_type == "mona":      provider = MoNAProvider(data_dir=data_path)
     else: raise ValueError("--dataset_type is invalid")
 
     train_raw = provider.load_data(mode='train')

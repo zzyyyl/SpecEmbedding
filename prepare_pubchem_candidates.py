@@ -13,7 +13,7 @@ from pathlib import Path
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from SpecEmbedding.config import config
-from src.data import MassBankProvider, MassSpecGymProvider
+from src.data import MassBankProvider, MassSpecGymProvider, MoNAProvider
 from train import setup_logging
 from rdkit import Chem
 
@@ -148,8 +148,8 @@ class PubChemFetcher:
 
 def main():
     parser = argparse.ArgumentParser(description="Prepare PubChem structural similarity candidate sets.")
-    parser.add_argument("--data_path", type=str, help="Dataset directory (required for massbank/nplib1)")
-    parser.add_argument("--dataset", type=str, choices=["massbank", "massspecgym"], default="massbank", help="Dataset type")
+    parser.add_argument("--data_path", type=str, default=config.data.data_path, help="Base directory containing processed dataset folders")
+    parser.add_argument("--dataset", type=str, choices=["massbank", "massspecgym", "mona"], default="massbank", help="Dataset type")
     parser.add_argument("--output", type=str, required=True, help="Path to save the candidates mapping (.pkl)")
     parser.add_argument("--max_cands", type=int, default=-1, help="Maximum number of candidates to keep per SMILES")
     parser.add_argument("--cache_dir", type=str, default=config.data.pubchem_cache_path, help="Directory for API cache")
@@ -161,13 +161,15 @@ def main():
     setup_logging("prepare.log")
     # 1. Load Data
     if args.dataset == "massspecgym":
-        provider = MassSpecGymProvider()
-        data = provider.load_data(mode=args.mode)
-    else:
-        if not args.data_path:
-            raise ValueError("--data_path is required")
+        provider = MassSpecGymProvider(data_dir=args.data_path)
+    elif args.dataset == "massbank":
         provider = MassBankProvider(data_dir=args.data_path)
-        data = provider.load_data(mode=args.mode)
+    elif args.dataset == "mona":
+        provider = MoNAProvider(data_dir=args.data_path)
+    else:
+        raise ValueError("--dataset is invalid")
+
+    data = provider.load_data(mode=args.mode)
 
     if not data:
         logging.error("No data loaded.")
