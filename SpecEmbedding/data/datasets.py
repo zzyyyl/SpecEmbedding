@@ -3,7 +3,8 @@ import numpy.typing as npt
 from torch.utils.data import Dataset
 
 from SpecEmbedding.data.const import SpecialToken
-from SpecEmbedding.type import TokenSequence, AugmentationConfig, DefaultAugmentationConifg
+from SpecEmbedding.type import AugmentationConfig, DefaultAugmentationConifg, TokenSequence
+
 
 class TrainDataset(Dataset):
     def __init__(

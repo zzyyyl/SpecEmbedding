@@ -1,20 +1,23 @@
 import os
 import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pickle
-import logging
 import json
+import logging
+import pickle
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from pathlib import Path
-from tqdm import tqdm
 from huggingface_hub import hf_hub_download
-from rdkit import Chem
 from matchms import Spectrum
+from rdkit import Chem
+from tqdm import tqdm
 
 from SpecEmbedding.config import config
 from train import setup_logging
+
 
 def is_valid_smiles(smiles):
     """校验 SMILES 的合法性"""
@@ -46,7 +49,7 @@ def process_massspecgym():
         with open(out_file, 'wb') as f:
             pickle.dump(candidates, f)
 
-    logging.info(f"Downloading MassSpecGym dataset...")
+    logging.info("Downloading MassSpecGym dataset...")
     data_path = hf_hub_download(repo_id=repo_id, filename=spectra_filename, repo_type="dataset")
     raw_data = pd.read_csv(data_path, sep="\t")
 

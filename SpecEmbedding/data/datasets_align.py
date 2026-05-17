@@ -1,10 +1,10 @@
 import numpy as np
 import torch
-from rdkit import Chem
-from torch_geometric.data import Data, Batch
+from torch_geometric.data import Batch
 
 from SpecEmbedding.data.datasets import TrainDataset
 from SpecEmbedding.data.graph_utils import smiles_to_graph
+
 
 class AlignGraphDataset(TrainDataset):
     """

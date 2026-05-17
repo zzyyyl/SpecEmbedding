@@ -1,22 +1,23 @@
-from typing import Optional, Literal
-from pathlib import Path
 from collections.abc import Sequence
- 
-import torch
-import pandas as pd
+from pathlib import Path
+from typing import Literal, Optional
+
 import numpy as np
 import numpy.typing as npt
-from tqdm import tqdm
-from numba import njit, prange
+import pandas as pd
+import torch
 from matchms import Spectrum
+from numba import njit, prange
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
+from SpecEmbedding.config import config
 from SpecEmbedding.data.datasets import TestDataset
 from SpecEmbedding.data.tokenizer import Tokenizer
-from SpecEmbedding.trainer.trainer import ModelTester
 from SpecEmbedding.models import SiameseModel
+from SpecEmbedding.trainer.trainer import ModelTester
 from SpecEmbedding.utils.clean import get_smiles
-from SpecEmbedding.config import config
+
 
 def embedding(
     tester: ModelTester, tokenizer: Tokenizer,

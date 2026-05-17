@@ -1,21 +1,20 @@
 import argparse
 import logging
-import torch
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from pathlib import Path
-from tqdm import tqdm
+import torch
 
-from SpecEmbedding.trainer.trainer import ModelTester
-from SpecEmbedding.data.tokenizer import Tokenizer
-from SpecEmbedding.trainer.trainer import set_seed
-from SpecEmbedding.utils.model import search, load_transformer_model, SiameseModel
 from SpecEmbedding.config import config
-
+from SpecEmbedding.data.tokenizer import Tokenizer
+from SpecEmbedding.trainer.trainer import ModelTester, set_seed
+from SpecEmbedding.utils.model import SiameseModel, load_transformer_model, search
 from train import (
     setup_logging,
     startup_logging,
 )
+
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate SpecEmbedding model using MassSpecGym split logic.")

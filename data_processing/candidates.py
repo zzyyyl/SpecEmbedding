@@ -1,5 +1,6 @@
 import os
 import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import argparse
@@ -12,8 +13,7 @@ from multiprocessing import Pool, cpu_count
 from pathlib import Path
 from typing import Iterable
 
-from rdkit import Chem
-from rdkit import rdBase
+from rdkit import Chem, rdBase
 from rdkit.Chem import Descriptors, rdMolDescriptors
 from tqdm import tqdm
 

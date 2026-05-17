@@ -1,36 +1,37 @@
+import random
 from collections import defaultdict
 from collections.abc import Sequence
 from pathlib import Path
 
-import random
 import numpy as np
-from tqdm import tqdm
 from matchms import Spectrum
-from matchms.Spectrum import Spectrum
 from matchms.filtering import (
-    normalize_intensities,
-    select_by_mz,
-    require_minimum_number_of_peaks,
     add_parent_mass,
     default_filters,
     derive_adduct_from_name,
-    derive_smiles_from_inchi,
     derive_inchi_from_smiles,
-    harmonize_undefined_inchi,
     derive_inchikey_from_inchi,
-    harmonize_undefined_smiles,
-    repair_inchi_inchikey_smiles,
+    derive_smiles_from_inchi,
+    harmonize_undefined_inchi,
     harmonize_undefined_inchikey,
+    harmonize_undefined_smiles,
+    normalize_intensities,
+    repair_inchi_inchikey_smiles,
+    require_minimum_number_of_peaks,
+    select_by_mz,
 )
 from matchms.filtering.filter_utils.smile_inchi_inchikey_conversions import (
     is_valid_inchi,
+    is_valid_inchikey,
     is_valid_smiles,
-    is_valid_inchikey
 )
 from matchms.importing import load_from_mgf, load_from_msp, load_from_mzxml
+from matchms.Spectrum import Spectrum
 from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
 from SpecEmbedding.type import TokenSequence
+
 
 def count_annotations(spectra: Sequence[Spectrum], desc: str):
     inchi_seq = []

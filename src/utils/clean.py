@@ -1,7 +1,9 @@
 import logging
-from rdkit import Chem
-from matchms import Spectrum
 from typing import Never, Optional, Union
+
+from matchms import Spectrum
+from rdkit import Chem
+
 
 def is_valid_smiles(smiles: str) -> bool:
     """校验 SMILES 的合法性"""

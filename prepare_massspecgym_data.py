@@ -1,22 +1,17 @@
-import os
 import argparse
 import logging
-import pickle
 from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 from huggingface_hub import hf_hub_download
 from matchms import Spectrum
+from matchms.filtering.filter_utils.smile_inchi_inchikey_conversions import is_valid_smiles
+from tqdm import tqdm
 
-from SpecEmbedding.utils.clean import (
-    get_ref_query
-)
-from matchms.filtering.filter_utils.smile_inchi_inchikey_conversions import (
-    is_valid_smiles
-)
+from SpecEmbedding.utils.clean import get_ref_query
+
 
 def setup_logging():
     logging.basicConfig(

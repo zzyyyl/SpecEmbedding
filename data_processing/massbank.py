@@ -1,33 +1,34 @@
 import os
 import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pickle
 import logging
+import pickle
 import random
-import numpy as np
 from pathlib import Path
-from tqdm import tqdm
-from matchms import Spectrum
 
-from train import setup_logging
+import numpy as np
+from matchms import Spectrum
+from tqdm import tqdm
 
 from SpecEmbedding.config import config
 from SpecEmbedding.utils.clean import (
     apply_filters,
-    seperate_spectra_by_ionmode,
-    filter_by_precursor_mz,
     clean_metadata,
     clean_metadata2,
-    minimal_processing,
-    is_annotated,
     count_annotations,
+    filter_by_precursor_mz,
+    is_annotated,
+    minimal_processing,
+    seperate_spectra_by_ionmode,
 )
-
 from src.utils.clean import (
-    is_valid_smiles,
     canonicalize_smiles,
+    is_valid_smiles,
 )
+from train import setup_logging
+
 
 def filters_massbank(spectra):
     spectra = [apply_filters(s) for s in tqdm(spectra, desc="Apply filters")]
@@ -181,7 +182,7 @@ def split_and_save(data, output_dir, train_ratio=0.8, val_ratio=0.1, seed=42):
         else:
             test_data.extend(records)
 
-    logging.info(f"Split results by Molecule:")
+    logging.info("Split results by Molecule:")
     logging.info(f"  Train: {len(train_data)} records ({len(train_inchikey_set)} unique InchiKeys)")
     logging.info(f"  Val:   {len(val_data)} records ({len(val_inchikey_set)} unique InchiKeys)")
     logging.info(f"  Test:  {len(test_data)} records ({len(test_inchikey_set)} unique InchiKeys)")

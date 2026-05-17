@@ -1,11 +1,9 @@
-from typing import TypedDict, Sequence, Callable, Optional, Literal
+from typing import Callable, Literal, Optional, Sequence, TypedDict
 
-import torch
-from torch import nn
-from torch import device
 import numpy as np
 import numpy.typing as npt
-
+import torch
+from torch import device, nn
 
 BatchType = Sequence[torch.Tensor]
 StepTrain = Callable[[nn.Module, nn.Module, device,

@@ -1,42 +1,42 @@
-from pathlib import Path
-from typing import Sequence, Optional, Literal
 from argparse import ArgumentParser
+from pathlib import Path
+from typing import Literal, Optional, Sequence
 
-import pandas as pd
 import numpy as np
 import numpy.typing as npt
 import optuna
-from optuna.trial import Trial
 import optuna.importance
+import pandas as pd
 import torch
+from matchms import Spectrum
+from optuna.trial import Trial
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
-from matchms import Spectrum
 
+from SpecEmbedding.config import config
+from SpecEmbedding.const import gnps
+from SpecEmbedding.data.datasets import TestDataset, TokenSequence, TrainDataset
+from SpecEmbedding.data.tokenizer import Tokenizer
+from SpecEmbedding.loss import SupConLoss, SupConLossWithTanimotoScore, TanimotoScoreLoss
 from SpecEmbedding.models import SiameseModel
-from SpecEmbedding.trainer.trainer import Trainer, ModelTester, set_seed
-from SpecEmbedding.trainer.fn import step_train, step_evaluate
+from SpecEmbedding.trainer.fn import step_evaluate, step_train
+from SpecEmbedding.trainer.trainer import ModelTester, Trainer, set_seed
 from SpecEmbedding.type import (
     AugmentationConfig,
-    OptimizerConfig,
-    TokenizerConfig,
     DataLoaderConfig,
-    StepFuncConfig,
+    DescriptionConfig,
+    OptimizerConfig,
     SchedulerConfig,
-    TrainerConfig,
+    StepFuncConfig,
+    StorageConfig,
     SupConLossConfig,
     SupConLossWithTanimotoScoreConfig,
     TanimotoLossConfig,
-    DescriptionConfig,
-    StorageConfig
+    TokenizerConfig,
+    TrainerConfig,
 )
-from SpecEmbedding.data.datasets import TrainDataset, TestDataset, TokenSequence
-from SpecEmbedding.data.tokenizer import Tokenizer
 from SpecEmbedding.utils.clean import get_classified_tokenset
-from SpecEmbedding.loss import SupConLossWithTanimotoScore, SupConLoss, TanimotoScoreLoss
 from SpecEmbedding.utils.model import embedding, metric
-from SpecEmbedding.const import gnps
-from SpecEmbedding.config import config
 
 
 def objective(
@@ -231,9 +231,9 @@ def objective(
 
     model_dir.mkdir(parents=True, exist_ok=True)
     storage_config = StorageConfig(
-        model=model_dir / f"model.ckpt",
-        lr=model_dir / f"lr.npy",
-        step_loss=model_dir / f"step_loss.npy",
+        model=model_dir / "model.ckpt",
+        lr=model_dir / "lr.npy",
+        step_loss=model_dir / "step_loss.npy",
         loss=model_dir / "epoch_loss.npy",
         custom=model_dir / "custom_metric.npy"
     )

@@ -1,11 +1,12 @@
 from collections.abc import Sequence
 
 import numpy as np
-from tqdm import tqdm
 from matchms import Spectrum
+from tqdm import tqdm
 
 from SpecEmbedding.data.const import SpecialToken
-from SpecEmbedding.type import Peak, MetaData, TokenSequence
+from SpecEmbedding.type import MetaData, Peak, TokenSequence
+
 
 class Tokenizer:
     def __init__(self, max_len: int, show_progress_bar: bool = True) -> None:

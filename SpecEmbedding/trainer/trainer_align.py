@@ -1,12 +1,14 @@
-import os
 import logging
+import os
+from copy import deepcopy
+
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from copy import deepcopy
 
-from SpecEmbedding.models_align import SpecMolAlignModel
 from SpecEmbedding.loss_align import ContrastiveAlignmentLoss
+from SpecEmbedding.models_align import SpecMolAlignModel
+
 
 class TrainerAlign:
     """质谱-分子图对齐训练器"""

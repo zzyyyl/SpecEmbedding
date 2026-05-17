@@ -1,37 +1,33 @@
 import argparse
 import logging
 import os
-import pickle
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
-from collections import defaultdict
 
-import pulp
+import matplotlib.pyplot as plt
 import numpy as np
+import pulp
 import torch
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
-from tqdm import tqdm
+from myopic_mces.myopic_mces import MCES
 from torch.utils.data import DataLoader, Dataset
 from torch_geometric.data import Batch
-from myopic_mces.myopic_mces import MCES
-from concurrent.futures import ProcessPoolExecutor
+from tqdm import tqdm
 
+from SpecEmbedding.config import config
+from SpecEmbedding.data.graph_utils import smiles_to_graph
 from SpecEmbedding.data.tokenizer import Tokenizer
+from SpecEmbedding.models import SiameseModel
+from SpecEmbedding.models_align import GINEEncoder, SpecMolAlignModel
 from SpecEmbedding.trainer.trainer import set_seed
 from SpecEmbedding.type import TokenizerConfig
-from SpecEmbedding.models import SiameseModel
-from SpecEmbedding.models_align import SpecMolAlignModel, GINEEncoder
-from SpecEmbedding.data.graph_utils import smiles_to_graph
-from SpecEmbedding.config import config
-
 from src.data import (
-    MassSpecGymProvider,
-    MassBankProvider,
-    NPLIB1Provider,
     GNPSProvider,
+    MassBankProvider,
+    MassSpecGymProvider,
     MoNAProvider,
+    NPLIB1Provider,
 )
-
 from train import (
     setup_logging,
     startup_logging,

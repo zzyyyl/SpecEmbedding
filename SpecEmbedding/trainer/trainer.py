@@ -1,27 +1,27 @@
+import logging
 import math
 import random
 from typing import Literal, Optional, Union
 
-from tqdm import tqdm
 import numpy as np
 import torch
 from torch.nn import Module
 from torch.optim import Optimizer
-from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import LambdaLR
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from SpecEmbedding.type import (
+    CustomMetricConfig,
+    DescriptionConfig,
+    SchedulerConfig,
+    StepFuncConfig,
     StepTrain,
     StepVal,
-    TrainerConfig,
-    SchedulerConfig,
-    DescriptionConfig,
-    StepFuncConfig,
     StorageConfig,
-    CustomMetricConfig
+    TrainerConfig,
 )
 
-import logging
 
 def set_seed(seed):
     np.random.seed(seed)

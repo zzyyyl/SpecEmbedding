@@ -1,7 +1,8 @@
-import subprocess
 import argparse
 import os
+import subprocess
 import sys
+
 
 def get_commit_hash():
     try:

@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class ContrastiveAlignmentLoss(nn.Module):
     """跨模态双向对比学习损失 (CLIP Loss)"""
     def __init__(self):

@@ -3,8 +3,8 @@ from typing import Literal
 import numpy as np
 import numpy.typing as npt
 import torch
-from torch import nn, device
 import torch.nn.functional as F
+from torch import device, nn
 
 
 class TanimotoScoreLoss(nn.Module):

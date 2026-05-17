@@ -1,20 +1,21 @@
 import os
 import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pickle
 import logging
-import numpy as np
+import pickle
 from pathlib import Path
-from tqdm import tqdm
+
 from matchms.importing import load_from_mgf
 
+from SpecEmbedding.config import config
 from SpecEmbedding.utils.clean import (
     count_annotations,
     is_annotated,
 )
-from SpecEmbedding.config import config
 from train import setup_logging
+
 
 def process_gnps():
     # Define paths

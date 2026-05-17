@@ -1,10 +1,12 @@
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GINEConv, global_add_pool, global_mean_pool
-from typing import Tuple, Union, Iterable
-from SpecEmbedding.models import SiameseModel
+
 from SpecEmbedding.data.graph_utils import ATOM_FEATURES, BOND_FEATURES
+from SpecEmbedding.models import SiameseModel
+
 
 class GINEEncoder(nn.Module):
     """基于 GINE (Graph Isomorphism Network with Edge features) 的分子编码器"""

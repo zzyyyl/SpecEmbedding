@@ -1,35 +1,33 @@
 import argparse
-import os
 import logging
+import os
+import pickle
 from pathlib import Path
 
-import torch
-import pickle
 import numpy as np
+import torch
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
-from matchms import Spectrum
 
-from SpecEmbedding.trainer.trainer import Trainer, set_seed
-from SpecEmbedding.trainer.fn import step_train, step_evaluate
+from SpecEmbedding.config import config
 from SpecEmbedding.data.datasets import TrainDataset
 from SpecEmbedding.data.tokenizer import Tokenizer
+from SpecEmbedding.loss import SupConLoss
+from SpecEmbedding.trainer.fn import step_evaluate, step_train
+from SpecEmbedding.trainer.trainer import Trainer, set_seed
+from SpecEmbedding.type import (
+    AugmentationConfig,
+    DescriptionConfig,
+    SchedulerConfig,
+    StepFuncConfig,
+    StorageConfig,
+    TokenizerConfig,
+    TrainerConfig,
+)
 from SpecEmbedding.utils.clean import get_classified_tokenset
 from SpecEmbedding.utils.model import SiameseModel
-from SpecEmbedding.loss import SupConLoss
-from SpecEmbedding.config import config
-from SpecEmbedding.type import (
-    AugmentationConfig, 
-    DataLoaderConfig, 
-    TrainerConfig, 
-    SchedulerConfig, 
-    StepFuncConfig, 
-    DescriptionConfig, 
-    StorageConfig, 
-    TokenizerConfig
-)
+from src.data import GNPSProvider, MassBankProvider, MassSpecGymProvider, MoNAProvider, NPLIB1Provider
 
-from src.data import MassBankProvider, MassSpecGymProvider, NPLIB1Provider, GNPSProvider, MoNAProvider
 
 def setup_logging(log_file=None):
     handlers = [

@@ -1,16 +1,19 @@
 import os
 import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import logging
 from pathlib import Path
-from tqdm import tqdm
-from matchms.importing import load_from_msp
 
-from train import setup_logging
-from massbank import split_and_save, filters_massbank
+from massbank import filters_massbank, split_and_save
+from matchms.importing import load_from_msp
+from tqdm import tqdm
+
 from SpecEmbedding.config import config
 from src.utils.clean import canonicalize_smiles
+from train import setup_logging
+
 
 def process_mona():
     # Define paths

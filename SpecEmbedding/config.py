@@ -1,6 +1,8 @@
-import yaml
 from pathlib import Path
 from typing import Any
+
+import yaml
+
 
 class ConfigObject:
     def __init__(self, data: dict[str, Any]):

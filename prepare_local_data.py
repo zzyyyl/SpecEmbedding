@@ -1,16 +1,14 @@
-import os
 import argparse
 import logging
 from pathlib import Path
 
 import numpy as np
-from tqdm import tqdm
 from matchms import Spectrum
+from tqdm import tqdm
 
-from SpecEmbedding.utils.clean import (
-    get_ref_query
-)
+from SpecEmbedding.utils.clean import get_ref_query
 from src.data import MassBankProvider
+
 
 def setup_logging():
     logging.basicConfig(

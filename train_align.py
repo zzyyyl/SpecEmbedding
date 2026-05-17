@@ -1,28 +1,22 @@
 import argparse
-import os
 import logging
+import os
+import random
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from SpecEmbedding.trainer.trainer_align import TrainerAlign
-from SpecEmbedding.trainer.trainer import set_seed
-from SpecEmbedding.models_align import SpecMolAlignModel, GINEEncoder
-from SpecEmbedding.utils.model import SiameseModel
-from SpecEmbedding.data.datasets_align import AlignGraphDataset, align_collate_fn
 from SpecEmbedding.config import config
+from SpecEmbedding.data.datasets_align import AlignGraphDataset, align_collate_fn
+from SpecEmbedding.models_align import GINEEncoder, SpecMolAlignModel
+from SpecEmbedding.trainer.trainer import set_seed
+from SpecEmbedding.trainer.trainer_align import TrainerAlign
+from SpecEmbedding.utils.model import SiameseModel
+from train import add_base_argument, get_classified_data, setup_logging, startup_logging
 
-from train import (
-    setup_logging,
-    startup_logging,
-    add_base_argument,
-    get_classified_data
-)
-
-import random
-import numpy as np
 
 def seed_worker(worker_id):
     worker_seed = torch.initial_seed() % 2**32

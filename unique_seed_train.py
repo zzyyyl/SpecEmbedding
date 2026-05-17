@@ -1,33 +1,32 @@
 from pathlib import Path
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import torch
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 
-from SpecEmbedding.models import SiameseModel
-from SpecEmbedding.trainer.trainer import Trainer, ModelTester, set_seed
-from SpecEmbedding.trainer.fn import step_train, step_evaluate
-from SpecEmbedding.type import (
-    AugmentationConfig,
-    OptimizerConfig,
-    TokenizerConfig,
-    DataLoaderConfig,
-    StepFuncConfig,
-    SchedulerConfig,
-    TrainerConfig,
-    SupConLossWithTanimotoScoreConfig,
-    DescriptionConfig,
-    StorageConfig
-)
+from SpecEmbedding.const import gnps
 from SpecEmbedding.data.datasets import TrainDataset
 from SpecEmbedding.data.tokenizer import Tokenizer
-from SpecEmbedding.models import SiameseModel
-from SpecEmbedding.utils.model import search_with_spectra, search
-from SpecEmbedding.utils.clean import get_classified_tokenset
 from SpecEmbedding.loss import SupConLossWithTanimotoScore
-from SpecEmbedding.const import gnps
+from SpecEmbedding.models import SiameseModel
+from SpecEmbedding.trainer.fn import step_evaluate, step_train
+from SpecEmbedding.trainer.trainer import ModelTester, Trainer, set_seed
+from SpecEmbedding.type import (
+    AugmentationConfig,
+    DataLoaderConfig,
+    DescriptionConfig,
+    OptimizerConfig,
+    SchedulerConfig,
+    StepFuncConfig,
+    StorageConfig,
+    SupConLossWithTanimotoScoreConfig,
+    TokenizerConfig,
+    TrainerConfig,
+)
+from SpecEmbedding.utils.clean import get_classified_tokenset
+from SpecEmbedding.utils.model import search, search_with_spectra
 
 spectra_paths = {
     "gnps": {
@@ -166,9 +165,9 @@ for i, seed in enumerate(seeds, 1):
     model_dir = Path(f"./replication_models/replication-seed{seed}")
     model_dir.mkdir(parents=True, exist_ok=True)
     storage_config = StorageConfig(
-        model=model_dir / f"model.ckpt",
-        lr=model_dir / f"lr.npy",
-        step_loss=model_dir / f"step_loss.npy",
+        model=model_dir / "model.ckpt",
+        lr=model_dir / "lr.npy",
+        step_loss=model_dir / "step_loss.npy",
         loss=model_dir / "epoch_loss.npy",
         custom=model_dir / "custom_metric.npy"
     )

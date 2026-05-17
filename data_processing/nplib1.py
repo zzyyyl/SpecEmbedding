@@ -1,29 +1,30 @@
 import os
 import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pickle
 import logging
-import numpy as np
+import pickle
 from pathlib import Path
-from tqdm import tqdm
+
+import numpy as np
 from matchms import Spectrum
 from matchms.filtering import (
     default_filters,
 )
+from tqdm import tqdm
 
-from train import setup_logging
-
+from SpecEmbedding.config import config
 from SpecEmbedding.utils.clean import (
-    apply_filters,
-    filter_by_precursor_mz,
     clean_metadata,
     clean_metadata2,
-    minimal_processing,
-    is_annotated,
     count_annotations,
+    filter_by_precursor_mz,
+    is_annotated,
+    minimal_processing,
 )
-from SpecEmbedding.config import config
+from train import setup_logging
+
 
 def filters_nplib1(spectra):
     spectra = [default_filters(s) for s in tqdm(spectra, desc="Apply filters")]

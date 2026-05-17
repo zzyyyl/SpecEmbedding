@@ -1,5 +1,7 @@
-from .base import DataProvider
 from SpecEmbedding.config import config
+
+from .base import DataProvider
+
 
 class NPLIB1Provider(DataProvider):
     def __init__(self, data_dir=None):
