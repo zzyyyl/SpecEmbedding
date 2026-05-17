@@ -26,7 +26,7 @@ def is_valid_smiles(smiles):
     try:
         mol = Chem.MolFromSmiles(smiles)
         return mol is not None
-    except:
+    except Exception:
         return False
 
 def process_massspecgym():

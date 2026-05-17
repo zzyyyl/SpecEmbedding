@@ -192,7 +192,8 @@ def main():
             try:
                 cands = future.result()
                 
-                if s in cands: cands.remove(s)
+                if s in cands:
+                    cands.remove(s)
                 cands = [s] + cands
 
                 if args.max_cands > 0 and len(cands) > args.max_cands:

@@ -88,7 +88,8 @@ class MolDataset(Dataset):
 def mol_collate_fn(batch):
     # Filter out failed parsing
     batch = [b for b in batch if b['graph'] is not None]
-    if not batch: return None
+    if not batch:
+        return None
     graphs = Batch.from_data_list([b['graph'] for b in batch])
     indices = [b['original_idx'] for b in batch]
     return {'mol_graph': graphs, 'indices': indices}
@@ -136,12 +137,18 @@ def main():
     model = model.to(device)
     model.eval()
 
-    if args.dataset_type == "massspecgym": provider = MassSpecGymProvider(data_dir=args.data_path)
-    elif args.dataset_type == "massbank":  provider = MassBankProvider(data_dir=args.data_path)
-    elif args.dataset_type == "nplib1":    provider = NPLIB1Provider(data_dir=args.data_path)
-    elif args.dataset_type == "gnps":      provider = GNPSProvider(data_dir=args.data_path)
-    elif args.dataset_type == "mona":      provider = MoNAProvider(data_dir=args.data_path)
-    else: raise ValueError("--dataset_type is invalid")
+    if args.dataset_type == "massspecgym":
+        provider = MassSpecGymProvider(data_dir=args.data_path)
+    elif args.dataset_type == "massbank":
+        provider = MassBankProvider(data_dir=args.data_path)
+    elif args.dataset_type == "nplib1":
+        provider = NPLIB1Provider(data_dir=args.data_path)
+    elif args.dataset_type == "gnps":
+        provider = GNPSProvider(data_dir=args.data_path)
+    elif args.dataset_type == "mona":
+        provider = MoNAProvider(data_dir=args.data_path)
+    else:
+        raise ValueError("--dataset_type is invalid")
 
     test_raw = provider.load_data(mode='test')
     if not test_raw:
@@ -200,7 +207,8 @@ def main():
 
     with torch.no_grad():
         for batch in tqdm(mol_loader, desc="Mol Embeddings", ascii=True):
-            if batch is None: continue
+            if batch is None:
+                continue
             
             mol_graph = batch['mol_graph'].to(device)
             indices = torch.tensor(batch['indices'], dtype=torch.long, device=device)

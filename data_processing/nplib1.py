@@ -95,7 +95,8 @@ def process_nplib1():
     ik_to_data_entries = {}
     for entry_id, info in data_dict.items():
         ik = info.get('inchikey')
-        if not ik: continue
+        if not ik:
+            continue
         if ik not in ik_to_data_entries:
             ik_to_data_entries[ik] = []
         ik_to_data_entries[ik].append(info)

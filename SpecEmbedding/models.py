@@ -72,8 +72,8 @@ class SinusodialMz(nn.Module):
         x = torch.einsum('bl,d->bld', mz, self.x)
         sin_embedding = torch.sin(x)
         cos_embedding = torch.cos(x)
-        b, l, d = sin_embedding.shape
-        x = torch.zeros(b, l, 2 * d, dtype=mz.dtype, device=mz.device)
+        b, length, d = sin_embedding.shape
+        x = torch.zeros(b, length, 2 * d, dtype=mz.dtype, device=mz.device)
         x[:, :, ::2] = sin_embedding
         x[:, :, 1::2] = cos_embedding
         return x

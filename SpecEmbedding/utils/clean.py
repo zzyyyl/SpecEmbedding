@@ -26,7 +26,6 @@ from matchms.filtering.filter_utils.smile_inchi_inchikey_conversions import (
     is_valid_smiles,
 )
 from matchms.importing import load_from_mgf, load_from_msp, load_from_mzxml
-from matchms.Spectrum import Spectrum
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 

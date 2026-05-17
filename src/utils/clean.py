@@ -12,7 +12,7 @@ def is_valid_smiles(smiles: str) -> bool:
     try:
         mol = Chem.MolFromSmiles(smiles)
         return mol is not None
-    except:
+    except Exception:
         return False
 
 def canonicalize_smiles(*invalid_args: Never, smiles: str = None, spectrum: Spectrum = None) -> Optional[Union[str, Spectrum]]:

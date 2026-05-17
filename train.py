@@ -78,12 +78,18 @@ def add_base_argument(parser):
     )
 
 def load_data(dataset_type, data_path=None):
-    if dataset_type == "massspecgym": provider = MassSpecGymProvider(data_dir=data_path)
-    elif dataset_type == "massbank":  provider = MassBankProvider(data_dir=data_path)
-    elif dataset_type == "nplib1":    provider = NPLIB1Provider(data_dir=data_path)
-    elif dataset_type == "gnps":      provider = GNPSProvider(data_dir=data_path)
-    elif dataset_type == "mona":      provider = MoNAProvider(data_dir=data_path)
-    else: raise ValueError("--dataset_type is invalid")
+    if dataset_type == "massspecgym":
+        provider = MassSpecGymProvider(data_dir=data_path)
+    elif dataset_type == "massbank":
+        provider = MassBankProvider(data_dir=data_path)
+    elif dataset_type == "nplib1":
+        provider = NPLIB1Provider(data_dir=data_path)
+    elif dataset_type == "gnps":
+        provider = GNPSProvider(data_dir=data_path)
+    elif dataset_type == "mona":
+        provider = MoNAProvider(data_dir=data_path)
+    else:
+        raise ValueError("--dataset_type is invalid")
 
     train_raw = provider.load_data(mode='train')
     val_raw = provider.load_data(mode='val')

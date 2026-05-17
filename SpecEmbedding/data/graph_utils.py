@@ -36,17 +36,24 @@ def safe_index(feature_list, value):
         return len(feature_list) - 1
 
 def get_atom_ring_info(atom):
-    if not atom.IsInRing(): return 0
-    if atom.IsInRingSize(3): return 3
-    if atom.IsInRingSize(4): return 4
-    if atom.IsInRingSize(5): return 5
-    if atom.IsInRingSize(6): return 6
+    if not atom.IsInRing():
+        return 0
+    if atom.IsInRingSize(3):
+        return 3
+    if atom.IsInRingSize(4):
+        return 4
+    if atom.IsInRingSize(5):
+        return 5
+    if atom.IsInRingSize(6):
+        return 6
     return '7+'
 
 def get_atom_formal_charge(atom):
     charge = atom.GetFormalCharge()
-    if charge < -2: return '<-2'
-    if charge > 2: return '>2'
+    if charge < -2:
+        return '<-2'
+    if charge > 2:
+        return '>2'
     return charge
 
 def get_atom_features(atom):

@@ -70,7 +70,8 @@ def main():
 
     # 4. Generate splits
     for inst, spectra in instrument2spectra.items():
-        if inst not in ["Orbitrap", "QTOF", "all"]: continue
+        if inst not in ["Orbitrap", "QTOF", "all"]:
+            continue
 
         logging.info(f"Splitting for instrument: {inst}")
         smiles_seq = np.array(list(set(s.get('smiles') for s in spectra)))
