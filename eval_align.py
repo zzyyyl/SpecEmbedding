@@ -100,8 +100,13 @@ def main():
     parser.add_argument("--dataset_type", type=str, choices=["massbank", "massspecgym", "nplib1", "gnps", "mona"], default="massspecgym", help="Dataset type")
     parser.add_argument("--data_path", type=str, default=config.data.data_path, help="Base directory containing processed dataset folders")
     parser.add_argument("--candidate_type", type=str, choices=["mass", "formula"], default="mass", help="Candidate set type to use.")
+    parser.add_argument("--mol_embedding_storage", type=str, choices=["cpu", "cuda"], default="cpu", help="Device used to store all molecule embeddings during retrieval.")
+    parser.add_argument("--mol_embedding_dtype", type=str, choices=["float32", "float16"], default="float32", help="Dtype used to store all molecule embeddings.")
+    parser.add_argument("--candidate_chunk_size", type=int, default=1000000, help="Maximum number of candidate embeddings moved to GPU at once.")
     parser.add_argument("--no-mces", action="store_true", help="Disable MCES structural similaritycalculation")
     args = parser.parse_args()
+    if args.candidate_chunk_size <= 0:
+        raise ValueError("--candidate_chunk_size must be greater than 0")
 
     checkpoint_path = Path(args.checkpoint)
     setup_logging(checkpoint_path.parent / "eval_align.log")
@@ -198,11 +203,19 @@ def main():
         num_workers=4
     )
 
-    # Pre-allocate a contiguous tensor to store embeddings for all unique candidate molecules
+    storage_device = torch.device("cuda" if args.mol_embedding_storage == "cuda" and device.type == "cuda" else "cpu")
+    storage_dtype = torch.float16 if args.mol_embedding_dtype == "float16" else torch.float32
+    logging.info(
+        f"Storing molecule embeddings on {storage_device} with dtype={storage_dtype}. "
+        "Use --mol_embedding_storage cuda only when the full candidate matrix fits in GPU memory."
+    )
+
+    # Pre-allocate a contiguous tensor to store embeddings for all unique candidate molecules.
+    # Keep it on CPU by default to avoid allocating tens of GB on GPU for large candidate sets.
     global_mol_embs = torch.zeros(
         (num_unique_mols, config.model.align.final_dim),
-        dtype=torch.float32,
-        device=device
+        dtype=storage_dtype,
+        device=storage_device
     )
 
     with torch.no_grad():
@@ -211,7 +224,7 @@ def main():
                 continue
             
             mol_graph = batch['mol_graph'].to(device)
-            indices = torch.tensor(batch['indices'], dtype=torch.long, device=device)
+            indices = torch.tensor(batch['indices'], dtype=torch.long, device=storage_device)
 
             # Forward pass to get molecule representations
             f_mol = model.mol_encoder(
@@ -224,7 +237,7 @@ def main():
             f_mol = F.normalize(f_mol, dim=-1)
             
             # Populate the embedding matrix using batch indices
-            global_mol_embs[indices] = f_mol
+            global_mol_embs[indices] = f_mol.to(device=storage_device, dtype=storage_dtype)
 
     spec_dataset = SpecDataset(test_sequences)
     spec_loader = DataLoader(spec_dataset, batch_size=config.eval.calc_batch_size, shuffle=False)
@@ -268,42 +281,57 @@ def main():
                 if not cand_indices_list or smiles_to_idx.get(true_smiles) not in cand_indices_list:
                     continue 
                 
-                # Select the embeddings for the current candidate set
-                cand_indices = torch.tensor(cand_indices_list, dtype=torch.long, device=device)
-                cand_embs = global_mol_embs[cand_indices] 
                 query_emb = f_spec[i].unsqueeze(0) # [1, 512]
-                
-                # Perform efficient similarity search via matrix multiplication
-                sims = torch.mm(query_emb, cand_embs.T).squeeze(0)
-                
-                # Update similarity histograms
                 true_idx_global = smiles_to_idx[true_smiles]
-                true_rel_idx = (cand_indices == true_idx_global).nonzero(as_tuple=True)[0].item()
-                sims_np = sims.cpu().numpy()
+                target_sim = None
+                top1_sim = -float("inf")
+                top1_idx_global = None
                 
-                target_sim = sims_np[true_rel_idx]
-                cand_sims = np.delete(sims_np, true_rel_idx)
+                for start in range(0, len(cand_indices_list), args.candidate_chunk_size):
+                    chunk_indices_list = cand_indices_list[start:start + args.candidate_chunk_size]
+                    cand_indices = torch.tensor(chunk_indices_list, dtype=torch.long, device=storage_device)
+                    cand_embs = global_mol_embs[cand_indices].to(device=device, dtype=f_spec.dtype)
+                    sims = torch.mm(query_emb, cand_embs.T).squeeze(0)
+                    sims_np = sims.cpu().numpy()
+
+                    chunk_top_sim, chunk_top_rel_idx = torch.max(sims, dim=0)
+                    chunk_top_sim_value = chunk_top_sim.item()
+                    if chunk_top_sim_value > top1_sim:
+                        top1_sim = chunk_top_sim_value
+                        top1_idx_global = chunk_indices_list[chunk_top_rel_idx.item()]
+
+                    if true_idx_global in chunk_indices_list:
+                        true_rel_idx = chunk_indices_list.index(true_idx_global)
+                        target_sim = sims_np[true_rel_idx]
+                        cand_sims = np.delete(sims_np, true_rel_idx)
+                    else:
+                        cand_sims = sims_np
+
+                    c_counts, _ = np.histogram(cand_sims, bins=sim_bins)
+                    candidate_sim_counts += c_counts
+
+                if target_sim is None or top1_idx_global is None:
+                    continue
+
+                # Ranking is descending, so every candidate with a higher similarity precedes the target.
+                candidate_rank_offset = 0
+                for start in range(0, len(cand_indices_list), args.candidate_chunk_size):
+                    chunk_indices_list = cand_indices_list[start:start + args.candidate_chunk_size]
+                    cand_indices = torch.tensor(chunk_indices_list, dtype=torch.long, device=storage_device)
+                    cand_embs = global_mol_embs[cand_indices].to(device=device, dtype=f_spec.dtype)
+                    sims = torch.mm(query_emb, cand_embs.T).squeeze(0)
+                    sims_np = sims.cpu().numpy()
+                    if true_idx_global in chunk_indices_list:
+                        true_rel_idx = chunk_indices_list.index(true_idx_global)
+                        sims_np = np.delete(sims_np, true_rel_idx)
+                    candidate_rank_offset += int(np.sum(sims_np > target_sim))
                 
                 # Update target histogram
                 t_idx = np.digitize(target_sim, sim_bins) - 1
                 if 0 <= t_idx < len(target_sim_counts):
                     target_sim_counts[t_idx] += 1
-                
-                # Update candidate histogram
-                c_counts, _ = np.histogram(cand_sims, bins=sim_bins)
-                candidate_sim_counts += c_counts
 
-                # Sort candidates by similarity in descending order
-                sorted_sims, sorted_rel_idx = torch.sort(sims, descending=True)
-                
-                # Identify the rank of the ground truth molecule
-                sorted_global_indices = cand_indices[sorted_rel_idx]
-                
-                # Determine the index (rank) of the true SMILES in the sorted list
-                rank_tensor = (sorted_global_indices == true_idx_global).nonzero(as_tuple=True)[0]
-                if rank_tensor.numel() == 0:
-                    continue
-                rank = rank_tensor.item() + 1
+                rank = candidate_rank_offset + 1
                 
                 # Accumulate Top-K accuracy and MRR
                 for k in config.eval.top_k:
@@ -312,7 +340,6 @@ def main():
                 mrr_sum += 1.0 / rank
 
                 # Store Top-1 prediction for downstream structural similarity analysis
-                top1_idx_global = sorted_global_indices[0].item()
                 top1_smiles = unique_candidate_list[top1_idx_global]
                 mces_pairs.append((top1_smiles, true_smiles))
 
