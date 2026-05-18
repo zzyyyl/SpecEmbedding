@@ -1,82 +1,361 @@
-# SpecEmbedding & SpecMolAlign 模型结构说明
+# SpecEmbedding 模型结构说明
 
-本项目的核心是一个跨模态对齐模型，旨在将**质谱数据 (Mass Spectrometry)** 和 **分子结构 (Molecular Structure)** 映射到同一个高维连续向量空间，从而实现质谱检索、分子识别等任务。
+本文档基于当前代码实现整理，覆盖三个层次：质谱编码器 `SiameseModel`、分子图编码器 `GINEEncoder`，以及用于跨模态检索的 `SpecMolAlignModel`。相关实现主要位于 `SpecEmbedding/models.py`、`SpecEmbedding/models_align.py`、`SpecEmbedding/data/tokenizer.py`、`SpecEmbedding/data/graph_utils.py`、`train.py` 和 `train_align.py`。
 
-## 1. 模型架构图 (Mermaid)
+## 1. 总览
+
+项目包含两条训练路径：
+
+1. 质谱表征预训练：只使用 MS/MS 谱图，训练 `SiameseModel`，让同一 SMILES 下的不同谱图或增强视图在嵌入空间中靠近。
+2. 谱图-分子跨模态对齐：使用预训练或随机初始化的 `SiameseModel` 作为谱图塔，同时使用 `GINEEncoder` 编码分子图，通过 `SpecMolAlignModel` 将两种模态投影到同一向量空间。
+
+默认配置来自 `params.yaml`：
+
+| 模块 | 默认值 |
+|---|---:|
+| 谱图 token 长度 | `100` |
+| 谱图峰嵌入维度 | `512` |
+| Transformer head 数 | `16` |
+| Transformer 层数 | `4` |
+| 谱图输出维度 | `512` |
+| 分子 GINE 隐藏维度 | `128` |
+| GINE 层数 | `4` |
+| 对齐空间维度 | `512` |
+| 对齐温度参数 | `tau = 0.07` |
+
+## 2. 端到端结构图
 
 ```mermaid
-graph TD
-    subgraph "左塔：质谱编码器 (Spectrum Tower / SiameseModel)"
-        S1[输入：MZ & Intensity] --> S2[Sinusoidal MZ 编码]
-        S2 --> S3[MZ 嵌入 MLP]
-        S3 --> S4[拼接 Intensity + 峰嵌入 MLP]
-        S4 --> S5[Transformer Encoder]
-        S5 --> S6[Masked Mean Pooling]
-        S6 --> S7[MLP 解码器 + ReLU]
+flowchart TD
+    subgraph "Spectrum Tower"
+        A["Spectrum peaks"] --> B["Tokenizer\nprecursor + top peaks"]
+        B --> C["m/z sinusoidal encoding"]
+        C --> D["m/z MLP"]
+        B --> E["intensity"]
+        D --> F["concat m/z embedding + intensity"]
+        E --> F
+        F --> G["peak embedding MLP"]
+        G --> H["TransformerEncoder"]
+        H --> I["masked mean pooling"]
+        I --> J["decoder MLP"]
     end
 
-    subgraph "右塔：分子编码器 (Molecule Tower / GINEEncoder)"
-        M1[输入：分子图 Graph] --> M2a[原子类别特征嵌入]
-        M1 --> M2b[化学键类别特征嵌入]
-        M2a --> M3a[原子投影层 Atom Proj]
-        M2b --> M3b[化学键投影层 Bond Proj]
-        
-        M3b -.-> |全局共享辅助信息| G_Edge
-
-        subgraph "GINE Block (内部循环 N 次)"
-            direction TB
-            G_In[输入节点特征 H_i] --> G1[GINEConv 消息传递]
-            G_Edge[边特征 E - 保持不变] --> G1
-            G_In --> |Skip Connection| G4((+))
-            G1 --> G2[LayerNorm]
-            G2 --> G3[ReLU]
-            G3 --> G4
-            G4 --> G5[Dropout]
-            G5 -.-> |"H_{i+1} 作为下一层输入"| G_In
-        end
-        
-        M3a --> G_In
-        G5 --> |输出 H_N| M6a[Global Add Pool]
-        G5 --> |输出 H_N| M6b[Global Mean Pool]
-        M6a --> M6c[Concat 拼接]
-        M6b --> M6c
-        M6c --> M7[全连接层 FC + ReLU]
+    subgraph "Molecule Tower"
+        K["SMILES"] --> L["RDKit molecule"]
+        L --> M["PyG graph"]
+        M --> N["atom feature embeddings"]
+        M --> O["bond feature embeddings"]
+        N --> P["GINEConv blocks"]
+        O --> P
+        P --> Q["global add pool"]
+        P --> R["global mean pool"]
+        Q --> S["concat + FC"]
+        R --> S
     end
 
-    S7 --> P1["Spec Projector (Linear-ReLU-Dropout-Linear)"]
-    M7 --> P2["Mol Projector (Linear-ReLU-Dropout-Linear)"]
-
-    P1 --> D[L2 归一化 & 余弦相似度计算]
-    P2 --> D
-
-    D --> L[对比损失函数 Contrastive Loss / InfoNCE]
+    J --> T["spec projector"]
+    S --> U["mol projector"]
+    T --> V["shared retrieval space"]
+    U --> V
+    V --> W["cosine similarity / contrastive loss"]
 ```
 
-## 2. 核心组件详解
+## 3. 谱图输入与 Tokenizer
 
-### 2.1 质谱编码器 (SiameseModel)
-*   **SinusodialMz**: 将连续的 `m/z` 值转换为正弦/余弦位置编码，使其能够捕捉不同尺度下的碎片特征。
-*   **PeaksEmbedding**: 
-    1. 首先通过一个 MLP 对 `m/z` 的位置编码进行投影。
-    2. 将投影后的 MZ 特征与原始强度 (Intensity) 拼接。
-    3. 再次通过一个 MLP 融合两者的信息，得到每个峰的 Embedding。
-*   **Transformer Encoder**: 使用标准的多头自注意力机制，对一个光谱内的所有有效峰进行建模，学习碎片之间的关联规律。
-*   **Pooling & Decoder**: 通过 `mask` 屏蔽掉填充峰，进行均值池化（Mean Pooling），随后经过一个 MLP 解码器输出质谱的特征向量。
+`Tokenizer` 将 `matchms.Spectrum` 转换为固定长度序列，输出字段为：
 
-### 2.2 分子编码器 (GINEEncoder)
-*   **多维度特征嵌入**: 
-    *   **原子特征**: 包括元素符号、度数、隐式氢原子数、芳香性、环信息、形式电荷。
-    *   **化学键特征**: 包括键型、是否共轭、是否在环内。
-    *   所有类别特征先经过 `nn.Embedding`，再通过各自的 `Proj` 层对齐维度。
-*   **GINEConv**: 采用 Graph Isomorphism Network with Edge features。每个卷积层内部包含一个双层 MLP。
-*   **训练优化**: 
-    *   **残差连接 (Residual Connection)**: `h = norm(conv(h)) + h`。
-    *   **层归一化 (LayerNorm)**: 提高深层网络的训练稳定性。
-*   **多重池化 (Multiple Pooling)**: 模型采用了一种混合池化策略。将 `global_add_pool` (捕获绝对尺寸/质量分布) 和 `global_mean_pool` (捕获相对结构/平均密度分布) 的结果在特征维度上进行**拼接 (Concat)**，然后通过全连接层进行融合。这既保留了质量等关键先验，又通过尺度不变性缓解了过拟合，大大增强了图表示的表达能力。
-### 2.3 投影与对齐 (SpecMolAlignModel)
-*   **双塔投影 (Projectors)**: 为了对齐两个模态的维度，两个编码器的输出分别进入一个独立的 MLP 投影层（线性 -> ReLU -> Dropout -> 线性）。
-*   **归一化**: 在计算相似度之前，对投影后的向量进行 L2 归一化，将特征映射到单位超球面上。
-*   **温度系数 (Tau)**: 引入可学习的倒数温度系数 $1/\tau$，用于在对比学习中调节相似度得分的分布。
+| 字段 | 形状 | 含义 |
+|---|---:|---|
+| `mz` | `[max_len]` | 峰的 m/z 序列 |
+| `intensity` | `[max_len]` | 峰强度序列 |
+| `mask` | `[max_len]` | `True` 表示 padding 位置 |
+| `smiles` | 标量字符串 | 谱图对应分子 |
 
-## 3. 训练目标
-模型通过 **InfoNCE 损失函数** 进行训练，使得同一对“质谱-分子”的余弦相似度最大化，同时最小化与批次内其他非匹配对的相似度。这种方法学习到的嵌入空间具有很好的判别性，支持高效的跨模态检索。
+处理步骤：
+
+1. 读取 `precursor_mz` 和谱峰数组。
+2. 按强度选取前 `max_len - 1` 个峰，再按原 m/z 顺序排列。
+3. 将峰强度归一化到最大值为 1。
+4. 在序列第 0 位加入 precursor token，其 `mz = precursor_mz`，`intensity = 2`。
+5. 不足 `max_len` 的部分使用 `SpecialToken["PAD"]` 补齐，并在 `mask` 中标记。
+
+这个设计让 precursor 信息和碎片峰使用同一个序列建模接口进入 Transformer。
+
+## 4. 谱图编码器 SiameseModel
+
+`SiameseModel` 是项目中的核心谱图编码器。它不是传统意义上两个参数独立的 Siamese tower，而是一个共享参数的谱图编码网络，训练时通过多视图输入和监督对比损失形成 Siamese/contrastive 学习目标。
+
+### 4.1 Peak Embedding
+
+谱图峰由 m/z 和 intensity 两部分组成。
+
+`SinusodialMz` 将连续 m/z 映射到正弦/余弦编码：
+
+```text
+mz: [batch, seq_len]
+-> sinusoidal m/z embedding: [batch, seq_len, embedding_dim]
+```
+
+频率范围由 `LAMBDA_MIN = 1e-3` 到 `LAMBDA_MAX = 1e3` 控制，覆盖不同尺度的 m/z 变化。随后 `SinusodialMzEmbedding` 用 MLP 对正弦编码再投影。
+
+`PeaksEmbedding` 再将 m/z embedding 与 intensity 拼接：
+
+```text
+[mz_embedding, intensity] -> MLP -> peak_embedding
+```
+
+输出形状为：
+
+```text
+[batch, seq_len, embedding_dim]
+```
+
+### 4.2 Transformer Encoder
+
+`SiameseModel` 使用 PyTorch `TransformerEncoder`：
+
+```text
+TransformerEncoderLayer(
+    d_model=512,
+    nhead=16,
+    dim_feedforward=512,
+    batch_first=True,
+    norm_first=True,
+)
+```
+
+`mask` 会作为 `src_key_padding_mask` 传入，padding token 不参与有效注意力计算。
+
+### 4.3 Masked Mean Pooling 与 Decoder
+
+Transformer 输出仍是峰级表示：
+
+```text
+[batch, seq_len, embedding_dim]
+```
+
+模型用 `mask` 屏蔽 padding 后进行 mean pooling：
+
+```text
+sum(valid_peak_embeddings) / num_valid_tokens
+```
+
+然后通过 `MultiFeedForwardModule` 解码到 `dim_target`，默认仍为 `512`。最终输出是谱图级向量：
+
+```text
+f_spec: [batch, 512]
+```
+
+## 5. 分子图表示
+
+`smiles_to_graph` 使用 RDKit 将 SMILES 转成分子图，再封装为 PyTorch Geometric `Data`。
+
+### 5.1 原子特征
+
+每个原子被编码为多个类别特征：
+
+| 特征 | 说明 |
+|---|---|
+| `symbol` | 元素符号，含 H/C/O/N/P/S/Cl/F/Br/I/Si/B/As/Se/unknown |
+| `degree` | 原子度数 |
+| `num_hs` | 总氢原子数 |
+| `is_aromatic` | 是否芳香 |
+| `ring_info` | 不在环内、3/4/5/6 元环、或 7+ |
+| `formal_charge` | 形式电荷，范围外归入 `<-2` 或 `>2` |
+
+### 5.2 化学键特征
+
+每条无向键会被展开为两条有向边 `[i, j]` 和 `[j, i]`。边特征包括：
+
+| 特征 | 说明 |
+|---|---|
+| `bond_type` | 单键、双键、三键、芳香键、unknown |
+| `is_conjugated` | 是否共轭 |
+| `is_in_ring` | 是否在环内 |
+
+输出图结构：
+
+```text
+x:         [num_atoms, num_atom_features]
+edge_index:[2, num_edges * 2]
+edge_attr: [num_edges * 2, num_bond_features]
+```
+
+## 6. 分子编码器 GINEEncoder
+
+`GINEEncoder` 使用带边特征的 GIN 变体 `GINEConv`。
+
+### 6.1 类别特征嵌入
+
+原子特征和键特征都是类别特征。每个字段先独立进入 `nn.Embedding`：
+
+```text
+small binary category -> 4 dims
+other category        -> 20 dims
+```
+
+然后拼接并投影到统一维度：
+
+```text
+atom categorical embeddings -> concat -> atom_proj -> emb_dim
+bond categorical embeddings -> concat -> bond_proj -> emb_dim
+```
+
+默认 `emb_dim = 128`。
+
+### 6.2 GINE Block
+
+每层 GINE block 包含：
+
+1. `GINEConv` 消息传递，内部 MLP 为 `Linear(emb_dim, 2*emb_dim) -> ReLU -> Linear(2*emb_dim, emb_dim)`。
+2. `LayerNorm`。
+3. `ReLU`。
+4. 残差连接。
+5. Dropout。
+
+代码中的更新形式为：
+
+```text
+h_res = h_node
+h_node = GINEConv(h_node, edge_index, edge_attr)
+h_node = LayerNorm(h_node)
+h_node = ReLU(h_node)
+h_node = h_node + h_res
+h_node = Dropout(h_node)
+```
+
+### 6.3 图级池化
+
+节点表示经过多层 GINE 后，模型同时使用：
+
+```text
+global_add_pool(h_node, batch)
+global_mean_pool(h_node, batch)
+```
+
+两者拼接后经过全连接层：
+
+```text
+concat(add_pool, mean_pool) -> Linear(2 * emb_dim, emb_dim) -> ReLU
+```
+
+最终输出：
+
+```text
+f_mol_base: [batch, 128]
+```
+
+## 7. 跨模态对齐模型 SpecMolAlignModel
+
+`SpecMolAlignModel` 是双塔结构：
+
+```text
+Spectrum -> SiameseModel -> spec_proj -> f_spec
+Molecule -> GINEEncoder  -> mol_proj  -> f_mol
+```
+
+两个 projector 结构相同：
+
+```text
+Linear(input_dim, hidden_dim)
+ReLU
+Dropout
+Linear(hidden_dim, final_dim)
+```
+
+默认维度：
+
+```text
+spec encoder output: 512
+mol encoder output:  128
+hidden_dim:          512
+final_dim:           512
+```
+
+模型返回：
+
+```text
+f_spec, f_mol, 1 / tau
+```
+
+其中 `tau` 来自配置，默认 `0.07`。在对齐损失中，`1 / tau` 用于缩放相似度 logits。
+
+## 8. 训练目标
+
+### 8.1 谱图预训练
+
+`train.py` 使用 `TrainDataset` 为每个 SMILES 构造多视图谱图输入：
+
+```text
+[batch, n_views, mz/intensity/mask]
+```
+
+默认 `n_views = 2`。当启用增强时，增强主要包括：
+
+1. 随机移除低强度峰。
+2. 随机扰动峰强度。
+
+训练目标为 `SupConLoss`。同一 SMILES 的样本视为正样本，不同 SMILES 视为负样本。模型学习的是谱图到谱图的判别式 embedding。
+
+### 8.2 谱图-分子对齐训练
+
+`train_align.py` 使用 `AlignGraphDataset`，每个样本同时返回：
+
+```text
+spec_mz, spec_intensity, spec_mask, mol_graph
+```
+
+分子图可进行结构增强：
+
+1. node dropping。
+2. edge masking / dropping。
+
+训练分两阶段：
+
+1. Stage 1：如果提供预训练谱图模型，则冻结 `spec_encoder`，只训练 `mol_encoder` 和两个 projector。
+2. Stage 2：解冻所有模块，端到端微调。谱图编码器使用较小学习率 `lr / 10`，分子编码器和 projector 使用 `lr`。
+
+对齐损失位于 `SpecEmbedding/loss_align.py`，是 CLIP 风格双向对比损失：
+
+```text
+logits = normalize(f_spec) @ normalize(f_mol).T * logit_scale
+loss = (CE(logits, labels) + CE(logits.T, labels)) / 2
+```
+
+batch 内对角线为正确谱图-分子配对，其余项为负样本。
+
+## 9. 推理与检索
+
+在 `eval_align.py` 中：
+
+1. 加载 `SpecMolAlignModel` checkpoint。
+2. 对测试谱图编码得到 `f_spec`。
+3. 对候选分子编码得到 `f_mol`。
+4. 对二者做 L2 normalize。
+5. 使用 cosine similarity 进行排序，计算 Top-K accuracy、MRR，并可选计算 top-1 MCES。
+
+为了避免大候选集导致 GPU 显存不足，当前评估逻辑支持将全量分子 embedding 存在 CPU，并按 chunk 将候选 embedding 搬到 GPU 计算相似度。
+
+## 10. 关键张量形状
+
+| 阶段 | 张量 | 形状 |
+|---|---|---|
+| Tokenizer 输出 | `mz` / `intensity` / `mask` | `[max_len]` |
+| 谱图 batch | `spec_mz` / `spec_intensity` / `spec_mask` | `[batch, max_len]` |
+| 峰嵌入 | peak embedding | `[batch, max_len, 512]` |
+| Transformer 输出 | contextual peak embedding | `[batch, max_len, 512]` |
+| 谱图向量 | `SiameseModel` output | `[batch, 512]` |
+| 分子图节点 | `x` | `[num_atoms, 6]` |
+| 分子图边 | `edge_attr` | `[num_directed_edges, 3]` |
+| GINE 输出 | molecule embedding | `[batch, 128]` |
+| 对齐投影后 | `f_spec`, `f_mol` | `[batch, 512]` |
+
+## 11. 设计要点
+
+1. 谱图侧使用连续 m/z 的正弦编码，避免把 m/z 离散化成固定词表。
+2. precursor token 被放在序列首位，与碎片峰共同参与自注意力建模。
+3. 谱图 Transformer 使用 mask-aware mean pooling，避免 padding 影响全局表示。
+4. 分子侧使用 GINEConv 显式利用边特征，比只使用节点特征的 GNN 更适合化学图。
+5. 图级表示拼接 add pooling 和 mean pooling，同时保留分子规模信息与平均结构信息。
+6. 跨模态部分采用双 projector，将谱图和分子映射到统一检索空间。
+7. 训练流程支持先学习谱图表征，再进行跨模态对齐，便于复用预训练谱图编码器。
