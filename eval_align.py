@@ -243,6 +243,7 @@ def main():
     spec_loader = DataLoader(spec_dataset, batch_size=config.eval.calc_batch_size, shuffle=False)
     
     hits = {k: 0 for k in config.eval.top_k}
+    random_hits = {k: 0.0 for k in config.eval.top_k}
     valid_queries = 0
     mrr_sum = 0.0
     mces_pairs = []
@@ -280,6 +281,8 @@ def main():
                 
                 if not cand_indices_list or smiles_to_idx.get(true_smiles) not in cand_indices_list:
                     continue 
+
+                candidate_size = len(cand_indices_list)
                 
                 query_emb = f_spec[i].unsqueeze(0) # [1, 512]
                 true_idx_global = smiles_to_idx[true_smiles]
@@ -337,6 +340,7 @@ def main():
                 for k in config.eval.top_k:
                     if rank <= k:
                         hits[k] += 1
+                    random_hits[k] += min(k, candidate_size) / candidate_size
                 mrr_sum += 1.0 / rank
 
                 # Store Top-1 prediction for downstream structural similarity analysis
@@ -357,6 +361,8 @@ def main():
     for k in sorted(config.eval.top_k):
         acc = hits[k] / valid_queries
         logging.info(f"Top-{k:<2} Accuracy : {acc:.4%}  ({hits[k]}/{valid_queries})")
+        random_acc = random_hits[k] / valid_queries
+        logging.info(f"Random Top-{k:<2} Baseline : {random_acc:.4%}")
         
     mrr = mrr_sum / valid_queries
     logging.info(f"Mean Reciprocal Rank (MRR): {mrr:.4f}")
