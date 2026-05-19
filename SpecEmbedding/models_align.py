@@ -132,21 +132,31 @@ class SpecMolAlignModel(nn.Module):
             raise ValueError("tau must be greater than 0")
         self.logit_scale = nn.Parameter(torch.tensor(math.log(1 / tau), dtype=torch.float32))
 
-    def forward(self, spec_mz, spec_intensity, spec_mask, mol_graph):
-        # 质谱特征提取
+    def encode_spec(self, spec_mz, spec_intensity, spec_mask, normalize: bool = False):
         f_spec = self.spec_encoder(spec_mz, spec_intensity, spec_mask)
+        f_spec = self.spec_proj(f_spec)
+        if normalize:
+            f_spec = F.normalize(f_spec, dim=-1)
+        return f_spec
 
-        # 分子图特征提取
+    def encode_mol(self, mol_graph, normalize: bool = False):
         f_mol = self.mol_encoder(
-            mol_graph.x, 
-            mol_graph.edge_index, 
-            mol_graph.edge_attr, 
+            mol_graph.x,
+            mol_graph.edge_index,
+            mol_graph.edge_attr,
             mol_graph.batch,
             mol_graph.graph_size_features,
         )
-
-        # 投影层
-        f_spec = self.spec_proj(f_spec)
         f_mol = self.mol_proj(f_mol)
+        if normalize:
+            f_mol = F.normalize(f_mol, dim=-1)
+        return f_mol
 
-        return f_spec, f_mol, self.logit_scale.exp().clamp(max=100)
+    def get_logit_scale(self):
+        return self.logit_scale.exp().clamp(max=100)
+
+    def forward(self, spec_mz, spec_intensity, spec_mask, mol_graph):
+        f_spec = self.encode_spec(spec_mz, spec_intensity, spec_mask)
+        f_mol = self.encode_mol(mol_graph)
+
+        return f_spec, f_mol, self.get_logit_scale()

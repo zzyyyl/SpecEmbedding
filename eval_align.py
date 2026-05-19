@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pulp
 import torch
-import torch.nn.functional as F
 from myopic_mces.myopic_mces import MCES
 from torch.utils.data import DataLoader, Dataset
 from torch_geometric.data import Batch
@@ -272,15 +271,7 @@ def main():
             indices = torch.tensor(batch['indices'], dtype=torch.long, device=storage_device)
 
             # Forward pass to get molecule representations
-            f_mol = model.mol_encoder(
-                mol_graph.x,
-                mol_graph.edge_index,
-                mol_graph.edge_attr,
-                mol_graph.batch,
-                mol_graph.graph_size_features,
-            )
-            f_mol = model.mol_proj(f_mol)
-            f_mol = F.normalize(f_mol, dim=-1)
+            f_mol = model.encode_mol(mol_graph, normalize=True)
             
             # Populate the embedding matrix using batch indices
             global_mol_embs[indices] = f_mol.to(device=storage_device, dtype=storage_dtype)
@@ -318,9 +309,7 @@ def main():
             true_smiles_batch = batch['smiles']
             
             # Generate spectrum representations [Batch, 512]
-            f_spec = model.spec_encoder(spec_mz, spec_intensity, spec_mask)
-            f_spec = model.spec_proj(f_spec)
-            f_spec = F.normalize(f_spec, dim=-1)
+            f_spec = model.encode_spec(spec_mz, spec_intensity, spec_mask, normalize=True)
             
             for i in range(len(true_smiles_batch)):
                 true_smiles = true_smiles_batch[i]
