@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 import numpy as np
 import torch
 from torch_geometric.data import Batch
@@ -11,8 +13,28 @@ class AlignGraphDataset(TrainDataset):
     质谱-分子图对齐数据集。
     将 SMILES 转换为 PyG 的 Data 对象，用于 GNN (如 GINE) 训练。
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, graph_cache_size: int = 0, **kwargs):
         super().__init__(*args, **kwargs)
+        if graph_cache_size < -1:
+            raise ValueError("graph_cache_size must be -1, 0, or a positive integer")
+        self.graph_cache_size = graph_cache_size
+        self._mol_cache = OrderedDict()
+
+    def get_mol_graph(self, label):
+        if self.graph_cache_size != 0 and label in self._mol_cache:
+            mol = self._mol_cache.pop(label)
+            self._mol_cache[label] = mol
+            return mol
+
+        smiles = self._data[label][0]["smiles"]
+        mol = smiles_to_graph(smiles)
+
+        if self.graph_cache_size != 0:
+            self._mol_cache[label] = mol
+            if self.graph_cache_size > 0 and len(self._mol_cache) > self.graph_cache_size:
+                self._mol_cache.popitem(last=False)
+
+        return mol
 
     def aug_mol(self, item):
         """
@@ -64,8 +86,7 @@ class AlignGraphDataset(TrainDataset):
 
     def __getitem__(self, index):
         spec_views, label = super().__getitem__(index)
-        smiles = self._data[label][0]["smiles"]
-        mol = smiles_to_graph(smiles)
+        mol = self.get_mol_graph(label)
 
         mzs, ints, masks, mols = [], [], [], []
 

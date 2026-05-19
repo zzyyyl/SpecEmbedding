@@ -54,6 +54,7 @@ train:
     batch_size: 128
     epochs_stage1: 50
     epochs_stage2: 100
+    graph_cache_size: 10000 # 0 disables graph cache, -1 means unlimited
     lr: 0.0001 # 1e-4
     weight_decay: 0.0001 # 1e-4
     patience: 5

@@ -32,6 +32,7 @@ def train_align(
     batch_size: int = config.train.align.batch_size,
     lr: float = config.train.align.lr,
     save_dir: str = config.general.save_dir,
+    graph_cache_size: int = config.train.align.graph_cache_size,
 ):
     device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
     seed = config.general.seed
@@ -40,8 +41,20 @@ def train_align(
 
     logging.info("1. 初始化数据集与 DataLoader...")
     # 使用自定义的 AlignGraphDataset (继承自 TrainDataset)
-    train_dataset = AlignGraphDataset(data=train_data, keys=train_keys, n_views=1, is_augment=True)
-    val_dataset = AlignGraphDataset(data=val_data, keys=val_keys, n_views=1, is_augment=False)
+    train_dataset = AlignGraphDataset(
+        data=train_data,
+        keys=train_keys,
+        n_views=1,
+        is_augment=True,
+        graph_cache_size=graph_cache_size,
+    )
+    val_dataset = AlignGraphDataset(
+        data=val_data,
+        keys=val_keys,
+        n_views=1,
+        is_augment=False,
+        graph_cache_size=graph_cache_size,
+    )
 
     # 为了确保可复现性，设置 Generator 和 worker_init_fn
     g = torch.Generator()
@@ -162,6 +175,7 @@ def main():
     add_base_argument(parser)
     parser.add_argument("--batch_size", type=int, default=config.train.align.batch_size, help="Batch size for alignment training")
     parser.add_argument("--lr", type=float, default=config.train.align.lr, help="Base learning rate")
+    parser.add_argument("--graph_cache_size", type=int, default=config.train.align.graph_cache_size, help="Lazy LRU molecule graph cache size per DataLoader worker. Use 0 to disable and -1 for unlimited.")
     parser.add_argument("--pretrained_spec", type=str, help="Path to your pre-trained SpecEmbedding model weights")
 
     args = parser.parse_args()
@@ -214,6 +228,7 @@ def main():
         batch_size=args.batch_size,
         lr=args.lr,
         save_dir=args.save_dir,
+        graph_cache_size=args.graph_cache_size,
     )
 
 
