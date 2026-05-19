@@ -80,12 +80,12 @@ class GINEEncoder(nn.Module):
 
         # 2. GINE 消息传递
         for conv, norm in zip(self.convs, self.norms):
-            h_res = h_node # 保存残差
-            h_node = conv(h_node, edge_index, edge_attr=h_edge)
+            h_res = h_node
             h_node = norm(h_node)
+            h_node = conv(h_node, edge_index, edge_attr=h_edge)
             h_node = F.relu(h_node)
-            h_node = h_node + h_res # 残差相加
             h_node = F.dropout(h_node, p=self.dropout_rate, training=self.training)
+            h_node = h_node + h_res
 
         # 3. 全局池化 (Graph-level representation): Mean + explicit size feature
         graph_mean = global_mean_pool(h_node, batch)

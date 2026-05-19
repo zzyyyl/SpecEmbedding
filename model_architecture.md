@@ -209,21 +209,21 @@ bond categorical embeddings -> concat -> bond_proj -> emb_dim
 
 每层 GINE block 包含：
 
-1. `GINEConv` 消息传递，内部 MLP 为 `Linear(emb_dim, 2*emb_dim) -> ReLU -> Linear(2*emb_dim, emb_dim)`。
-2. `LayerNorm`。
+1. `LayerNorm` 预归一化。
+2. `GINEConv` 消息传递，内部 MLP 为 `Linear(emb_dim, 2*emb_dim) -> ReLU -> Linear(2*emb_dim, emb_dim)`。
 3. `ReLU`。
-4. 残差连接。
-5. Dropout。
+4. Dropout。
+5. 残差连接。
 
 代码中的更新形式为：
 
 ```text
 h_res = h_node
-h_node = GINEConv(h_node, edge_index, edge_attr)
 h_node = LayerNorm(h_node)
+h_node = GINEConv(h_node, edge_index, edge_attr)
 h_node = ReLU(h_node)
-h_node = h_node + h_res
 h_node = Dropout(h_node)
+h_node = h_node + h_res
 ```
 
 ### 6.3 图级池化
