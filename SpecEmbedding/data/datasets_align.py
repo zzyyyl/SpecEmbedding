@@ -82,23 +82,25 @@ class AlignGraphDataset(TrainDataset):
         mzs = torch.stack(mzs, dim=0)
         ints = torch.stack(ints, dim=0)
         masks = torch.stack(masks, dim=0)
+        labels = [label] * len(mols)
 
-        # Tuple[Tensor, Tensor, Tensor, List[Graph]]
-        return mzs, ints, masks, mols
+        # Tuple[Tensor, Tensor, Tensor, List[Graph], List[str]]
+        return mzs, ints, masks, mols, labels
 
 def align_collate_fn(batch):
     """
     自定义 Collate 函数，支持多视图展开。
     """
-    mzs, ints, masks, graphs = zip(*batch)
+    mzs, ints, masks, graphs, labels = zip(*batch)
 
     # 质谱数据组装
     mzs = torch.cat(mzs, dim=0)
     ints = torch.cat(ints, dim=0)
     masks = torch.cat(masks, dim=0)
     graphs = [g for views in graphs for g in views]
+    labels = [label for views in labels for label in views]
 
     # 分子图数据组装 (使用 PyG Batch.from_data_list)
     mols = Batch.from_data_list(graphs)
 
-    return mzs, ints, masks, mols
+    return mzs, ints, masks, mols, labels

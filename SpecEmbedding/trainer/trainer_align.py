@@ -34,7 +34,7 @@ class TrainerAlign:
         total_loss = 0
         pbar = tqdm(self.train_loader, desc=f"[{stage_name}] Epoch {epoch} Training", ascii=True)
         
-        for mzs, ints, masks, mols in pbar:
+        for mzs, ints, masks, mols, labels in pbar:
             spec_mz = mzs.to(self.device)
             spec_intensity = ints.to(self.device)
             spec_mask = masks.to(self.device)
@@ -43,7 +43,7 @@ class TrainerAlign:
             optimizer.zero_grad()
             
             f_spec, f_mol, scale = self.model(spec_mz, spec_intensity, spec_mask, mol_graph)
-            loss = self.criterion(f_spec, f_mol, scale)
+            loss = self.criterion(f_spec, f_mol, scale, labels)
             
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
@@ -60,14 +60,14 @@ class TrainerAlign:
         total_loss = 0
         pbar = tqdm(self.val_loader, desc=f"[{stage_name}] Epoch {epoch} Validation", ascii=True)
         
-        for mzs, ints, masks, mols in pbar:
+        for mzs, ints, masks, mols, labels in pbar:
             spec_mz = mzs.to(self.device)
             spec_intensity = ints.to(self.device)
             spec_mask = masks.to(self.device)
             mol_graph = mols.to(self.device)
             
             f_spec, f_mol, scale = self.model(spec_mz, spec_intensity, spec_mask, mol_graph)
-            loss = self.criterion(f_spec, f_mol, scale)
+            loss = self.criterion(f_spec, f_mol, scale, labels)
             
             total_loss += loss.item()
             pbar.set_postfix({'loss': f"{loss.item():.4f}"})
