@@ -1,3 +1,4 @@
+import math
 
 import torch
 import torch.nn as nn
@@ -115,7 +116,9 @@ class SpecMolAlignModel(nn.Module):
             nn.Linear(hidden_dim, final_dim)
         )
 
-        self.tau = tau
+        if tau <= 0:
+            raise ValueError("tau must be greater than 0")
+        self.logit_scale = nn.Parameter(torch.tensor(math.log(1 / tau), dtype=torch.float32))
 
     def forward(self, spec_mz, spec_intensity, spec_mask, mol_graph):
         # 质谱特征提取
@@ -133,4 +136,4 @@ class SpecMolAlignModel(nn.Module):
         f_spec = self.spec_proj(f_spec)
         f_mol = self.mol_proj(f_mol)
 
-        return f_spec, f_mol, 1 / self.tau
+        return f_spec, f_mol, self.logit_scale.exp().clamp(max=100)

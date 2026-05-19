@@ -177,6 +177,11 @@ def main():
         tau=config.model.align.tau
     )
     state_dict = torch.load(args.checkpoint, map_location=device, weights_only=True)
+    if "logit_scale" not in state_dict:
+        logging.warning(
+            "Checkpoint has no learnable logit_scale; initializing it from config.model.align.tau for backward compatibility."
+        )
+        state_dict["logit_scale"] = model.logit_scale.detach().clone()
     model.load_state_dict(state_dict, strict=True)
     model = model.to(device)
     model.eval()

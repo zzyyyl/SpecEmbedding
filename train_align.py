@@ -123,7 +123,7 @@ def train_align(
             {'params': model.mol_encoder.parameters(), 'lr': lr * 10}, # 1e-3
             {'params': model.spec_proj.parameters(), 'lr': lr * 10},
             {'params': model.mol_proj.parameters(), 'lr': lr * 10},
-            # {'params': [model.logit_scale], 'lr': lr * 10}
+            {'params': [model.logit_scale], 'lr': lr * 10},
         ]
 
         optimizer1 = optim.AdamW(stage1_params, weight_decay=config.train.align.weight_decay)
@@ -144,7 +144,7 @@ def train_align(
         {'params': model.mol_encoder.parameters(), 'lr': lr},
         {'params': model.spec_proj.parameters(), 'lr': lr},
         {'params': model.mol_proj.parameters(), 'lr': lr},
-        # {'params': [model.logit_scale], 'lr': lr}
+        {'params': [model.logit_scale], 'lr': lr},
     ]
 
     optimizer2 = optim.AdamW(stage2_params, weight_decay=config.train.align.weight_decay)
