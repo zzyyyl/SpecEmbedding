@@ -76,9 +76,8 @@ def train_align(
         dropout_rate=config.model.mol_encoder.dropout_rate
     )
 
-    skip_stage1 = False
+    has_pretrained_spec = spec_encoder is not None
     if not spec_encoder:
-        skip_stage1 = True
         spec_encoder = SiameseModel(
             embedding_dim=config.model.spec_encoder.embedding_dim,
             n_head=config.model.spec_encoder.n_head,
@@ -113,7 +112,7 @@ def train_align(
     logging.info("Stage 1: Frozen MS Encoder, Train Mol Encoder & Projection Heads")
     logging.info("="*50)
 
-    if skip_stage1:
+    if not has_pretrained_spec:
         logging.info("No pretrained model, skipped.")
     else:
         for param in model.spec_encoder.parameters():
@@ -139,8 +138,11 @@ def train_align(
     for param in model.spec_encoder.parameters():
         param.requires_grad = True
 
+    spec_encoder_lr = lr / 10 if has_pretrained_spec else lr
+    logging.info(f"Using spec_encoder lr={spec_encoder_lr:.2e} in stage2.")
+
     stage2_params = [
-        {'params': model.spec_encoder.parameters(), 'lr': lr / 10}, # 预训练模型用极小学习率
+        {'params': model.spec_encoder.parameters(), 'lr': spec_encoder_lr},
         {'params': model.mol_encoder.parameters(), 'lr': lr},
         {'params': model.spec_proj.parameters(), 'lr': lr},
         {'params': model.mol_proj.parameters(), 'lr': lr},
