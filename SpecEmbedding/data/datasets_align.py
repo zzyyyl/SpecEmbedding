@@ -120,6 +120,8 @@ def align_collate_fn(batch):
     masks = torch.cat(masks, dim=0)
     graphs = [g for views in graphs for g in views]
     labels = [label for views in labels for label in views]
+    label_to_id = {label: idx for idx, label in enumerate(dict.fromkeys(labels))}
+    labels = torch.tensor([label_to_id[label] for label in labels], dtype=torch.long)
 
     # 分子图数据组装 (使用 PyG Batch.from_data_list)
     mols = Batch.from_data_list(graphs)
