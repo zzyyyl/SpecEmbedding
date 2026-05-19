@@ -36,6 +36,42 @@ from train import (
 mces_solvers = pulp.listSolvers(onlyAvailable=True)
 mces_solver = "MOSEK" if "MOSEK" in mces_solvers else mces_solvers[0]
 
+
+def get_dtype_size(dtype: torch.dtype) -> int:
+    return torch.empty((), dtype=dtype).element_size()
+
+
+def resolve_candidate_chunk_size(
+    requested_chunk_size: int,
+    memory_fraction: float,
+    device: torch.device,
+    embedding_dim: int,
+    compute_dtype: torch.dtype,
+    max_chunk_size: int,
+) -> int:
+    if requested_chunk_size > 0:
+        return min(requested_chunk_size, max_chunk_size)
+
+    if device.type != "cuda":
+        return max_chunk_size
+
+    free_bytes, total_bytes = torch.cuda.mem_get_info(device)
+    dtype_size = get_dtype_size(compute_dtype)
+    bytes_per_candidate = embedding_dim * dtype_size + dtype_size
+    chunk_size = int(free_bytes * memory_fraction / bytes_per_candidate)
+    chunk_size = max(1, min(chunk_size, max_chunk_size))
+
+    logging.info(
+        "Auto candidate chunk size: %s "
+        "(free_cuda=%.2f GiB, total_cuda=%.2f GiB, memory_fraction=%.2f)",
+        chunk_size,
+        free_bytes / 1024**3,
+        total_bytes / 1024**3,
+        memory_fraction,
+    )
+    return chunk_size
+
+
 def mces_worker(smiles_pair):
     s1, s2 = smiles_pair
     if s1 == s2:
@@ -102,11 +138,14 @@ def main():
     parser.add_argument("--candidate_type", type=str, choices=["mass", "formula"], default="mass", help="Candidate set type to use.")
     parser.add_argument("--mol_embedding_storage", type=str, choices=["cpu", "cuda"], default="cpu", help="Device used to store all molecule embeddings during retrieval.")
     parser.add_argument("--mol_embedding_dtype", type=str, choices=["float32", "float16"], default="float32", help="Dtype used to store all molecule embeddings.")
-    parser.add_argument("--candidate_chunk_size", type=int, default=1000000, help="Maximum number of candidate embeddings moved to GPU at once.")
+    parser.add_argument("--candidate_chunk_size", type=int, default=0, help="Maximum number of candidate embeddings moved to GPU at once. Use 0 to choose automatically from free GPU memory.")
+    parser.add_argument("--candidate_chunk_memory_fraction", type=float, default=0.5, help="Fraction of free GPU memory used to estimate --candidate_chunk_size when it is 0.")
     parser.add_argument("--no-mces", action="store_true", help="Disable MCES structural similaritycalculation")
     args = parser.parse_args()
-    if args.candidate_chunk_size <= 0:
-        raise ValueError("--candidate_chunk_size must be greater than 0")
+    if args.candidate_chunk_size < 0:
+        raise ValueError("--candidate_chunk_size must be greater than or equal to 0")
+    if not 0 < args.candidate_chunk_memory_fraction <= 1:
+        raise ValueError("--candidate_chunk_memory_fraction must be in the range (0, 1]")
 
     checkpoint_path = Path(args.checkpoint)
     setup_logging(checkpoint_path.parent / "eval_align.log")
@@ -239,6 +278,16 @@ def main():
             # Populate the embedding matrix using batch indices
             global_mol_embs[indices] = f_mol.to(device=storage_device, dtype=storage_dtype)
 
+    candidate_chunk_size = resolve_candidate_chunk_size(
+        requested_chunk_size=args.candidate_chunk_size,
+        memory_fraction=args.candidate_chunk_memory_fraction,
+        device=device,
+        embedding_dim=config.model.align.final_dim,
+        compute_dtype=torch.float32,
+        max_chunk_size=num_unique_mols,
+    )
+    logging.info(f"Using candidate_chunk_size={candidate_chunk_size}")
+
     spec_dataset = SpecDataset(test_sequences)
     spec_loader = DataLoader(spec_dataset, batch_size=config.eval.calc_batch_size, shuffle=False)
     
@@ -290,8 +339,8 @@ def main():
                 top1_sim = -float("inf")
                 top1_idx_global = None
                 
-                for start in range(0, len(cand_indices_list), args.candidate_chunk_size):
-                    chunk_indices_list = cand_indices_list[start:start + args.candidate_chunk_size]
+                for start in range(0, len(cand_indices_list), candidate_chunk_size):
+                    chunk_indices_list = cand_indices_list[start:start + candidate_chunk_size]
                     cand_indices = torch.tensor(chunk_indices_list, dtype=torch.long, device=storage_device)
                     cand_embs = global_mol_embs[cand_indices].to(device=device, dtype=f_spec.dtype)
                     sims = torch.mm(query_emb, cand_embs.T).squeeze(0)
@@ -318,8 +367,8 @@ def main():
 
                 # Ranking is descending, so every candidate with a higher similarity precedes the target.
                 candidate_rank_offset = 0
-                for start in range(0, len(cand_indices_list), args.candidate_chunk_size):
-                    chunk_indices_list = cand_indices_list[start:start + args.candidate_chunk_size]
+                for start in range(0, len(cand_indices_list), candidate_chunk_size):
+                    chunk_indices_list = cand_indices_list[start:start + candidate_chunk_size]
                     cand_indices = torch.tensor(chunk_indices_list, dtype=torch.long, device=storage_device)
                     cand_embs = global_mol_embs[cand_indices].to(device=device, dtype=f_spec.dtype)
                     sims = torch.mm(query_emb, cand_embs.T).squeeze(0)
