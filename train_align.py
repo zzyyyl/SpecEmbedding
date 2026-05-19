@@ -86,7 +86,8 @@ def train_align(
     mol_encoder = GINEEncoder(
         emb_dim=config.model.mol_encoder.emb_dim,
         n_layers=config.model.mol_encoder.n_layers,
-        dropout_rate=config.model.mol_encoder.dropout_rate
+        dropout_rate=config.model.mol_encoder.dropout_rate,
+        size_feature_dim=config.model.mol_encoder.size_feature_dim,
     )
 
     has_pretrained_spec = spec_encoder is not None

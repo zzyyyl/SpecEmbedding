@@ -165,7 +165,8 @@ def main():
     mol_encoder = GINEEncoder(
         emb_dim=config.model.mol_encoder.emb_dim,
         n_layers=config.model.mol_encoder.n_layers,
-        dropout_rate=config.model.mol_encoder.dropout_rate
+        dropout_rate=config.model.mol_encoder.dropout_rate,
+        size_feature_dim=config.model.mol_encoder.size_feature_dim,
     )
     model = SpecMolAlignModel(
         spec_encoder=spec_encoder,
@@ -276,6 +277,7 @@ def main():
                 mol_graph.edge_index,
                 mol_graph.edge_attr,
                 mol_graph.batch,
+                mol_graph.graph_size_features,
             )
             f_mol = model.mol_proj(f_mol)
             f_mol = F.normalize(f_mol, dim=-1)

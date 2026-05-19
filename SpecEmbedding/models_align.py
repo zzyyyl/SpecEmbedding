@@ -3,7 +3,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GINEConv, global_add_pool, global_mean_pool
+from torch_geometric.nn import GINEConv, global_mean_pool
 
 from SpecEmbedding.data.graph_utils import ATOM_FEATURES, BOND_FEATURES
 from SpecEmbedding.models import SiameseModel
@@ -15,11 +15,14 @@ class GINEEncoder(nn.Module):
         self,
         emb_dim: int,
         n_layers: int,
-        dropout_rate: float
+        dropout_rate: float,
+        size_feature_dim: int = 32,
     ):
         super().__init__()
         self.emb_dim = emb_dim
         self.dropout_rate = dropout_rate
+        if size_feature_dim <= 0:
+            raise ValueError("size_feature_dim must be greater than 0")
 
         # 1. 节点特征嵌入：根据类别数分配较小维度，拼接后投影 (避免维度冗余)
         self.atom_embeddings = nn.ModuleList()
@@ -55,10 +58,15 @@ class GINEEncoder(nn.Module):
             self.convs.append(GINEConv(nn=mlp, train_eps=True))
             self.norms.append(nn.LayerNorm(emb_dim))
 
-        # 拼接 Add 和 Mean 池化，因此输入维度为 emb_dim * 2
-        self.fc = nn.Linear(emb_dim * 2, emb_dim)
+        # 使用 mean pooling 表示结构信息，并通过显式规模特征补充 size signal
+        self.size_proj = nn.Sequential(
+            nn.Linear(2, size_feature_dim),
+            nn.ReLU(),
+            nn.Linear(size_feature_dim, size_feature_dim),
+        )
+        self.fc = nn.Linear(emb_dim + size_feature_dim, emb_dim)
 
-    def forward(self, x, edge_index, edge_attr, batch):
+    def forward(self, x, edge_index, edge_attr, batch, graph_size_features):
         # 1. 节点与边特征的拼接与投影
         h_node = torch.cat([
             emb(x[:, i]) for i, emb in enumerate(self.atom_embeddings)
@@ -79,11 +87,15 @@ class GINEEncoder(nn.Module):
             h_node = h_node + h_res # 残差相加
             h_node = F.dropout(h_node, p=self.dropout_rate, training=self.training)
 
-        # 3. 全局池化 (Graph-level representation): Add + Mean 拼接
-        graph_add = global_add_pool(h_node, batch)
+        # 3. 全局池化 (Graph-level representation): Mean + explicit size feature
         graph_mean = global_mean_pool(h_node, batch)
-        graph_repr = torch.cat([graph_add, graph_mean], dim=-1)
-        
+        graph_size_features = graph_size_features.view(graph_mean.size(0), -1).to(
+            device=graph_mean.device,
+            dtype=graph_mean.dtype,
+        )
+        size_repr = self.size_proj(graph_size_features)
+        graph_repr = torch.cat([graph_mean, size_repr], dim=-1)
+
         return F.relu(self.fc(graph_repr))
 
 class SpecMolAlignModel(nn.Module):
@@ -129,7 +141,8 @@ class SpecMolAlignModel(nn.Module):
             mol_graph.x, 
             mol_graph.edge_index, 
             mol_graph.edge_attr, 
-            mol_graph.batch
+            mol_graph.batch,
+            mol_graph.graph_size_features,
         )
 
         # 投影层

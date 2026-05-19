@@ -47,14 +47,15 @@ flowchart TD
         M --> O["bond feature embeddings"]
         N --> P["GINEConv blocks"]
         O --> P
-        P --> Q["global add pool"]
-        P --> R["global mean pool"]
-        Q --> S["concat + FC"]
-        R --> S
+        P --> Q["global mean pool"]
+        M --> R["graph size features\nlog1p atoms + log1p bonds"]
+        R --> S["size feature MLP"]
+        Q --> T2["concat + FC"]
+        S --> T2
     end
 
     J --> T["spec projector"]
-    S --> U["mol projector"]
+    T2 --> U["mol projector"]
     T --> V["shared retrieval space"]
     U --> V
     V --> W["cosine similarity / contrastive loss"]
@@ -179,6 +180,7 @@ f_spec: [batch, 512]
 x:         [num_atoms, num_atom_features]
 edge_index:[2, num_edges * 2]
 edge_attr: [num_edges * 2, num_bond_features]
+graph_size_features: [2]
 ```
 
 ## 6. 分子编码器 GINEEncoder
@@ -226,17 +228,28 @@ h_node = Dropout(h_node)
 
 ### 6.3 图级池化
 
-节点表示经过多层 GINE 后，模型同时使用：
+节点表示经过多层 GINE 后，模型使用 mean pooling 生成结构表示：
 
 ```text
-global_add_pool(h_node, batch)
 global_mean_pool(h_node, batch)
 ```
 
-两者拼接后经过全连接层：
+为了避免 add pooling 让分子大小信号过强，同时保留可控的规模信息，图数据额外记录两个显式 size feature：
 
 ```text
-concat(add_pool, mean_pool) -> Linear(2 * emb_dim, emb_dim) -> ReLU
+graph_size_features = [log1p(num_atoms), log1p(num_bonds)]
+```
+
+size feature 会先经过一个小型 MLP：
+
+```text
+Linear(2, size_feature_dim) -> ReLU -> Linear(size_feature_dim, size_feature_dim)
+```
+
+然后与 mean pooling 表示拼接，再经过全连接层：
+
+```text
+concat(mean_pool, size_repr) -> Linear(emb_dim + size_feature_dim, emb_dim) -> ReLU
 ```
 
 最终输出：
@@ -347,6 +360,7 @@ batch 内对角线为正确谱图-分子配对，其余项为负样本。
 | 谱图向量 | `SiameseModel` output | `[batch, 512]` |
 | 分子图节点 | `x` | `[num_atoms, 6]` |
 | 分子图边 | `edge_attr` | `[num_directed_edges, 3]` |
+| 分子规模特征 | `graph_size_features` | `[batch, 2]` |
 | GINE 输出 | molecule embedding | `[batch, 128]` |
 | 对齐投影后 | `f_spec`, `f_mol` | `[batch, 512]` |
 
@@ -356,6 +370,6 @@ batch 内对角线为正确谱图-分子配对，其余项为负样本。
 2. precursor token 被放在序列首位，与碎片峰共同参与自注意力建模。
 3. 谱图 Transformer 使用 mask-aware mean pooling，避免 padding 影响全局表示。
 4. 分子侧使用 GINEConv 显式利用边特征，比只使用节点特征的 GNN 更适合化学图。
-5. 图级表示拼接 add pooling 和 mean pooling，同时保留分子规模信息与平均结构信息。
+5. 图级表示使用 mean pooling 表达平均结构信息，并通过显式 size feature 以可控方式注入分子规模信息。
 6. 跨模态部分采用双 projector，将谱图和分子映射到统一检索空间。
 7. 训练流程支持先学习谱图表征，再进行跨模态对齐，便于复用预训练谱图编码器。

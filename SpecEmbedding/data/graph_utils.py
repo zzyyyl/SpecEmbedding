@@ -1,3 +1,5 @@
+import math
+
 import torch
 from rdkit import Chem
 from torch_geometric.data import Data
@@ -101,5 +103,15 @@ def smiles_to_graph(smiles: str):
     if edge_index.numel() == 0:
         edge_index = torch.empty((2, 0), dtype=torch.long)
         edge_attr = torch.empty((0, len(BOND_FEATURES)), dtype=torch.long)
-        
-    return Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
+
+    graph_size_features = torch.tensor(
+        [math.log1p(mol.GetNumAtoms()), math.log1p(mol.GetNumBonds())],
+        dtype=torch.float32,
+    )
+
+    return Data(
+        x=x,
+        edge_index=edge_index,
+        edge_attr=edge_attr,
+        graph_size_features=graph_size_features,
+    )
