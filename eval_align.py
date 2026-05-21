@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import pickle
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
@@ -129,12 +130,34 @@ def mol_collate_fn(batch):
     indices = [b['original_idx'] for b in batch]
     return {'mol_graph': graphs, 'indices': indices}
 
+def load_candidates(provider, candidate_type: str, candidate_path: str | None):
+    if candidate_path is None:
+        candidates = provider.load_candidates(type=candidate_type)
+        return candidates, candidate_type
+
+    path = Path(candidate_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Candidate file not found: {path}")
+
+    logging.info(f"Loading candidates from custom file {path} ...")
+    with open(path, "rb") as f:
+        candidates = pickle.load(f)
+
+    if not isinstance(candidates, dict):
+        raise TypeError(
+            f"Candidate file must contain dict[str, list[str]], got {type(candidates).__name__}"
+        )
+
+    logging.info(f"Loaded {len(candidates)} candidate sets from custom file.")
+    return candidates, path.stem
+
 def main():
     parser = argparse.ArgumentParser(description="Efficient Evaluate SpecMolAlignModel on Cross-Modal Retrieval.")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to best aligned model checkpoint")
     parser.add_argument("--dataset_type", type=str, choices=["massbank", "massspecgym", "nplib1", "gnps", "mona"], default="massspecgym", help="Dataset type")
     parser.add_argument("--data_path", type=str, default=config.data.data_path, help="Base directory containing processed dataset folders")
     parser.add_argument("--candidate_type", type=str, choices=["mass", "formula"], default="mass", help="Candidate set type to use.")
+    parser.add_argument("--candidate_path", type=str, default=None, help="Path to a custom candidates pickle. Overrides --candidate_type when provided.")
     parser.add_argument("--mol_embedding_storage", type=str, choices=["cpu", "cuda"], default="cpu", help="Device used to store all molecule embeddings during retrieval.")
     parser.add_argument("--mol_embedding_dtype", type=str, choices=["float32", "float16"], default="float32", help="Dtype used to store all molecule embeddings.")
     parser.add_argument("--candidate_chunk_size", type=int, default=0, help="Maximum number of candidate embeddings moved to GPU at once. Use 0 to choose automatically from free GPU memory.")
@@ -204,13 +227,17 @@ def main():
         logging.error("No test data loaded.")
         return
 
-    candidates_dict = provider.load_candidates(type=args.candidate_type)
+    candidates_dict, candidate_label = load_candidates(
+        provider,
+        args.candidate_type,
+        args.candidate_path,
+    )
     if not candidates_dict:
         logging.error("No candidate loaded.")
         return
 
     logging.info(f"Loaded {len(test_raw)} test spectra.")
-    logging.info(f"Loaded {len(candidates_dict)} unique {args.candidate_type} candidate mapping keys.")
+    logging.info(f"Loaded {len(candidates_dict)} unique {candidate_label} candidate mapping keys.")
 
     tokenizer_config = TokenizerConfig(max_len=100, show_progress_bar=False)
     tokenizer = Tokenizer(**tokenizer_config)
@@ -221,6 +248,9 @@ def main():
     # use unique_test_smiles to filter candidates_dict
     candidates_dict = {k: v for k, v in candidates_dict.items() if k in unique_test_smiles}
     logging.info(f"Filtered candidates_dict to {len(candidates_dict)} entries based on test dataset.")
+    if not candidates_dict:
+        logging.error("No candidate entries match SMILES in the test dataset.")
+        return
     cand_sizes = np.array([len(v) for v in candidates_dict.values()])
     logging.info(
         f"Candidate set sizes: "
@@ -437,11 +467,11 @@ def main():
 
     plt.xlabel('Cosine Similarity')
     plt.ylabel('Percentage of Occurrence')
-    plt.title(f'Cosine Similarity Distribution ({args.dataset_type}, {args.candidate_type})')
+    plt.title(f'Cosine Similarity Distribution ({args.dataset_type}, {candidate_label})')
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.6)
 
-    plot_path = checkpoint_path.parent / f"similarity_dist_{args.dataset_type}_{args.candidate_type}.png"
+    plot_path = checkpoint_path.parent / f"similarity_dist_{args.dataset_type}_{candidate_label}.png"
     plt.savefig(plot_path)
     logging.info(f"Similarity distribution plot saved to {plot_path}")
 
