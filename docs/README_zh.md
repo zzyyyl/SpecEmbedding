@@ -64,7 +64,7 @@ ruff check . --fix
 
 ### 3. 示例展示
 
-#### 2.1 计算 query 和 reference 的余弦相似度矩阵
+#### 3.1 计算 query 和 reference 的余弦相似度矩阵
 ```python
 import sys
 sys.path.append("..")
@@ -96,7 +96,7 @@ r, _ = embedding(tester, tokenizer, 512, r, True)
 cosine_scores = cosine_similarity(q, r)
 ```
 
-#### 2.2 计算 Top1 的候选化合物
+#### 3.2 计算 Top1 的候选化合物
 
 ```python
 import sys

@@ -66,7 +66,7 @@ For spectrum-molecule alignment tasks, SpecEmbedding uses a Graph Isomorphism Ne
 
 ### 3. Demo
 
-#### 2.1 Compute Cosine Similarity Matrix Between Query and Reference Spectra
+#### 3.1 Compute Cosine Similarity Matrix Between Query and Reference Spectra
 
 ```python
 import sys
@@ -99,7 +99,7 @@ r, _ = embedding(tester, tokenizer, 512, r, True)
 cosine_scores = cosine_similarity(q, r)
 ```
 
-#### 2.2 Get the Top-1 Most Similar Compound for Each Query Spectrum
+#### 3.2 Get the Top-1 Most Similar Compound for Each Query Spectrum
 
 ```python
 import sys
