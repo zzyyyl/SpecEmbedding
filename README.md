@@ -146,6 +146,76 @@ Users can refer to the following Jupyter notebooks for details on model training
 [Model Training Script](./demo/train_model.ipynb)
 [Model Model Evaluation and Metrics](./hit_metric/GNPS&MoNA&MTBLS1572.ipynb)
 
-### 3. Web Service
+### 4. Command-line workflows
+
+The default paths and hyperparameters are defined in `params.yaml`. The processed data root is expected to contain one subdirectory per dataset, for example `MassSpecGym`, `MassBank`, `GNPS`, `MoNA`, or `NPLIB1`. Each dataset directory is loaded through `src/data/base.py` and should contain split files such as `train.pkl`, `val.pkl`, and `test.pkl`.
+
+Each split file is a pickle file containing `list[matchms.Spectrum]`. Each `Spectrum` must provide:
+
+```python
+spectrum.get("smiles")
+spectrum.get("precursor_mz")
+spectrum.peaks.to_numpy  # shape: [num_peaks, 2], columns are mz and intensity
+```
+
+Pre-train the spectrum encoder:
+
+```bash
+python train.py \
+  --dataset_type massspecgym \
+  --data_path /path/to/processed \
+  --save_dir ./checkpoints
+```
+
+Train the spectrum-molecule alignment model:
+
+```bash
+python train_align.py \
+  --dataset_type massspecgym \
+  --data_path /path/to/processed \
+  --save_dir ./checkpoints_align/run \
+  --pretrained_spec ./checkpoints/model.ckpt
+```
+
+If `--pretrained_spec` is omitted or the file is missing, the spectrum encoder is trained from scratch during alignment. `--graph_cache_size` controls the lazy molecule graph cache per DataLoader worker: `0` disables it and `-1` makes it unlimited.
+
+Evaluate spectrum-to-spectrum retrieval on replicated query/reference `.npy` files:
+
+```bash
+python eval.py \
+  --checkpoint ./checkpoints/model.ckpt \
+  --data_dir /path/to/replicated_splits \
+  --loss_type custom
+```
+
+Evaluate spectrum-to-molecule retrieval with candidate sets:
+
+```bash
+python eval_align.py \
+  --checkpoint ./checkpoints_align/run/final_aligned_model.pth \
+  --dataset_type massspecgym \
+  --data_path /path/to/processed \
+  --candidate_type mass
+```
+
+By default, `eval_align.py` loads `candidates_mass.pkl` or `candidates_formula.pkl` from the selected processed dataset directory according to `--candidate_type`. A custom candidate file can be used instead:
+
+```bash
+python eval_align.py \
+  --checkpoint ./checkpoints_align/run/final_aligned_model.pth \
+  --dataset_type massspecgym \
+  --data_path /path/to/processed \
+  --candidate_path /path/to/custom_candidates.pkl
+```
+
+When `--candidate_path` is provided, it overrides `--candidate_type`. The custom candidate pickle must contain:
+
+```python
+dict[str, list[str]]
+```
+
+where each key is a query or ground-truth SMILES string from `test.pkl`, and each value is the list of candidate molecule SMILES strings for that query. During evaluation, candidate entries are filtered to SMILES present in the test split. Molecule embeddings are stored on CPU by default; use `--mol_embedding_storage cuda` only when the full candidate embedding matrix fits in GPU memory. `--candidate_chunk_size 0` lets the script choose a chunk size from available CUDA memory, and `--no-mces` disables MCES calculation.
+
+### 5. Web Service
 
 An online web interface is available for demonstration and public use: [SpecEmbedding](https://huggingface.co/spaces/xp113280/SpecEmbedding)

@@ -144,6 +144,76 @@ for i, index in enumerate(indices[:, 0]):
 [训练脚本](../demo/train_model.ipynb)
 [评估脚本](../hit_metric/GNPS&MoNA&MTBLS1572.ipynb)
 
-### 3. Web 服务
+### 4. 命令行流程
+
+默认路径和超参数由 `params.yaml` 配置。处理后的数据目录需要按数据集分目录存放，例如 `MassSpecGym`、`MassBank`、`GNPS`、`MoNA` 或 `NPLIB1`。每个数据集目录由 `src/data/base.py` 加载，通常包含 `train.pkl`、`val.pkl` 和 `test.pkl` 等划分文件。
+
+每个划分文件都是 pickle 文件，内容为 `list[matchms.Spectrum]`。每条 `Spectrum` 至少需要支持：
+
+```python
+spectrum.get("smiles")
+spectrum.get("precursor_mz")
+spectrum.peaks.to_numpy  # shape: [num_peaks, 2]，两列分别是 mz 和 intensity
+```
+
+预训练谱图编码器：
+
+```bash
+python train.py \
+  --dataset_type massspecgym \
+  --data_path /path/to/processed \
+  --save_dir ./checkpoints
+```
+
+训练谱图-分子跨模态对齐模型：
+
+```bash
+python train_align.py \
+  --dataset_type massspecgym \
+  --data_path /path/to/processed \
+  --save_dir ./checkpoints_align/run \
+  --pretrained_spec ./checkpoints/model.ckpt
+```
+
+如果不传 `--pretrained_spec`，或指定文件不存在，对齐训练会从随机初始化的谱图编码器开始。`--graph_cache_size` 控制每个 DataLoader worker 内的分子图惰性缓存：`0` 表示关闭缓存，`-1` 表示不限制缓存大小。
+
+在预先生成的 query/reference `.npy` 文件上评估谱图到谱图检索：
+
+```bash
+python eval.py \
+  --checkpoint ./checkpoints/model.ckpt \
+  --data_dir /path/to/replicated_splits \
+  --loss_type custom
+```
+
+使用候选集评估谱图到分子检索：
+
+```bash
+python eval_align.py \
+  --checkpoint ./checkpoints_align/run/final_aligned_model.pth \
+  --dataset_type massspecgym \
+  --data_path /path/to/processed \
+  --candidate_type mass
+```
+
+默认情况下，`eval_align.py` 会根据 `--candidate_type` 从所选数据集目录加载 `candidates_mass.pkl` 或 `candidates_formula.pkl`。也可以直接指定自定义候选集文件：
+
+```bash
+python eval_align.py \
+  --checkpoint ./checkpoints_align/run/final_aligned_model.pth \
+  --dataset_type massspecgym \
+  --data_path /path/to/processed \
+  --candidate_path /path/to/custom_candidates.pkl
+```
+
+传入 `--candidate_path` 时，它会覆盖 `--candidate_type`。自定义候选集 pickle 必须是：
+
+```python
+dict[str, list[str]]
+```
+
+其中 key 是 `test.pkl` 中 query 或真实分子的 SMILES，value 是该 query 对应的候选分子 SMILES 列表。评估时会先按 test split 中存在的 SMILES 过滤候选集。分子 embedding 默认存储在 CPU；只有确认完整候选 embedding 矩阵能放入显存时，才建议使用 `--mol_embedding_storage cuda`。`--candidate_chunk_size 0` 会根据可用 CUDA 显存自动估计候选分块大小，`--no-mces` 可关闭 MCES 计算。
+
+### 5. Web 服务
 
 我们也为用户提供了一个 web 服务，每个人都可以通过访问网址 [SpecEmbedding](https://huggingface.co/spaces/xp113280/SpecEmbedding) 使用。
