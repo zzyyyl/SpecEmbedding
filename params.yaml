@@ -36,6 +36,8 @@ model:
     n_layers: 4
     dropout_rate: 0.2
     size_feature_dim: 32
+    norm_type: "layernorm" # layernorm or rmsnorm
+    norm_eps: 0.00001
   align:
     final_dim: 512
     dropout_rate: 0.2

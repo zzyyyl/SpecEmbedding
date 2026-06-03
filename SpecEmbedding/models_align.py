@@ -9,6 +9,15 @@ from SpecEmbedding.data.graph_utils import ATOM_FEATURES, BOND_FEATURES
 from SpecEmbedding.models import SiameseModel
 
 
+def build_norm(norm_type: str, emb_dim: int, eps: float = 1e-5) -> nn.Module:
+    norm_type = norm_type.lower()
+    if norm_type == "layernorm":
+        return nn.LayerNorm(emb_dim, eps=eps)
+    if norm_type == "rmsnorm":
+        return nn.RMSNorm(emb_dim, eps=eps)
+    raise ValueError(f"Unsupported norm_type: {norm_type}. Use 'layernorm' or 'rmsnorm'.")
+
+
 class GINEEncoder(nn.Module):
     """基于 GINE (Graph Isomorphism Network with Edge features) 的分子编码器"""
     def __init__(
@@ -17,10 +26,14 @@ class GINEEncoder(nn.Module):
         n_layers: int,
         dropout_rate: float,
         size_feature_dim: int = 32,
+        norm_type: str = "layernorm",
+        norm_eps: float = 1e-5,
     ):
         super().__init__()
         self.emb_dim = emb_dim
         self.dropout_rate = dropout_rate
+        self.norm_type = norm_type
+        self.norm_eps = norm_eps
         if size_feature_dim <= 0:
             raise ValueError("size_feature_dim must be greater than 0")
 
@@ -56,7 +69,7 @@ class GINEEncoder(nn.Module):
                 nn.Linear(emb_dim * 2, emb_dim)
             )
             self.convs.append(GINEConv(nn=mlp, train_eps=True))
-            self.norms.append(nn.LayerNorm(emb_dim))
+            self.norms.append(build_norm(norm_type, emb_dim, eps=norm_eps))
 
         # 使用 mean pooling 表示结构信息，并通过显式规模特征补充 size signal
         self.size_proj = nn.Sequential(

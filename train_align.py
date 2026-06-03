@@ -33,6 +33,8 @@ def train_align(
     lr: float = config.train.align.lr,
     save_dir: str = config.general.save_dir,
     graph_cache_size: int = config.train.align.graph_cache_size,
+    mol_norm_type: str = getattr(config.model.mol_encoder, "norm_type", "layernorm"),
+    mol_norm_eps: float = getattr(config.model.mol_encoder, "norm_eps", 1e-5),
 ):
     device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
     seed = config.general.seed
@@ -88,6 +90,8 @@ def train_align(
         n_layers=config.model.mol_encoder.n_layers,
         dropout_rate=config.model.mol_encoder.dropout_rate,
         size_feature_dim=config.model.mol_encoder.size_feature_dim,
+        norm_type=mol_norm_type,
+        norm_eps=mol_norm_eps,
     )
 
     has_pretrained_spec = spec_encoder is not None
@@ -177,6 +181,8 @@ def main():
     parser.add_argument("--batch_size", type=int, default=config.train.align.batch_size, help="Batch size for alignment training")
     parser.add_argument("--lr", type=float, default=config.train.align.lr, help="Base learning rate")
     parser.add_argument("--graph_cache_size", type=int, default=config.train.align.graph_cache_size, help="Lazy LRU molecule graph cache size per DataLoader worker. Use 0 to disable and -1 for unlimited.")
+    parser.add_argument("--mol_norm_type", type=str, choices=["layernorm", "rmsnorm"], default=getattr(config.model.mol_encoder, "norm_type", "layernorm"), help="Normalization used in the molecule GINE encoder.")
+    parser.add_argument("--mol_norm_eps", type=float, default=getattr(config.model.mol_encoder, "norm_eps", 1e-5), help="Epsilon used by molecule encoder normalization.")
     parser.add_argument("--pretrained_spec", type=str, help="Path to your pre-trained SpecEmbedding model weights")
 
     args = parser.parse_args()
@@ -230,6 +236,8 @@ def main():
         lr=args.lr,
         save_dir=args.save_dir,
         graph_cache_size=args.graph_cache_size,
+        mol_norm_type=args.mol_norm_type,
+        mol_norm_eps=args.mol_norm_eps,
     )
 
 

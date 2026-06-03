@@ -162,6 +162,8 @@ def main():
     parser.add_argument("--mol_embedding_dtype", type=str, choices=["float32", "float16"], default="float32", help="Dtype used to store all molecule embeddings.")
     parser.add_argument("--candidate_chunk_size", type=int, default=0, help="Maximum number of candidate embeddings moved to GPU at once. Use 0 to choose automatically from free GPU memory.")
     parser.add_argument("--candidate_chunk_memory_fraction", type=float, default=0.5, help="Fraction of free GPU memory used to estimate --candidate_chunk_size when it is 0.")
+    parser.add_argument("--mol_norm_type", type=str, choices=["layernorm", "rmsnorm"], default=getattr(config.model.mol_encoder, "norm_type", "layernorm"), help="Normalization used in the molecule GINE encoder. Must match the checkpoint.")
+    parser.add_argument("--mol_norm_eps", type=float, default=getattr(config.model.mol_encoder, "norm_eps", 1e-5), help="Epsilon used by molecule encoder normalization. Must match the checkpoint.")
     parser.add_argument("--no-mces", action="store_true", help="Disable MCES structural similaritycalculation")
     args = parser.parse_args()
     if args.candidate_chunk_size < 0:
@@ -189,6 +191,8 @@ def main():
         n_layers=config.model.mol_encoder.n_layers,
         dropout_rate=config.model.mol_encoder.dropout_rate,
         size_feature_dim=config.model.mol_encoder.size_feature_dim,
+        norm_type=args.mol_norm_type,
+        norm_eps=args.mol_norm_eps,
     )
     model = SpecMolAlignModel(
         spec_encoder=spec_encoder,
