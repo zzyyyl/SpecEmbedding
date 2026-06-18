@@ -281,7 +281,7 @@ def main():
         num_workers=4
     )
 
-    storage_device = torch.device("cuda" if args.mol_embedding_storage == "cuda" and device.type == "cuda" else "cpu")
+    storage_device = device if args.mol_embedding_storage == "cuda" and device.type == "cuda" else torch.device("cpu")
     storage_dtype = torch.float16 if args.mol_embedding_dtype == "float16" else torch.float32
     logging.info(
         f"Storing molecule embeddings on {storage_device} with dtype={storage_dtype}. "
