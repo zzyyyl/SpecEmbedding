@@ -50,11 +50,17 @@ def startup_logging(args, message: str = "Start training"):
     for k, v in vars(args).items():
         logging.info(f"  {k}: {v}")
 
-    device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
+    device = resolve_device(getattr(args, "device", None))
     if device.type == 'cuda':
         logging.info(f"Using device: {device} ({torch.cuda.get_device_name(device)})")
     else:
         logging.info(f"Using device: {device}")
+
+def resolve_device(device: str | torch.device | None = None) -> torch.device:
+    requested_device = torch.device(device or config.general.device)
+    if requested_device.type == "cuda" and not torch.cuda.is_available():
+        return torch.device("cpu")
+    return requested_device
 
 def add_base_argument(parser):
     parser.add_argument(
@@ -75,6 +81,12 @@ def add_base_argument(parser):
         type=str,
         default=config.general.save_dir,
         help="Directory to save model and logs"
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default=config.general.device,
+        help='Device to use, for example "cpu", "cuda", "cuda:0", or "cuda:1".'
     )
 
 def load_data(dataset_type, data_path=None):
@@ -166,7 +178,7 @@ def main():
     setup_logging(save_path / "train.log")
     startup_logging(args, "Start SpecEmbedding Pre-training")
     set_seed(config.general.seed)
-    device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
+    device = resolve_device(args.device)
 
     classified_data = get_classified_data(dataset_type=args.dataset_type, data_path=args.data_path)
     train_data = classified_data['train_data']

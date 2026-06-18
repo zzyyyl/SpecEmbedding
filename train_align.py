@@ -15,7 +15,7 @@ from SpecEmbedding.models_align import GINEEncoder, SpecMolAlignModel
 from SpecEmbedding.trainer.trainer import set_seed
 from SpecEmbedding.trainer.trainer_align import TrainerAlign
 from SpecEmbedding.utils.model import SiameseModel
-from train import add_base_argument, get_classified_data, setup_logging, startup_logging
+from train import add_base_argument, get_classified_data, resolve_device, setup_logging, startup_logging
 
 
 def seed_worker(worker_id):
@@ -35,8 +35,9 @@ def train_align(
     graph_cache_size: int = config.train.align.graph_cache_size,
     mol_norm_type: str = getattr(config.model.mol_encoder, "norm_type", "layernorm"),
     mol_norm_eps: float = getattr(config.model.mol_encoder, "norm_eps", 1e-5),
+    device: str | torch.device | None = None,
 ):
-    device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
+    device = resolve_device(device)
     seed = config.general.seed
     epochs_stage1 = config.train.align.epochs_stage1
     epochs_stage2 = config.train.align.epochs_stage2
@@ -192,7 +193,7 @@ def main():
     setup_logging(save_path / "align_train.log")
     startup_logging(args)
     set_seed(config.general.seed)
-    device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
+    device = resolve_device(args.device)
 
     classified_data = get_classified_data(dataset_type=args.dataset_type, data_path=args.data_path)
     train_data = classified_data['train_data']
@@ -238,6 +239,7 @@ def main():
         graph_cache_size=args.graph_cache_size,
         mol_norm_type=args.mol_norm_type,
         mol_norm_eps=args.mol_norm_eps,
+        device=device,
     )
 
 

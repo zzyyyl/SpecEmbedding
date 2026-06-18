@@ -29,6 +29,7 @@ from src.data import (
     NPLIB1Provider,
 )
 from train import (
+    resolve_device,
     setup_logging,
     startup_logging,
 )
@@ -156,6 +157,7 @@ def main():
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to best aligned model checkpoint")
     parser.add_argument("--dataset_type", type=str, choices=["massbank", "massspecgym", "nplib1", "gnps", "mona"], default="massspecgym", help="Dataset type")
     parser.add_argument("--data_path", type=str, default=config.data.data_path, help="Base directory containing processed dataset folders")
+    parser.add_argument("--device", type=str, default=config.general.device, help='Device to use, for example "cpu", "cuda", "cuda:0", or "cuda:1".')
     parser.add_argument("--candidate_type", type=str, choices=["mass", "formula"], default="mass", help="Candidate set type to use.")
     parser.add_argument("--candidate_path", type=str, default=None, help="Path to a custom candidates pickle. Overrides --candidate_type when provided.")
     parser.add_argument("--mol_embedding_storage", type=str, choices=["cpu", "cuda"], default="cpu", help="Device used to store all molecule embeddings during retrieval.")
@@ -175,7 +177,7 @@ def main():
     setup_logging(checkpoint_path.parent / "eval_align.log")
     startup_logging(args, "Start Cross-Modal Evaluation")
     set_seed(config.general.seed)
-    device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
+    device = resolve_device(args.device)
 
     logging.info("Initializing SpecMolAlignModel...")
     spec_encoder = SiameseModel(

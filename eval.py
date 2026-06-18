@@ -11,6 +11,7 @@ from SpecEmbedding.data.tokenizer import Tokenizer
 from SpecEmbedding.trainer.trainer import ModelTester, set_seed
 from SpecEmbedding.utils.model import SiameseModel, load_transformer_model, search
 from train import (
+    resolve_device,
     setup_logging,
     startup_logging,
 )
@@ -21,6 +22,7 @@ def main():
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to model checkpoint. If using a pre-configured architecture via --loss_type, this parameter is ignored.")
     parser.add_argument("--data_dir", type=str, required=True, help="Directory containing the replicated .npy files (e.g. /data1/xp/data/massSpecGymData)")
     parser.add_argument("--loss_type", type=str, default="custom", choices=["custom", "TanimotoLoss", "SupConLoss", "SupConWithTanimotoLoss"], help="Type of model to load. 'custom' means load from --checkpoint directly using the default architecture.")
+    parser.add_argument("--device", type=str, default=config.general.device, help='Device to use, for example "cpu", "cuda", "cuda:0", or "cuda:1".')
 
     args = parser.parse_args()
 
@@ -29,7 +31,7 @@ def main():
     setup_logging(checkpoint_path.parent / "eval_massspecgym.log")
     startup_logging(args, "Starting MassSpecGym Evaluation (Replication Mode)")
     set_seed(config.general.seed)
-    device = torch.device(config.general.device if torch.cuda.is_available() else "cpu")
+    device = resolve_device(args.device)
 
     path_dir = Path(args.data_dir)
     replica_suffix = "-replication-{}.npy"

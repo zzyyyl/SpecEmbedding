@@ -18,12 +18,17 @@ def run_command(command):
         print(f"Command failed with exit code {result.returncode}")
         sys.exit(result.returncode)
 
+def append_device(command, device):
+    if device:
+        command.extend(["--device", device])
+
 def main():
     parser = argparse.ArgumentParser(description="Unified training and evaluation pipeline.")
     parser.add_argument("dataset_type", nargs="?", default="massspecgym", help="Type of dataset (default: massspecgym)")
     parser.add_argument("--mode", choices=["train", "eval", "test", "all"], default="all", help="Execution mode: train, eval/test, or all (default: all)")
     parser.add_argument("--no-pretrain", action="store_true", help="Run without pre-trained model (equivalent to nostage1)")
     parser.add_argument("--save_dir", help="Explicit save directory (optional)")
+    parser.add_argument("--device", help='Device to use, for example "cpu", "cuda", "cuda:0", or "cuda:1"')
 
     args = parser.parse_args()
 
@@ -47,6 +52,7 @@ def main():
             "--dataset_type", args.dataset_type,
             "--save_dir", save_dir
         ]
+        append_device(train_cmd, args.device)
         if not args.no_pretrain:
             train_cmd.extend(["--pretrained_spec", "checkpoints/model.ckpt"])
 
@@ -60,30 +66,40 @@ def main():
 
         if args.no_pretrain:
             # Evaluate only best_model_stage2.pth for no-pretrain mode
-            run_command([
+            eval_cmd = [
                 "python", "eval_align.py",
                 "--dataset_type", args.dataset_type,
                 "--checkpoint", os.path.join(save_dir, "best_model_stage2.pth")
-            ])
+            ]
+            append_device(eval_cmd, args.device)
+            run_command(eval_cmd)
         else:
             # Standard evaluation sequence
-            run_command([
+            eval_stage1_cmd = [
                 "python", "eval_align.py",
                 "--dataset_type", args.dataset_type,
                 "--checkpoint", os.path.join(save_dir, "best_model_stage1.pth"),
                 "--no-mces"
-            ])
-            run_command([
+            ]
+            append_device(eval_stage1_cmd, args.device)
+            run_command(eval_stage1_cmd)
+
+            eval_stage2_cmd = [
                 "python", "eval_align.py",
                 "--dataset_type", args.dataset_type,
                 "--checkpoint", os.path.join(save_dir, "best_model_stage2.pth")
-            ])
-            run_command([
+            ]
+            append_device(eval_stage2_cmd, args.device)
+            run_command(eval_stage2_cmd)
+
+            eval_final_cmd = [
                 "python", "eval_align.py",
                 "--dataset_type", args.dataset_type,
                 "--checkpoint", os.path.join(save_dir, "final_aligned_model.pth"),
                 "--no-mces"
-            ])
+            ]
+            append_device(eval_final_cmd, args.device)
+            run_command(eval_final_cmd)
 
 if __name__ == "__main__":
     main()
