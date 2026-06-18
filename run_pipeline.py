@@ -18,9 +18,9 @@ def run_command(command):
         print(f"Command failed with exit code {result.returncode}")
         sys.exit(result.returncode)
 
-def append_device(command, device):
-    if device:
-        command.extend(["--device", device])
+def append_optional_arg(command, flag, value):
+    if value:
+        command.extend([flag, value])
 
 def main():
     parser = argparse.ArgumentParser(description="Unified training and evaluation pipeline.")
@@ -29,6 +29,7 @@ def main():
     parser.add_argument("--no-pretrain", action="store_true", help="Run without pre-trained model (equivalent to nostage1)")
     parser.add_argument("--save_dir", help="Explicit save directory (optional)")
     parser.add_argument("--device", help='Device to use, for example "cpu", "cuda", "cuda:0", or "cuda:1"')
+    parser.add_argument("--mol_norm_type", choices=["layernorm", "rmsnorm"], help="Normalization used in the molecule GINE encoder.")
 
     args = parser.parse_args()
 
@@ -52,7 +53,8 @@ def main():
             "--dataset_type", args.dataset_type,
             "--save_dir", save_dir
         ]
-        append_device(train_cmd, args.device)
+        append_optional_arg(train_cmd, "--device", args.device)
+        append_optional_arg(train_cmd, "--mol_norm_type", args.mol_norm_type)
         if not args.no_pretrain:
             train_cmd.extend(["--pretrained_spec", "checkpoints/model.ckpt"])
 
@@ -72,7 +74,8 @@ def main():
                 "--checkpoint", os.path.join(save_dir, "best_model_stage2.pth"),
                 "--no-mces"
             ]
-            append_device(eval_cmd, args.device)
+            append_optional_arg(eval_cmd, "--device", args.device)
+            append_optional_arg(eval_cmd, "--mol_norm_type", args.mol_norm_type)
             run_command(eval_cmd)
         else:
             # Standard evaluation sequence
@@ -82,7 +85,8 @@ def main():
                 "--checkpoint", os.path.join(save_dir, "best_model_stage1.pth"),
                 "--no-mces"
             ]
-            append_device(eval_stage1_cmd, args.device)
+            append_optional_arg(eval_stage1_cmd, "--device", args.device)
+            append_optional_arg(eval_stage1_cmd, "--mol_norm_type", args.mol_norm_type)
             run_command(eval_stage1_cmd)
 
             eval_stage2_cmd = [
@@ -91,7 +95,8 @@ def main():
                 "--checkpoint", os.path.join(save_dir, "best_model_stage2.pth"),
                 "--no-mces"
             ]
-            append_device(eval_stage2_cmd, args.device)
+            append_optional_arg(eval_stage2_cmd, "--device", args.device)
+            append_optional_arg(eval_stage2_cmd, "--mol_norm_type", args.mol_norm_type)
             run_command(eval_stage2_cmd)
 
             eval_final_cmd = [
@@ -100,7 +105,8 @@ def main():
                 "--checkpoint", os.path.join(save_dir, "final_aligned_model.pth"),
                 "--no-mces"
             ]
-            append_device(eval_final_cmd, args.device)
+            append_optional_arg(eval_final_cmd, "--device", args.device)
+            append_optional_arg(eval_final_cmd, "--mol_norm_type", args.mol_norm_type)
             run_command(eval_final_cmd)
 
 if __name__ == "__main__":
