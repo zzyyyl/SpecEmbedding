@@ -69,7 +69,8 @@ def main():
             eval_cmd = [
                 "python", "eval_align.py",
                 "--dataset_type", args.dataset_type,
-                "--checkpoint", os.path.join(save_dir, "best_model_stage2.pth")
+                "--checkpoint", os.path.join(save_dir, "best_model_stage2.pth"),
+                "--no-mces"
             ]
             append_device(eval_cmd, args.device)
             run_command(eval_cmd)
@@ -87,7 +88,8 @@ def main():
             eval_stage2_cmd = [
                 "python", "eval_align.py",
                 "--dataset_type", args.dataset_type,
-                "--checkpoint", os.path.join(save_dir, "best_model_stage2.pth")
+                "--checkpoint", os.path.join(save_dir, "best_model_stage2.pth"),
+                "--no-mces"
             ]
             append_device(eval_stage2_cmd, args.device)
             run_command(eval_stage2_cmd)
