@@ -1,17 +1,14 @@
 import argparse
 import logging
-import os
-from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
-import pulp
 import torch
-from myopic_mces.myopic_mces import MCES
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from SpecEmbedding.config import config
 from SpecEmbedding.data.datasets_rerank import RerankCacheDataset, rerank_collate_fn
+from SpecEmbedding.utils.mces import compute_mces
 from SpecEmbedding.utils.rerank import (
     init_ranking_metrics,
     load_reranker,
@@ -24,27 +21,6 @@ from SpecEmbedding.utils.rerank import (
 from SpecEmbedding.utils.runtime import configure_runtime_cache, resolve_device, setup_logging, startup_logging
 
 configure_runtime_cache()
-
-mces_solvers = pulp.listSolvers(onlyAvailable=True)
-mces_solver = "MOSEK" if "MOSEK" in mces_solvers else mces_solvers[0]
-
-
-def mces_worker(smiles_pair):
-    pred_smiles, true_smiles = smiles_pair
-    if pred_smiles == true_smiles:
-        return 0.0, False
-    try:
-        retval = MCES(
-            smiles1=pred_smiles,
-            smiles2=true_smiles,
-            threshold=15,
-            always_stronger_bound=True,
-            solver=mces_solver,
-            solver_options=dict(msg=0),
-        )
-        return retval[1], False
-    except Exception:
-        return 0.0, True
 
 
 @torch.no_grad()
@@ -95,20 +71,6 @@ def evaluate(model, loader, device, top_k):
         "rerank_mces_pairs": rerank_mces_pairs,
         "total": base_metrics["total"],
     }
-
-
-def compute_mces(pairs, label):
-    if not pairs:
-        return None
-    max_workers = min(os.cpu_count() or 1, 16)
-    logging.info("Computing %s MCES for %s pairs using %s solver...", label, len(pairs), mces_solver)
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        results = list(tqdm(executor.map(mces_worker, pairs), total=len(pairs), desc=f"{label} MCES", ascii=True))
-    mces = sum(item[0] for item in results) / len(pairs)
-    errors = sum(item[1] for item in results)
-    if errors:
-        logging.warning("%s MCES calculation errors: %s/%s", label, errors, len(pairs))
-    return mces
 
 
 def parse_args():
@@ -190,8 +152,8 @@ def main():
     log_ranking_summary("RERANK", results["rerank"], top_k)
 
     if args.compute_mces:
-        base_mces = compute_mces(results["base_mces_pairs"], "Base")
-        rerank_mces = compute_mces(results["rerank_mces_pairs"], "Rerank")
+        base_mces = compute_mces(results["base_mces_pairs"], "Base MCES")
+        rerank_mces = compute_mces(results["rerank_mces_pairs"], "Rerank MCES")
         logging.info("Base   MCES@1 : %.4f", base_mces)
         logging.info("Rerank MCES@1 : %.4f", rerank_mces)
     else:

@@ -26,41 +26,9 @@ from SpecEmbedding.type import (
 )
 from SpecEmbedding.utils.clean import get_classified_tokenset
 from SpecEmbedding.utils.model import SiameseModel
-from src.data import GNPSProvider, MassBankProvider, MassSpecGymProvider, MoNAProvider, NPLIB1Provider
+from SpecEmbedding.utils.providers import load_train_val_data
+from SpecEmbedding.utils.runtime import resolve_device, setup_logging, startup_logging
 
-
-def setup_logging(log_file=None):
-    handlers = [
-        logging.FileHandler(log_file, encoding='utf-8'),
-        logging.StreamHandler()
-    ] if log_file else [
-        logging.StreamHandler()
-    ]
-    logging.basicConfig(
-        level=logging.INFO, 
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=handlers
-    )
-
-def startup_logging(args, message: str = "Start training"):
-    logging.info("=" * 50)
-    logging.info(message)
-    logging.info("=" * 50)
-    logging.info("Parsed Arguments:")
-    for k, v in vars(args).items():
-        logging.info(f"  {k}: {v}")
-
-    device = resolve_device(getattr(args, "device", None))
-    if device.type == 'cuda':
-        logging.info(f"Using device: {device} ({torch.cuda.get_device_name(device)})")
-    else:
-        logging.info(f"Using device: {device}")
-
-def resolve_device(device: str | torch.device | None = None) -> torch.device:
-    requested_device = torch.device(device or config.general.device)
-    if requested_device.type == "cuda" and not torch.cuda.is_available():
-        return torch.device("cpu")
-    return requested_device
 
 def add_base_argument(parser):
     parser.add_argument(
@@ -90,21 +58,7 @@ def add_base_argument(parser):
     )
 
 def load_data(dataset_type, data_path=None):
-    if dataset_type == "massspecgym":
-        provider = MassSpecGymProvider(data_dir=data_path)
-    elif dataset_type == "massbank":
-        provider = MassBankProvider(data_dir=data_path)
-    elif dataset_type == "nplib1":
-        provider = NPLIB1Provider(data_dir=data_path)
-    elif dataset_type == "gnps":
-        provider = GNPSProvider(data_dir=data_path)
-    elif dataset_type == "mona":
-        provider = MoNAProvider(data_dir=data_path)
-    else:
-        raise ValueError("--dataset_type is invalid")
-
-    train_raw = provider.load_data(mode='train')
-    val_raw = provider.load_data(mode='val')
+    train_raw, val_raw = load_train_val_data(dataset_type, data_path)
 
     if not train_raw:
         logging.error("No training data loaded. Check your data paths or internet connection.")

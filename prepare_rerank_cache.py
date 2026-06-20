@@ -10,8 +10,7 @@ os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
 os.environ.setdefault("XDG_CACHE_HOME", "/tmp")
 
 import torch
-from torch.utils.data import DataLoader, Dataset
-from torch_geometric.data import Batch
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from SpecEmbedding.utils.runtime import configure_runtime_cache
@@ -19,53 +18,12 @@ from SpecEmbedding.utils.runtime import configure_runtime_cache
 configure_runtime_cache()
 
 from SpecEmbedding.config import config
-from SpecEmbedding.data.graph_utils import smiles_to_graph
+from SpecEmbedding.data.datasets_eval import MolSmilesDataset, SpecSequenceDataset, mol_collate_fn
 from SpecEmbedding.data.tokenizer import Tokenizer
 from SpecEmbedding.type import TokenizerConfig
-from SpecEmbedding.utils.rerank import build_align_model, get_provider, load_candidates, resolve_storage_dtype
+from SpecEmbedding.utils.align import load_align_model, resolve_storage_dtype
+from SpecEmbedding.utils.providers import get_provider, load_candidates
 from SpecEmbedding.utils.runtime import resolve_device, setup_logging, startup_logging
-
-
-class SpecSequenceDataset(Dataset):
-    def __init__(self, sequences):
-        self.sequences = sequences
-
-    def __len__(self):
-        return len(self.sequences)
-
-    def __getitem__(self, idx):
-        seq = self.sequences[idx]
-        return {
-            "spec_mz": torch.tensor(seq["mz"], dtype=torch.float32),
-            "spec_intensity": torch.tensor(seq["intensity"], dtype=torch.float32),
-            "spec_mask": torch.tensor(seq["mask"], dtype=torch.bool),
-            "smiles": seq["smiles"],
-        }
-
-
-class MolSmilesDataset(Dataset):
-    def __init__(self, smiles_list):
-        self.smiles_list = smiles_list
-
-    def __len__(self):
-        return len(self.smiles_list)
-
-    def __getitem__(self, idx):
-        try:
-            graph = smiles_to_graph(self.smiles_list[idx])
-        except Exception:
-            graph = None
-        return {"graph": graph, "original_idx": idx}
-
-
-def mol_collate_fn(batch):
-    batch = [item for item in batch if item["graph"] is not None]
-    if not batch:
-        return None
-    return {
-        "mol_graph": Batch.from_data_list([item["graph"] for item in batch]),
-        "indices": [item["original_idx"] for item in batch],
-    }
 
 
 def build_unique_candidate_list(sequences, candidates_dict, limit: int = 0):
@@ -361,7 +319,7 @@ def main():
     startup_logging(args, "Prepare rerank cache")
     device = resolve_device(args.device)
 
-    model = build_align_model(
+    model = load_align_model(
         checkpoint=args.checkpoint,
         device=device,
         mol_norm_type=args.mol_norm_type,

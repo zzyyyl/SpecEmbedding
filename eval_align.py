@@ -1,156 +1,26 @@
 import argparse
 import logging
-import os
-import pickle
-from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
-import pulp
 import torch
-from myopic_mces.myopic_mces import MCES
-from torch.utils.data import DataLoader, Dataset
-from torch_geometric.data import Batch
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from SpecEmbedding.config import config
-from SpecEmbedding.data.graph_utils import smiles_to_graph
+from SpecEmbedding.data.datasets_eval import MolDataset, SpecDataset, mol_collate_fn
 from SpecEmbedding.data.tokenizer import Tokenizer
-from SpecEmbedding.models import SiameseModel
-from SpecEmbedding.models_align import GINEEncoder, SpecMolAlignModel
 from SpecEmbedding.trainer.trainer import set_seed
 from SpecEmbedding.type import TokenizerConfig
-from src.data import (
-    GNPSProvider,
-    MassBankProvider,
-    MassSpecGymProvider,
-    MoNAProvider,
-    NPLIB1Provider,
+from SpecEmbedding.utils.align import (
+    load_align_model,
+    resolve_candidate_chunk_size,
+    resolve_storage_dtype,
 )
-from train import (
-    resolve_device,
-    setup_logging,
-    startup_logging,
-)
+from SpecEmbedding.utils.mces import compute_mces
+from SpecEmbedding.utils.providers import get_provider, load_candidates
+from SpecEmbedding.utils.runtime import resolve_device, setup_logging, startup_logging
 
-mces_solvers = pulp.listSolvers(onlyAvailable=True)
-mces_solver = "MOSEK" if "MOSEK" in mces_solvers else mces_solvers[0]
-
-
-def get_dtype_size(dtype: torch.dtype) -> int:
-    return torch.empty((), dtype=dtype).element_size()
-
-
-def resolve_candidate_chunk_size(
-    requested_chunk_size: int,
-    memory_fraction: float,
-    device: torch.device,
-    embedding_dim: int,
-    compute_dtype: torch.dtype,
-    max_chunk_size: int,
-) -> int:
-    if requested_chunk_size > 0:
-        return min(requested_chunk_size, max_chunk_size)
-
-    if device.type != "cuda":
-        return max_chunk_size
-
-    free_bytes, total_bytes = torch.cuda.mem_get_info(device)
-    dtype_size = get_dtype_size(compute_dtype)
-    bytes_per_candidate = embedding_dim * dtype_size + dtype_size
-    chunk_size = int(free_bytes * memory_fraction / bytes_per_candidate)
-    chunk_size = max(1, min(chunk_size, max_chunk_size))
-
-    logging.info(
-        "Auto candidate chunk size: %s "
-        "(free_cuda=%.2f GiB, total_cuda=%.2f GiB, memory_fraction=%.2f)",
-        chunk_size,
-        free_bytes / 1024**3,
-        total_bytes / 1024**3,
-        memory_fraction,
-    )
-    return chunk_size
-
-
-def mces_worker(smiles_pair):
-    s1, s2 = smiles_pair
-    if s1 == s2:
-        return 0.0, False
-    try:
-        retval = MCES(
-            smiles1=s1,
-            smiles2=s2,
-            threshold=15,
-            always_stronger_bound=True,
-            solver=mces_solver,
-            solver_options=dict(msg=0)
-        )
-        return retval[1], False
-    except Exception:
-        return 0.0, True # Return value and error flag
-
-# ----------------- Spectra Dataset -----------------
-class SpecDataset(Dataset):
-    def __init__(self, sequences):
-        self.sequences = sequences
-        
-    def __len__(self):
-        return len(self.sequences)
-        
-    def __getitem__(self, idx):
-        seq = self.sequences[idx]
-        return {
-            'spec_mz': torch.tensor(seq['mz'], dtype=torch.float32),
-            'spec_intensity': torch.tensor(seq['intensity'], dtype=torch.float32),
-            'spec_mask': torch.tensor(seq['mask'], dtype=torch.bool),
-            'smiles': seq['smiles']
-        }
-
-# ----------------- Mol Dataset -----------------
-class MolDataset(Dataset):
-    def __init__(self, smiles_list):
-        self.smiles_list = smiles_list
-
-    def __len__(self):
-        return len(self.smiles_list)
-
-    def __getitem__(self, idx):
-        smiles = self.smiles_list[idx]
-        return {
-            'graph': smiles_to_graph(smiles),
-            'original_idx': idx
-        }
-
-def mol_collate_fn(batch):
-    # Filter out failed parsing
-    batch = [b for b in batch if b['graph'] is not None]
-    if not batch:
-        return None
-    graphs = Batch.from_data_list([b['graph'] for b in batch])
-    indices = [b['original_idx'] for b in batch]
-    return {'mol_graph': graphs, 'indices': indices}
-
-def load_candidates(provider, candidate_type: str, candidate_path: str | None):
-    if candidate_path is None:
-        candidates = provider.load_candidates(type=candidate_type)
-        return candidates, candidate_type
-
-    path = Path(candidate_path)
-    if not path.exists():
-        raise FileNotFoundError(f"Candidate file not found: {path}")
-
-    logging.info(f"Loading candidates from custom file {path} ...")
-    with open(path, "rb") as f:
-        candidates = pickle.load(f)
-
-    if not isinstance(candidates, dict):
-        raise TypeError(
-            f"Candidate file must contain dict[str, list[str]], got {type(candidates).__name__}"
-        )
-
-    logging.info(f"Loaded {len(candidates)} candidate sets from custom file.")
-    return candidates, path.stem
 
 def main():
     parser = argparse.ArgumentParser(description="Efficient Evaluate SpecMolAlignModel on Cross-Modal Retrieval.")
@@ -180,53 +50,14 @@ def main():
     device = resolve_device(args.device)
 
     logging.info("Initializing SpecMolAlignModel...")
-    spec_encoder = SiameseModel(
-        embedding_dim=config.model.spec_encoder.embedding_dim,
-        n_head=config.model.spec_encoder.n_head,
-        n_layer=config.model.spec_encoder.n_layer,
-        dim_feedward=config.model.spec_encoder.dim_feedward,
-        dim_target=config.model.spec_encoder.dim_target,
-        feedward_activation=config.model.spec_encoder.feedward_activation
+    model = load_align_model(
+        checkpoint=args.checkpoint,
+        device=device,
+        mol_norm_type=args.mol_norm_type,
+        mol_norm_eps=args.mol_norm_eps,
     )
-    mol_encoder = GINEEncoder(
-        emb_dim=config.model.mol_encoder.emb_dim,
-        n_layers=config.model.mol_encoder.n_layers,
-        dropout_rate=config.model.mol_encoder.dropout_rate,
-        size_feature_dim=config.model.mol_encoder.size_feature_dim,
-        norm_type=args.mol_norm_type,
-        norm_eps=args.mol_norm_eps,
-    )
-    model = SpecMolAlignModel(
-        spec_encoder=spec_encoder,
-        mol_encoder=mol_encoder,
-        spec_dim=config.model.spec_encoder.dim_target,
-        hidden_dim=config.model.align.final_dim,
-        final_dim=config.model.align.final_dim,
-        dropout_rate=config.model.align.dropout_rate,
-        tau=config.model.align.tau
-    )
-    state_dict = torch.load(args.checkpoint, map_location=device, weights_only=True)
-    if "logit_scale" not in state_dict:
-        logging.warning(
-            "Checkpoint has no learnable logit_scale; initializing it from config.model.align.tau for backward compatibility."
-        )
-        state_dict["logit_scale"] = model.logit_scale.detach().clone()
-    model.load_state_dict(state_dict, strict=True)
-    model = model.to(device)
-    model.eval()
 
-    if args.dataset_type == "massspecgym":
-        provider = MassSpecGymProvider(data_dir=args.data_path)
-    elif args.dataset_type == "massbank":
-        provider = MassBankProvider(data_dir=args.data_path)
-    elif args.dataset_type == "nplib1":
-        provider = NPLIB1Provider(data_dir=args.data_path)
-    elif args.dataset_type == "gnps":
-        provider = GNPSProvider(data_dir=args.data_path)
-    elif args.dataset_type == "mona":
-        provider = MoNAProvider(data_dir=args.data_path)
-    else:
-        raise ValueError("--dataset_type is invalid")
+    provider = get_provider(args.dataset_type, args.data_path)
 
     test_raw = provider.load_data(mode='test')
     if not test_raw:
@@ -284,7 +115,7 @@ def main():
     )
 
     storage_device = device if args.mol_embedding_storage == "cuda" and device.type == "cuda" else torch.device("cpu")
-    storage_dtype = torch.float16 if args.mol_embedding_dtype == "float16" else torch.float32
+    storage_dtype = resolve_storage_dtype(args.mol_embedding_dtype)
     logging.info(
         f"Storing molecule embeddings on {storage_device} with dtype={storage_dtype}. "
         "Use --mol_embedding_storage cuda only when the full candidate matrix fits in GPU memory."
@@ -450,6 +281,8 @@ def main():
 
     # Plot Similarity Distribution
     logging.info("Plotting similarity distribution...")
+    import matplotlib.pyplot as plt
+
     plt.figure(figsize=(10, 6))
     bin_centers = (sim_bins[:-1] + sim_bins[1:]) / 2
     
@@ -483,27 +316,9 @@ def main():
 
     # Parallel MCES Calculation
     if not args.no_mces:
-        mces_sum = 0.0
-        mces_errors = 0
-        if mces_pairs:
-            logging.info(f"Computing MCES for {len(mces_pairs)} pairs using {mces_solver} solver...")
-            # Use a fraction of CPUs to avoid overwhelming the system
-            max_workers = min(os.cpu_count() or 1, 16)
-            with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                mces_results = list(tqdm(
-                    executor.map(mces_worker, mces_pairs), 
-                    total=len(mces_pairs), 
-                    desc="MCES Calc", 
-                    ascii=True
-                ))
-            mces_sum = sum(res[0] for res in mces_results)
-            mces_errors = sum(res[1] for res in mces_results)
-
-        top1_mces = mces_sum / valid_queries
-        logging.info(f"Top-1 MCES Similarity : {top1_mces:.4f}")
-        
-        if mces_errors > 0:
-            logging.warning(f"MCES Calculation Errors: {mces_errors} out of {len(mces_pairs)}")
+        top1_mces = compute_mces(mces_pairs, "MCES Calc")
+        if top1_mces is not None:
+            logging.info(f"Top-1 MCES Similarity : {top1_mces:.4f}")
     else:
         logging.info("MCES Calculation skipped (--no-mces is set).")
 

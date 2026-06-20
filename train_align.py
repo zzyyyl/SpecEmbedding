@@ -15,7 +15,8 @@ from SpecEmbedding.models_align import GINEEncoder, SpecMolAlignModel
 from SpecEmbedding.trainer.trainer import set_seed
 from SpecEmbedding.trainer.trainer_align import TrainerAlign
 from SpecEmbedding.utils.model import SiameseModel
-from train import add_base_argument, get_classified_data, resolve_device, setup_logging, startup_logging
+from SpecEmbedding.utils.runtime import resolve_device, setup_logging, startup_logging
+from train import add_base_argument, get_classified_data
 
 
 def seed_worker(worker_id):

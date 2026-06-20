@@ -10,11 +10,7 @@ from SpecEmbedding.config import config
 from SpecEmbedding.data.tokenizer import Tokenizer
 from SpecEmbedding.trainer.trainer import ModelTester, set_seed
 from SpecEmbedding.utils.model import SiameseModel, load_transformer_model, search
-from train import (
-    resolve_device,
-    setup_logging,
-    startup_logging,
-)
+from SpecEmbedding.utils.runtime import resolve_device, setup_logging, startup_logging
 
 
 def main():
