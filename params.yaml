@@ -1,6 +1,6 @@
 general:
   seed: 42
-  device: "cuda" # or "cpu"
+  device: "cuda" # or "cpu", "cuda:0", "cuda:1"
   save_dir: "./checkpoints"
 
 data:
@@ -67,6 +67,59 @@ eval:
   top_k: [1, 5, 10, 20]
   loader_batch_size: 1024
   calc_batch_size: 512
+
+rerank:
+  prepare:
+    checkpoint: null
+    dataset_type: "massspecgym"
+    split: "train"
+    data_path: null # null means data.data_path
+    save_path: null
+    candidate_type: "mass"
+    candidate_path: null
+    pre_top_k: 256
+    force_include_positive: false
+    spec_batch_size: 512
+    mol_batch_size: 512
+    candidate_chunk_size: 4096
+    mol_embedding_storage: "cpu"
+    mol_embedding_dtype: "float16"
+    mol_norm_type: null # null means model.mol_encoder.norm_type
+    mol_norm_eps: null # null means model.mol_encoder.norm_eps
+    num_workers: 4
+    limit: 0
+  train:
+    train_cache: null
+    val_cache: null
+    save_dir: "./checkpoints_rerank"
+    model_type: "transformer"
+    train_k: 128
+    batch_size: 16
+    epochs: 30
+    lr: 0.0001
+    weight_decay: 0.0001
+    patience: 5
+    hidden_dim: 512
+    rank_emb_dim: 32
+    max_rank: 512
+    n_layers: 2
+    n_heads: 8
+    dropout: 0.1
+    alpha_init: 1.0
+    lambda_pair: 0.2
+    margin: 0.1
+    grad_clip: 1.0
+    metric_for_best: "mrr"
+    num_workers: 0
+    top_k: [1, 5, 10, 20]
+  eval:
+    cache: null
+    checkpoint: null
+    save_dir: null
+    batch_size: 32
+    num_workers: 0
+    top_k: [1, 5, 10, 20]
+    compute_mces: true
 
 paths:
   pretrained_models:

@@ -120,14 +120,16 @@ score_j = alpha * base_score_j + delta_j
 
 ```yaml
 rerank:
-  pre_top_k: 256
-  train_k: 128
-  hidden_dim: 512
-  rank_emb_dim: 32
-  n_layers: 2
-  n_heads: 8
-  dropout: 0.1
-  alpha_init: 1.0
+  prepare:
+    pre_top_k: 256
+  train:
+    train_k: 128
+    hidden_dim: 512
+    rank_emb_dim: 32
+    n_layers: 2
+    n_heads: 8
+    dropout: 0.1
+    alpha_init: 1.0
 ```
 
 ## 5. 候选样本构造
@@ -227,14 +229,15 @@ margin: 0.1
 ### 7.1 推荐训练参数
 
 ```yaml
-train_rerank:
-  batch_size: 16
-  epochs: 30
-  lr: 0.0001
-  weight_decay: 0.0001
-  patience: 5
-  grad_clip: 1.0
-  metric_for_best: "val_mrr"
+rerank:
+  train:
+    batch_size: 16
+    epochs: 30
+    lr: 0.0001
+    weight_decay: 0.0001
+    patience: 5
+    grad_clip: 1.0
+    metric_for_best: "mrr"
 ```
 
 如果显存不足，优先降低 `train_k` 或 `batch_size`。
@@ -408,9 +411,18 @@ Metrics: Top-1/5/10/20, MRR, MCES@1, pre_top_k recall upper bound
 | `train_rerank.py` | 读取 train/val cache 训练 reranker |
 | `eval_rerank.py` | 读取 test cache 和 reranker checkpoint，比较 base 与 rerank 结果 |
 
+重排序相关超参数统一写在 `params.yaml` 的 `rerank.prepare`、`rerank.train`、`rerank.eval` 中。命令行只保留本次运行经常变化的路径、split、候选来源和设备等参数。设备参数支持 `cpu`、`cuda`、`cuda:0`、`cuda:1` 等写法，例如：
+
+```bash
+python train_rerank.py \
+  --train_cache rerank_cache/massspecgym_formula_train.pt \
+  --val_cache rerank_cache/massspecgym_formula_val.pt \
+  --device cuda:1
+```
+
 ### 16.1 生成训练 cache
 
-训练 cache 建议打开 `--force_include_positive`，保证每个训练样本都有正例：
+训练 cache 建议打开 `--force_include_positive`，保证每个训练样本都有正例。`pre_top_k`、batch size、候选 chunk size、embedding dtype 等从 `params.yaml` 读取：
 
 ```bash
 python prepare_rerank_cache.py \
@@ -419,7 +431,6 @@ python prepare_rerank_cache.py \
   --split train \
   --data_path /path/to/processed \
   --candidate_type formula \
-  --pre_top_k 256 \
   --force_include_positive \
   --save_path rerank_cache/massspecgym_formula_train.pt
 ```
@@ -435,7 +446,6 @@ python prepare_rerank_cache.py \
   --split val \
   --data_path /path/to/processed \
   --candidate_type formula \
-  --pre_top_k 256 \
   --save_path rerank_cache/massspecgym_formula_val.pt
 
 python prepare_rerank_cache.py \
@@ -444,24 +454,23 @@ python prepare_rerank_cache.py \
   --split test \
   --data_path /path/to/processed \
   --candidate_type formula \
-  --pre_top_k 256 \
   --save_path rerank_cache/massspecgym_formula_test.pt
 ```
 
 ### 16.3 训练 reranker
 
+训练超参数从 `params.yaml` 的 `rerank.train` 读取：
+
 ```bash
 python train_rerank.py \
   --train_cache rerank_cache/massspecgym_formula_train.pt \
   --val_cache rerank_cache/massspecgym_formula_val.pt \
-  --save_dir checkpoints_rerank/massspecgym_formula \
-  --train_k 128 \
-  --batch_size 16 \
-  --epochs 30 \
-  --lr 1e-4
+  --save_dir checkpoints_rerank/massspecgym_formula
 ```
 
 ### 16.4 评估 reranker
+
+评估的 `top_k`、batch size、worker 数和是否默认计算 MCES 从 `params.yaml` 的 `rerank.eval` 读取：
 
 ```bash
 python eval_rerank.py \

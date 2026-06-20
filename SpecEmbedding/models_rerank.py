@@ -8,13 +8,13 @@ class CandidateReranker(nn.Module):
     def __init__(
         self,
         embedding_dim: int,
-        hidden_dim: int = 512,
-        rank_emb_dim: int = 32,
-        max_rank: int = 512,
-        n_layers: int = 2,
-        n_heads: int = 8,
-        dropout: float = 0.1,
-        alpha_init: float = 1.0,
+        hidden_dim: int,
+        rank_emb_dim: int,
+        max_rank: int,
+        n_layers: int,
+        n_heads: int,
+        dropout: float,
+        alpha_init: float,
     ):
         super().__init__()
         if max_rank <= 0:

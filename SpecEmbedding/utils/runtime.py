@@ -18,8 +18,18 @@ def configure_runtime_cache():
 
 def resolve_device(device: str | torch.device | None = None) -> torch.device:
     requested_device = torch.device(device or config.general.device)
-    if requested_device.type == "cuda" and not torch.cuda.is_available():
+    if requested_device.type != "cuda":
+        return requested_device
+
+    if not torch.cuda.is_available():
+        logging.warning("CUDA device %s was requested, but CUDA is unavailable. Falling back to CPU.", requested_device)
         return torch.device("cpu")
+
+    if requested_device.index is not None and requested_device.index >= torch.cuda.device_count():
+        raise ValueError(
+            f"Requested device {requested_device}, but only {torch.cuda.device_count()} CUDA device(s) are available."
+        )
+
     return requested_device
 
 

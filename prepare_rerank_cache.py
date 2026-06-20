@@ -259,43 +259,101 @@ def prune_molecule_embeddings(queries, mol_embs, smiles_list):
     return pruned_mol_embs, pruned_smiles
 
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser(description="Prepare offline rerank cache from a frozen SpecMolAlignModel.")
-    parser.add_argument("--checkpoint", type=str, required=True, help="Path to aligned model checkpoint.")
+    parser.add_argument(
+        "--checkpoint",
+        type=str,
+        default=config.rerank.prepare.checkpoint,
+        help="Path to aligned model checkpoint. Falls back to rerank.prepare.checkpoint.",
+    )
     parser.add_argument(
         "--dataset_type",
         type=str,
         choices=["massbank", "massspecgym", "nplib1", "gnps", "mona"],
-        default="massspecgym",
+        default=config.rerank.prepare.dataset_type,
     )
-    parser.add_argument("--split", type=str, choices=["train", "val", "test"], default="train")
-    parser.add_argument("--data_path", type=str, default=config.data.data_path)
-    parser.add_argument("--save_path", type=str, required=True, help="Output .pt rerank cache path.")
-    parser.add_argument("--device", type=str, default=config.general.device)
-    parser.add_argument("--candidate_type", type=str, choices=["mass", "formula"], default="mass")
-    parser.add_argument("--candidate_path", type=str, default=None)
-    parser.add_argument("--pre_top_k", type=int, default=256)
-    parser.add_argument("--force_include_positive", action="store_true")
-    parser.add_argument("--spec_batch_size", type=int, default=config.eval.calc_batch_size)
-    parser.add_argument("--mol_batch_size", type=int, default=config.eval.calc_batch_size)
-    parser.add_argument("--candidate_chunk_size", type=int, default=4096)
-    parser.add_argument("--mol_embedding_storage", type=str, choices=["cpu", "cuda"], default="cpu")
-    parser.add_argument("--mol_embedding_dtype", type=str, choices=["float32", "float16"], default="float16")
     parser.add_argument(
-        "--mol_norm_type",
+        "--split",
         type=str,
-        choices=["layernorm", "rmsnorm"],
-        default=getattr(config.model.mol_encoder, "norm_type", "layernorm"),
+        choices=["train", "val", "test"],
+        default=config.rerank.prepare.split,
     )
-    parser.add_argument("--mol_norm_eps", type=float, default=getattr(config.model.mol_encoder, "norm_eps", 1e-5))
-    parser.add_argument("--num_workers", type=int, default=4)
-    parser.add_argument("--limit", type=int, default=0, help="Debug mode: only keep the first N matched spectra.")
+    parser.add_argument(
+        "--data_path",
+        type=str,
+        default=config.rerank.prepare.data_path or config.data.data_path,
+    )
+    parser.add_argument(
+        "--save_path",
+        type=str,
+        default=config.rerank.prepare.save_path,
+        help="Output .pt rerank cache path. Falls back to rerank.prepare.save_path.",
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default=config.general.device,
+        help='Device to use, for example "cpu", "cuda", "cuda:0", or "cuda:1".',
+    )
+    parser.add_argument(
+        "--candidate_type",
+        type=str,
+        choices=["mass", "formula"],
+        default=config.rerank.prepare.candidate_type,
+    )
+    parser.add_argument("--candidate_path", type=str, default=config.rerank.prepare.candidate_path)
+    parser.add_argument(
+        "--force_include_positive",
+        action=argparse.BooleanOptionalAction,
+        default=config.rerank.prepare.force_include_positive,
+        help="Force the positive molecule into the saved top-k list. Use only for training cache.",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=config.rerank.prepare.limit,
+        help="Debug mode: only keep the first N matched spectra.",
+    )
     args = parser.parse_args()
 
+    args.pre_top_k = int(config.rerank.prepare.pre_top_k)
+    args.spec_batch_size = int(config.rerank.prepare.spec_batch_size)
+    args.mol_batch_size = int(config.rerank.prepare.mol_batch_size)
+    args.candidate_chunk_size = int(config.rerank.prepare.candidate_chunk_size)
+    args.mol_embedding_storage = config.rerank.prepare.mol_embedding_storage
+    args.mol_embedding_dtype = config.rerank.prepare.mol_embedding_dtype
+    args.mol_norm_type = config.rerank.prepare.mol_norm_type or config.model.mol_encoder.norm_type
+    mol_norm_eps = config.rerank.prepare.mol_norm_eps
+    if mol_norm_eps is None:
+        mol_norm_eps = config.model.mol_encoder.norm_eps
+    args.mol_norm_eps = float(mol_norm_eps)
+    args.num_workers = int(config.rerank.prepare.num_workers)
+
+    if not args.checkpoint:
+        parser.error("--checkpoint is required unless rerank.prepare.checkpoint is set in params.yaml")
+    if not args.save_path:
+        parser.error("--save_path is required unless rerank.prepare.save_path is set in params.yaml")
+    if args.mol_embedding_storage not in {"cpu", "cuda"}:
+        parser.error("rerank.prepare.mol_embedding_storage must be either 'cpu' or 'cuda'")
+    if args.mol_embedding_dtype not in {"float32", "float16"}:
+        parser.error("rerank.prepare.mol_embedding_dtype must be either 'float32' or 'float16'")
+    if args.mol_norm_type not in {"layernorm", "rmsnorm"}:
+        parser.error("rerank.prepare.mol_norm_type must be either 'layernorm' or 'rmsnorm'")
+    if args.limit < 0:
+        parser.error("--limit/rerank.prepare.limit must be greater than or equal to 0")
+    return args
+
+
+def main():
+    args = parse_args()
+
     if args.pre_top_k <= 0:
-        raise ValueError("--pre_top_k must be greater than 0")
+        raise ValueError("rerank.prepare.pre_top_k must be greater than 0")
     if args.candidate_chunk_size <= 0:
-        raise ValueError("--candidate_chunk_size must be greater than 0")
+        raise ValueError("rerank.prepare.candidate_chunk_size must be greater than 0")
+    if args.num_workers < 0:
+        raise ValueError("rerank.prepare.num_workers must be greater than or equal to 0")
 
     save_path = Path(args.save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -315,7 +373,12 @@ def main():
     if not raw_data or not candidates_dict:
         raise RuntimeError("No data or candidates loaded.")
 
-    tokenizer = Tokenizer(**TokenizerConfig(max_len=config.data.tokenizer.max_len, show_progress_bar=True))
+    tokenizer = Tokenizer(
+        **TokenizerConfig(
+            max_len=config.data.tokenizer.max_len,
+            show_progress_bar=config.data.tokenizer.show_progress_bar,
+        )
+    )
     sequences = tokenizer.tokenize_sequence(raw_data)
     matched_sequences, unique_smiles, smiles_to_idx = build_unique_candidate_list(
         sequences,
