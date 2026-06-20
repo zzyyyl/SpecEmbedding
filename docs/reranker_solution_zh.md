@@ -398,3 +398,83 @@ Metrics: Top-1/5/10/20, MRR, MCES@1, pre_top_k recall upper bound
 
 如果 MassSpecGym 上 Top-1 有稳定提升，再扩展到 MassBank、GNPS、MoNA 和 NPLIB1。
 
+## 16. 当前代码入口
+
+第一版实现采用离线 cache 流程，对应 3 个入口脚本：
+
+| 脚本 | 作用 |
+|---|---|
+| `prepare_rerank_cache.py` | 用已有 `SpecMolAlignModel` checkpoint 生成 rerank cache |
+| `train_rerank.py` | 读取 train/val cache 训练 reranker |
+| `eval_rerank.py` | 读取 test cache 和 reranker checkpoint，比较 base 与 rerank 结果 |
+
+### 16.1 生成训练 cache
+
+训练 cache 建议打开 `--force_include_positive`，保证每个训练样本都有正例：
+
+```bash
+python prepare_rerank_cache.py \
+  --checkpoint checkpoints_align/run/best_model_stage2.pth \
+  --dataset_type massspecgym \
+  --split train \
+  --data_path /path/to/processed \
+  --candidate_type formula \
+  --pre_top_k 256 \
+  --force_include_positive \
+  --save_path rerank_cache/massspecgym_formula_train.pt
+```
+
+### 16.2 生成验证和测试 cache
+
+验证和测试 cache 不要打开 `--force_include_positive`，否则会高估真实效果：
+
+```bash
+python prepare_rerank_cache.py \
+  --checkpoint checkpoints_align/run/best_model_stage2.pth \
+  --dataset_type massspecgym \
+  --split val \
+  --data_path /path/to/processed \
+  --candidate_type formula \
+  --pre_top_k 256 \
+  --save_path rerank_cache/massspecgym_formula_val.pt
+
+python prepare_rerank_cache.py \
+  --checkpoint checkpoints_align/run/best_model_stage2.pth \
+  --dataset_type massspecgym \
+  --split test \
+  --data_path /path/to/processed \
+  --candidate_type formula \
+  --pre_top_k 256 \
+  --save_path rerank_cache/massspecgym_formula_test.pt
+```
+
+### 16.3 训练 reranker
+
+```bash
+python train_rerank.py \
+  --train_cache rerank_cache/massspecgym_formula_train.pt \
+  --val_cache rerank_cache/massspecgym_formula_val.pt \
+  --save_dir checkpoints_rerank/massspecgym_formula \
+  --train_k 128 \
+  --batch_size 16 \
+  --epochs 30 \
+  --lr 1e-4
+```
+
+### 16.4 评估 reranker
+
+```bash
+python eval_rerank.py \
+  --cache rerank_cache/massspecgym_formula_test.pt \
+  --checkpoint checkpoints_rerank/massspecgym_formula/best_reranker.pth \
+  --save_dir checkpoints_rerank/massspecgym_formula
+```
+
+如果只想快速验证排序指标，可以先跳过 MCES：
+
+```bash
+python eval_rerank.py \
+  --cache rerank_cache/massspecgym_formula_test.pt \
+  --checkpoint checkpoints_rerank/massspecgym_formula/best_reranker.pth \
+  --no-mces
+```
