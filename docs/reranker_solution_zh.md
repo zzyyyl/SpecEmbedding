@@ -410,6 +410,7 @@ Metrics: Top-1/5/10/20, MRR, MCES@1, pre_top_k recall upper bound
 | `prepare_rerank_cache.py` | 用已有 `SpecMolAlignModel` checkpoint 生成 rerank cache |
 | `train_rerank.py` | 读取 train/val cache 训练 reranker |
 | `eval_rerank.py` | 读取 test cache 和 reranker checkpoint，比较 base 与 rerank 结果 |
+| `run_rerank_pipeline.py` | 串联 cache 生成、reranker 训练和 reranker 评估 |
 
 重排序相关超参数统一写在 `params.yaml` 的 `rerank.prepare`、`rerank.train`、`rerank.eval` 中。命令行只保留本次运行经常变化的路径、split、候选来源和设备等参数。设备参数支持 `cpu`、`cuda`、`cuda:0`、`cuda:1` 等写法，例如：
 
@@ -417,6 +418,26 @@ Metrics: Top-1/5/10/20, MRR, MCES@1, pre_top_k recall upper bound
 python train_rerank.py \
   --train_cache rerank_cache/massspecgym_formula_train.pt \
   --val_cache rerank_cache/massspecgym_formula_val.pt \
+  --device cuda:1
+```
+
+如果已经通过 `run_pipeline.py` 训练好 alignment checkpoint，可以直接使用 rerank 流水线：
+
+```bash
+python run_rerank_pipeline.py massspecgym \
+  --align_save_dir checkpoints_align/run \
+  --candidate_type formula \
+  --device cuda:1
+```
+
+如果不想依赖 `run_pipeline.py` 的默认目录命名，也可以显式指定 checkpoint：
+
+```bash
+python run_rerank_pipeline.py massspecgym \
+  --checkpoint checkpoints_align/run/best_model_stage2.pth \
+  --candidate_type formula \
+  --cache_dir rerank_cache/massspecgym_formula \
+  --save_dir checkpoints_rerank/massspecgym_formula \
   --device cuda:1
 ```
 

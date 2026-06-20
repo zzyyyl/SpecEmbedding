@@ -273,6 +273,19 @@ def parse_args():
         default=config.rerank.prepare.limit,
         help="Debug mode: only keep the first N matched spectra.",
     )
+    parser.add_argument(
+        "--mol_norm_type",
+        type=str,
+        choices=["layernorm", "rmsnorm"],
+        default=config.rerank.prepare.mol_norm_type or config.model.mol_encoder.norm_type,
+        help="Normalization used in the molecule GINE encoder. Must match the alignment checkpoint.",
+    )
+    parser.add_argument(
+        "--mol_norm_eps",
+        type=float,
+        default=config.rerank.prepare.mol_norm_eps or config.model.mol_encoder.norm_eps,
+        help="Epsilon used by molecule encoder normalization. Must match the alignment checkpoint.",
+    )
     args = parser.parse_args()
 
     args.pre_top_k = int(config.rerank.prepare.pre_top_k)
@@ -281,11 +294,6 @@ def parse_args():
     args.candidate_chunk_size = int(config.rerank.prepare.candidate_chunk_size)
     args.mol_embedding_storage = config.rerank.prepare.mol_embedding_storage
     args.mol_embedding_dtype = config.rerank.prepare.mol_embedding_dtype
-    args.mol_norm_type = config.rerank.prepare.mol_norm_type or config.model.mol_encoder.norm_type
-    mol_norm_eps = config.rerank.prepare.mol_norm_eps
-    if mol_norm_eps is None:
-        mol_norm_eps = config.model.mol_encoder.norm_eps
-    args.mol_norm_eps = float(mol_norm_eps)
     args.num_workers = int(config.rerank.prepare.num_workers)
 
     if not args.checkpoint:
