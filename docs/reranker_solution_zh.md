@@ -430,6 +430,18 @@ python run_rerank_pipeline.py massspecgym \
   --device cuda:1
 ```
 
+候选集截断大小可以通过 `--pre_top_k` 指定，也可以使用简写别名 `--topk`。显式指定后，流水线会自动给输出目录追加 `_topkN`，便于比较不同候选规模：
+
+```bash
+python run_rerank_pipeline.py massspecgym \
+  --align_save_dir checkpoints_align/run \
+  --candidate_type formula \
+  --topk 100 \
+  --device cuda:1
+```
+
+上面的命令会写入 `rerank_cache/run_formula_topk100` 和 `checkpoints_rerank/run_formula_topk100`。如果不传 `--pre_top_k/--topk`，则使用 `params.yaml` 里的 `rerank.prepare.pre_top_k`，并保持原有目录命名。
+
 如果不想依赖 `run_pipeline.py` 的默认目录命名，也可以显式指定 checkpoint：
 
 ```bash
@@ -447,11 +459,12 @@ python run_rerank_pipeline.py massspecgym \
 python run_rerank_pipeline.py massspecgym \
   --align_save_dir checkpoints_align/run \
   --candidate_type formula \
+  --topk 256 \
   --limit 100 \
   --device cuda:1
 ```
 
-上面的命令会写入 `rerank_cache/run_formula_limit100` 和 `checkpoints_rerank/run_formula_limit100`，不会覆盖不带 `_limit100` 的正式目录。
+上面的命令会写入 `rerank_cache/run_formula_topk256_limit100` 和 `checkpoints_rerank/run_formula_topk256_limit100`，不会覆盖不带 `_limit100` 的正式目录。
 
 ### 16.1 生成训练 cache
 

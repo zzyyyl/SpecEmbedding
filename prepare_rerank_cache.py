@@ -274,6 +274,14 @@ def parse_args():
         help="Debug mode: only keep the first N matched spectra.",
     )
     parser.add_argument(
+        "--pre_top_k",
+        "--topk",
+        dest="pre_top_k",
+        type=int,
+        default=config.rerank.prepare.pre_top_k,
+        help="Number of base-retrieved candidates kept for reranking.",
+    )
+    parser.add_argument(
         "--mol_norm_type",
         type=str,
         choices=["layernorm", "rmsnorm"],
@@ -288,7 +296,7 @@ def parse_args():
     )
     args = parser.parse_args()
 
-    args.pre_top_k = int(config.rerank.prepare.pre_top_k)
+    args.pre_top_k = int(args.pre_top_k)
     args.spec_batch_size = int(config.rerank.prepare.spec_batch_size)
     args.mol_batch_size = int(config.rerank.prepare.mol_batch_size)
     args.candidate_chunk_size = int(config.rerank.prepare.candidate_chunk_size)
@@ -306,6 +314,8 @@ def parse_args():
         parser.error("rerank.prepare.mol_embedding_dtype must be either 'float32' or 'float16'")
     if args.mol_norm_type not in {"layernorm", "rmsnorm"}:
         parser.error("rerank.prepare.mol_norm_type must be either 'layernorm' or 'rmsnorm'")
+    if args.pre_top_k <= 0:
+        parser.error("--pre_top_k/--topk must be greater than 0")
     if args.limit < 0:
         parser.error("--limit/rerank.prepare.limit must be greater than or equal to 0")
     return args

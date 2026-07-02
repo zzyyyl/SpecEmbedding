@@ -38,6 +38,12 @@ def candidate_label(args):
     return args.candidate_type
 
 
+def topk_suffix(pre_top_k):
+    if pre_top_k is None:
+        return ""
+    return f"_topk{pre_top_k}"
+
+
 def limit_suffix(limit):
     if limit is None or limit <= 0:
         return ""
@@ -45,7 +51,7 @@ def limit_suffix(limit):
 
 
 def append_name_suffix(name: str, suffix: str):
-    if not suffix or name.endswith(suffix):
+    if not suffix or name.endswith(suffix) or f"{suffix}_" in name:
         return name
     return f"{name}{suffix}"
 
@@ -61,19 +67,25 @@ def default_align_save_dir(args):
     return Path("checkpoints_align") / f"{get_commit_hash()}_{args.dataset_type}{suffix}"
 
 
+def append_output_suffixes(name_or_path, suffixes):
+    result = name_or_path
+    for suffix in suffixes:
+        if isinstance(result, Path):
+            result = append_path_suffix(result, suffix)
+        else:
+            result = append_name_suffix(result, suffix)
+    return result
+
+
 def resolve_paths(args):
     align_save_dir = Path(args.align_save_dir) if args.align_save_dir else default_align_save_dir(args)
     checkpoint = Path(args.checkpoint) if args.checkpoint else align_save_dir / args.align_checkpoint_name
 
     label = candidate_label(args)
-    output_suffix = limit_suffix(args.limit)
-    run_name = append_name_suffix(args.run_name or f"{align_save_dir.name}_{label}", output_suffix)
-    cache_dir = Path(args.cache_dir) if args.cache_dir else Path("rerank_cache") / run_name
-    save_dir = Path(args.save_dir) if args.save_dir else Path("checkpoints_rerank") / run_name
-
-    if output_suffix:
-        cache_dir = append_path_suffix(cache_dir, output_suffix)
-        save_dir = append_path_suffix(save_dir, output_suffix)
+    output_suffixes = [topk_suffix(args.pre_top_k), limit_suffix(args.limit)]
+    run_name = append_output_suffixes(args.run_name or f"{align_save_dir.name}_{label}", output_suffixes)
+    cache_dir = append_output_suffixes(Path(args.cache_dir), output_suffixes) if args.cache_dir else Path("rerank_cache") / run_name
+    save_dir = append_output_suffixes(Path(args.save_dir), output_suffixes) if args.save_dir else Path("checkpoints_rerank") / run_name
 
     caches = {
         split: cache_dir / f"{args.dataset_type}_{label}_{split}.pt"
@@ -100,6 +112,7 @@ def build_prepare_command(args, checkpoint, split, save_path):
     append_optional_arg(command, "--data_path", args.data_path)
     append_optional_arg(command, "--device", args.device)
     append_optional_arg(command, "--candidate_path", args.candidate_path)
+    append_optional_arg(command, "--pre_top_k", args.pre_top_k)
     append_optional_arg(command, "--limit", args.limit)
     append_optional_arg(command, "--mol_norm_type", args.mol_norm_type)
     append_optional_arg(command, "--mol_norm_eps", args.mol_norm_eps)
@@ -170,6 +183,13 @@ def main():
     parser.add_argument("--mol_norm_eps", type=float, help="Must match the alignment checkpoint.")
     parser.add_argument("--model_type", choices=["transformer", "pointwise"], help="Reranker model variant.")
     parser.add_argument(
+        "--pre_top_k",
+        "--topk",
+        dest="pre_top_k",
+        type=int,
+        help="Number of base-retrieved candidates kept for reranking; output dirs get a _topkN suffix.",
+    )
+    parser.add_argument(
         "--limit",
         type=int,
         help="Debug mode: only keep the first N matched spectra per split; output dirs get a _limitN suffix.",
@@ -178,6 +198,8 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Print commands without executing them.")
     args = parser.parse_args()
 
+    if args.pre_top_k is not None and args.pre_top_k <= 0:
+        parser.error("--pre_top_k/--topk must be greater than 0")
     if args.limit is not None and args.limit < 0:
         parser.error("--limit must be greater than or equal to 0")
 
@@ -195,6 +217,8 @@ def main():
     print(f"Align Checkpoint   : {checkpoint}")
     print(f"Rerank Cache Dir   : {cache_dir}")
     print(f"Rerank Save Dir    : {save_dir}")
+    if args.pre_top_k is not None:
+        print(f"Pre Top K          : {args.pre_top_k}")
     if args.limit is not None and args.limit > 0:
         print(f"Debug Limit        : first {args.limit} matched spectra per split")
     print("=" * 56)
