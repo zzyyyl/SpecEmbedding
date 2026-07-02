@@ -38,6 +38,24 @@ def candidate_label(args):
     return args.candidate_type
 
 
+def limit_suffix(limit):
+    if limit is None or limit <= 0:
+        return ""
+    return f"_limit{limit}"
+
+
+def append_name_suffix(name: str, suffix: str):
+    if not suffix or name.endswith(suffix):
+        return name
+    return f"{name}{suffix}"
+
+
+def append_path_suffix(path: Path, suffix: str):
+    if not suffix or path.name.endswith(suffix):
+        return path
+    return path.with_name(f"{path.name}{suffix}")
+
+
 def default_align_save_dir(args):
     suffix = "_nopretrain" if args.no_pretrain else ""
     return Path("checkpoints_align") / f"{get_commit_hash()}_{args.dataset_type}{suffix}"
@@ -48,9 +66,14 @@ def resolve_paths(args):
     checkpoint = Path(args.checkpoint) if args.checkpoint else align_save_dir / args.align_checkpoint_name
 
     label = candidate_label(args)
-    run_name = args.run_name or f"{align_save_dir.name}_{label}"
+    output_suffix = limit_suffix(args.limit)
+    run_name = append_name_suffix(args.run_name or f"{align_save_dir.name}_{label}", output_suffix)
     cache_dir = Path(args.cache_dir) if args.cache_dir else Path("rerank_cache") / run_name
     save_dir = Path(args.save_dir) if args.save_dir else Path("checkpoints_rerank") / run_name
+
+    if output_suffix:
+        cache_dir = append_path_suffix(cache_dir, output_suffix)
+        save_dir = append_path_suffix(save_dir, output_suffix)
 
     caches = {
         split: cache_dir / f"{args.dataset_type}_{label}_{split}.pt"
@@ -146,10 +169,17 @@ def main():
     parser.add_argument("--mol_norm_type", choices=["layernorm", "rmsnorm"], help="Must match the alignment checkpoint.")
     parser.add_argument("--mol_norm_eps", type=float, help="Must match the alignment checkpoint.")
     parser.add_argument("--model_type", choices=["transformer", "pointwise"], help="Reranker model variant.")
-    parser.add_argument("--limit", type=int, help="Debug mode: only keep the first N matched spectra per split.")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        help="Debug mode: only keep the first N matched spectra per split; output dirs get a _limitN suffix.",
+    )
     parser.add_argument("--mces", action="store_true", help="Enable MCES@1 during final rerank evaluation.")
     parser.add_argument("--dry-run", action="store_true", help="Print commands without executing them.")
     args = parser.parse_args()
+
+    if args.limit is not None and args.limit < 0:
+        parser.error("--limit must be greater than or equal to 0")
 
     do_prepare = args.mode in ["prepare", "all"]
     do_train = args.mode in ["train", "all"]
@@ -165,6 +195,8 @@ def main():
     print(f"Align Checkpoint   : {checkpoint}")
     print(f"Rerank Cache Dir   : {cache_dir}")
     print(f"Rerank Save Dir    : {save_dir}")
+    if args.limit is not None and args.limit > 0:
+        print(f"Debug Limit        : first {args.limit} matched spectra per split")
     print("=" * 56)
 
     if (do_prepare or args.mode == "all") and not args.dry_run:

@@ -441,6 +441,18 @@ python run_rerank_pipeline.py massspecgym \
   --device cuda:1
 ```
 
+调试时可以使用 `--limit N` 只取每个 split 的前 N 条匹配谱图。注意这里的 `limit` 是 query 数量，不是 candidate top-k。为避免覆盖正式实验结果，流水线会自动把输出目录追加 `_limitN` 后缀，例如：
+
+```bash
+python run_rerank_pipeline.py massspecgym \
+  --align_save_dir checkpoints_align/run \
+  --candidate_type formula \
+  --limit 100 \
+  --device cuda:1
+```
+
+上面的命令会写入 `rerank_cache/run_formula_limit100` 和 `checkpoints_rerank/run_formula_limit100`，不会覆盖不带 `_limit100` 的正式目录。
+
 ### 16.1 生成训练 cache
 
 训练 cache 建议打开 `--force_include_positive`，保证每个训练样本都有正例。`pre_top_k`、batch size、候选 chunk size、embedding dtype 等从 `params.yaml` 读取：
