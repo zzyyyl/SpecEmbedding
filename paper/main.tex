@@ -1,0 +1,372 @@
+\documentclass[11pt]{article}
+
+% Replace this generic template with the target conference/journal template when needed.
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\newcommand{\method}{SpecEmbedding-Rerank}
+\newcommand{\zs}{\mathbf{z}_s}
+\newcommand{\zm}{\mathbf{z}_m}
+\newcommand{\candidates}{\mathcal{C}}
+
+\title{
+  Candidate-Constrained Molecular Reranking for MS/MS-Based Metabolite Annotation
+}
+
+\author{
+  Anonymous Authors
+}
+
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Tandem mass spectrometry (MS/MS) is a central technology for metabolomics, but
+accurately annotating unknown spectra remains challenging due to the structural
+ambiguity of molecular candidates. We study MS/MS-based molecular annotation as
+a bioinformatics data mining problem, where the goal is to retrieve and rank
+candidate molecules from large chemical spaces. We propose \method{}, a
+two-stage framework that first learns aligned spectrum and molecule embeddings
+for coarse retrieval, and then applies a lightweight listwise reranker to refine
+the top-ranked molecular candidates. The reranker combines spectrum embeddings,
+molecule embeddings, base retrieval scores, and rank-aware candidate context to
+distinguish hard candidates with similar mass or formula constraints. Experiments
+on metabolomics benchmark datasets show that the proposed reranking stage
+improves top-$K$ accuracy and mean reciprocal rank over the base retrieval model.
+We further analyze candidate recall upper bounds, candidate construction
+protocols, and the contribution of each reranking component.
+\end{abstract}
+
+\section{Introduction}
+
+Untargeted metabolomics relies on MS/MS spectra to identify small molecules in
+complex biological samples. However, many spectra cannot be confidently
+annotated because different molecules may share similar precursor masses,
+fragmentation patterns, or molecular formulas. This makes metabolite annotation a
+large-scale bioinformatics data mining problem: given an observed spectrum, the
+method must mine a large chemical search space and prioritize biologically
+plausible molecular structures.
+
+Recent deep learning methods learn neural representations for spectra or
+molecules and use embedding similarity for retrieval. While such methods are
+efficient for large-scale search, the top retrieved candidates often contain
+hard negatives that are structurally or chemically close to the true molecule.
+This motivates a second-stage ranking model that focuses on fine-grained
+discrimination among a small candidate set.
+
+In this work, we propose \method{}, a candidate-constrained molecular reranking
+framework for MS/MS-based metabolite annotation. The framework first uses a
+spectrum-molecule alignment model to retrieve top-$K$ candidates. It then
+applies a listwise reranker that re-scores these candidates using pairwise
+spectrum-molecule features, the base retrieval score, the base rank, and
+candidate-candidate context.
+
+\paragraph{Contributions.}
+Our main contributions are:
+
+\begin{itemize}
+  \item We formulate MS/MS molecular annotation as a candidate-constrained
+  bioinformatics data mining problem with explicit candidate recall upper bounds.
+  \item We introduce a spectrum-molecule representation learning framework for
+  coarse molecular retrieval from MS/MS spectra.
+  \item We design a listwise molecular reranker that refines hard top-$K$
+  candidates without generating new molecules or accessing the full molecular
+  database during reranking.
+  \item We provide ablation studies on reranker architecture, feature design,
+  loss functions, and candidate construction protocols.
+\end{itemize}
+
+\section{Related Work}
+
+\paragraph{MS/MS-Based Molecular Annotation.}
+Discuss traditional library search, fragmentation-tree-based methods, molecular
+fingerprint prediction, and recent neural approaches for metabolite annotation.
+Emphasize the challenge of structural ambiguity and hard candidates.
+
+\paragraph{Representation Learning for Spectra and Molecules.}
+Review methods that learn spectrum embeddings, molecular graph embeddings, or
+joint spectrum-molecule representations. Position the base model as a retrieval
+component that supports scalable candidate search.
+
+\paragraph{Learning to Rank in Bioinformatics Data Mining.}
+Discuss pointwise, pairwise, and listwise ranking methods. Explain why molecular
+annotation benefits from listwise reranking: candidates for the same spectrum are
+not independent, and their relative order carries useful information.
+
+\section{Problem Formulation}
+
+Let $s$ denote an MS/MS spectrum and $m$ denote a candidate molecule represented
+by its molecular graph or SMILES string. Given a candidate molecular database
+$\mathcal{D}$, the goal is to rank molecules such that the true molecule
+$m^{+}$ is placed as high as possible:
+
+\begin{equation}
+  \operatorname{rank}(m^{+} \mid s, \mathcal{D}) \rightarrow 1.
+\end{equation}
+
+In practice, molecular annotation is often performed under candidate constraints
+derived from experimental metadata, such as precursor mass or molecular formula.
+We therefore define a candidate set $\candidates_s \subseteq \mathcal{D}$ for
+each spectrum $s$. Our reranking task is to improve the order of candidates
+inside $\candidates_s$, rather than recover molecules missing from the candidate
+set. This distinction is important because the final performance is upper-bounded
+by the recall of the initial candidate generation stage.
+
+\section{Method}
+
+\subsection{Overview}
+
+\method{} follows a two-stage retrieval and reranking pipeline. First, a base
+spectrum-molecule alignment model maps spectra and molecules into a shared
+embedding space and retrieves top-$K$ candidates by similarity. Second, a
+molecular reranker refines the order of these candidates using listwise candidate
+context.
+
+\begin{figure}[t]
+  \centering
+  \fbox{
+    \parbox{0.88\linewidth}{
+      \centering
+      MS/MS spectrum $\rightarrow$ spectrum-molecule alignment model
+      $\rightarrow$ top-$K$ candidates
+      $\rightarrow$ listwise molecule reranker
+      $\rightarrow$ reranked candidate list
+    }
+  }
+  \caption{
+    Overview of \method{}. The reranker only reorders the initial top-$K$
+    candidates and does not generate new molecular structures.
+  }
+  \label{fig:overview}
+\end{figure}
+
+\subsection{Spectrum-Molecule Alignment Model}
+
+The base model encodes an MS/MS spectrum $s$ into a vector $\zs$ and a molecule
+$m$ into a vector $\zm$. The retrieval score is computed by normalized embedding
+similarity:
+
+\begin{equation}
+  b(s, m) = \zs^{\top}\zm.
+\end{equation}
+
+The top-$K$ candidates with the highest base scores are retained for reranking.
+This stage provides both the candidate molecules and their base scores and ranks.
+
+\subsection{Candidate Reranker}
+
+For each candidate molecule $m_i$ in the top-$K$ set, we construct a pairwise
+feature vector:
+
+\begin{equation}
+  \mathbf{x}_i =
+  [\zs,\ \mathbf{z}_{m_i},\ \zs \odot \mathbf{z}_{m_i},\
+  |\zs - \mathbf{z}_{m_i}|,\ b_i,\ \mathbf{e}(r_i)],
+\end{equation}
+
+where $b_i$ is the base retrieval score, $r_i$ is the base rank, and
+$\mathbf{e}(r_i)$ is a learnable rank embedding. The feature vector is projected
+by a multilayer perceptron:
+
+\begin{equation}
+  \mathbf{h}_i = \operatorname{MLP}(\mathbf{x}_i).
+\end{equation}
+
+To model interactions among candidates for the same spectrum, the sequence
+$[\mathbf{h}_1,\ldots,\mathbf{h}_K]$ is passed into a Transformer encoder:
+
+\begin{equation}
+  [\tilde{\mathbf{h}}_1,\ldots,\tilde{\mathbf{h}}_K]
+  = \operatorname{Transformer}([\mathbf{h}_1,\ldots,\mathbf{h}_K]).
+\end{equation}
+
+The reranker predicts a residual score $\Delta_i$ for each candidate and combines
+it with the base retrieval score:
+
+\begin{equation}
+  s_i = \alpha b_i + \Delta_i,
+\end{equation}
+
+where $\alpha$ is a learnable scalar. The final candidate order is obtained by
+sorting $\{s_i\}_{i=1}^{K}$ in descending order.
+
+\subsection{Training Objective}
+
+Given the index $y$ of the true molecule within the candidate set, we optimize a
+listwise cross-entropy loss:
+
+\begin{equation}
+  \mathcal{L}_{\text{CE}}
+  = -\log \frac{\exp(s_y)}{\sum_{i=1}^{K}\exp(s_i)}.
+\end{equation}
+
+We optionally add a pairwise ranking loss that encourages the positive molecule
+to score higher than negative candidates:
+
+\begin{equation}
+  \mathcal{L}_{\text{pair}}
+  = \frac{1}{K-1}\sum_{i \neq y}
+  \log \left(1 + \exp(s_i - s_y + \gamma)\right),
+\end{equation}
+
+where $\gamma$ is a margin. The final objective is:
+
+\begin{equation}
+  \mathcal{L} = \mathcal{L}_{\text{CE}} +
+  \lambda \mathcal{L}_{\text{pair}}.
+\end{equation}
+
+\section{Experiments}
+
+\subsection{Datasets}
+
+Describe the metabolomics datasets used in this work, such as MassSpecGym, GNPS,
+MoNA, MassBank, or NPLIB1. Report the number of spectra, unique molecules,
+training/validation/test splits, and candidate set statistics.
+
+\begin{table}[t]
+  \centering
+  \caption{Dataset statistics.}
+  \label{tab:dataset}
+  \begin{tabular}{lrrrr}
+    \toprule
+    Dataset & Train spectra & Val spectra & Test spectra & Unique molecules \\
+    \midrule
+    MassSpecGym & -- & -- & -- & -- \\
+    GNPS & -- & -- & -- & -- \\
+    MoNA & -- & -- & -- & -- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Candidate Construction Protocol}
+
+Clearly specify how candidate sets are constructed. Distinguish official
+benchmark candidates, mass-constrained candidates, formula-constrained
+candidates, and external database candidates. For fair evaluation, candidate
+sets used for validation and testing should not be generated from test labels
+unless the experiment is explicitly described as an oracle candidate setting.
+
+\subsection{Baselines}
+
+Compare against representative baselines:
+
+\begin{itemize}
+  \item Traditional spectral similarity or library search baselines.
+  \item Neural spectrum embedding baselines.
+  \item Spectrum-molecule retrieval without reranking.
+  \item Pointwise reranking without candidate-candidate context.
+\end{itemize}
+
+\subsection{Evaluation Metrics}
+
+We evaluate molecular annotation performance using Top-$K$ accuracy, mean
+reciprocal rank (MRR), and candidate recall upper bound. When available, we also
+report structure-aware metrics such as MCES for the top-ranked prediction.
+
+\subsection{Implementation Details}
+
+Report encoder dimensions, batch size, optimizer, learning rate, number of
+epochs, candidate top-$K$, reranker hidden dimension, Transformer layers, and
+hardware. Include random seeds and early stopping criteria for reproducibility.
+
+\subsection{Main Results}
+
+\begin{table}[t]
+  \centering
+  \caption{Main retrieval and reranking results.}
+  \label{tab:main_results}
+  \begin{tabular}{llrrrr}
+    \toprule
+    Dataset & Method & Top-1 & Top-5 & Top-10 & MRR \\
+    \midrule
+    MassSpecGym & Base retrieval & -- & -- & -- & -- \\
+    MassSpecGym & \method{} & -- & -- & -- & -- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Ablation Studies}
+
+\subsection{Effect of Reranking}
+
+Compare the base retrieval model with the full reranking pipeline to quantify
+the gain from the second-stage model.
+
+\subsection{Reranker Architecture}
+
+Compare the Transformer reranker with a pointwise reranker. Vary the number of
+Transformer layers and attention heads to analyze the value of candidate
+context.
+
+\subsection{Feature Ablation}
+
+Remove individual input features from the reranker, including base score, base
+rank embedding, element-wise product, and absolute difference. This identifies
+which signals contribute most to hard candidate discrimination.
+
+\subsection{Loss Function Ablation}
+
+Compare listwise cross-entropy alone with the combined cross-entropy and pairwise
+ranking objective.
+
+\subsection{Candidate Set Analysis}
+
+Analyze the effect of candidate type and size, including mass candidates,
+formula candidates, official benchmark candidates, and different values of
+top-$K$. Report the initial candidate recall upper bound to separate retrieval
+failure from reranking failure.
+
+\begin{table}[t]
+  \centering
+  \caption{Candidate set analysis.}
+  \label{tab:candidate_analysis}
+  \begin{tabular}{llrrrr}
+    \toprule
+    Candidate type & Top-$K$ & Upper bound & Base Top-1 & Rerank Top-1 & MRR \\
+    \midrule
+    Mass & 128 & -- & -- & -- & -- \\
+    Mass & 256 & -- & -- & -- & -- \\
+    Formula & 128 & -- & -- & -- & -- \\
+    Formula & 256 & -- & -- & -- & -- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Case Study}
+
+Provide qualitative examples where the reranker improves the rank of the true
+molecule. Discuss whether the corrected candidates share similar mass, formula,
+or substructures with the true molecule. This section helps connect the ranking
+improvement to chemically meaningful distinctions.
+
+\section{Discussion}
+
+Discuss the strengths and limitations of \method{}. In particular, emphasize
+that reranking improves the order of retrieved candidates but cannot recover the
+true molecule if it is absent from the initial candidate set. Also discuss the
+importance of non-oracle candidate construction protocols for fair evaluation in
+bioinformatics data mining.
+
+\section{Conclusion}
+
+We presented \method{}, a two-stage framework for MS/MS-based molecular
+annotation. By combining spectrum-molecule embedding retrieval with a listwise
+molecular reranker, the method improves hard candidate ranking under mass or
+formula constraints. Future work will focus on stricter non-oracle candidate
+generation, cross-dataset generalization, and integration with larger molecular
+databases.
+
+\bibliographystyle{plain}
+% Add references to paper/references.bib and uncomment the next line if needed.
+% \bibliography{references}
+
+\end{document}
