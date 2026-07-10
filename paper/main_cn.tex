@@ -1,30 +1,48 @@
 \documentclass[UTF8,11pt]{ctexart}
 
-% ADMA2026 官方 CFP 对投稿的关键要求：
-% - Research paper 必须使用英文，并包含未发表的数据挖掘或相关领域贡献。
-% - 最终投稿必须使用 Springer LNAI/LNCS 格式，主文含参考文献等不超过 15 页。
-% - 评审为双盲；投稿 PDF 不得包含作者、单位、致谢、基金和可识别元数据。
-% - 若最终稿保留 AI 生成文本，应按 CFP 要求加入匿名的 AI 使用说明。
-% 本中文稿用于组内讨论；正式 ADMA 投稿应以英文稿 paper/main.tex 为基础。
+% 本稿用于中文讨论，正式 ADMA 2026 投稿必须使用英文稿 paper/main.tex。
+% 根据 2026-07-10 核对的官方 CFP：
+% - Research paper 截止时间为 2026-07-17（AoE）。
+% - 正文必须为英文，使用 Springer LNAI/LNCS 格式，总长度不超过 15 页；
+%   参考文献、致谢和 limitation claims 均计入页数。
+% - 采用双盲评审，PDF、补充材料及其元数据均不得暴露作者身份；投稿时的作者
+%   列表为最终列表。
+% - 评审稿不得包含致谢和基金信息。
+% - 补充材料在正文截止后三天截止，单个匿名 ZIP/PDF 不超过 20 MB；也可使用
+%   匿名代码仓库。
+% - 禁止同时向其他 archival venue 投稿，评审期间不得新公开预印本。
+% - 使用 AI 生成或修改的文字必须披露；下方披露覆盖本稿所有章节。
+%
+% 投稿前必须完成：
+% 1. 在同一 canonicalization 和候选协议下复现 JESTR/GLMR，或始终明确标注
+%    reported results，不能直接声称公平超越。
+% 2. 补齐消融、效率、至少三个随机种子的误差，以及 mass candidate 的 MCES@1。
+% 3. 检查英文 PDF 不超过 15 页，并清理可识别作者身份的元数据。
+
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb}
+\usepackage{array}
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{multirow}
 \usepackage{xcolor}
 \usepackage{hyperref}
 
+\hypersetup{
+  hidelinks,
+  pdfauthor={},
+  pdfsubject={},
+  pdfkeywords={串联质谱, 分子检索, 学习排序}
+}
+
 \newcommand{\method}{SpecEmbedding-Rerank}
+\newcommand{\base}{SpecMolAlign}
 \newcommand{\zs}{\mathbf{z}_s}
 \newcommand{\zm}{\mathbf{z}_m}
 \newcommand{\candidates}{\mathcal{C}}
 
-\title{
-  面向 MS/MS 代谢物注释数据挖掘的候选约束分子重排序方法
-}
-
+\title{面向 MS/MS 分子检索的候选集合感知重排序方法}
 \author{匿名作者}
-
 \date{}
 
 \begin{document}
@@ -32,304 +50,376 @@
 \maketitle
 
 \begin{abstract}
-串联质谱（MS/MS）是代谢组学中的关键技术，但由于不同分子可能具有相近的前体质量、
-相同的分子式或相似的碎片模式，从实验谱图中准确注释未知小分子仍然具有挑战性。本文
-将 MS/MS 代谢物注释建模为一个面向生物信息学的数据挖掘问题：给定一条实验谱图和候选
-分子库，模型需要在大规模化学空间中挖掘并排序最可能的真实分子。我们提出
-\method{}，一个两阶段候选约束框架。该框架首先学习谱图和分子的共享嵌入表示，用于
-粗粒度候选检索；随后引入轻量级 listwise 分子重排序模块，在 hard candidates 内部
-优化排序。重排序模块综合利用谱图嵌入、分子嵌入、基础检索分数、排名嵌入和候选间
-上下文信息，在不生成新分子结构的情况下提升精细排序能力。当前 MassSpecGym 初步实验
-显示，在质量约束和分子式约束候选库上，重排序均能显著提升 Top-1 accuracy 和 MRR。
-本文进一步强调非 oracle 候选构造、候选召回上界和消融实验协议，使工作更贴合 ADMA
-中 ``Data mining for bioinformatics''、深度数据挖掘模型和 benchmark evaluation 等主题。
+从串联质谱中检索分子结构具有较大挑战，因为大量候选分子可能具有相同或相近的质量、
+分子式和子结构。JESTR 等联合嵌入方法使用谱图--分子相似度独立排序每个候选；GLMR
+则先生成一个分子，再根据生成分子与候选分子的相似度进行重排序。本文研究第三种技术
+路线：直接在检索候选集合上进行非生成式学习排序。我们提出 \method{}。第一阶段使用
+双向多正例对比学习对齐峰序列谱图编码器和分子图编码器；第二阶段综合谱图嵌入、候选
+嵌入、二者的交互特征、基础分数和原始排名。模型通过自注意力学习 hard candidates
+之间的关系，并采用残差 listwise 目标保留基础检索顺序。在包含 17,556 条测试查询的
+MassSpecGym 上，使用其官方质量约束和分子式约束候选库，且测试阶段不插入真实分子，
+重排序分别将 Recall@1 从 43.78\% 提升到 67.91\%，以及从 58.49\% 提升到
+74.33\%；MRR 分别从 51.96\% 提升到 71.62\%，以及从 64.65\% 提升到
+77.27\%。结果表明，在不进行自回归分子生成的情况下，候选集合结构仍能提供超出
+pairwise 嵌入相似度的有效排序信号。
 \end{abstract}
 
 \noindent\textbf{关键词：}
-生物信息学数据挖掘；串联质谱；代谢物注释；分子检索；学习排序；表示学习
+生物信息学数据挖掘；串联质谱；分子检索；学习排序；多模态表示学习
+
+\paragraph{AI 使用披露。}
+本稿所有章节均使用 OpenAI Codex 辅助文字起草和语言修改，但未使用其生成实验观测。
+作者已核验技术论述、引用、代码和实验结果，并对稿件的准确性、完整性和原创性承担
+全部责任。
 
 \section{引言}
 
-非靶向代谢组学旨在从复杂生物样本中发现和解释小分子代谢物。MS/MS 谱图能够反映分子
-的碎裂模式，因此被广泛用于小分子注释。然而，在真实场景中，大量实验谱图无法被可靠
-注释。不同分子可能具有相近质量或相同分子式，同一分子在不同仪器、碰撞能量和加合物
-条件下也可能产生不同谱图。因此，MS/MS 分子注释不仅是一个化学问题，也是一个典型的
-高级数据挖掘问题：模型需要在大规模、有噪声、且部分观测的化学空间中完成候选搜索、
-筛选和排序。
+串联质谱（MS/MS）被广泛用于代谢组学、天然产物发现和相关生物医学任务中的小分子
+鉴定。实验谱图只是分子结构在特定实验条件下的部分观测：不同分子可能产生相似碎片，
+同一分子也可能因仪器、加合物和碰撞能量不同而产生差异明显的谱图。因此，结构注释
+天然属于一个大规模数据挖掘问题，即根据查询谱图，从受化学条件约束的候选库中检索并
+排序正确分子。
 
-近年来，神经网络方法开始学习谱图嵌入、分子嵌入或谱图-分子联合嵌入空间。这类方法
-适合大规模检索，但 top-ranked 结果中仍常包含大量 hard negative molecules。这些负
-候选与真实分子在质量、分子式或局部结构上非常接近，基础嵌入相似度难以直接完成精细
-区分。从 ADMA 的数据挖掘视角看，该任务天然属于结构化科学数据上的 learning-to-rank
-问题，且需要将候选召回质量和候选排序质量分开评估。
+MassSpecGym 提供了结构不重叠的数据划分，以及标准化的质量约束和分子式约束检索
+候选库 \cite{bushuiev2024massspecgym}。现有方法主要尝试缩小谱图和分子之间的模态差距。
+JESTR 使用 contrastive multiview coding 学习谱图--分子联合空间，并直接按余弦相似度
+排序候选 \cite{kalia2025jestr,tian2020cmc}。GLMR 则先检索上下文候选，再利用条件
+语言模型生成 refined molecule，最后根据分子--分子相似度重排候选
+\cite{zhang2026glmr}。
 
-本文提出 \method{}，一个面向 MS/MS 代谢物注释的候选约束分子重排序框架。该框架
-首先使用谱图-分子对齐模型，从质量约束或分子式约束候选库中检索 top-$K$ 候选分子；
-随后使用 listwise reranker，结合谱图-分子 pairwise 特征、基础检索分数、原始排名和
-候选间上下文，对候选进行二次打分。与生成式检索方法不同，我们的方法不生成新分子，
-而是直接优化已有候选集合内的排序，因此推理成本更低、流程更透明，也更容易作为第二
-阶段排序模块接入现有系统。
+这两类方法仍留下一个重要的数据挖掘问题。pairwise 余弦排序忽略了候选之间的关系；
+生成式检索则引入自回归解码器，最终排序依赖生成结构的质量和有效性。本文研究：当一个
+较强的基础检索器已经召回真实分子、但未能区分结构相似的 hard negatives 时，能否直接
+在嵌入空间中通过 listwise 排序改进结果。
 
-\paragraph{本文贡献。}
-本文面向 ADMA2026 的 ``Data mining for bioinformatics'' 主题，主要贡献包括：
+为此，我们提出 \method{} 两阶段框架。第一阶段对齐 Transformer 谱图编码器和 GINE
+分子图编码器；第二阶段只处理基础检索的 top-$K$ 列表。该阶段显式构造谱图--候选交互
+特征，将基础分数和排名作为检索先验，利用候选间自注意力交换信息，并预测对基础分数
+的残差修正。
+
+本文贡献如下：
 
 \begin{itemize}
-  \item 将 MS/MS 代谢物注释明确建模为候选约束的生物信息学数据挖掘任务，并区分候选
-  召回失败和候选排序失败。
-  \item 提出谱图-分子检索与重排序两阶段框架，将表示学习和 listwise learning-to-rank
-  结合，用于 hard molecular candidates 的精细排序。
-  \item 设计非生成式分子重排序模型，利用谱图-候选匹配特征和候选间上下文，在避免
-  自回归分子生成成本的同时提升排序质量。
-  \item 设计面向 ADMA 的实验协议，包括官方候选库、非 oracle 候选构造、Top-$K$/MRR/MCES
-  指标、推理成本比较和系统消融实验。
+  \item 提出面向 MS/MS 分子检索的直接、非生成式 listwise 重排序方案。不同于
+  JESTR 的独立余弦打分和 GLMR 的生成式间接相似度，我们显式学习检索候选集合内部的
+  相对结构。
+  \item 设计候选集合感知的残差排序器，联合使用多模态嵌入、对称交互特征、基础分数
+  和排名嵌入，并通过 listwise 与 hard-negative pairwise 目标训练；基础模型嵌入可被
+  缓存复用。
+  \item 在 MassSpecGym 官方候选协议下，质量约束和分子式约束的 Recall@1 相对同一
+  基础检索器分别获得 24.13 和 15.84 个百分点的绝对提升。实验明确报告 top-$K$
+  召回上界，并区分训练阶段的监督候选补全和无泄漏的验证、测试协议。
 \end{itemize}
 
 \section{相关工作}
 
-\paragraph{基于 MS/MS 的分子注释。}
-传统分子注释方法通常依赖谱图库搜索、碎裂规则、分子指纹预测或分子式筛选。这些方法
-在参考谱图覆盖充分时有效，但容易受谱图库覆盖率限制，并且难以区分结构相近候选。近年
-的 MassSpecGym 等 benchmark 推动了谱图到分子检索任务的系统评测。
+\subsection{谱图到分子的检索}
 
-\paragraph{谱图与分子的表示学习。}
-深度学习方法通常使用峰序列模型、Transformer 或 binning 表示编码谱图，并使用分子图、
-SMILES 或化学指纹编码分子。通过对比学习，模型可以将两个模态映射到共享空间以支持
-高效检索。然而，谱图反映的是碎裂行为，分子结构反映的是化学拓扑，两者之间存在明显
-模态差异，因此 top-ranked 结果中仍会出现排序错误。
+早期结构注释系统通常比较实验谱图和参考谱图、预测分子指纹，或为每个候选模拟谱图。
+这些方法分别受到谱图库覆盖率、中间表示重建误差和谱图模拟质量的限制。MIST 使用
+formula-aware Transformer 预测结构相关指纹 \cite{goldman2023mist}；CMSSP 通过对比
+预训练对齐谱图和分子表示 \cite{chen2024cmssp}。这些方法说明直接跨模态检索具有潜力，
+但没有显式优化下游候选列表。
 
-\paragraph{科学数据挖掘中的学习排序。}
-学习排序广泛应用于搜索和推荐任务。在 MS/MS 注释中，同一谱图下的候选分子并非独立：
-它们共享质量约束、分子式约束或结构片段。因此，与 pointwise 打分相比，listwise 方法
-能够利用候选集合内部的相对关系，更适合 hard candidate reranking。
+本文的谱图编码器源自 SpecEmbedding。该方法利用同一分子的重复谱图和结构相似度进行
+监督对比学习 \cite{xiong2025specembedding}。在本工作中，我们将它与分子图编码器配对，
+并针对跨模态检索而非谱图--谱图检索进行优化。当前结果使用从零训练的对齐模型，没有
+加载额外的 SpecEmbedding 预训练权重，因此重排序增益不依赖外部谱图预训练检查点。
 
-\paragraph{生成式检索与非生成式重排序。}
-近期生成式检索方法尝试先生成 refined molecule，再用生成分子和候选分子的分子相似度
-完成重排序。这类方法能够缓解谱图-分子模态差距，但推理成本较高，并依赖生成分子的
-有效性和质量。本文研究互补问题：当初始候选集合已经包含较强 hard candidates 时，
-一个简单的非生成式 reranker 能达到怎样的排序效果。
+\subsection{JESTR：联合空间余弦排序}
+
+JESTR 使用 GCN 表示分子，并使用 MLP 编码 1 Da 分箱后的谱图。它通过 InfoNCE
+目标对齐匹配的谱图--分子对；在最后 3\% 的训练轮次中，JESTR 还将与真实分子具有
+相同分子式的 PubChem 候选推离查询谱图。尽管引入候选正则，其最终分数仍然是查询谱图
+与每个候选分子之间的余弦相似度 \cite{kalia2025jestr}。该方案简单且无需生成，但候选
+在推理时相互独立，也没有学习下游排序函数。JESTR 论文还指出，同分子式候选正则在
+结构不重叠的 MassSpecGym 划分上提升很小或不稳定。这说明使用候选监督并不自动等价于
+有效利用候选集合。
+
+\subsection{GLMR：生成式中介重排序}
+
+GLMR 首先使用 dual-path InfoNCE 对齐 Transformer 谱图编码器和冻结的 ChemFormer
+分子编码器。预检索 top-$K$ 分子作为上下文，由 cross-attention fusion 模块和
+ChemFormer decoder 自回归生成 SMILES。生成分子被再次编码，并通过其与各候选分子的
+余弦相似度得到最终排序 \cite{zhang2026glmr}。该方法将跨模态匹配转化为同模态分子
+相似度，在 MassSpecGym 上表现很强，但其收益与生成质量、解码成本和分子有效性耦合。
+
+\subsection{本文方法的定位}
+
+表~\ref{tab:method_comparison_cn} 对比三种方法最终的排序机制。本文并不将创新点表述为
+再次提出联合嵌入，而是强调在已有谱图、分子嵌入之上学习候选集合感知的下游排序器。
+
+\begin{table}[t]
+  \centering
+  \caption{本文方法与两个最相关工作的机制对比。}
+  \label{tab:method_comparison_cn}
+  \small
+  \begin{tabular}{p{1.4cm}p{3.1cm}p{2.8cm}p{1.8cm}p{3.0cm}}
+    \toprule
+    方法 & 最终排序信号 & 候选间交互 & 生成分子 & 训练信号 \\
+    \midrule
+    JESTR & 谱图--候选余弦相似度 & 推理时无 & 否
+      & InfoNCE 加候选正则 \\
+    GLMR & 生成分子--候选余弦相似度 & 生成器内部 cross-attention & 是
+      & 自回归生成损失 \\
+    本文 & pair/list 特征预测的残差分数
+      & 候选列表 self-attention & 否
+      & listwise CE 加 pairwise margin \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 \section{问题定义}
 
-记 $s$ 为一条 MS/MS 谱图，$m$ 为候选分子。给定候选分子库 $\mathcal{D}$，分子注释
-目标是使真实分子 $m^+$ 在候选中排名尽可能靠前：
+记 $s$ 为一条 MS/MS 谱图，$m^+$ 为真实分子，$\mathcal{D}_s$ 为查询对应的质量约束
+或分子式约束候选库。基础检索器为每个 $m\in\mathcal{D}_s$ 计算
 
 \begin{equation}
-  \operatorname{rank}(m^{+} \mid s, \mathcal{D}) \rightarrow 1.
+  b(s,m)=\operatorname{sim}(f_s(s),f_m(m)),
 \end{equation}
 
-在实际代谢物注释中，候选库通常会根据实验元数据进行过滤，例如前体质量、加合物类型
-或分子式。因此，对每条谱图 $s$，我们定义候选集合
-$\candidates_s \subseteq \mathcal{D}$。本文中的重排序任务是在 $\candidates_s$
-内部优化候选顺序。如果 $m^+ \notin \candidates_s$，任何 reranker 都无法恢复正确
-分子。因此，实验中必须报告候选召回上界，以区分候选生成失败和排序模型失败。
+并返回 top-$K$ 列表 $\candidates_s=(m_1,\ldots,m_K)$。重排序器学习
+$g(s,m_i,\candidates_s)$，使 $m^+$ 的排名尽可能靠前。由于重排序器无法返回
+$\candidates_s$ 之外的分子，端到端 Recall@$k$ 的上界为
+
+\begin{equation}
+  U_K=\frac{1}{N}\sum_{n=1}^{N}
+  \mathbb{I}[m_n^+\in\candidates_{s_n}].
+\end{equation}
+
+因此，我们同时报告 $U_K$ 和面向全部查询的排序指标。如果正例不在 top-$K$ 中，该
+查询在排序指标中记为零，而不是只在成功召回的子集上计算条件准确率。
 
 \section{方法}
 
 \subsection{总体框架}
 
-\method{} 采用两阶段流程。第一阶段使用谱图-分子对齐模型完成粗粒度候选检索；第二
-阶段在检索得到的 top-$K$ 候选内执行候选感知的 listwise reranking。
+框架包含跨模态对齐、top-$K$ 检索和候选集合感知重排序三个步骤。训练 reranker 时冻结
+谱图和分子编码器，因此两个模态的嵌入可以离线计算并重复使用。
 
 \begin{figure}[t]
   \centering
   \fbox{
     \parbox{0.88\linewidth}{
       \centering
-      MS/MS 谱图 $\rightarrow$ 谱图-分子对齐模型
-      $\rightarrow$ top-$K$ 候选分子
-      $\rightarrow$ listwise 分子重排序器
-      $\rightarrow$ 重排序结果
+      MS/MS 谱图 $\rightarrow$ 对齐谱图嵌入
+      $\rightarrow$ top-$K$ 分子候选
+      $\rightarrow$ 候选集合 self-attention
+      $\rightarrow$ 残差重排序
     }
   }
-  \caption{
-    \method{} 的整体流程。重排序器仅对初始候选重新排序，不生成新的分子结构。
-  }
+  \caption{\method{} 总体流程。第二阶段只重排已检索分子，测试时既不生成分子，
+  也不插入真实分子。}
   \label{fig:overview_cn}
 \end{figure}
 
-\subsection{谱图-分子对齐模型}
+\subsection{跨模态基础检索器}
 
-基础模型将谱图 $s$ 映射为向量 $\zs$，将分子 $m$ 映射为向量 $\zm$。基础检索分数由
-归一化嵌入相似度计算：
-
-\begin{equation}
-  b(s, m) = \zs^{\top}\zm.
-\end{equation}
-
-对于每条谱图，基础模型保留分数最高的 top-$K$ 个候选分子，并记录每个候选的基础
-分数和原始排名。
-
-\subsection{分子重排序模型}
-
-对于第 $i$ 个候选分子 $m_i$，我们构造 pairwise 特征：
+谱图编码器结合正弦 $m/z$ 特征和 Transformer，处理峰的 $m/z$ 与强度序列。分子编码器
+是基于原子和化学键特征的 GINE，并将 mean-pooled 图特征与显式图规模特征拼接。两个
+投影头将编码结果映射到统一的 $d$ 维空间：
 
 \begin{equation}
-  \mathbf{x}_i =
-  [\zs,\ \mathbf{z}_{m_i},\ \zs \odot \mathbf{z}_{m_i},\
-  |\zs - \mathbf{z}_{m_i}|,\ b_i,\ \mathbf{e}(r_i)],
+  \zs=\frac{p_s(f_s(s))}{\lVert p_s(f_s(s))\rVert_2},
+  \qquad
+  \zm=\frac{p_m(f_m(m))}{\lVert p_m(f_m(m))\rVert_2}.
 \end{equation}
 
-其中 $b_i$ 为基础检索分数，$r_i$ 为基础排名，$\mathbf{e}(r_i)$ 为可学习 rank embedding。
-该特征同时包含谱图信息、分子信息、匹配关系和基础检索先验。随后，特征经过 MLP 投影：
+基础模型使用双向多正例对比损失。具有相同分子标签的谱图和分子均作为正例，从而避免
+把同一分子的重复谱图误当成负例。使用可学习温度尺度 $a$，基础 logits 为
 
 \begin{equation}
-  \mathbf{h}_i = \operatorname{MLP}(\mathbf{x}_i).
+  \ell_{ij}=a\,\mathbf{z}_{s_i}^{\top}\mathbf{z}_{m_j}.
 \end{equation}
 
-为了建模候选间上下文，我们将 $[\mathbf{h}_1, \ldots, \mathbf{h}_K]$ 输入 Transformer
-Encoder：
+损失对 spectrum-to-molecule 和 molecule-to-spectrum 两个方向的多正例 log-softmax
+取平均。推理时，归一化点积 $b_i=\zs^\top\mathbf{z}_{m_i}$ 作为基础分数。
+
+\subsection{候选构造与训练协议}
+
+基础检索器对每条查询对应的 MassSpecGym 官方候选库打分，并保留 top-$K$，当前实验
+取 $K=40$。监督训练要求候选列表中存在正例。如果真实训练分子的基础排名低于 40，则
+用它替换最后一个候选，同时保留它在完整候选池中的原始基础排名。训练 reranker 时随机
+打乱候选张量顺序，但将基础排名作为显式特征，从而避免模型直接利用张量位置作为捷径。
+
+正例插入只用于训练集。验证和测试 cache 均关闭插入；如果正例未被基础 top-40 召回，
+则保持缺失，并降低召回上界和所有端到端指标。候选文件直接来自 MassSpecGym 官方
+发布版本，没有使用测试谱图、结构或标签训练任一阶段。
+
+\subsection{候选集合感知重排序器}
+
+对基础排名为 $r_i$ 的候选 $m_i$，构造
+
+\begin{equation}
+  \mathbf{x}_i=
+  [\zs,\ \mathbf{z}_{m_i},\ \zs\odot\mathbf{z}_{m_i},\
+  |\zs-\mathbf{z}_{m_i}|,\ b_i,\ \mathbf{e}(r_i)],
+  \label{eq:features_cn}
+\end{equation}
+
+其中 $\mathbf{e}(r_i)$ 是可学习排名嵌入。直接嵌入保留模态信息，元素乘积和绝对差则
+显式提供对称匹配信号。MLP 将特征投影为
+
+\begin{equation}
+  \mathbf{h}_i=\operatorname{MLP}(\mathbf{x}_i).
+\end{equation}
+
+Transformer encoder 在候选之间交换信息 \cite{vaswani2017attention}：
 
 \begin{equation}
   [\tilde{\mathbf{h}}_1,\ldots,\tilde{\mathbf{h}}_K]
-  = \operatorname{Transformer}([\mathbf{h}_1,\ldots,\mathbf{h}_K]).
+  =\operatorname{Transformer}
+  ([\mathbf{h}_1,\ldots,\mathbf{h}_K]).
 \end{equation}
 
-模型预测每个候选的残差分数 $\Delta_i$，并与基础检索分数融合：
+padding mask 支持不同长度的候选列表。score head 预测修正值 $\Delta_i$，最终采用
+残差分数
 
 \begin{equation}
-  s_i = \alpha b_i + \Delta_i,
+  q_i=\alpha b_i+\Delta_i,
+  \label{eq:residual_cn}
 \end{equation}
 
-其中 $\alpha$ 为可学习标量。最终按 $s_i$ 降序得到重排序结果。
+其中 $\alpha$ 可学习。残差路径使模型能够保留有效的基础排序，而不必从头学习检索。
 
 \subsection{训练目标}
 
-设真实分子在候选集合中的索引为 $y$。我们使用 listwise cross-entropy 优化真实分子的
-排序位置：
+设训练列表中的正例索引为 $y$，主目标为 listwise cross-entropy：
 
 \begin{equation}
-  \mathcal{L}_{\text{CE}}
-  = -\log \frac{\exp(s_y)}{\sum_{i=1}^{K}\exp(s_i)}.
+  \mathcal{L}_{\mathrm{list}}
+  =-\log\frac{\exp(q_y)}{\sum_{i=1}^{K}\exp(q_i)}.
 \end{equation}
 
-此外，我们使用 pairwise ranking loss 鼓励真实分子分数高于负候选：
+同时使用所有 hard candidates 构造 pairwise 损失：
 
 \begin{equation}
-  \mathcal{L}_{\text{pair}}
-  = \frac{1}{K-1}\sum_{i \neq y}
-  \log \left(1 + \exp(s_i - s_y + \gamma)\right),
+  \mathcal{L}_{\mathrm{pair}}
+  =\frac{1}{K-1}\sum_{i\ne y}
+  \log\left(1+\exp(q_i-q_y+\gamma)\right).
 \end{equation}
 
-其中 $\gamma$ 为 margin。最终损失为：
+总损失为
 
 \begin{equation}
-  \mathcal{L} = \mathcal{L}_{\text{CE}} +
-  \lambda \mathcal{L}_{\text{pair}}.
+  \mathcal{L}
+  =\mathcal{L}_{\mathrm{list}}
+  +\lambda\mathcal{L}_{\mathrm{pair}}.
 \end{equation}
 
-\section{实验设计}
+当隐藏维度为 $h$ 时，reranker 的单查询复杂度为 $O(Kd+K^2h)$，且不需要逐 token
+生成分子。但在完成与 GLMR 的实测 latency 对比之前，本文不据此声称实际推理一定更快。
 
-\subsection{数据集}
+\section{实验}
 
-我们计划在 MassSpecGym、GNPS、MoNA、MassBank 和 NPLIB1 等代谢组学数据集上评估。
-每个数据集需要报告谱图数量、唯一分子数量、训练/验证/测试划分、候选库规模和候选召回
-上界。
+\subsection{数据集与候选库}
+
+我们使用 MassSpecGym 官方划分 \cite{bushuiev2024massspecgym}，包含 194,119 条训练
+谱图、19,429 条验证谱图和 17,556 条测试谱图，共覆盖 32,010 个唯一分子。其划分按
+结构相似性分组，使测试分子与训练分子具有明显结构差异。
+
+实验评估两个官方检索场景。质量约束候选库使用前体质量和容差窗口；分子式约束候选库
+假设已知分子式，因此应解释为 formula-conditioned retrieval，而不是完全开放的未知
+结构注释。经过基础 top-40 截断后，测试列表在质量场景下平均包含 40.00 个候选，在
+分子式场景下平均包含 35.73 个候选。
+
+\subsection{实现细节}
+
+对齐模型输出 512 维嵌入。当前实验没有加载单独预训练的 SpecEmbedding 检查点，而是
+直接在 MassSpecGym 训练集上使用双向对比学习训练谱图和分子编码器。
+
+reranker 隐藏维度为 512，rank embedding 为 32 维，使用两层 Transformer、八个
+attention heads 和 0.1 dropout。优化器为 AdamW，学习率 $10^{-4}$，batch size 16，
+最多训练 30 个 epoch，并根据验证集 MRR 进行 patience 为 5 的 early stopping。
+$\lambda=0.2$，$\gamma=0.1$。所有 reranker 均不访问测试集进行模型选择，并在单张
+NVIDIA RTX 4090 上评估。
+
+训练集中，插入正例之前的基础 top-40 召回上界在质量和分子式场景下分别为 92.59\%
+和 89.40\%；按前述训练协议补全后，训练列表的 labeled coverage 为 100\%。测试阶段
+关闭插入，对应的真实上界分别为 82.15\% 和 87.30\%。
+
+\subsection{对比方法与指标}
+
+受控基线是与 reranker 使用同一对齐检查点的基础检索器。表中还列出 GLMR 论文表 1
+报告的 JESTR 和 GLMR 结果 \cite{zhang2026glmr}。这些外部数字只能提供背景，不是严格
+受控的消融：我们尚未在当前代码库中复现 JESTR 和 GLMR，分子 canonicalization 或
+候选处理的细微差异可能影响结果。
+
+评价指标为全部测试查询上的 Recall@1、Recall@5、Recall@20 和 MRR。MCES@1 表示
+top-1 预测与真实分子的结构距离，因此越低越好。目前已完成分子式场景的 MCES@1，
+质量场景仍需计算。
+
+\subsection{主要结果}
 
 \begin{table}[t]
   \centering
-  \caption{最终 ADMA 投稿中需要报告的数据集统计信息。}
-  \label{tab:dataset_cn}
-  \begin{tabular}{lrrrrr}
-    \toprule
-    数据集 & 训练集 & 验证集 & 测试集 & 唯一分子数 & 候选来源 \\
-    \midrule
-    MassSpecGym & -- & -- & -- & -- & 官方 mass/formula \\
-    GNPS & -- & -- & -- & -- & 外部或处理后候选 \\
-    MoNA & -- & -- & -- & -- & 外部或处理后候选 \\
-    MassBank & -- & -- & -- & -- & 外部或处理后候选 \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-\subsection{候选集构造协议}
-
-为了保证公平的数据挖掘评估，主实验应使用不依赖测试标签的候选集，例如 MassSpecGym
-官方 retrieval library，或由实验质量信息生成的候选。任何将测试集真实 SMILES 插入候选池
-的 oracle setting 都应与主实验分开报告。每次实验应记录候选来源、$K$ 值、候选池规模和
-labeled-query fraction。
-
-\subsection{对比方法}
-
-计划比较以下方法：
-
-\begin{itemize}
-  \item 传统谱图相似度或谱图库检索方法。
-  \item MIST、CMSSP、JESTR 等神经谱图-分子检索模型。
-  \item GLMR 等生成式检索方法，可使用论文报告结果或复现实验。
-  \item 不使用重排序的基础谱图-分子检索模型。
-  \item 不建模候选间上下文的 pointwise reranker。
-\end{itemize}
-
-\subsection{评价指标}
-
-主要指标包括 Recall@1/5/10/20 或 Top-$K$ accuracy、MRR 和候选召回上界。我们还计划
-报告 MCES@1，用于衡量 top-1 预测与真实分子的结构相似度。为了突出实际数据挖掘系统
-的成本收益，还应报告基础模型、reranker 和生成式 baseline 的推理时间与显存开销。
-
-\subsection{MassSpecGym 初步结果}
-
-表~\ref{tab:prelim_results_cn} 汇总了当前基于 MassSpecGym 官方候选文件、$K=40$ 的初步
-重排序结果。该结果将在最终投稿前基于严格候选协议重新运行确认。
-
-\begin{table}[t]
-  \centering
-  \caption{MassSpecGym 初步重排序结果。MRR 和准确率均以百分比表示。}
-  \label{tab:prelim_results_cn}
+  \caption{MassSpecGym 分子检索结果（\%）。JESTR 和 GLMR 数字来自
+  Zhang 等人 \cite{zhang2026glmr}；本文两行来自本地流水线和官方候选文件。
+  MCES@1 为距离，越低越好。在统一复现之前，跨论文对比均为初步结果。}
+  \label{tab:main_results_cn}
+  \small
   \begin{tabular}{llrrrrr}
     \toprule
-    候选库 & 方法 & 召回上界 & Top-1 & Top-5 & Top-20 & MRR \\
+    候选库 & 方法 & R@1 & R@5 & R@20 & MRR & MCES@1 \\
     \midrule
-    质量约束 & 基础检索 & 82.15 & 43.78 & 61.10 & 75.55 & 51.96 \\
-    质量约束 & \method{} & 82.15 & 67.91 & 76.00 & 80.45 & 71.62 \\
-    分子式约束 & 基础检索 & 87.30 & 58.49 & 71.49 & 81.81 & 64.65 \\
-    分子式约束 & \method{} & 87.30 & 74.33 & 80.64 & 85.07 & 77.27 \\
+    \multirow{4}{*}{质量}
+      & JESTR（reported） & 17.62 & 40.36 & 64.76 & 29.12 & 15.82 \\
+      & GLMR（reported） & 64.17 & 72.96 & 78.78 & 67.82 & 11.14 \\
+      & \base{} & 43.78 & 61.10 & 75.55 & 51.96 & -- \\
+      & \method{} & 67.91 & 76.00 & 80.45 & 71.62 & -- \\
+    \midrule
+    \multirow{4}{*}{分子式}
+      & JESTR（reported） & 11.77 & 33.26 & 61.01 & 22.83 & 11.73 \\
+      & GLMR（reported） & 68.48 & 78.09 & 84.22 & 72.47 & 5.05 \\
+      & \base{} & 58.49 & 71.49 & 81.81 & 64.65 & 6.14 \\
+      & \method{} & 74.33 & 80.64 & 85.07 & 77.27 & 3.13 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\section{消融实验}
+受控对比表明，listwise reranking 在质量约束 Recall@1 上带来 24.13 个百分点提升，在
+分子式约束 Recall@1 上带来 15.84 个百分点提升；MRR 分别提升 19.66 和 12.62 个
+百分点。Recall@20 的提升较小，因为此时主要瓶颈已经变为基础 top-40 召回上界。
 
-\subsection{重排序模块贡献}
+相对 GLMR 论文报告的结果，当前 Recall@1 在质量和分子式场景下分别高 3.74 和 5.85
+个百分点；分子式 MCES@1 也从其报告的 5.05 降至 3.13。这些结果值得继续验证，但不能
+单独证明 listwise reranking 优于生成式方法，因为我们的基础检索器与 GLMR 的
+pre-retriever 已经有显著差异。要得出因果结论，必须统一复现基线，或在完全相同的冻结
+嵌入和候选列表上比较不同重排序器。
 
-比较基础检索模型与 \method{}，衡量第二阶段 learning-to-rank 模块带来的增益。
+\subsection{投稿前必须完成的消融与稳健性实验}
 
-\subsection{重排序结构消融}
+最终实验应隔离四组因素：（1）基础检索、pointwise MLP 和完整候选集合 Transformer；
+（2）分别移除基础分数、rank embedding、元素乘积和绝对差特征；（3）只使用 listwise
+loss 与联合损失；（4）$K=20,40,100,256$。还应关闭一次候选顺序打乱，以检验模型是否
+利用了不合理的位置捷径。
 
-比较 Transformer reranker 和 pointwise reranker，并改变 Transformer 层数、注意力头数、
-隐藏维度和 rank embedding 维度。
+为符合 ADMA 对 benchmarking and evaluations 的关注，主要配置至少使用三个随机种子
+并报告误差。同时应报告参数量、峰值显存、cache 构造时间、reranker latency 和端到端
+latency。效率分析必须区分一次性的分子嵌入/cache 成本与每条查询的在线成本。
 
-\subsection{输入特征消融}
+\section{局限性与负责任评估}
 
-分别移除基础分数、基础排名 embedding、元素乘积特征和绝对差特征，分析不同信号对 hard
-candidate 区分能力的贡献。
+\method{} 无法恢复不在基础 top-$K$ 列表中的分子，因此其效果依赖第一阶段召回率。
+分子式约束场景假设已知分子式，而真实工作流中可能需要先预测分子式。当前 JESTR 和
+GLMR 数字来自原论文而非独立复现，本文结果也只有一个随机种子，因此现阶段不能据此
+作出确定的 SOTA 声明。
 
-\subsection{损失函数消融}
-
-比较仅使用 listwise cross-entropy 与同时使用 cross-entropy 和 pairwise ranking loss
-的效果。
-
-\subsection{候选集分析}
-
-分析质量候选、分子式候选、官方候选集、外部数据库候选以及不同 $K$ 值对结果的影响。
-该实验必须同时报告候选召回上界，以免把候选召回不足误判为 reranker 失败。
-
-\section{讨论}
-
-\method{} 面向候选约束的生物信息学数据挖掘场景。它的主要优势是无需分子生成即可提升
-hard candidate 排序质量，因此推理成本较低，容易接入现有检索流水线。它的主要限制是：
-如果初始检索没有召回真实分子，reranker 无法恢复正确答案。因此，最终 ADMA 投稿需要
-重点报告非 oracle 候选协议、候选召回上界、MCES@1 和推理成本，避免夸大 reranker 的适用
-范围。
+训练阶段的正例插入是一种监督采样策略，不能用于验证和测试。我们报告插入前的训练
+召回，并在验证、测试中完全关闭插入；所有测试查询均参与评价，包括真实分子未进入
+top-40 的查询。最后，作为闭集候选重排序器，本方法不能提出候选数据库以外的新结构。
+相对于 de novo generation，这是明确限制，但同时避免了无效生成结构带来的失败。
 
 \section{结论}
 
-本文提出 \method{}，一个面向 MS/MS 代谢物注释的两阶段候选检索与重排序框架。该方法
-结合谱图-分子表示学习和 listwise 分子重排序，解决生物信息学中具有实际意义的数据挖掘
-问题：在质量或分子式约束下对 hard molecular candidates 进行高质量排序。后续工作将
-进一步完善严格非 oracle 候选构造、跨数据集泛化和大规模候选库部署。
+本文提出 \method{}，一个面向 MS/MS 分子检索的非生成式候选集合感知重排序器。该
+方法在对比对齐的基础检索器之上，引入显式 pair features、候选 self-attention、残差
+打分和 listwise 监督。MassSpecGym 上的受控实验表明，该方法在质量约束和分子式约束
+候选库上均显著优于同一基础检索器。与 JESTR、GLMR 的比较也明确了本文真正的技术定位：
+不是再次提出联合嵌入或分子生成，而是直接在 hard molecular candidates 上学习排序。
+在正式投稿前，仍需完成统一基线复现、多随机种子消融和实测效率比较。
 
 \bibliographystyle{plain}
-% 后续可在 paper/references.bib 中维护参考文献，并取消下一行注释。
-% \bibliography{references}
+\bibliography{references}
 
 \end{document}
