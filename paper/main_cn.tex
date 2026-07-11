@@ -16,7 +16,7 @@
 % 投稿前必须完成：
 % 1. 在同一 canonicalization 和候选协议下复现 JESTR/GLMR，或始终明确标注
 %    reported results，不能直接声称公平超越。
-% 2. 补齐消融、效率以及至少三个随机种子的误差。
+% 2. 补齐剩余 feature/loss/top-K 消融和效率结果。
 % 3. 检查英文 PDF 不超过 15 页，并清理可识别作者身份的元数据。
 
 \usepackage[margin=1in]{geometry}
@@ -41,7 +41,7 @@
 \newcommand{\zm}{\mathbf{z}_m}
 \newcommand{\candidates}{\mathcal{C}}
 
-\title{面向 MS/MS 分子检索的候选集合感知重排序方法}
+\title{面向 MS/MS 分子检索的非生成式学习排序方法}
 \author{匿名作者}
 \date{}
 
@@ -51,17 +51,16 @@
 
 \begin{abstract}
 从串联质谱中检索分子结构具有较大挑战，因为大量候选分子可能具有相同或相近的质量、
-分子式和子结构。JESTR 等联合嵌入方法使用谱图--分子相似度独立排序每个候选；GLMR
-则先生成一个分子，再根据生成分子与候选分子的相似度进行重排序。本文研究第三种技术
-路线：直接在检索候选集合上进行非生成式学习排序。我们提出 \method{}。第一阶段使用
-双向多正例对比学习对齐峰序列谱图编码器和分子图编码器；第二阶段综合谱图嵌入、候选
-嵌入、二者的交互特征、基础分数和原始排名。模型通过自注意力学习 hard candidates
-之间的关系，并采用残差 listwise 目标保留基础检索顺序。在包含 17,556 条测试查询的
-MassSpecGym 上，使用其官方质量约束和分子式约束候选库，且测试阶段不插入真实分子，
-重排序分别将 Recall@1 从 43.78\% 提升到 67.91\%，以及从 58.49\% 提升到
-74.33\%；MRR 分别从 51.96\% 提升到 71.62\%，以及从 64.65\% 提升到
-77.27\%。结果表明，在不进行自回归分子生成的情况下，候选集合结构仍能提供超出
-pairwise 嵌入相似度的有效排序信号。
+分子式和子结构。联合嵌入方法按谱图--分子相似度排序，生成式检索则可能引入自回归
+分子解码器。本文研究第三种技术路线：直接对已检索分子列表进行非生成式学习排序。
+我们提出 \method{}：第一阶段对齐峰序列谱图编码器和分子图编码器；第二阶段在 listwise
+监督下，综合谱图与候选嵌入、显式交互特征、基础分数和原始排名进行残差重排序。
+我们在固定第一阶段 checkpoint 和 cache 的条件下，使用三个 reranker 随机种子比较不含上下文的
+pointwise 打分器与候选集合 Transformer。在包含 17,556 条测试查询的 MassSpecGym 上，
+两者在质量约束场景的 Recall@1 分别为 $67.89\pm0.44$ 和 $67.75\pm0.31$，在分子式
+约束场景分别为 $73.77\pm0.19$ 和 $73.98\pm0.84$，而固定基础检索器分别为 43.78 和
+58.49。Transformer 未显示稳定优势，说明当前证据支持的是监督残差重排序，而非候选间自注意力
+本身的独立收益。两种变体都不需要自回归分子生成，测试时也不插入正例。
 \end{abstract}
 
 \noindent\textbf{关键词：}
@@ -87,28 +86,27 @@ JESTR 使用 contrastive multiview coding 学习谱图--分子联合空间，并
 语言模型生成 refined molecule，最后根据分子--分子相似度重排候选
 \cite{zhang2026glmr}。
 
-这两类方法仍留下一个重要的数据挖掘问题。pairwise 余弦排序忽略了候选之间的关系；
-生成式检索则引入自回归解码器，最终排序依赖生成结构的质量和有效性。本文研究：当一个
-较强的基础检索器已经召回真实分子、但未能区分结构相似的 hard negatives 时，能否直接
-在嵌入空间中通过 listwise 排序改进结果。
+这两类方法仍留下一个重要的数据挖掘问题。固定的 pairwise 余弦分数并不直接优化最终候选顺序；
+生成式检索则引入自回归解码器，最终排序依赖生成结构的质量和有效性。本文研究能否用监督的
+第二阶段排序器直接区分 hard candidates，以及候选间显式交互是否比 pointwise 残差打分提供
+额外收益。
 
 为此，我们提出 \method{} 两阶段框架。第一阶段对齐 Transformer 谱图编码器和 GINE
-分子图编码器；第二阶段只处理基础检索的 top-$K$ 列表。该阶段显式构造谱图--候选交互
-特征，将基础分数和排名作为检索先验，利用候选间自注意力交换信息，并预测对基础分数
-的残差修正。
+分子图编码器；第二阶段只处理基础检索的 top-$K$ 列表，显式构造谱图--候选交互特征，
+将基础分数和排名作为检索先验，并预测对基础分数的残差修正。本文比较 pointwise 与候选
+集合 Transformer 两种实现。
 
 本文贡献如下：
 
 \begin{itemize}
-  \item 提出面向 MS/MS 分子检索的直接、非生成式 listwise 重排序方案。不同于
-  JESTR 的独立余弦打分和 GLMR 的生成式间接相似度，我们显式学习检索候选集合内部的
-  相对结构。
-  \item 设计候选集合感知的残差排序器，联合使用多模态嵌入、对称交互特征、基础分数
-  和排名嵌入，并通过 listwise 与 hard-negative pairwise 目标训练；基础模型嵌入可被
-  缓存复用。
-  \item 在 MassSpecGym 官方候选协议下，质量约束和分子式约束的 Recall@1 相对同一
-  基础检索器分别获得 24.13 和 15.84 个百分点的绝对提升。实验明确报告 top-$K$
-  召回上界，并区分训练阶段的监督候选补全和无泄漏的验证、测试协议。
+  \item 提出面向 MS/MS 分子检索的直接、非生成式残差 learning-to-rank 方案，
+  同时避免固定余弦打分和自回归分子解码。
+  \item 联合使用多模态嵌入、对称交互特征、基础分数和排名嵌入，通过 listwise 与
+  hard-negative pairwise 目标训练，并在缓存的同一第一阶段嵌入上受控比较 pointwise 和
+  self-attentive 两种实现。
+  \item 在 MassSpecGym 官方候选协议下，两种实现均在三个 reranker seeds 上显著优于固定
+  基础检索器；受控对比同时发现候选间自注意力没有稳定额外收益，避免将整体重排序增益
+  误归因于候选间自注意力。
 \end{itemize}
 
 \section{相关工作}
@@ -147,7 +145,8 @@ ChemFormer decoder 自回归生成 SMILES。生成分子被再次编码，并通
 \subsection{本文方法的定位}
 
 表~\ref{tab:method_comparison_cn} 对比三种方法最终的排序机制。本文并不将创新点表述为
-再次提出联合嵌入，而是强调在已有谱图、分子嵌入之上学习候选集合感知的下游排序器。
+再次提出联合嵌入，而是强调在已有谱图、分子嵌入之上进行直接的非生成式残差排序。候选
+间自注意力是被受控评估的架构选项，而不是预先假定的增益来源。
 
 \begin{table}[t]
   \centering
@@ -162,8 +161,8 @@ ChemFormer decoder 自回归生成 SMILES。生成分子被再次编码，并通
       & InfoNCE 加候选正则 \\
     GLMR & 生成分子--候选余弦相似度 & 生成器内部 cross-attention & 是
       & 自回归生成损失 \\
-    本文 & pair/list 特征预测的残差分数
-      & 候选列表 self-attention & 否
+    本文 & pair 特征和检索先验预测的残差分数
+      & set-aware 变体可选 self-attention & 否
       & listwise CE 加 pairwise margin \\
     \bottomrule
   \end{tabular}
@@ -194,7 +193,7 @@ $\candidates_s$ 之外的分子，端到端 Recall@$k$ 的上界为
 
 \subsection{总体框架}
 
-框架包含跨模态对齐、top-$K$ 检索和候选集合感知重排序三个步骤。训练 reranker 时冻结
+框架包含跨模态对齐、top-$K$ 检索和监督残差重排序三个步骤。训练 reranker 时冻结
 谱图和分子编码器，因此两个模态的嵌入可以离线计算并重复使用。
 
 \begin{figure}[t]
@@ -204,7 +203,7 @@ $\candidates_s$ 之外的分子，端到端 Recall@$k$ 的上界为
       \centering
       MS/MS 谱图 $\rightarrow$ 对齐谱图嵌入
       $\rightarrow$ top-$K$ 分子候选
-      $\rightarrow$ 候选集合 self-attention
+      $\rightarrow$ pointwise 或 set-aware 残差打分
       $\rightarrow$ 残差重排序
     }
   }
@@ -246,7 +245,7 @@ $\candidates_s$ 之外的分子，端到端 Recall@$k$ 的上界为
 则保持缺失，并降低召回上界和所有端到端指标。候选文件直接来自 MassSpecGym 官方
 发布版本，没有使用测试谱图、结构或标签训练任一阶段。
 
-\subsection{候选集合感知重排序器}
+\subsection{残差重排序器变体}
 
 对基础排名为 $r_i$ 的候选 $m_i$，构造
 
@@ -264,7 +263,8 @@ $\candidates_s$ 之外的分子，端到端 Recall@$k$ 的上界为
   \mathbf{h}_i=\operatorname{MLP}(\mathbf{x}_i).
 \end{equation}
 
-Transformer encoder 在候选之间交换信息 \cite{vaswani2017attention}：
+set-aware 变体使用 Transformer encoder 在候选之间交换信息
+\cite{vaswani2017attention}：
 
 \begin{equation}
   [\tilde{\mathbf{h}}_1,\ldots,\tilde{\mathbf{h}}_K]
@@ -272,8 +272,9 @@ Transformer encoder 在候选之间交换信息 \cite{vaswani2017attention}：
   ([\mathbf{h}_1,\ldots,\mathbf{h}_K]).
 \end{equation}
 
-padding mask 支持不同长度的候选列表。score head 预测修正值 $\Delta_i$，最终采用
-残差分数
+padding mask 支持不同长度的候选列表。匹配的 pointwise 对照令
+$\tilde{\mathbf{h}}_i=\mathbf{h}_i$，保留相同特征、score head、残差路径和训练损失，仅移除候选间
+交互。score head 预测修正值 $\Delta_i$，最终采用残差分数
 
 \begin{equation}
   q_i=\alpha b_i+\Delta_i,
@@ -307,8 +308,9 @@ padding mask 支持不同长度的候选列表。score head 预测修正值 $\De
   +\lambda\mathcal{L}_{\mathrm{pair}}.
 \end{equation}
 
-当隐藏维度为 $h$ 时，reranker 的单查询复杂度为 $O(Kd+K^2h)$，且不需要逐 token
-生成分子。但在完成与 GLMR 的实测 latency 对比之前，本文不据此声称实际推理一定更快。
+当隐藏维度为 $h$ 时，set-aware 变体比 pointwise 打分额外引入 $O(K^2h)$ 的注意力开销；
+两者都不需要逐 token 生成分子。本文不报告与 GLMR 的同硬件实测 latency 对比，因此不作
+实际推理速度声明。
 
 \section{实验}
 
@@ -328,11 +330,12 @@ padding mask 支持不同长度的候选列表。score head 预测修正值 $\De
 对齐模型输出 512 维嵌入。当前实验没有加载单独预训练的 SpecEmbedding 检查点，而是
 直接在 MassSpecGym 训练集上使用双向对比学习训练谱图和分子编码器。
 
-reranker 隐藏维度为 512，rank embedding 为 32 维，使用两层 Transformer、八个
-attention heads 和 0.1 dropout。优化器为 AdamW，学习率 $10^{-4}$，batch size 16，
-最多训练 30 个 epoch，并根据验证集 MRR 进行 patience 为 5 的 early stopping。
-$\lambda=0.2$，$\gamma=0.1$。所有 reranker 均不访问测试集进行模型选择，并在单张
-NVIDIA RTX 4090 上评估。
+reranker 隐藏维度为 512，rank embedding 为 32 维，dropout 为 0.1。set-aware 变体
+使用两层 Transformer 和八个 attention heads，pointwise 对照移除这两层。优化器为 AdamW，
+学习率 $10^{-4}$，batch size 16，最多训练 30 个 epoch，并根据验证集 MRR 进行 patience 为 5
+的 early stopping。$\lambda=0.2$，$\gamma=0.1$。在固定 alignment checkpoint 和 cache 的条件下，
+两种变体均使用 seeds 42、43 和 44 训练。这只衡量 reranker 的变异，不包含端到端 alignment
+不确定性。所有模型均不访问测试集进行选择，并在单张 NVIDIA RTX 4090 上评估。
 
 训练集中，插入正例之前的基础 top-40 召回上界在质量和分子式场景下分别为 92.59\%
 和 89.40\%；按前述训练协议补全后，训练列表的 labeled coverage 为 100\%。测试阶段
@@ -340,21 +343,23 @@ NVIDIA RTX 4090 上评估。
 
 \subsection{对比方法与指标}
 
-受控基线是与 reranker 使用同一对齐检查点的基础检索器。表中还列出 GLMR 论文表 1
+受控基线包括与 reranker 使用同一对齐 checkpoint 的基础检索器，以及保留全部输入和损失、
+仅移除候选间自注意力的 pointwise reranker。表中还列出 GLMR 论文表 1
 报告的 JESTR 和 GLMR 结果 \cite{zhang2026glmr}。这些外部数字只能提供背景，不是严格
-受控的消融：我们尚未在当前代码库中复现 JESTR 和 GLMR，分子 canonicalization 或
+受控的消融：我们未在当前代码库中独立复现 JESTR 和 GLMR，分子 canonicalization 或
 候选处理的细微差异可能影响结果。
 
 评价指标为全部测试查询上的 Recall@1、Recall@5、Recall@20 和 MRR。MCES@1 表示
-top-1 预测与真实分子的结构距离，因此越低越好。两种候选场景均报告 MCES@1。
+top-1 预测与真实分子的结构距离，因此越低越好。Recall 和 MRR 的误差来自固定基础
+checkpoint 上的三个 reranker seeds；MCES@1 仅在代表性 seed-42 Transformer 实验中计算。
 
 \subsection{主要结果}
 
 \begin{table}[t]
   \centering
-  \caption{MassSpecGym 分子检索结果。Recall 和 MRR 以百分比报告；MCES@1 为距离，
-  越低越好。JESTR 和 GLMR 数字来自 Zhang 等人 \cite{zhang2026glmr}；本文两行来自
-  本地流水线和官方候选文件。在统一复现之前，跨论文对比均为初步结果。}
+  \caption{代表性 seed-42 MassSpecGym 结果和跨论文背景。Recall 和 MRR 以百分比报告；
+  MCES@1 为距离，越低越好。JESTR 和 GLMR 数字来自 Zhang 等人 \cite{zhang2026glmr}；
+  本文行来自本地流水线和官方候选文件。外部结果仅用于跨论文背景对照。}
   \label{tab:main_results_cn}
   \small
   \begin{tabular}{llrrrrr}
@@ -365,44 +370,69 @@ top-1 预测与真实分子的结构距离，因此越低越好。两种候选�
       & JESTR（reported） & 17.62 & 40.36 & 64.76 & 29.12 & 15.82 \\
       & GLMR（reported） & 64.17 & 72.96 & 78.78 & 67.82 & 11.14 \\
       & \base{} & 43.78 & 61.10 & 75.55 & 51.96 & 16.42 \\
-      & \method{} & 67.91 & 76.00 & 80.45 & 71.62 & 8.02 \\
+      & Set Transformer & 67.91 & 76.00 & 80.45 & 71.62 & 8.02 \\
     \midrule
     \multirow{4}{*}{分子式}
       & JESTR（reported） & 11.77 & 33.26 & 61.01 & 22.83 & 11.73 \\
       & GLMR（reported） & 68.48 & 78.09 & 84.22 & 72.47 & 5.05 \\
       & \base{} & 58.49 & 71.49 & 81.81 & 64.65 & 6.14 \\
-      & \method{} & 74.33 & 80.64 & 85.07 & 77.27 & 3.13 \\
+      & Set Transformer & 74.33 & 80.64 & 85.07 & 77.27 & 3.13 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-受控对比表明，listwise reranking 在质量约束 Recall@1 上带来 24.13 个百分点提升，在
-分子式约束 Recall@1 上带来 15.84 个百分点提升；MRR 分别提升 19.66 和 12.62 个
-百分点。Recall@20 的提升较小，因为此时主要瓶颈已经变为基础 top-40 召回上界。
+在代表性 seed-42 实验中，Set Transformer 在质量约束 Recall@1 上带来 24.13 个百分点提升，
+在分子式约束场景带来 15.84 个百分点提升；MRR 分别提升 19.66 和 12.62 个百分点。
+Recall@20 的提升较小，因为此时主要瓶颈已经变为基础 top-40 召回上界。
 
-相对 GLMR 论文报告的结果，当前 Recall@1 在质量和分子式场景下分别高 3.74 和 5.85
+相对 GLMR 论文报告的结果，代表性 Recall@1 在质量和分子式场景下分别高 3.74 和 5.85
 个百分点；质量场景 MCES@1 从其报告的 11.14 降至 8.02，分子式场景从 5.05 降至
 3.13。这些结果值得继续验证，但不能单独证明 listwise reranking 优于生成式方法，
-因为我们的基础检索器与 GLMR 的 pre-retriever 已经有显著差异。要得出因果结论，必须统一
-复现基线，或在完全相同的冻结嵌入和候选列表上比较不同重排序器。
+因为我们的基础检索器与 GLMR 的 pre-retriever 已经有显著差异。匹配的因果比较需要统一
+复现基线，或在完全相同的冻结嵌入和候选列表上比较不同重排序器；因此本文只把该比较视为
+背景信息，不作因果解释。
 
-\subsection{投稿前必须完成的消融与稳健性实验}
+\subsection{受控 reranker 消融}
 
-最终实验应隔离四组因素：（1）基础检索、pointwise MLP 和完整候选集合 Transformer；
-（2）分别移除基础分数、rank embedding、元素乘积和绝对差特征；（3）只使用 listwise
-loss 与联合损失；（4）$K=20,40,100,256$。还应关闭一次候选顺序打乱，以检验模型是否
-利用了不合理的位置捷径。
+\begin{table}[t]
+  \centering
+  \caption{固定同一基础检索器的受控比较。reranker 结果是 seeds 42、43 和 44 的
+  均值 $\pm$ 样本标准差；Base 在各次运行中固定。所有数值均为百分比。}
+  \label{tab:reranker_ablation_cn}
+  \scriptsize
+  \begin{tabular}{llcccc}
+    \toprule
+    候选库 & 方法 & R@1 & R@5 & R@20 & MRR \\
+    \midrule
+    \multirow{3}{*}{质量}
+      & Base & 43.78 & 61.10 & 75.55 & 51.96 \\
+      & Pointwise & $67.89\pm0.44$ & $75.79\pm0.19$ & $80.63\pm0.05$ & $71.53\pm0.35$ \\
+      & Set Transformer & $67.75\pm0.31$ & $75.88\pm0.18$ & $80.63\pm0.15$ & $71.52\pm0.24$ \\
+    \midrule
+    \multirow{3}{*}{分子式}
+      & Base & 58.49 & 71.49 & 81.81 & 64.65 \\
+      & Pointwise & $73.77\pm0.19$ & $80.55\pm0.12$ & $84.97\pm0.15$ & $76.88\pm0.16$ \\
+      & Set Transformer & $73.98\pm0.84$ & $80.27\pm0.54$ & $85.07\pm0.05$ & $76.95\pm0.69$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
-为符合 ADMA 对 benchmarking and evaluations 的关注，主要配置至少使用三个随机种子
-并报告误差。同时应报告参数量、峰值显存、cache 构造时间、reranker latency 和端到端
-latency。效率分析必须区分一次性的分子嵌入/cache 成本与每条查询的在线成本。
+两种学习排序器都显著优于固定基础模型。但 Set Transformer 的平均 Recall@1 相对
+Pointwise 在质量场景仅相差 $-0.13$ 个百分点，在分子式场景仅相差 $+0.21$ 个百分点，
+且在六个成对的 seed--candidate Recall@1 比较中只获胜三次。MRR 差异同样可忽略。因此，当前协议下候选间
+自注意力没有稳定额外收益；被结果支持的是结合显式交互和检索特征的监督残差重排序。
+
+本文不报告 feature removal、loss、候选顺序或完整 top-$K$ 消融，因此不对这些组件的独立
+贡献作出结论。本文也不报告参数量、峰值显存、cache 构造时间、reranker latency 或端到端
+latency。
 
 \section{局限性与负责任评估}
 
 \method{} 无法恢复不在基础 top-$K$ 列表中的分子，因此其效果依赖第一阶段召回率。
 分子式约束场景假设已知分子式，而真实工作流中可能需要先预测分子式。当前 JESTR 和
-GLMR 数字来自原论文而非独立复现，本文结果也只有一个随机种子，因此现阶段不能据此
-作出确定的 SOTA 声明。
+GLMR 数字来自原论文而非独立复现。reranker 已使用三个随机种子，但它们共享同一个
+seed-42 alignment checkpoint，因此当前误差不包含第一阶段变异。候选间自注意力相对 pointwise 对照
+也没有稳定优势。这些限制使当前结果无法支持确定的 SOTA 或 self-attention 增益声明。
 
 训练阶段的正例插入是一种监督采样策略，不能用于验证和测试。我们报告插入前的训练
 召回，并在验证、测试中完全关闭插入；所有测试查询均参与评价，包括真实分子未进入
@@ -411,12 +441,13 @@ top-40 的查询。最后，作为闭集候选重排序器，本方法不能提�
 
 \section{结论}
 
-本文提出 \method{}，一个面向 MS/MS 分子检索的非生成式候选集合感知重排序器。该
-方法在对比对齐的基础检索器之上，引入显式 pair features、候选 self-attention、残差
-打分和 listwise 监督。MassSpecGym 上的受控实验表明，该方法在质量约束和分子式约束
-候选库上均显著优于同一基础检索器。与 JESTR、GLMR 的比较也明确了本文真正的技术定位：
-不是再次提出联合嵌入或分子生成，而是直接在 hard molecular candidates 上学习排序。
-在正式投稿前，仍需完成统一基线复现、多随机种子消融和实测效率比较。
+本文提出 \method{}，一个面向 MS/MS 分子检索的非生成式残差学习排序框架。该方法在
+对比对齐的基础检索器之上，引入显式 pair features、检索先验、残差打分和 listwise 监督。
+MassSpecGym 上的受控实验表明，在固定 seed-42 基础检索器的三个 reranker 初始化中，学习式
+重排序在质量约束和分子式约束候选库上均带来大幅提升。匹配的三种子对比中，pointwise
+打分器与候选集合 Transformer 表现相当，因此当前
+证据支持的是直接残差 learning-to-rank，而非 self-attention 本身的特定收益。匹配外部基线、
+各特征与损失的独立贡献以及实测效率均超出当前证据范围。
 
 \bibliographystyle{plain}
 \bibliography{references}

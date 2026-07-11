@@ -5,7 +5,7 @@
 本次更新前代码状态：
 
 - 分支：`dev`
-- 最新提交：`4b275f0 docs: 添加项目记忆文档`
+- 最新提交：`cafb70c feat(rerank): 支持多随机种子批量实验`
 - 工作区：干净
 
 本文档用于后续开发、实验和论文协作时快速恢复上下文。它是内部协作材料，不应直接放入 ADMA 双盲补充材料。若本文档与代码、`params.yaml` 或实验日志冲突，以代码和原始日志为准。
@@ -18,18 +18,19 @@
 2. 使用 GINE 编码候选分子图。
 3. 通过跨模态对比学习对齐谱图和分子。
 4. 使用基础相似度从候选库中检索 top-$K$ 分子。
-5. 使用候选集合感知的非生成式 reranker 重新排序 hard candidates。
+5. 使用非生成式残差 reranker 重新排序 hard candidates，并受控比较 pointwise 与 set-aware 变体。
 
 当前论文目标是投稿 ADMA 2026，主题选择为 `Data mining for bioinformatics`。英文标题暂定为：
 
-> Candidate-Set-Aware Reranking for MS/MS-Based Molecule Retrieval
+> Non-Generative Learning to Rerank for MS/MS-Based Molecule Retrieval
 
-论文真正需要强调的创新不是“首次学习谱图--分子联合嵌入”，而是：
+三随机种子受控消融完成后，论文需要强调的证据边界是：
 
 - 在已有跨模态检索器之上直接优化候选列表排序。
-- 使用候选集合 self-attention 建模候选之间的关系。
 - 结合 base score、base rank 和显式谱图--候选交互特征。
 - 使用 residual listwise reranking，在不生成分子的情况下修正基础排序。
+- pointwise 与 set-aware Transformer 都大幅优于固定 base，但 self-attention 没有显示稳定额外收益。
+- 因此可被当前实验支持的核心是“监督残差学习排序有效”，而不是“候选间关系是主要增益来源”。
 
 ## 2. 协作与工程约定
 
@@ -327,7 +328,8 @@ latexmk -pdf -xelatex \
 - 基础 checkpoint：`checkpoints_align/d4c1f70_massspecgym_nopretrain/best_model_stage2.pth`
 - alignment：无额外 SpecEmbedding 预训练
 - rerank top-$K$：40
-- 随机种子：42
+- alignment 随机种子：42（固定 checkpoint）
+- reranker 随机种子：42、43、44
 - reranker hidden dim：512
 - rank embedding dim：32
 - Transformer：2 层、8 heads
@@ -350,16 +352,35 @@ MassSpecGym 候选文件来自其官方数据集发布：
 
 除 MCES@1 外，表中数值均以百分比表示；MRR 在日志中原始范围为 $[0,1]$，表中乘以 100。MCES@1 是结构距离，保留原始量纲，越低越好。
 
+下表是代表性 seed-42 Set Transformer 结果，也是 MCES@1 的计算对象：
+
 | Candidate | Method | Upper bound | Recall@1 | Recall@5 | Recall@10 | Recall@20 | MRR | MCES@1 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | mass | Base | 82.15 | 43.78 | 61.10 | 68.43 | 75.55 | 51.96 | 16.42 |
-| mass | Rerank | 82.15 | 67.91 | 76.00 | 78.44 | 80.45 | 71.62 | 8.02 |
+| mass | Set Transformer (seed 42) | 82.15 | 67.91 | 76.00 | 78.44 | 80.45 | 71.62 | 8.02 |
 | formula | Base | 87.30 | 58.49 | 71.49 | 76.86 | 81.81 | 64.65 | 6.14 |
-| formula | Rerank | 87.30 | 74.33 | 80.64 | 82.89 | 85.07 | 77.27 | 3.13 |
+| formula | Set Transformer (seed 42) | 87.30 | 74.33 | 80.64 | 82.89 | 85.07 | 77.27 | 3.13 |
 
-mass MCES@1 的原始输出为 Base 16.4199、Rerank 8.0209；表中按两位小数展示。
+mass MCES@1 的原始输出为 Base 16.4199、代表性 seed-42 Set Transformer 8.0209；表中按两位小数展示。
 
-相对基础检索器：
+固定同一 alignment checkpoint 和 top-40 cache，reranker seeds 42/43/44 的均值 $\pm$ 样本标准差为：
+
+| Candidate | Model | Recall@1 | Recall@5 | Recall@10 | Recall@20 | MRR |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| mass | Pointwise | 67.89±0.44 | 75.79±0.19 | 78.36±0.11 | 80.63±0.05 | 71.53±0.35 |
+| mass | Set Transformer | 67.75±0.31 | 75.88±0.18 | 78.41±0.12 | 80.63±0.15 | 71.52±0.24 |
+| formula | Pointwise | 73.77±0.19 | 80.55±0.12 | 82.93±0.23 | 84.97±0.15 | 76.88±0.16 |
+| formula | Set Transformer | 73.98±0.84 | 80.27±0.54 | 82.75±0.33 | 85.07±0.05 | 76.95±0.69 |
+
+受控结论：
+
+- 两种学习式 reranker 都大幅优于固定 base retriever。
+- Set Transformer 相对 Pointwise 的 Recall@1 平均差异为 mass $-0.13$ 个百分点、formula $+0.21$ 个百分点。
+- Transformer 在 6 个成对的 seed--candidate Recall@1 比较中只获胜 3 次，MRR 差异也接近于零。
+- 当前结果不支持“candidate self-attention 带来稳定独立收益”；不应将整体 reranking 提升归因于 self-attention。
+- 该误差只覆盖 reranker 训练变异，不覆盖 alignment 或完整端到端流水线的方差。
+
+代表性 seed-42 Set Transformer 相对基础检索器：
 
 - mass Recall@1：+24.13 个百分点
 - mass MRR：+19.66 个百分点
@@ -402,6 +423,17 @@ rerank_cache/d4c1f70_massspecgym_nopretrain_formula_topk40/
 checkpoints_rerank/d4c1f70_massspecgym_nopretrain_formula_topk40/
 ```
 
+三种子 pointwise/Transformer 受控实验：
+
+```text
+checkpoints_rerank/d4c1f70_massspecgym_nopretrain_topk40_multiseed/
+checkpoints_rerank/d4c1f70_massspecgym_nopretrain_topk40_multiseed/summary.csv
+checkpoints_rerank/d4c1f70_massspecgym_nopretrain_topk40_multiseed/summary_aggregate.csv
+checkpoints_rerank/d4c1f70_massspecgym_nopretrain_topk40_multiseed/batch_status.json
+```
+
+该批次共 12 组实验（2 candidate types $\times$ 2 reranker variants $\times$ 3 seeds），全部以 `complete` 状态结束，无失败 attempt。
+
 关键日志：
 
 ```text
@@ -428,7 +460,8 @@ rerank_cache/<run>/prepare_rerank_cache_{train,val,test}.log
 
 - formula candidate 设置假设已知真实分子式，应称为 formula-conditioned retrieval，不能描述成完全开放的未知分子鉴定。
 - reranker 是 closed-library 方法，不能生成候选库之外的新分子。
-- 当前只有一个随机种子。
+- reranker 已使用 3 个随机种子，但 alignment 仍只有 seed 42，当前误差不覆盖端到端方差。
+- candidate self-attention 相对 pointwise 对照没有稳定优势，不能将整体增益归因于候选交互。
 - JESTR 和 GLMR 尚未在本代码库统一复现。
 
 ## 8. 与 JESTR 和 GLMR 的比较
@@ -495,7 +528,7 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 基础 retriever 不同。
 - 分子 canonicalization 和候选处理细节可能不同。
 - GLMR/JESTR 未在本地统一复现。
-- 当前本地实验只有 seed 42。
+- 当前多种子只覆盖 reranker，alignment 仍固定为 seed 42。
 
 ### 8.4 最稳妥的论文定位
 
@@ -503,18 +536,20 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 | --- | --- | --- | --- | --- |
 | JESTR | spectrum--candidate cosine | 无 | 否 | 否 |
 | GLMR | generated--candidate cosine | 生成器 cross-attention | 是 | 否 |
-| SpecEmbedding-Rerank | residual learned score | candidate self-attention | 否 | 是 |
+| SpecEmbedding-Rerank | explicit pair/retrieval features 的 residual learned score | set-aware 变体可选 self-attention | 否 | 是 |
 
 可以主张：
 
-- 直接候选集合感知的非生成式 listwise reranking。
-- 将候选相对关系用于 MS/MS-to-molecule retrieval。
+- 直接、非生成式的监督残差 learning-to-rank。
+- 结合显式谱图--候选交互特征、base score 和 base rank 进行重排序。
 - 轻量级、可缓存、可插入现有双塔检索器。
+- 三种子受控实验中 pointwise 与 Set Transformer 表现相当。
 
 不要主张：
 
 - 首次学习谱图--分子联合嵌入。
 - 首次使用候选分子训练。
+- candidate self-attention 已被证明是主要增益来源。
 - 仅凭当前外部数字已经严格达到 SOTA。
 - 在没有 latency 实验时声称一定比 GLMR 更快。
 
@@ -552,14 +587,17 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 中文稿：`paper/main_cn.tex`
 - 参考文献：`paper/references.bib`
 - 待办清单：`paper/ADMA2026_TODO.md`
-- 英文编译：成功，9 页
-- 中文编译：成功，8 页
+- 英文编译：成功，10 页
+- 中文编译：成功，9 页
 - 英文 PDF 作者元数据：空
 - 致谢和基金：未加入
 - AI assistance disclosure：已加入
-- mass MCES@1：已完成（Base 16.42，Rerank 8.02）
+- mass MCES@1：已完成（Base 16.42，代表性 seed-42 Set Transformer 8.02）
+- 固定 alignment 的 reranker 多种子：12/12 组 pointwise/Transformer 实验已完成
+- 中心主张：已收窄为非生成式残差 learning-to-rank，不再将 self-attention 作为已验证增益来源
 
-当前论文仍不是最终可提交版本，正文中保留了待完成实验和未来时态。
+当前论文仍不是最终可提交版本；未完成消融、外部基线复现、方法图与投稿检查已明确记录为
+当前证据范围之外的待办。
 
 ## 10. 论文文件与结构
 
@@ -594,17 +632,14 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 
 ## 11. 当前最高优先级待办
 
-完整清单以 `paper/ADMA2026_TODO.md` 为准。当前 P0：
+完整清单以 `paper/ADMA2026_TODO.md` 为准。当前优先事项：
 
-1. 至少运行 3 个随机种子。
-2. 完成 base、pointwise 和 Transformer reranker 受控消融。
-3. 完成 feature、loss、候选顺序和 top-$K$ 消融。
-4. 尽可能在统一协议下复现 JESTR 和 GLMR。
-5. 若不能复现，保留 `reported` 标记并撤回严格 SOTA 表述。
-6. 测量参数量、显存、cache 时间、rerank latency 和端到端 latency。
-7. 制作正式方法图，替换 LaTeX 文本框。
-8. 用真实结果替换正文中的待办式段落和未来时态。
-9. 对匿名补充材料执行身份信息清理。
+1. 完成 feature、loss、候选顺序和 top-$K$ 消融。
+2. 尽可能在统一协议下复现 JESTR 和 GLMR。
+3. 若不能复现，保留 `reported` 标记并撤回严格 SOTA 表述。
+4. 测量参数量、显存、cache 时间、rerank latency 和端到端 latency。
+5. 制作正式方法图，替换 LaTeX 文本框。
+6. 对匿名补充材料执行身份信息清理。
 
 ## 12. 已知风险与容易混淆的地方
 
@@ -618,14 +653,21 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 
 `docs/reranker_solution_zh.md` 中的“合理预期提升”是实现前估计，不是最终实验结果。实际结果以第 6 节和日志为准。
 
-### 12.3 跨论文结果不能作为受控消融
+### 12.3 多种子作用域与 self-attention 证据
+
+- seeds 42/43/44 只重训 reranker，所有实验共享同一 seed-42 alignment checkpoint 和 cache。
+- 因此已报告的标准差是 reranker-level uncertainty，不是 end-to-end uncertainty。
+- Pointwise 与 Set Transformer 表现相当，不能将增益归因于候选间 self-attention。
+- 如需主张完整流水线稳定性，必须重训多个 alignment seeds 并为每个 checkpoint 重建 cache。
+
+### 12.4 跨论文结果不能作为受控消融
 
 我们的 base retriever 已经与 JESTR/GLMR 的 pre-retriever 不同，因此：
 
 - reranker 相对本地 base 的提升可以归因于 reranker。
 - 本地端到端结果与 GLMR 的差异不能全部归因于 reranker。
 
-### 12.4 匿名补充材料风险
+### 12.5 匿名补充材料风险
 
 仓库中可能存在：
 
@@ -636,7 +678,7 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 
 匿名补充材料应使用无 `.git` 历史的独立归档，并执行身份字符串扫描。
 
-### 12.5 AI 披露
+### 12.6 AI 披露
 
 当前稿件使用一个全局声明说明 OpenAI Codex 用于全文起草和语言修改。ADMA CFP 的措辞较严格，提交前应再次确认该全局披露是否足以覆盖“任何使用 AI 文本的章节”。
 
@@ -653,6 +695,8 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - `a2ccd8c`：加入参考论文 PDF。
 - `1669f4b`：按 ADMA 2026 要求完善中英文论文。
 - `91877d6`：添加 ADMA 2026 投稿待办清单。
+- `96fbaa9`：回填质量候选 MCES@1 结果。
+- `cafb70c`：支持多随机种子 pointwise/Transformer 批量实验。
 
 ## 14. 维护本记忆文档
 

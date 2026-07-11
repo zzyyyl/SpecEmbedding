@@ -17,23 +17,23 @@
 
 ## P0：投稿前必须完成
 
-- [x] 计算质量候选场景的 MCES@1（Base：16.4199；Full reranker：8.0209；越低越好）。
+- [x] 计算质量候选场景的 MCES@1（Base：16.4199；代表性 seed-42 Set Transformer：8.0209；越低越好）。
 - [ ] 在统一候选集、SMILES canonicalization 和评价代码下复现 JESTR。
 - [ ] 在相同协议下复现 GLMR。
-- [ ] 如果无法完成 JESTR/GLMR 复现，全文保留 `reported results` 标记，不声称严格 SOTA。
-- [ ] 主要实验至少运行 3 个随机种子，报告均值和标准差。
+- [x] 当前采用无法完成统一复现时的降级方案：全文保留 `reported results` 标记，不声称严格 SOTA。
+- [x] 在固定 alignment checkpoint 上为 pointwise/Transformer reranker 运行 seeds 42/43/44，报告均值和样本标准差。
 - [ ] 确认验证集和测试集始终使用 `force_include_positive=false`。
 - [ ] 再次核验训练、验证、测试分子划分不存在样本或结构泄露。
 - [ ] 固化最终 checkpoint、`params.yaml`、代码 commit 和候选文件版本。
-- [ ] 将正文中的 `Required Ablations`、`we will` 等待办式内容替换为真实实验结果。
+- [x] 将正文中的 `Required Ablations`、`we will` 等待办式内容替换为已完成的三种子 pointwise/Transformer 结果。
 - [ ] 制作正式方法架构图，替换当前文本框占位图。
 - [ ] 检查 SpecEmbedding 既有工作的引用和增量说明，避免重复声明已有贡献。
 - [ ] 确认 AI 使用披露形式满足 ADMA 要求；必要时咨询 Program Chair。
 
 ## P1：核心消融实验
 
-- [ ] 基础检索器 vs. pointwise MLP vs. Transformer listwise reranker。
-- [ ] 移除候选间 self-attention。
+- [x] 基础检索器 vs. pointwise MLP vs. Transformer listwise reranker（3 个 reranker seeds）。
+- [x] 移除候选间 self-attention：pointwise 与 Transformer 表现相当，未观察到稳定额外收益。
 - [ ] 移除基础检索分数。
 - [ ] 移除 rank embedding。
 - [ ] 移除元素乘积特征。
@@ -43,6 +43,7 @@
 - [ ] 比较 `K=20/40/100/256`。
 - [ ] 比较有无 SpecEmbedding 预训练。
 - [ ] 分析不同候选召回上界下 reranker 的实际增益。
+- [ ] 若要报告端到端不确定性，还需使用多个 alignment seeds 重训基础检索器并重建 cache。
 
 ## P1：效率与可解释性
 
@@ -56,12 +57,12 @@
 
 ## P1：论文完善
 
-- [ ] 补充主要结果的标准差或置信区间。
-- [ ] 在结果表中明确区分本地复现结果和论文报告结果。
+- [x] 补充固定基础检索器上三个 reranker seeds 的均值和样本标准差。
+- [x] 在结果表中明确区分本地复现结果和论文报告结果。
 - [ ] 补充数据集、完整候选池规模和平均候选数量统计。
 - [ ] 统一使用 `Recall@K`、`MRR`、`MCES@1` 等术语。
 - [ ] 压缩相关工作，避免 JESTR/GLMR 方法介绍喧宾夺主。
-- [ ] 强化核心论点：候选集合关系能够提供独立于 pairwise 相似度的排序信号。
+- [x] 根据受控消融收窄核心论点：监督残差重排序稳定有效，但候选间 self-attention 未显示稳定独立收益。
 - [ ] 完成人工英文润色。
 - [ ] 检查中英文稿内容一致性。
 - [ ] 核对全部参考文献的作者、年份、页码和 DOI。
@@ -69,7 +70,7 @@
 ## 投稿合规
 
 - [x] 使用 Springer LNCS/LNAI 模板。
-- [x] 英文稿当前为 9 页，低于 15 页限制。
+- [x] 英文稿当前为 10 页，低于 15 页限制。
 - [x] 作者、单位和 PDF 作者元数据已隐藏。
 - [x] 未包含致谢和基金信息。
 - [x] 已加入 AI 使用披露。
@@ -91,25 +92,28 @@
 | 实验 | 候选类型 | 随机种子 | Recall@1 | Recall@5 | Recall@20 | MRR | MCES@1 | 结果路径 | 状态 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
 | Base retriever | mass | 42 | 43.78 | 61.10 | 75.55 | 51.96 | 16.42 | `checkpoints_rerank/d4c1f70_massspecgym_nopretrain_mass_topk40/eval_rerank.log` | 已完成 |
-| Full reranker | mass | 42 | 67.91 | 76.00 | 80.45 | 71.62 | 8.02 | `checkpoints_rerank/d4c1f70_massspecgym_nopretrain_mass_topk40/eval_rerank.log` | 已完成 |
+| Set Transformer | mass | 42 | 67.91 | 76.00 | 80.45 | 71.62 | 8.02 | `checkpoints_rerank/d4c1f70_massspecgym_nopretrain_mass_topk40/eval_rerank.log` | 已完成 |
 | Base retriever | formula | 42 | 58.49 | 71.49 | 81.81 | 64.65 | 6.14 | `checkpoints_rerank/d4c1f70_massspecgym_nopretrain_formula_topk40/eval_rerank.log` | 已完成 |
-| Full reranker | formula | 42 | 74.33 | 80.64 | 85.07 | 77.27 | 3.13 | `checkpoints_rerank/d4c1f70_massspecgym_nopretrain_formula_topk40/eval_rerank.log` | 已完成 |
-| Pointwise reranker | mass | - | - | - | - | - | - | - | 未运行 |
-| Pointwise reranker | formula | - | - | - | - | - | - | - | 未运行 |
+| Set Transformer | formula | 42 | 74.33 | 80.64 | 85.07 | 77.27 | 3.13 | `checkpoints_rerank/d4c1f70_massspecgym_nopretrain_formula_topk40/eval_rerank.log` | 已完成 |
+| Pointwise reranker | mass | 42/43/44 | 67.89±0.44 | 75.79±0.19 | 80.63±0.05 | 71.53±0.35 | 未重算 | `checkpoints_rerank/d4c1f70_massspecgym_nopretrain_topk40_multiseed/summary_aggregate.csv` | 已完成 |
+| Set Transformer | mass | 42/43/44 | 67.75±0.31 | 75.88±0.18 | 80.63±0.15 | 71.52±0.24 | 未重算 | `checkpoints_rerank/d4c1f70_massspecgym_nopretrain_topk40_multiseed/summary_aggregate.csv` | 已完成 |
+| Pointwise reranker | formula | 42/43/44 | 73.77±0.19 | 80.55±0.12 | 84.97±0.15 | 76.88±0.16 | 未重算 | `checkpoints_rerank/d4c1f70_massspecgym_nopretrain_topk40_multiseed/summary_aggregate.csv` | 已完成 |
+| Set Transformer | formula | 42/43/44 | 73.98±0.84 | 80.27±0.54 | 85.07±0.05 | 76.95±0.69 | 未重算 | `checkpoints_rerank/d4c1f70_massspecgym_nopretrain_topk40_multiseed/summary_aggregate.csv` | 已完成 |
 
 ## 论文数字来源
 
 | 方法 | 数字来源 | 是否本地复现 | 使用限制 |
 | --- | --- | --- | --- |
 | SpecMolAlign | 本项目日志 | 是 | 可用于受控比较 |
-| SpecEmbedding-Rerank | 本项目日志 | 是 | 当前只有 seed 42 |
+| SpecEmbedding-Rerank | 本项目日志 | 是 | alignment 固定为 seed 42；reranker 使用 seeds 42/43/44 |
 | JESTR | GLMR 论文 Table 1 | 否 | 必须标注 `reported` |
 | GLMR | GLMR 论文 Table 1 | 否 | 必须标注 `reported` |
 
 ## 建议时间线
 
 - [x] 7 月 10 日至 12 日：完成质量候选场景的 MCES@1。
-- [ ] 7 月 10 日至 12 日：完成基线复现和多随机种子实验。
+- [x] 7 月 10 日至 12 日：完成固定 alignment 的 reranker 多随机种子实验。
+- [ ] 7 月 10 日至 12 日：完成 JESTR/GLMR 统一基线复现，或确定保留 reported-results 降级方案。
 - [ ] 7 月 13 日至 14 日：消融、效率和案例分析。
 - [ ] 7 月 15 日：更新图表和全文。
 - [ ] 7 月 16 日：执行双盲、页数、引用和补充材料检查。

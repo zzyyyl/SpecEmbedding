@@ -20,7 +20,7 @@
 % 1. Replace all provisional cross-paper comparisons with results obtained
 %    under one canonicalization/candidate protocol, or retain the explicit
 %    "reported result" qualification.
-% 2. Fill in ablations, efficiency, and three-seed uncertainty.
+% 2. Fill in the remaining feature/loss/top-K ablations and efficiency results.
 % 3. Check the final PDF is <=15 pages and scrub identifying PDF metadata.
 
 \usepackage[T1]{fontenc}
@@ -45,8 +45,8 @@
 \newcommand{\zm}{\mathbf{z}_m}
 \newcommand{\candidates}{\mathcal{C}}
 
-\title{Candidate-Set-Aware Reranking for MS/MS-Based Molecule Retrieval}
-\titlerunning{Candidate-Set-Aware Molecular Reranking}
+\title{Non-Generative Learning to Rerank for MS/MS-Based Molecule Retrieval}
+\titlerunning{Non-Generative Molecular Reranking}
 
 % Keep these fields empty for ADMA's double-blind review.
 \author{}
@@ -60,23 +60,23 @@
 \begin{abstract}
 Retrieving molecular structures from tandem mass spectra is difficult because
 many candidates share mass, formula, and substructure information. Joint
-embedding methods such as JESTR rank each candidate independently by
-spectrum--molecule similarity, whereas GLMR bridges the modality gap by
-generating a molecule and comparing it with retrieved candidates. We investigate
-a third design point: direct, non-generative learning to rank over the retrieved
-candidate set. Our framework, \method{}, first aligns a peak-sequence spectrum
-encoder and a molecular graph encoder using bidirectional multi-positive
-contrastive learning. A second-stage reranker then combines the spectrum
-embedding, each candidate embedding, their interaction features, the base score,
-and the base rank. Self-attention models relations among hard candidates, and a
-residual listwise objective preserves the strong first-stage ordering. On the
-17,556-query MassSpecGym test split, using its official mass- and
-formula-conditioned libraries and no test-time positive insertion, reranking
-improves Recall@1 from 43.78\% to 67.91\% and from 58.49\% to 74.33\%,
-respectively. MRR rises from 51.96\% to 71.62\% and from 64.65\% to
-77.27\%. These results show that candidate-set structure is a useful signal
-beyond pairwise embedding similarity, without requiring autoregressive molecule
-generation.
+embedding methods rank candidates by spectrum--molecule similarity, whereas
+generative retrieval can introduce an autoregressive molecular decoder. We
+investigate a third design point: direct, non-generative learning to rerank a
+retrieved molecular list. Our framework, \method{}, first aligns a peak-sequence
+spectrum encoder and a molecular graph encoder. A second-stage residual ranker
+then combines spectrum and candidate embeddings, explicit interaction features,
+the base score, and the base rank under listwise supervision. We compare a
+context-free pointwise scorer with a candidate-set Transformer across three
+reranker initializations while keeping the first-stage checkpoint and caches
+fixed. On the 17,556-query MassSpecGym test split, their Recall@1 values are
+$67.89\pm0.44$ and $67.75\pm0.31$ for mass-conditioned retrieval, and
+$73.77\pm0.19$ and $73.98\pm0.84$ for formula-conditioned retrieval, compared
+with fixed-base values of 43.78 and 58.49. The lack of a consistent Transformer
+advantage shows that the current evidence supports supervised residual
+reranking, rather than a distinct benefit from candidate self-attention. Both
+variants operate without autoregressive molecule generation or test-time
+positive insertion.
 \keywords{Data mining for bioinformatics \and Tandem mass spectrometry \and
 Molecule retrieval \and Learning to rank \and Multimodal representation
 learning}
@@ -108,37 +108,37 @@ similarity \cite{kalia2025jestr,tian2020cmc}. GLMR instead retrieves contextual
 candidates, generates a refined molecule with a conditional language model, and
 reranks candidates by molecule--molecule similarity \cite{zhang2026glmr}.
 
-Both approaches leave an important data mining question open. Pairwise cosine
-ranking ignores relations among candidates, while generative retrieval adds an
-autoregressive decoder and makes ranking depend on the quality and validity of a
-generated structure. We ask whether hard candidates can be separated directly
-in embedding space by a learned listwise ranker. This setting is particularly
-relevant when a strong retriever already recalls the correct molecule but
-misorders structurally similar alternatives.
+Both approaches leave an important data mining question open. Fixed pairwise
+cosine scores do not directly optimize the final candidate order, while
+generative retrieval adds an autoregressive decoder and makes ranking depend on
+the quality and validity of a generated structure. We ask whether hard
+candidates can instead be separated directly in embedding space by a supervised
+second-stage ranker, and whether explicit candidate interaction adds value beyond
+a pointwise residual scorer.
 
 We propose \method{}, a two-stage retrieval and reranking framework. The first
 stage aligns a Transformer spectrum encoder with a GINE molecular graph encoder.
 The second stage operates only on the first-stage top-$K$ list. It constructs
 explicit spectrum--candidate interaction features, injects the original score
-and rank as retrieval priors, exchanges information across candidates through
-self-attention, and predicts a residual correction to the base score.
+and rank as retrieval priors, and predicts a residual correction to the base
+score. We instantiate this framework with pointwise and candidate-set
+Transformer variants.
 
 Our contributions are:
 
 \begin{itemize}
-  \item We introduce a direct, non-generative listwise formulation for
-  MS/MS-to-molecule reranking. In contrast to JESTR's independent cosine scores
-  and GLMR's generation-mediated similarity, the proposed model learns the
-  relative structure of a retrieved candidate set.
-  \item We design a candidate-set-aware residual ranker that combines
-  multimodal embeddings, symmetric interaction features, base scores, and rank
-  embeddings. It is trained with listwise and hard-negative pairwise objectives
-  while leaving the expensive first-stage embeddings cacheable.
-  \item Under MassSpecGym's official candidate protocol, we obtain absolute
-  Recall@1 gains of 24.13 and 15.84 percentage points over our base retriever
-  for mass- and formula-conditioned retrieval. We explicitly report top-$K$
-  recall upper bounds and separate supervised training-list completion from
-  leakage-free validation and test evaluation.
+  \item We introduce a direct, non-generative residual learning-to-rank
+  formulation for MS/MS-to-molecule retrieval, avoiding both fixed cosine-only
+  ranking and autoregressive molecular decoding.
+  \item We combine multimodal embeddings, symmetric interaction features, base
+  scores, and rank embeddings under listwise and hard-negative pairwise
+  supervision, and compare matched pointwise and self-attentive implementations
+  while keeping the first-stage embeddings cacheable.
+  \item Under MassSpecGym's official candidate protocol, both implementations
+  substantially improve the fixed base retriever across three reranker seeds.
+  The controlled comparison finds no stable advantage from candidate
+  self-attention, preventing the overall reranking gain from being incorrectly
+  attributed to candidate self-attention.
 \end{itemize}
 
 \section{Related Work}
@@ -159,7 +159,7 @@ Our spectrum encoder originates from SpecEmbedding, which uses replicated
 spectra and structural similarity in supervised contrastive learning
 \cite{xiong2025specembedding}. In this work, it is paired with a molecular graph
 encoder and optimized for cross-modal rather than spectrum-to-spectrum
-retrieval. The preliminary experiments reported here train this aligned model
+retrieval. The aligned model used here is trained
 from scratch, so the observed reranking gains do not rely on an external
 pretrained spectrum checkpoint.
 
@@ -192,8 +192,9 @@ coupled to generation quality, decoding cost, and molecular validity.
 
 Table~\ref{tab:method_comparison} isolates the ranking mechanism of the three
 methods. Our claim is deliberately narrower than improving cross-modal
-embeddings: the proposed contribution is a learned, candidate-set-aware
-downstream ranker over existing spectrum and molecule embeddings.
+embeddings: the proposed contribution is direct non-generative residual ranking
+over existing spectrum and molecule embeddings. Candidate self-attention is an
+evaluated architectural option rather than an assumed source of improvement.
 
 \begin{table}[t]
   \centering
@@ -209,8 +210,8 @@ downstream ranker over existing spectrum and molecule embeddings.
       & InfoNCE plus candidate regularization \\
     GLMR & Generated--candidate cosine & Cross-attention inside generator & Yes
       & Autoregressive generation loss \\
-    Ours & Residual score from pair and list features
-      & Self-attention over candidate list & No
+    Ours & Residual score from pair features and retrieval priors
+      & Optional self-attention in set-aware variant & No
       & Listwise CE plus pairwise margin \\
     \bottomrule
   \end{tabular}
@@ -246,7 +247,7 @@ accuracy only on successfully retrieved examples.
 \subsection{Overview}
 
 The framework has three steps: cross-modal alignment, top-$K$ retrieval, and
-candidate-set-aware reranking. Spectrum and molecule encoders are frozen while
+supervised residual reranking. Spectrum and molecule encoders are frozen while
 the reranker is trained, so their embeddings can be computed once and reused.
 
 \begin{figure}[t]
@@ -256,7 +257,7 @@ the reranker is trained, so their embeddings can be computed once and reused.
       \centering
       MS/MS spectrum $\rightarrow$ aligned spectrum embedding
       $\rightarrow$ top-$K$ molecular candidates
-      $\rightarrow$ candidate-set self-attention
+      $\rightarrow$ pointwise or set-aware residual scorer
       $\rightarrow$ residual reranking
     }
   }
@@ -308,7 +309,7 @@ and lowers both the upper bound and every end-to-end metric. Candidate files are
 loaded from the official MassSpecGym release and no test spectrum, structure,
 or label is used to train either stage.
 
-\subsection{Candidate-Set-Aware Reranker}
+\subsection{Residual Reranker Variants}
 
 For candidate $m_i$ with base rank $r_i$, we construct
 
@@ -327,8 +328,8 @@ make symmetric matching cues explicit. An MLP projects each vector:
   \mathbf{h}_i=\operatorname{MLP}(\mathbf{x}_i).
 \end{equation}
 
-A Transformer encoder exchanges information across all candidates
-\cite{vaswani2017attention}:
+The candidate-set variant uses a Transformer encoder to exchange information
+across candidates \cite{vaswani2017attention}:
 
 \begin{equation}
   [\tilde{\mathbf{h}}_1,\ldots,\tilde{\mathbf{h}}_K]
@@ -336,8 +337,10 @@ A Transformer encoder exchanges information across all candidates
   ([\mathbf{h}_1,\ldots,\mathbf{h}_K]).
 \end{equation}
 
-Padding masks support variable-sized lists. A score head predicts a correction
-$\Delta_i$, and the final score is residual:
+Padding masks support variable-sized lists. The matched pointwise control sets
+$\tilde{\mathbf{h}}_i=\mathbf{h}_i$, retaining the same features, score head,
+residual path, and training losses while removing all candidate interaction. A
+score head predicts a correction $\Delta_i$, and the final score is residual:
 
 \begin{equation}
   q_i=\alpha b_i+\Delta_i,
@@ -373,9 +376,10 @@ The complete objective is
   +\lambda\mathcal{L}_{\mathrm{pair}}.
 \end{equation}
 
-For hidden width $h$, the reranker costs $O(Kd+K^2h)$ per query. It does not
-decode molecules token by token. An empirical latency comparison with GLMR is
-still required before making a measured efficiency claim.
+For hidden width $h$, the set-aware variant adds $O(K^2h)$ attention cost over
+the pointwise scorer. Neither variant decodes molecules token by token. An
+empirical latency comparison with GLMR is not reported, so we make no measured
+efficiency claim.
 
 \section{Experiments}
 
@@ -396,17 +400,20 @@ setting and 35.73 for the formula setting.
 
 \subsection{Implementation Details}
 
-The aligned model uses 512-dimensional output embeddings. The preliminary run
-reported here does not load the separately pretrained SpecEmbedding checkpoint;
+The aligned model uses 512-dimensional output embeddings. It does not load the
+separately pretrained SpecEmbedding checkpoint;
 the spectrum and molecular encoders are trained on the MassSpecGym training
 split with bidirectional contrastive alignment.
 
-The reranker has hidden width 512, a 32-dimensional rank embedding, two
-Transformer layers, eight attention heads, and dropout 0.1. We use AdamW with
-learning rate $10^{-4}$, batch size 16, at most 30 epochs, and early stopping on
+The reranker has hidden width 512, a 32-dimensional rank embedding, and dropout
+0.1. The set-aware variant has two Transformer layers with eight attention
+heads; the pointwise control removes both layers. We use AdamW with learning
+rate $10^{-4}$, batch size 16, at most 30 epochs, and early stopping on
 validation MRR with patience 5. The pairwise weight and margin are
-$\lambda=0.2$ and $\gamma=0.1$. All reported rerankers are selected without
-test-set access and evaluated on one NVIDIA RTX 4090.
+$\lambda=0.2$ and $\gamma=0.1$. With one fixed alignment checkpoint and fixed
+caches, each reranker variant is trained with seeds 42, 43, and 44. This measures
+reranker variation, not end-to-end alignment uncertainty. All models are
+selected without test-set access and evaluated on one NVIDIA RTX 4090.
 
 The top-40 base recall before supervised insertion is 92.59\% for mass and
 89.40\% for formula on the training split. Training lists are completed to
@@ -415,26 +422,30 @@ the corresponding upper bounds are 82.15\% and 87.30\%.
 
 \subsection{Baselines and Metrics}
 
-The controlled baseline is the same aligned retriever without the second-stage
-ranker. We also show JESTR and GLMR values from Table 1 of the GLMR paper
+The controlled baselines are the same aligned retriever without the second-stage
+ranker and a pointwise reranker that removes candidate self-attention while
+retaining all other inputs and objectives. We also show JESTR and GLMR values
+from Table 1 of the GLMR paper
 \cite{zhang2026glmr}. These external numbers provide context but are not a
-controlled ablation: JESTR and GLMR have not yet been rerun in our codebase, and
+controlled ablation: JESTR and GLMR were not independently reproduced in our codebase, and
 small differences in molecular canonicalization or candidate handling may
 affect exact values.
 
 We report Recall@1, Recall@5, Recall@20, and mean reciprocal rank (MRR) over all
 test queries. MCES@1 measures structural distance between the top prediction and
-target, so lower is better. MCES@1 is reported for both candidate settings.
+target, so lower is better. Recall and MRR uncertainty is computed over three
+reranker seeds with a fixed base checkpoint. MCES@1 was computed only for the
+representative seed-42 Transformer run.
 
 \subsection{Main Results}
 
 \begin{table}[t]
   \centering
-  \caption{MassSpecGym retrieval results. Recall and MRR are reported in
-  percent; MCES@1 is a distance (lower is better). JESTR and GLMR values are
-  reported by Zhang et al.\ \cite{zhang2026glmr}; our rows use the local
-  pipeline and official candidate files. Cross-paper comparisons are
-  provisional until controlled reproduction.}
+  \caption{Representative seed-42 MassSpecGym results and cross-paper context.
+  Recall and MRR are percentages; MCES@1 is a distance (lower is better). JESTR
+  and GLMR values are reported by Zhang et al.\ \cite{zhang2026glmr}; our rows
+  use the local pipeline and official candidate files. The external rows are
+  used only as cross-paper context.}
   \label{tab:main_results}
   \small
   \begin{tabular}{llrrrrr}
@@ -445,46 +456,72 @@ target, so lower is better. MCES@1 is reported for both candidate settings.
       & JESTR (reported) & 17.62 & 40.36 & 64.76 & 29.12 & 15.82 \\
       & GLMR (reported) & 64.17 & 72.96 & 78.78 & 67.82 & 11.14 \\
       & \base{} & 43.78 & 61.10 & 75.55 & 51.96 & 16.42 \\
-      & \method{} & 67.91 & 76.00 & 80.45 & 71.62 & 8.02 \\
+      & Set Transformer & 67.91 & 76.00 & 80.45 & 71.62 & 8.02 \\
     \midrule
     \multirow{4}{*}{Formula}
       & JESTR (reported) & 11.77 & 33.26 & 61.01 & 22.83 & 11.73 \\
       & GLMR (reported) & 68.48 & 78.09 & 84.22 & 72.47 & 5.05 \\
       & \base{} & 58.49 & 71.49 & 81.81 & 64.65 & 6.14 \\
-      & \method{} & 74.33 & 80.64 & 85.07 & 77.27 & 3.13 \\
+      & Set Transformer & 74.33 & 80.64 & 85.07 & 77.27 & 3.13 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-The controlled comparison shows that listwise reranking adds 24.13 percentage
+In the representative seed-42 run, the set Transformer adds 24.13 percentage
 points in mass-conditioned Recall@1 and 15.84 points in formula-conditioned
 Recall@1. The corresponding MRR gains are 19.66 and 12.62 points. Improvements
 at Recall@20 are smaller because the first-stage top-40 upper bound is already
 the dominant constraint.
 
-Relative to the externally reported GLMR values, our current Recall@1 is higher
+Relative to the externally reported GLMR values, the representative Recall@1 is higher
 by 3.74 points for mass candidates and 5.85 points for formula candidates. The
 MCES@1 distances decrease from the reported 11.14 to 8.02 for mass candidates
 and from 5.05 to 3.13 for formula candidates. These figures are encouraging but
 do not by themselves prove that listwise reranking is superior to generation:
 our base retriever already differs substantially from the GLMR pre-retriever. A
-publishable causal comparison must rerun the baselines or apply the reranker to
-matched frozen embeddings and candidate lists.
+matched causal comparison would require rerunning the baselines or applying the
+reranker to identical frozen embeddings and candidate lists; we therefore treat
+the present comparison as contextual rather than causal.
 
-\subsection{Required Ablations and Robustness Checks}
+\subsection{Controlled Reranker Ablation}
 
-The final evaluation should isolate four factors: (i) base retrieval versus a
-pointwise MLP versus the full candidate-set Transformer; (ii) removal of the
-base score, rank embedding, product feature, and absolute-difference feature;
-(iii) listwise loss alone versus the combined loss; and (iv) top-$K$ values
-20, 40, 100, and 256. Candidate-order shuffling should also be disabled in one
-run to test for positional shortcuts.
+\begin{table}[t]
+  \centering
+  \caption{Controlled comparison on one fixed base retriever. Reranker results
+  are mean $\pm$ sample standard deviation over seeds 42, 43, and 44; the base
+  row is fixed across runs. All values are percentages.}
+  \label{tab:reranker_ablation}
+  \scriptsize
+  \begin{tabular}{llcccc}
+    \toprule
+    Library & Method & R@1 & R@5 & R@20 & MRR \\
+    \midrule
+    \multirow{3}{*}{Mass}
+      & Base & 43.78 & 61.10 & 75.55 & 51.96 \\
+      & Pointwise & $67.89\pm0.44$ & $75.79\pm0.19$ & $80.63\pm0.05$ & $71.53\pm0.35$ \\
+      & Set Transformer & $67.75\pm0.31$ & $75.88\pm0.18$ & $80.63\pm0.15$ & $71.52\pm0.24$ \\
+    \midrule
+    \multirow{3}{*}{Formula}
+      & Base & 58.49 & 71.49 & 81.81 & 64.65 \\
+      & Pointwise & $73.77\pm0.19$ & $80.55\pm0.12$ & $84.97\pm0.15$ & $76.88\pm0.16$ \\
+      & Set Transformer & $73.98\pm0.84$ & $80.27\pm0.54$ & $85.07\pm0.05$ & $76.95\pm0.69$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
-For ADMA's benchmarking scope, every main configuration should be rerun with at
-least three seeds and reported with uncertainty. We will additionally report
-parameter count, peak memory, cache construction time, reranker latency, and
-end-to-end latency. The efficiency comparison must distinguish one-time
-molecule embedding/cache cost from per-query inference cost.
+Both learned rankers substantially outperform the fixed base model. However,
+the set Transformer differs from the pointwise model by only $-0.13$ Recall@1
+points for mass candidates and $+0.21$ points for formula candidates on average,
+and it wins only three of the six paired seed--candidate Recall@1 comparisons.
+MRR differences are likewise negligible. Candidate self-attention therefore provides no stable
+additional benefit under the current protocol; the supported result is the
+value of supervised residual reranking with explicit interaction and retrieval
+features.
+
+We do not report feature-removal, objective, candidate-order, or full top-$K$
+ablations; conclusions about those components are outside the present evidence.
+We also do not report parameter count, peak memory, cache construction time,
+reranker latency, or end-to-end latency.
 
 \section{Limitations and Responsible Evaluation}
 
@@ -492,8 +529,11 @@ molecule embedding/cache cost from per-query inference cost.
 utility depends on first-stage recall. The formula-conditioned setting assumes
 formula information that may itself require prediction in a real workflow. The
 current external JESTR and GLMR rows are reported rather than independently
-reproduced, and the current results come from one random seed. These limitations
-preclude a definitive state-of-the-art claim at this stage.
+reproduced. The rerankers use three seeds, but all share one fixed seed-42
+alignment checkpoint; the reported uncertainty therefore excludes first-stage
+variation. Candidate self-attention also shows no stable advantage over the
+pointwise control. These limitations preclude a definitive state-of-the-art or
+self-attention benefit claim.
 
 Training-only positive insertion is a supervised sampling operation, not a
 valid evaluation protocol. We expose the pre-insertion training recall and
@@ -505,15 +545,17 @@ though it avoids generation validity failures.
 
 \section{Conclusion}
 
-We presented \method{} for MS/MS-based molecule retrieval. This non-generative
-reranker models a candidate set using explicit pair features, self-attention,
-residual scoring, and listwise supervision on top of a contrastively aligned
-base retriever. Controlled MassSpecGym results show large gains under both mass-
-and formula-conditioned libraries. The comparison with JESTR and GLMR clarifies
-the intended contribution: not another joint embedding or molecule generator,
-but direct learning to rank over hard molecular candidates. Controlled baseline
-reproduction, multi-seed ablations, and measured efficiency remain necessary
-for the final submission.
+We presented \method{} for MS/MS-based molecule retrieval. The framework uses
+explicit pair features, retrieval priors, residual scoring, and listwise
+supervision on top of a contrastively aligned base retriever. Controlled
+MassSpecGym results show large gains from learned reranking in every one of
+three reranker initializations on the fixed seed-42 base retriever under both
+mass- and formula-conditioned libraries. A matched three-seed comparison finds
+that the pointwise scorer performs on par with the candidate-set Transformer, so
+the current evidence supports direct residual learning to rank rather than a
+specific benefit from self-attention. Claims about matched external baselines,
+individual feature and loss contributions, and measured efficiency are outside
+the present evidence.
 
 \bibliographystyle{splncs04}
 \bibliography{references}
