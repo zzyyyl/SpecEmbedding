@@ -20,7 +20,7 @@
 % 1. Replace all provisional cross-paper comparisons with results obtained
 %    under one canonicalization/candidate protocol, or retain the explicit
 %    "reported result" qualification.
-% 2. Fill in ablations, efficiency, three-seed uncertainty, and mass MCES@1.
+% 2. Fill in ablations, efficiency, and three-seed uncertainty.
 % 3. Check the final PDF is <=15 pages and scrub identifying PDF metadata.
 
 \usepackage[T1]{fontenc}
@@ -424,18 +424,17 @@ affect exact values.
 
 We report Recall@1, Recall@5, Recall@20, and mean reciprocal rank (MRR) over all
 test queries. MCES@1 measures structural distance between the top prediction and
-target, so lower is better. MCES@1 has been completed for the formula setting;
-the mass result remains to be computed.
+target, so lower is better. MCES@1 is reported for both candidate settings.
 
 \subsection{Main Results}
 
 \begin{table}[t]
   \centering
-  \caption{MassSpecGym retrieval results (\%). JESTR and GLMR values are
+  \caption{MassSpecGym retrieval results. Recall and MRR are reported in
+  percent; MCES@1 is a distance (lower is better). JESTR and GLMR values are
   reported by Zhang et al.\ \cite{zhang2026glmr}; our rows use the local
-  pipeline and official candidate files. MCES@1 is a distance (lower is
-  better). Cross-paper comparisons are provisional until controlled
-  reproduction.}
+  pipeline and official candidate files. Cross-paper comparisons are
+  provisional until controlled reproduction.}
   \label{tab:main_results}
   \small
   \begin{tabular}{llrrrrr}
@@ -445,8 +444,8 @@ the mass result remains to be computed.
     \multirow{4}{*}{Mass}
       & JESTR (reported) & 17.62 & 40.36 & 64.76 & 29.12 & 15.82 \\
       & GLMR (reported) & 64.17 & 72.96 & 78.78 & 67.82 & 11.14 \\
-      & \base{} & 43.78 & 61.10 & 75.55 & 51.96 & -- \\
-      & \method{} & 67.91 & 76.00 & 80.45 & 71.62 & -- \\
+      & \base{} & 43.78 & 61.10 & 75.55 & 51.96 & 16.42 \\
+      & \method{} & 67.91 & 76.00 & 80.45 & 71.62 & 8.02 \\
     \midrule
     \multirow{4}{*}{Formula}
       & JESTR (reported) & 11.77 & 33.26 & 61.01 & 22.83 & 11.73 \\
@@ -465,12 +464,12 @@ the dominant constraint.
 
 Relative to the externally reported GLMR values, our current Recall@1 is higher
 by 3.74 points for mass candidates and 5.85 points for formula candidates. The
-formula MCES@1 distance also decreases from the reported 5.05 to 3.13. These
-figures are encouraging but do not by themselves prove that listwise reranking
-is superior to generation: our base retriever already differs substantially
-from the GLMR pre-retriever. A publishable causal comparison must rerun the
-baselines or apply the reranker to matched frozen embeddings and candidate
-lists.
+MCES@1 distances decrease from the reported 11.14 to 8.02 for mass candidates
+and from 5.05 to 3.13 for formula candidates. These figures are encouraging but
+do not by themselves prove that listwise reranking is superior to generation:
+our base retriever already differs substantially from the GLMR pre-retriever. A
+publishable causal comparison must rerun the baselines or apply the reranker to
+matched frozen embeddings and candidate lists.
 
 \subsection{Required Ablations and Robustness Checks}
 

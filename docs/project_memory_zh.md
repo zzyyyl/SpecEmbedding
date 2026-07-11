@@ -1,11 +1,11 @@
 # SpecEmbedding 项目记忆
 
-最后更新：2026-07-10
+最后更新：2026-07-11
 
-文档创建前代码状态：
+本次更新前代码状态：
 
 - 分支：`dev`
-- 最新提交：`91877d6 docs(paper): 添加 ADMA2026 投稿待办清单`
+- 最新提交：`4b275f0 docs: 添加项目记忆文档`
 - 工作区：干净
 
 本文档用于后续开发、实验和论文协作时快速恢复上下文。它是内部协作材料，不应直接放入 ADMA 双盲补充材料。若本文档与代码、`params.yaml` 或实验日志冲突，以代码和原始日志为准。
@@ -348,21 +348,25 @@ MassSpecGym 候选文件来自其官方数据集发布：
 
 ### 6.2 本地结果
 
-所有数值以百分比表示，MRR 在日志中原始范围为 $[0,1]$，论文中乘以 100。
+除 MCES@1 外，表中数值均以百分比表示；MRR 在日志中原始范围为 $[0,1]$，表中乘以 100。MCES@1 是结构距离，保留原始量纲，越低越好。
 
 | Candidate | Method | Upper bound | Recall@1 | Recall@5 | Recall@10 | Recall@20 | MRR | MCES@1 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| mass | Base | 82.15 | 43.78 | 61.10 | 68.43 | 75.55 | 51.96 | 待计算 |
-| mass | Rerank | 82.15 | 67.91 | 76.00 | 78.44 | 80.45 | 71.62 | 待计算 |
+| mass | Base | 82.15 | 43.78 | 61.10 | 68.43 | 75.55 | 51.96 | 16.42 |
+| mass | Rerank | 82.15 | 67.91 | 76.00 | 78.44 | 80.45 | 71.62 | 8.02 |
 | formula | Base | 87.30 | 58.49 | 71.49 | 76.86 | 81.81 | 64.65 | 6.14 |
 | formula | Rerank | 87.30 | 74.33 | 80.64 | 82.89 | 85.07 | 77.27 | 3.13 |
+
+mass MCES@1 的原始输出为 Base 16.4199、Rerank 8.0209；表中按两位小数展示。
 
 相对基础检索器：
 
 - mass Recall@1：+24.13 个百分点
 - mass MRR：+19.66 个百分点
+- mass MCES@1：16.42 降至 8.02，绝对降低 8.40，相对降低 51.15%（越低越好）
 - formula Recall@1：+15.84 个百分点
 - formula MRR：+12.62 个百分点
+- formula MCES@1：6.14 降至 3.13（越低越好）
 
 测试 top-40 平均候选数：
 
@@ -425,7 +429,6 @@ rerank_cache/<run>/prepare_rerank_cache_{train,val,test}.log
 - formula candidate 设置假设已知真实分子式，应称为 formula-conditioned retrieval，不能描述成完全开放的未知分子鉴定。
 - reranker 是 closed-library 方法，不能生成候选库之外的新分子。
 - 当前只有一个随机种子。
-- mass MCES@1 尚未完成。
 - JESTR 和 GLMR 尚未在本代码库统一复现。
 
 ## 8. 与 JESTR 和 GLMR 的比较
@@ -550,10 +553,11 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 参考文献：`paper/references.bib`
 - 待办清单：`paper/ADMA2026_TODO.md`
 - 英文编译：成功，9 页
-- 中文编译：成功，9 页
+- 中文编译：成功，8 页
 - 英文 PDF 作者元数据：空
 - 致谢和基金：未加入
 - AI assistance disclosure：已加入
+- mass MCES@1：已完成（Base 16.42，Rerank 8.02）
 
 当前论文仍不是最终可提交版本，正文中保留了待完成实验和未来时态。
 
@@ -592,16 +596,15 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 
 完整清单以 `paper/ADMA2026_TODO.md` 为准。当前 P0：
 
-1. 计算 mass MCES@1。
-2. 至少运行 3 个随机种子。
-3. 完成 base、pointwise 和 Transformer reranker 受控消融。
-4. 完成 feature、loss、候选顺序和 top-$K$ 消融。
-5. 尽可能在统一协议下复现 JESTR 和 GLMR。
-6. 若不能复现，保留 `reported` 标记并撤回严格 SOTA 表述。
-7. 测量参数量、显存、cache 时间、rerank latency 和端到端 latency。
-8. 制作正式方法图，替换 LaTeX 文本框。
-9. 用真实结果替换正文中的待办式段落和未来时态。
-10. 对匿名补充材料执行身份信息清理。
+1. 至少运行 3 个随机种子。
+2. 完成 base、pointwise 和 Transformer reranker 受控消融。
+3. 完成 feature、loss、候选顺序和 top-$K$ 消融。
+4. 尽可能在统一协议下复现 JESTR 和 GLMR。
+5. 若不能复现，保留 `reported` 标记并撤回严格 SOTA 表述。
+6. 测量参数量、显存、cache 时间、rerank latency 和端到端 latency。
+7. 制作正式方法图，替换 LaTeX 文本框。
+8. 用真实结果替换正文中的待办式段落和未来时态。
+9. 对匿名补充材料执行身份信息清理。
 
 ## 12. 已知风险与容易混淆的地方
 

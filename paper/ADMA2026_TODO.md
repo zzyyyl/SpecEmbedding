@@ -1,6 +1,6 @@
 # ADMA 2026 投稿待办
 
-最后更新：2026-07-10
+最后更新：2026-07-11
 
 - 论文截止：2026-07-17 AoE
 - 补充材料截止：正文截止后 3 天
@@ -17,7 +17,7 @@
 
 ## P0：投稿前必须完成
 
-- [ ] 计算质量候选场景的 MCES@1。
+- [x] 计算质量候选场景的 MCES@1（Base：16.4199；Full reranker：8.0209；越低越好）。
 - [ ] 在统一候选集、SMILES canonicalization 和评价代码下复现 JESTR。
 - [ ] 在相同协议下复现 GLMR。
 - [ ] 如果无法完成 JESTR/GLMR 复现，全文保留 `reported results` 标记，不声称严格 SOTA。
@@ -86,14 +86,14 @@
 
 ## 实验结果记录
 
-在完成实验后，将结果路径和关键指标记录在这里，避免只保留终端日志。
+在完成实验后，将结果路径和关键指标记录在这里，避免只保留终端日志。MCES@1 为结构距离，越低越好；表中保留两位小数，精确原始值记录在对应待办项中。
 
 | 实验 | 候选类型 | 随机种子 | Recall@1 | Recall@5 | Recall@20 | MRR | MCES@1 | 结果路径 | 状态 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
-| Base retriever | mass | 42 | 43.78 | 61.10 | 75.55 | 51.96 | 待计算 | `checkpoints_align/d4c1f70_massspecgym_nopretrain/` | 已完成 |
-| Full reranker | mass | 42 | 67.91 | 76.00 | 80.45 | 71.62 | 待计算 | `checkpoints_rerank/d4c1f70_massspecgym_nopretrain_mass_topk40/` | 已完成 |
-| Base retriever | formula | 42 | 58.49 | 71.49 | 81.81 | 64.65 | 6.14 | `checkpoints_align/d4c1f70_massspecgym_nopretrain/` | 已完成 |
-| Full reranker | formula | 42 | 74.33 | 80.64 | 85.07 | 77.27 | 3.13 | `checkpoints_rerank/d4c1f70_massspecgym_nopretrain_formula_topk40/` | 已完成 |
+| Base retriever | mass | 42 | 43.78 | 61.10 | 75.55 | 51.96 | 16.42 | `checkpoints_rerank/d4c1f70_massspecgym_nopretrain_mass_topk40/eval_rerank.log` | 已完成 |
+| Full reranker | mass | 42 | 67.91 | 76.00 | 80.45 | 71.62 | 8.02 | `checkpoints_rerank/d4c1f70_massspecgym_nopretrain_mass_topk40/eval_rerank.log` | 已完成 |
+| Base retriever | formula | 42 | 58.49 | 71.49 | 81.81 | 64.65 | 6.14 | `checkpoints_rerank/d4c1f70_massspecgym_nopretrain_formula_topk40/eval_rerank.log` | 已完成 |
+| Full reranker | formula | 42 | 74.33 | 80.64 | 85.07 | 77.27 | 3.13 | `checkpoints_rerank/d4c1f70_massspecgym_nopretrain_formula_topk40/eval_rerank.log` | 已完成 |
 | Pointwise reranker | mass | - | - | - | - | - | - | - | 未运行 |
 | Pointwise reranker | formula | - | - | - | - | - | - | - | 未运行 |
 
@@ -108,7 +108,8 @@
 
 ## 建议时间线
 
-- [ ] 7 月 10 日至 12 日：基线复现、MCES 和多随机种子实验。
+- [x] 7 月 10 日至 12 日：完成质量候选场景的 MCES@1。
+- [ ] 7 月 10 日至 12 日：完成基线复现和多随机种子实验。
 - [ ] 7 月 13 日至 14 日：消融、效率和案例分析。
 - [ ] 7 月 15 日：更新图表和全文。
 - [ ] 7 月 16 日：执行双盲、页数、引用和补充材料检查。
