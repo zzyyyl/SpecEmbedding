@@ -91,6 +91,12 @@ def parse_args():
         default=config.rerank.train.model_type,
         help="Reranker variant. Other hyperparameters are read from rerank.train in params.yaml.",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=config.general.seed,
+        help="Random seed. Defaults to general.seed in params.yaml.",
+    )
     args = parser.parse_args()
 
     args.train_k = int(config.rerank.train.train_k)
@@ -133,6 +139,8 @@ def main():
 
     if args.train_k <= 0:
         raise ValueError("rerank.train.train_k must be greater than 0")
+    if args.seed < 0:
+        raise ValueError("--seed must be greater than or equal to 0")
     if args.batch_size <= 0:
         raise ValueError("rerank.train.batch_size must be greater than 0")
     if args.epochs <= 0:
@@ -156,7 +164,7 @@ def main():
     save_dir.mkdir(parents=True, exist_ok=True)
     setup_logging(save_dir / "train_rerank.log")
     startup_logging(args, "Train SpecEmbedding reranker")
-    set_seed(config.general.seed)
+    set_seed(args.seed)
     device = resolve_device(args.device)
 
     train_dataset = RerankCacheDataset(
@@ -251,6 +259,8 @@ def main():
                     "best_metric": best_metric,
                     "best_epoch": best_epoch,
                     "val_metrics": val_metrics,
+                    "seed": args.seed,
+                    "training_config": vars(args).copy(),
                 },
                 save_path,
             )
@@ -261,7 +271,15 @@ def main():
             if patience_counter >= args.patience:
                 break
 
-    torch.save({"state_dict": model.state_dict(), "model_config": model_config}, save_dir / "last_reranker.pth")
+    torch.save(
+        {
+            "state_dict": model.state_dict(),
+            "model_config": model_config,
+            "seed": args.seed,
+            "training_config": vars(args).copy(),
+        },
+        save_dir / "last_reranker.pth",
+    )
     logging.info("Training finished. Best epoch=%s best_%s=%.4f", best_epoch, args.metric_for_best, best_metric)
 
 
