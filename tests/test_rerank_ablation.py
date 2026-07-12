@@ -16,6 +16,7 @@ from run_rerank_multiseed import (
     experiment_dir,
     experiment_fingerprint,
     select_attempt,
+    training_selection_metadata,
     write_summaries,
 )
 from SpecEmbedding.models_rerank import CandidateReranker
@@ -54,6 +55,7 @@ class RerankerAblationTest(unittest.TestCase):
             params_sha256="params",
             mces=False,
             rerun_completed=False,
+            exclude_val_query_indices=[],
         )
 
     def _materialize_attempt(self, args, experiment, *, state="complete", with_eval=True):
@@ -71,16 +73,24 @@ class RerankerAblationTest(unittest.TestCase):
             **{key: value for key, value in overrides.items() if key.startswith("use_")},
         }
         training_config = {
-            key: value for key, value in overrides.items() if not key.startswith("use_")
+            **{key: value for key, value in overrides.items() if not key.startswith("use_")},
+            "exclude_val_query_indices": args.exclude_val_query_indices,
+            "metric_for_best": "mrr",
+            "epochs": 30,
         }
         checkpoint = {
             "seed": experiment.seed,
             "model_config": model_config,
             "training_config": training_config,
+            "best_epoch": 7,
+            "best_metric": 0.75,
         }
         torch.save(checkpoint, attempt / "best_reranker.pth")
         torch.save(checkpoint, attempt / "last_reranker.pth")
-        (attempt / "train_rerank.log").write_text("Training finished.\n", encoding="utf-8")
+        (attempt / "train_rerank.log").write_text(
+            "Epoch 1: train_loss=1.0\nEpoch 12: train_loss=0.5\nTraining finished.\n",
+            encoding="utf-8",
+        )
         if with_eval:
             (attempt / "eval_rerank.log").write_text(
                 "\n".join(
@@ -198,6 +208,18 @@ class RerankerAblationTest(unittest.TestCase):
         )
         self.assertEqual(ce_command[ce_command.index("--lambda-pair") + 1], "0.0")
 
+        filtered_command = build_train_command(
+            Path("/repo"),
+            caches,
+            Path("attempt"),
+            Experiment("mass", "pointwise", "full", 42),
+            "cuda:1",
+            40,
+            [7686, 7687],
+        )
+        exclusion_position = filtered_command.index("--exclude-val-query-indices")
+        self.assertEqual(filtered_command[exclusion_position + 1 :], ["7686", "7687"])
+
     def test_failed_evaluation_resumes_without_retraining(self):
         with tempfile.TemporaryDirectory() as temporary:
             args = self._runner_args(Path(temporary))
@@ -211,6 +233,42 @@ class RerankerAblationTest(unittest.TestCase):
             action, selected = select_attempt(args, experiment)
         self.assertEqual(action, "eval")
         self.assertEqual(selected, attempt)
+
+    def test_changed_validation_exclusions_create_a_new_attempt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args = self._runner_args(Path(temporary))
+            experiment = Experiment("mass", "pointwise", "full", 42)
+            self._materialize_attempt(args, experiment)
+            args.exclude_val_query_indices = [7686, 7687]
+
+            action, selected = select_attempt(args, experiment)
+
+        self.assertEqual(action, "train_eval")
+        self.assertEqual(selected.name, "attempt_002")
+
+    def test_training_selection_metadata_uses_exact_checkpoint_values(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            attempt = Path(temporary)
+            torch.save(
+                {
+                    "best_epoch": 10,
+                    "best_metric": 0.6353486421,
+                    "training_config": {"metric_for_best": "mrr", "epochs": 30},
+                },
+                attempt / "best_reranker.pth",
+            )
+            (attempt / "train_rerank.log").write_text(
+                "Epoch 1: train_loss=1.0\nEpoch 15: train_loss=0.5\nTraining finished.\n",
+                encoding="utf-8",
+            )
+
+            metadata = training_selection_metadata(attempt)
+
+        self.assertEqual(metadata["metric_for_best"], "mrr")
+        self.assertEqual(metadata["best_epoch"], 10)
+        self.assertEqual(metadata["best_val_metric"], 0.6353486421)
+        self.assertEqual(metadata["stop_epoch"], 15)
+        self.assertTrue(metadata["early_stopped"])
 
     def test_summary_discovers_completed_subset_runs(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -231,6 +289,8 @@ class RerankerAblationTest(unittest.TestCase):
             {row["ablation"] for row in aggregate_rows},
             {"no_residual", "listwise_only"},
         )
+        self.assertTrue(all(row["best_val_metric_mean"] == "0.75" for row in aggregate_rows))
+        self.assertTrue(all(row["best_epoch_mean"] == "7" for row in aggregate_rows))
 
     def test_query_exclusion_uses_cache_indices(self):
         dataset = SimpleNamespace(queries=[{} for _ in range(5)], indices=list(range(5)))

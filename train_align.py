@@ -1,4 +1,6 @@
 import argparse
+import hashlib
+import json
 import logging
 import os
 import random
@@ -11,10 +13,12 @@ from torch.utils.data import DataLoader
 
 from SpecEmbedding.config import config
 from SpecEmbedding.data.datasets_align import AlignGraphDataset, align_collate_fn
+from SpecEmbedding.data.overlap import filter_classified_validation
 from SpecEmbedding.models_align import GINEEncoder, SpecMolAlignModel
 from SpecEmbedding.trainer.trainer import set_seed
 from SpecEmbedding.trainer.trainer_align import TrainerAlign
 from SpecEmbedding.utils.model import SiameseModel
+from SpecEmbedding.utils.providers import get_provider
 from SpecEmbedding.utils.runtime import resolve_device, setup_logging, startup_logging
 from train import add_base_argument, get_classified_data
 
@@ -23,6 +27,7 @@ def seed_worker(worker_id):
     worker_seed = torch.initial_seed() % 2**32
     np.random.seed(worker_seed)
     random.seed(worker_seed)
+
 
 def train_align(
     train_data: dict,
@@ -37,6 +42,7 @@ def train_align(
     mol_norm_type: str = getattr(config.model.mol_encoder, "norm_type", "layernorm"),
     mol_norm_eps: float = getattr(config.model.mol_encoder, "norm_eps", 1e-5),
     device: str | torch.device | None = None,
+    selection_metadata: dict | None = None,
 ):
     device = resolve_device(device)
     seed = config.general.seed
@@ -174,6 +180,22 @@ def train_align(
 
     trainer.fit(epochs=epochs_stage2, optimizer=optimizer2, scheduler=scheduler2, stage_name="stage2", patience=config.train.align.patience)
 
+    best_checkpoint = Path(save_dir) / "best_model_stage2.pth"
+    checkpoint_digest = hashlib.sha256()
+    with best_checkpoint.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            checkpoint_digest.update(chunk)
+    selection_summary = {
+        **(selection_metadata or {}),
+        "checkpoint": str(best_checkpoint.resolve()),
+        "checkpoint_sha256": checkpoint_digest.hexdigest(),
+        "stages": trainer.stage_summaries,
+    }
+    (Path(save_dir) / "alignment_selection.json").write_text(
+        json.dumps(selection_summary, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
     logging.info("\nTwo-stage training completed successfully.")
     return model
 
@@ -186,8 +208,27 @@ def main():
     parser.add_argument("--mol_norm_type", type=str, choices=["layernorm", "rmsnorm"], default=getattr(config.model.mol_encoder, "norm_type", "layernorm"), help="Normalization used in the molecule GINE encoder.")
     parser.add_argument("--mol_norm_eps", type=float, default=getattr(config.model.mol_encoder, "norm_eps", 1e-5), help="Epsilon used by molecule encoder normalization.")
     parser.add_argument("--pretrained_spec", type=str, help="Path to your pre-trained SpecEmbedding model weights")
+    parser.add_argument(
+        "--tokenset_cache",
+        "--tokenset-cache",
+        dest="tokenset_cache",
+        type=str,
+        help="Exact classified TokenSet cache file used for alignment training.",
+    )
+    parser.add_argument(
+        "--exclude_val_query_indices",
+        "--exclude-val-query-indices",
+        dest="exclude_val_query_indices",
+        nargs="*",
+        type=int,
+        default=[],
+        help="Zero-based raw validation query indices excluded before alignment model selection.",
+    )
 
     args = parser.parse_args()
+    args.exclude_val_query_indices = sorted(set(args.exclude_val_query_indices))
+    if any(index < 0 for index in args.exclude_val_query_indices):
+        parser.error("--exclude-val-query-indices must contain non-negative integers")
 
     save_path = Path(args.save_dir)
     save_path.mkdir(parents=True, exist_ok=True)
@@ -196,7 +237,25 @@ def main():
     set_seed(config.general.seed)
     device = resolve_device(args.device)
 
-    classified_data = get_classified_data(dataset_type=args.dataset_type, data_path=args.data_path)
+    classified_data = get_classified_data(
+        dataset_type=args.dataset_type,
+        data_path=args.data_path,
+        cache_file=args.tokenset_cache,
+    )
+    exclusion_report = {
+        "query_indices": [],
+        "smiles": [],
+        "keys": [],
+    }
+    if args.exclude_val_query_indices:
+        provider = get_provider(args.dataset_type, args.data_path)
+        val_raw = provider.load_data(mode="val")
+        classified_data, exclusion_report = filter_classified_validation(
+            classified_data,
+            val_raw,
+            args.exclude_val_query_indices,
+        )
+        logging.info("Validation exclusion report: %s", exclusion_report)
     train_data = classified_data['train_data']
     train_keys = classified_data['train_keys']
     val_data = classified_data['val_data']
@@ -241,6 +300,18 @@ def main():
         mol_norm_type=args.mol_norm_type,
         mol_norm_eps=args.mol_norm_eps,
         device=device,
+        selection_metadata={
+            "dataset_type": args.dataset_type,
+            "data_path": str(Path(args.data_path).resolve()),
+            "tokenset_cache": (
+                str(Path(args.tokenset_cache).resolve())
+                if args.tokenset_cache
+                else None
+            ),
+            "seed": config.general.seed,
+            "exclude_val_query_indices": args.exclude_val_query_indices,
+            "validation_exclusion_report": exclusion_report,
+        },
     )
 
 

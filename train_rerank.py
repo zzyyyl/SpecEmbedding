@@ -8,7 +8,11 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from SpecEmbedding.config import config
-from SpecEmbedding.data.datasets_rerank import RerankCacheDataset, rerank_collate_fn
+from SpecEmbedding.data.datasets_rerank import (
+    RerankCacheDataset,
+    exclude_query_indices,
+    rerank_collate_fn,
+)
 from SpecEmbedding.trainer.trainer import set_seed
 from SpecEmbedding.utils.rerank import (
     build_reranker,
@@ -150,7 +154,18 @@ def parse_args():
         default=int(config.rerank.train.train_k),
         help="Maximum candidates per training list.",
     )
+    parser.add_argument(
+        "--exclude-val-query-indices",
+        nargs="*",
+        type=int,
+        default=[],
+        help="Zero-based validation cache query indices excluded before model selection.",
+    )
     args = parser.parse_args()
+
+    if any(index < 0 for index in args.exclude_val_query_indices):
+        parser.error("--exclude-val-query-indices must contain non-negative integers")
+    args.exclude_val_query_indices = sorted(set(args.exclude_val_query_indices))
 
     args.batch_size = int(config.rerank.train.batch_size)
     args.epochs = int(config.rerank.train.epochs)
@@ -232,6 +247,17 @@ def main():
         shuffle_candidates=False,
         require_label=False,
     )
+    excluded_val_count = exclude_query_indices(
+        val_dataset,
+        args.exclude_val_query_indices,
+        split_name="validation",
+    )
+    if excluded_val_count:
+        logging.info(
+            "Excluded %s validation cache queries before model selection: %s",
+            excluded_val_count,
+            args.exclude_val_query_indices,
+        )
     train_loader = DataLoader(
         train_dataset,
         batch_size=args.batch_size,

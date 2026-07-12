@@ -12,6 +12,23 @@ def load_rerank_cache(cache_path: str | Path):
         return torch.load(cache_path, map_location="cpu")
 
 
+def exclude_query_indices(
+    dataset,
+    query_indices: list[int],
+    *,
+    split_name: str = "evaluation",
+) -> int:
+    excluded = set(query_indices)
+    invalid = sorted(index for index in excluded if index < 0 or index >= len(dataset.queries))
+    if invalid:
+        raise ValueError(f"Excluded {split_name} query indices are out of range: {invalid}")
+    original_size = len(dataset.indices)
+    dataset.indices = [index for index in dataset.indices if index not in excluded]
+    if not dataset.indices:
+        raise ValueError(f"Query exclusion removed every {split_name} sample")
+    return original_size - len(dataset.indices)
+
+
 class RerankCacheDataset(Dataset):
     """Dataset backed by a rerank cache generated from a frozen SpecMolAlignModel."""
 

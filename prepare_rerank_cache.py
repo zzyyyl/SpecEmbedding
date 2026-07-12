@@ -1,5 +1,6 @@
 # ruff: noqa: E402
 import argparse
+import hashlib
 import logging
 import os
 from pathlib import Path
@@ -24,6 +25,14 @@ from SpecEmbedding.type import TokenizerConfig
 from SpecEmbedding.utils.align import load_align_model, resolve_storage_dtype
 from SpecEmbedding.utils.providers import get_provider, load_candidates
 from SpecEmbedding.utils.runtime import resolve_device, setup_logging, startup_logging
+
+
+def sha256_file(path: str | Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def build_unique_candidate_list(sequences, candidates_dict, limit: int = 0):
@@ -336,6 +345,7 @@ def main():
     setup_logging(save_path.parent / f"prepare_rerank_cache_{args.split}.log")
     startup_logging(args, "Prepare rerank cache")
     device = resolve_device(args.device)
+    checkpoint_sha256 = sha256_file(args.checkpoint)
 
     model = load_align_model(
         checkpoint=args.checkpoint,
@@ -345,6 +355,12 @@ def main():
     )
     provider = get_provider(args.dataset_type, args.data_path)
     raw_data = provider.load_data(mode=args.split)
+    candidate_source_path = (
+        Path(args.candidate_path)
+        if args.candidate_path
+        else provider.data_dir / f"candidates_{args.candidate_type}.pkl"
+    )
+    candidate_sha256 = sha256_file(candidate_source_path)
     candidates_dict, candidate_label = load_candidates(provider, args.candidate_type, args.candidate_path)
     if not raw_data or not candidates_dict:
         raise RuntimeError("No data or candidates loaded.")
@@ -417,9 +433,12 @@ def main():
             "candidate_label": candidate_label,
             "candidate_type": args.candidate_type,
             "candidate_path": args.candidate_path,
+            "candidate_source_path": str(candidate_source_path.resolve()),
+            "candidate_sha256": candidate_sha256,
             "pre_top_k": args.pre_top_k,
             "force_include_positive": args.force_include_positive,
             "checkpoint": args.checkpoint,
+            "checkpoint_sha256": checkpoint_sha256,
             "num_queries": len(queries),
             "num_molecules": len(pruned_smiles),
             "upper_bound": upper_bound,

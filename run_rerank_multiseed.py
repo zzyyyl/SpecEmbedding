@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import queue
+import re
 import socket
 import statistics
 import subprocess
@@ -141,6 +142,7 @@ def experiment_fingerprint(args, experiment: Experiment, caches: dict[str, Path]
         "ablation": experiment.ablation,
         "ablation_overrides": ablation_overrides(experiment),
         "seed": experiment.seed,
+        "exclude_val_query_indices": args.exclude_val_query_indices,
         "cache_files": {split: cache_file_metadata(path) for split, path in caches.items()},
     }
 
@@ -156,7 +158,11 @@ def attempt_directories(root: Path) -> list[Path]:
     return sorted(path for path in root.glob("attempt_[0-9][0-9][0-9]") if path.is_dir())
 
 
-def checkpoint_matches(path: Path, experiment: Experiment) -> bool:
+def checkpoint_matches(
+    path: Path,
+    experiment: Experiment,
+    expected_val_exclusions: list[int] | None = None,
+) -> bool:
     if not path.exists():
         return False
     try:
@@ -172,6 +178,10 @@ def checkpoint_matches(path: Path, experiment: Experiment) -> bool:
     if model_config.get("model_type") != experiment.model_type:
         return False
     training_config = checkpoint.get("training_config", {})
+    if expected_val_exclusions is not None:
+        actual_exclusions = sorted(set(training_config.get("exclude_val_query_indices", [])))
+        if actual_exclusions != expected_val_exclusions:
+            return False
     for key, expected in ablation_overrides(experiment).items():
         source = model_config if key.startswith("use_") else training_config
         if source.get(key) != expected:
@@ -179,15 +189,27 @@ def checkpoint_matches(path: Path, experiment: Experiment) -> bool:
     return True
 
 
-def training_complete(attempt_dir: Path, experiment: Experiment) -> bool:
+def training_complete(
+    attempt_dir: Path,
+    experiment: Experiment,
+    expected_val_exclusions: list[int] | None = None,
+) -> bool:
     train_log = attempt_dir / "train_rerank.log"
     if not train_log.exists():
         return False
     log_text = train_log.read_text(encoding="utf-8", errors="replace")
     return (
         "Training finished." in log_text
-        and checkpoint_matches(attempt_dir / "best_reranker.pth", experiment)
-        and checkpoint_matches(attempt_dir / "last_reranker.pth", experiment)
+        and checkpoint_matches(
+            attempt_dir / "best_reranker.pth",
+            experiment,
+            expected_val_exclusions,
+        )
+        and checkpoint_matches(
+            attempt_dir / "last_reranker.pth",
+            experiment,
+            expected_val_exclusions,
+        )
     )
 
 
@@ -202,6 +224,40 @@ def evaluation_complete(attempt_dir: Path, expect_mces: bool) -> bool:
     if expect_mces:
         return "Rerank MCES@1" in log_text
     return "MCES calculation skipped." in log_text or "Rerank MCES@1" in log_text
+
+
+def training_selection_metadata(attempt_dir: Path) -> dict:
+    checkpoint_path = attempt_dir / "best_reranker.pth"
+    train_log = attempt_dir / "train_rerank.log"
+    if not checkpoint_path.exists() or not train_log.exists():
+        return {}
+    try:
+        try:
+            checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        except TypeError:
+            checkpoint = torch.load(checkpoint_path, map_location="cpu")
+    except Exception:
+        return {}
+
+    training_config = checkpoint.get("training_config", {})
+    log_text = train_log.read_text(encoding="utf-8", errors="replace")
+    epochs = [
+        int(match.group(1))
+        for match in re.finditer(r"Epoch\s+(\d+):\s+train_loss=", log_text)
+    ]
+    stop_epoch = max(epochs) if epochs else None
+    configured_epochs = training_config.get("epochs")
+    return {
+        "metric_for_best": training_config.get("metric_for_best"),
+        "best_epoch": checkpoint.get("best_epoch"),
+        "best_val_metric": checkpoint.get("best_metric"),
+        "stop_epoch": stop_epoch,
+        "early_stopped": (
+            isinstance(stop_epoch, int)
+            and isinstance(configured_epochs, int)
+            and stop_epoch < configured_epochs
+        ),
+    }
 
 
 def process_is_alive(status: dict) -> bool:
@@ -232,7 +288,7 @@ def select_attempt(args, experiment: Experiment) -> tuple[str, Path]:
     for attempt in reversed(attempts):
         if (
             attempt_matches_current_fingerprint(args, experiment, attempt)
-            and training_complete(attempt, experiment)
+            and training_complete(attempt, experiment, args.exclude_val_query_indices)
             and evaluation_complete(attempt, args.mces)
         ):
             if not args.rerun_completed:
@@ -246,7 +302,7 @@ def select_attempt(args, experiment: Experiment) -> tuple[str, Path]:
             raise RuntimeError(f"Experiment is already running: {latest}")
         if (
             attempt_matches_current_fingerprint(args, experiment, latest)
-            and training_complete(latest, experiment)
+            and training_complete(latest, experiment, args.exclude_val_query_indices)
         ):
             if not evaluation_complete(latest, args.mces):
                 return "eval", latest
@@ -262,6 +318,7 @@ def build_train_command(
     experiment: Experiment,
     device: str,
     train_k: int,
+    exclude_val_query_indices: list[int] | None = None,
 ) -> list[str]:
     command = [
         sys.executable,
@@ -296,6 +353,13 @@ def build_train_command(
             command.append(flag_names[key] if value else flag_names[key].replace("--", "--no-", 1))
         else:
             raise ValueError(f"Unsupported ablation override: {key}")
+    if exclude_val_query_indices:
+        command.extend(
+            [
+                "--exclude-val-query-indices",
+                *[str(index) for index in exclude_val_query_indices],
+            ]
+        )
     return command
 
 
@@ -340,6 +404,7 @@ def base_status(
         "model_type": experiment.model_type,
         "ablation": experiment.ablation,
         "ablation_overrides": ablation_overrides(experiment),
+        "exclude_val_query_indices": args.exclude_val_query_indices,
         "seed": experiment.seed,
         "device": device,
         "attempt_dir": str(attempt_dir),
@@ -410,6 +475,7 @@ def execute_experiment(
         experiment,
         device,
         args.topk,
+        args.exclude_val_query_indices,
     )
     eval_command = build_eval_command(repo_root, caches, attempt_dir, device, args.mces)
     label = (
@@ -431,6 +497,9 @@ def execute_experiment(
     status_path = attempt_dir / "status.json"
     status = base_status(args, experiment, attempt_dir, device, caches, train_command, eval_command)
     status["started_at"] = now_iso()
+    existing_selection = training_selection_metadata(attempt_dir)
+    if existing_selection:
+        status["training_selection"] = existing_selection
 
     try:
         if action == "train_eval":
@@ -444,8 +513,13 @@ def execute_experiment(
             )
             atomic_write_json(status_path, status)
             run_subprocess(train_command, repo_root, device, active_processes, active_lock)
-            if not training_complete(attempt_dir, experiment):
+            if not training_complete(
+                attempt_dir,
+                experiment,
+                args.exclude_val_query_indices,
+            ):
                 raise RuntimeError(f"Training command exited successfully but artifacts are incomplete: {attempt_dir}")
+            status["training_selection"] = training_selection_metadata(attempt_dir)
             status["state"] = "train_complete"
             status["train_finished_at"] = now_iso()
             atomic_write_json(status_path, status)
@@ -486,7 +560,7 @@ def find_complete_attempt(
     for attempt in reversed(attempt_directories(experiment_dir(args, experiment))):
         if (
             attempt_matches_current_fingerprint(args, experiment, attempt)
-            and training_complete(attempt, experiment)
+            and training_complete(attempt, experiment, args.exclude_val_query_indices)
             and evaluation_complete(attempt, expect_mces)
         ):
             return attempt
@@ -535,6 +609,7 @@ def write_summaries(args, experiments: list[Experiment]) -> None:
             continue
         row = asdict(experiment)
         row["attempt_dir"] = str(attempt)
+        row.update(training_selection_metadata(attempt))
         row.update(parse_rerank_eval_metrics(attempt / "eval_rerank.log"))
         rows.append(row)
 
@@ -546,6 +621,11 @@ def write_summaries(args, experiments: list[Experiment]) -> None:
         "model_type",
         "ablation",
         "seed",
+        "metric_for_best",
+        "best_epoch",
+        "best_val_metric",
+        "stop_epoch",
+        "early_stopped",
         "upper_bound_pct",
         "base_top1_pct",
         "base_top5_pct",
@@ -571,6 +651,11 @@ def write_summaries(args, experiments: list[Experiment]) -> None:
     metric_fields = [field for field in fields if field.startswith("rerank_") and field != "rerank_mces"]
     if "rerank_mces" in fields:
         metric_fields.append("rerank_mces")
+    metric_fields.extend(
+        field
+        for field in ("best_val_metric", "best_epoch", "stop_epoch", "early_stopped")
+        if field in fields
+    )
     groups: dict[tuple[str, str, str], list[dict]] = {}
     for row in rows:
         key = (row["candidate_type"], row["model_type"], row["ablation"])
@@ -629,6 +714,13 @@ def parse_args():
         help="Matched single-factor reranker ablations. Defaults to the full model.",
     )
     parser.add_argument("--seeds", nargs="+", type=int, default=[42, 43, 44])
+    parser.add_argument(
+        "--exclude-val-query-indices",
+        nargs="*",
+        type=int,
+        default=[],
+        help="Zero-based validation cache query indices excluded before model selection.",
+    )
     parser.add_argument("--devices", nargs="+", required=True, help="Explicit devices, for example cuda:0 cuda:1.")
     parser.add_argument("--cache-root", type=Path, default=Path("rerank_cache"))
     parser.add_argument("--output-root", type=Path)
@@ -659,6 +751,9 @@ def parse_args():
         parser.error("--ablations must not contain duplicates")
     if len(set(args.devices)) != len(args.devices):
         parser.error("--devices must not contain duplicates")
+    if any(index < 0 for index in args.exclude_val_query_indices):
+        parser.error("--exclude-val-query-indices must contain non-negative integers")
+    args.exclude_val_query_indices = sorted(set(args.exclude_val_query_indices))
     if args.min_free_mib < 0:
         parser.error("--min-free-mib must be non-negative")
     if not 0 <= args.max_utilization <= 100:
@@ -705,6 +800,7 @@ def main():
     print(f"Planned experiments: {len(experiments)}")
     print(f"Output root: {args.output_root}")
     print(f"MCES during per-seed evaluation: {args.mces}")
+    print(f"Excluded validation query indices: {args.exclude_val_query_indices}")
     initial_gpu_states = {}
     for device in args.devices:
         initial_gpu_states[device] = require_available_gpu(
@@ -734,6 +830,7 @@ def main():
             "hostname": socket.gethostname(),
             "devices": initial_gpu_states,
             "experiments": [asdict(experiment) for experiment in experiments],
+            "exclude_val_query_indices": args.exclude_val_query_indices,
             "mces": args.mces,
         },
     )
@@ -809,6 +906,7 @@ def main():
             "hostname": socket.gethostname(),
             "devices": initial_gpu_states,
             "experiments": [asdict(experiment) for experiment in experiments],
+            "exclude_val_query_indices": args.exclude_val_query_indices,
             "results": results,
             "errors": errors,
             "mces": args.mces,

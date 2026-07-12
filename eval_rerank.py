@@ -7,7 +7,11 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from SpecEmbedding.config import config
-from SpecEmbedding.data.datasets_rerank import RerankCacheDataset, rerank_collate_fn
+from SpecEmbedding.data.datasets_rerank import (
+    RerankCacheDataset,
+    exclude_query_indices,
+    rerank_collate_fn,
+)
 from SpecEmbedding.utils.mces import compute_mces
 from SpecEmbedding.utils.rerank import (
     init_ranking_metrics,
@@ -71,18 +75,6 @@ def evaluate(model, loader, device, top_k):
         "rerank_mces_pairs": rerank_mces_pairs,
         "total": base_metrics["total"],
     }
-
-
-def exclude_query_indices(dataset, query_indices: list[int]) -> int:
-    excluded = set(query_indices)
-    invalid = sorted(index for index in excluded if index < 0 or index >= len(dataset.queries))
-    if invalid:
-        raise ValueError(f"Excluded query indices are out of range: {invalid}")
-    original_size = len(dataset.indices)
-    dataset.indices = [index for index in dataset.indices if index not in excluded]
-    if not dataset.indices:
-        raise ValueError("Query exclusion removed every evaluation sample")
-    return original_size - len(dataset.indices)
 
 
 def parse_args():
@@ -157,7 +149,11 @@ def main():
     device = resolve_device(args.device)
 
     dataset = RerankCacheDataset(args.cache, return_smiles=True, require_label=False)
-    excluded_count = exclude_query_indices(dataset, args.exclude_query_indices)
+    excluded_count = exclude_query_indices(
+        dataset,
+        args.exclude_query_indices,
+        split_name="evaluation",
+    )
     if excluded_count:
         logging.info(
             "Excluded %s cache queries for sensitivity evaluation: %s",

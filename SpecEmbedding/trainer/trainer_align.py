@@ -26,6 +26,7 @@ class TrainerAlign:
         self.device = device
         self.save_dir = save_dir
         self.criterion = ContrastiveAlignmentLoss().to(device)
+        self.stage_summaries = {}
         
         os.makedirs(self.save_dir, exist_ok=True)
 
@@ -76,10 +77,14 @@ class TrainerAlign:
 
     def fit(self, epochs: int, optimizer: torch.optim.Optimizer, scheduler=None, stage_name="Stage", patience=5):
         best_val_loss = float('inf')
+        best_epoch = None
         best_model_state = None
         patience_counter = 0
+        stop_epoch = 0
+        early_stopped = False
         
         for epoch in range(1, epochs + 1):
+            stop_epoch = epoch
             train_loss = self.train_epoch(optimizer, epoch, stage_name)
             val_loss = self.validate(epoch, stage_name)
             
@@ -90,6 +95,7 @@ class TrainerAlign:
                 
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
+                best_epoch = epoch
                 best_model_state = deepcopy(self.model.state_dict())
                 patience_counter = 0 # reset patience
                 
@@ -101,9 +107,20 @@ class TrainerAlign:
                 logging.info(f"EarlyStopping counter: {patience_counter} out of {patience}")
                 if patience_counter >= patience:
                     logging.info("Early stopping triggered.")
+                    early_stopped = True
                     break
                 
         if best_model_state is not None:
             self.model.load_state_dict(best_model_state)
+
+        self.stage_summaries[stage_name] = {
+            "metric_for_best": "validation_contrastive_loss",
+            "best_epoch": best_epoch,
+            "best_val_loss": best_val_loss,
+            "stop_epoch": stop_epoch,
+            "early_stopped": early_stopped,
+            "configured_epochs": epochs,
+            "patience": patience,
+        }
             
         return best_val_loss

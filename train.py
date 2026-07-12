@@ -67,13 +67,17 @@ def load_data(dataset_type, data_path=None):
     logging.info(f"Loaded {len(train_raw)} train records and {len(val_raw)} val records.")
     return train_raw, val_raw
 
-def get_classified_data(dataset_type, data_path=None, cache_path=None):
-    if cache_path is None:
-        cache_path = config.data.cache_path
+def get_classified_data(dataset_type, data_path=None, cache_path=None, cache_file=None):
     # Tokenize & Classify 处理 (带缓存逻辑)
-    cache_dir = Path(cache_path)
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_file = cache_dir / f"tokenset_{dataset_type}.pkl"
+    if cache_file is None:
+        if cache_path is None:
+            cache_path = config.data.cache_path
+        cache_dir = Path(cache_path)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / f"tokenset_{dataset_type}.pkl"
+    else:
+        cache_file = Path(cache_file)
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
 
     if cache_file.exists():
         logging.info(f"Loading cached TokenSet from {cache_file}...")
