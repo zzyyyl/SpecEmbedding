@@ -18,6 +18,13 @@ def _config_value(source, key: str):
     raise KeyError(f"Missing reranker model config value: {key}")
 
 
+def _config_value_default(source, key: str, default):
+    try:
+        return _config_value(source, key)
+    except KeyError:
+        return default
+
+
 def build_reranker(model_config, embedding_dim: int | None = None):
     if embedding_dim is None:
         embedding_dim = _config_value(model_config, "embedding_dim")
@@ -32,6 +39,7 @@ def build_reranker(model_config, embedding_dim: int | None = None):
     else:
         raise ValueError(f"Unsupported reranker model_type: {model_type}")
 
+    legacy_base_score = bool(_config_value_default(model_config, "use_base_score", True))
     return model_cls(
         embedding_dim=int(embedding_dim),
         hidden_dim=int(_config_value(model_config, "hidden_dim")),
@@ -41,6 +49,15 @@ def build_reranker(model_config, embedding_dim: int | None = None):
         n_heads=int(_config_value(model_config, "n_heads")),
         dropout=float(_config_value(model_config, "dropout")),
         alpha_init=float(_config_value(model_config, "alpha_init")),
+        use_base_score_feature=bool(
+            _config_value_default(model_config, "use_base_score_feature", legacy_base_score)
+        ),
+        use_residual_score=bool(
+            _config_value_default(model_config, "use_residual_score", legacy_base_score)
+        ),
+        use_rank_embedding=bool(_config_value_default(model_config, "use_rank_embedding", True)),
+        use_product_feature=bool(_config_value_default(model_config, "use_product_feature", True)),
+        use_abs_diff_feature=bool(_config_value_default(model_config, "use_abs_diff_feature", True)),
     )
 
 
@@ -55,6 +72,11 @@ def reranker_model_config(args, embedding_dim: int) -> dict:
         "n_heads": args.n_heads,
         "dropout": args.dropout,
         "alpha_init": args.alpha_init,
+        "use_base_score_feature": args.use_base_score_feature,
+        "use_residual_score": args.use_residual_score,
+        "use_rank_embedding": args.use_rank_embedding,
+        "use_product_feature": args.use_product_feature,
+        "use_abs_diff_feature": args.use_abs_diff_feature,
     }
 
 

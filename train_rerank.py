@@ -97,9 +97,61 @@ def parse_args():
         default=config.general.seed,
         help="Random seed. Defaults to general.seed in params.yaml.",
     )
+    parser.add_argument(
+        "--base-score-feature",
+        dest="use_base_score_feature",
+        action=argparse.BooleanOptionalAction,
+        default=bool(config.rerank.train.use_base_score_feature),
+        help="Use the base score as an input pair feature.",
+    )
+    parser.add_argument(
+        "--residual-score",
+        dest="use_residual_score",
+        action=argparse.BooleanOptionalAction,
+        default=bool(config.rerank.train.use_residual_score),
+        help="Add the learned alpha-scaled base score to the predicted correction.",
+    )
+    parser.add_argument(
+        "--rank-embedding",
+        dest="use_rank_embedding",
+        action=argparse.BooleanOptionalAction,
+        default=bool(config.rerank.train.use_rank_embedding),
+        help="Use the embedding of the base retrieval rank.",
+    )
+    parser.add_argument(
+        "--product-feature",
+        dest="use_product_feature",
+        action=argparse.BooleanOptionalAction,
+        default=bool(config.rerank.train.use_product_feature),
+        help="Use the elementwise spectrum-candidate product feature.",
+    )
+    parser.add_argument(
+        "--abs-diff-feature",
+        dest="use_abs_diff_feature",
+        action=argparse.BooleanOptionalAction,
+        default=bool(config.rerank.train.use_abs_diff_feature),
+        help="Use the absolute spectrum-candidate difference feature.",
+    )
+    parser.add_argument(
+        "--shuffle-candidates",
+        action=argparse.BooleanOptionalAction,
+        default=bool(config.rerank.train.shuffle_candidates),
+        help="Randomize candidate order within each training list.",
+    )
+    parser.add_argument(
+        "--lambda-pair",
+        type=float,
+        default=float(config.rerank.train.lambda_pair),
+        help="Weight of the pairwise ranking loss; use 0 for listwise CE only.",
+    )
+    parser.add_argument(
+        "--train-k",
+        type=int,
+        default=int(config.rerank.train.train_k),
+        help="Maximum candidates per training list.",
+    )
     args = parser.parse_args()
 
-    args.train_k = int(config.rerank.train.train_k)
     args.batch_size = int(config.rerank.train.batch_size)
     args.epochs = int(config.rerank.train.epochs)
     args.lr = float(config.rerank.train.lr)
@@ -112,7 +164,6 @@ def parse_args():
     args.n_heads = int(config.rerank.train.n_heads)
     args.dropout = float(config.rerank.train.dropout)
     args.alpha_init = float(config.rerank.train.alpha_init)
-    args.lambda_pair = float(config.rerank.train.lambda_pair)
     args.margin = float(config.rerank.train.margin)
     args.grad_clip = float(config.rerank.train.grad_clip)
     args.metric_for_best = config.rerank.train.metric_for_best
@@ -159,6 +210,8 @@ def main():
         raise ValueError("rerank.train.max_rank must be greater than 0")
     if args.n_layers < 0:
         raise ValueError("rerank.train.n_layers must be greater than or equal to 0")
+    if args.lambda_pair < 0:
+        raise ValueError("--lambda-pair must be greater than or equal to 0")
 
     save_dir = Path(args.save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -170,7 +223,7 @@ def main():
     train_dataset = RerankCacheDataset(
         args.train_cache,
         max_candidates=args.train_k,
-        shuffle_candidates=True,
+        shuffle_candidates=args.shuffle_candidates,
         require_label=True,
     )
     val_dataset = RerankCacheDataset(

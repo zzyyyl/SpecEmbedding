@@ -21,7 +21,43 @@ import torch
 class Experiment:
     candidate_type: str
     model_type: str
+    ablation: str
     seed: int
+
+
+FULL_RERANKER_OVERRIDES = {
+    "use_base_score_feature": True,
+    "use_residual_score": True,
+    "use_rank_embedding": True,
+    "use_product_feature": True,
+    "use_abs_diff_feature": True,
+    "lambda_pair": 0.2,
+    "shuffle_candidates": True,
+}
+
+ABLATION_OVERRIDES = {
+    "full": {**FULL_RERANKER_OVERRIDES},
+    "no_base_score": {
+        **FULL_RERANKER_OVERRIDES,
+        "use_base_score_feature": False,
+        "use_residual_score": False,
+    },
+    "no_residual": {**FULL_RERANKER_OVERRIDES, "use_residual_score": False},
+    "no_rank_embedding": {**FULL_RERANKER_OVERRIDES, "use_rank_embedding": False},
+    "no_product_feature": {**FULL_RERANKER_OVERRIDES, "use_product_feature": False},
+    "no_abs_diff_feature": {**FULL_RERANKER_OVERRIDES, "use_abs_diff_feature": False},
+    "no_interaction_features": {
+        **FULL_RERANKER_OVERRIDES,
+        "use_product_feature": False,
+        "use_abs_diff_feature": False,
+    },
+    "listwise_only": {**FULL_RERANKER_OVERRIDES, "lambda_pair": 0.0},
+    "no_candidate_shuffle": {**FULL_RERANKER_OVERRIDES, "shuffle_candidates": False},
+}
+
+
+def ablation_overrides(experiment: Experiment) -> dict:
+    return ABLATION_OVERRIDES[experiment.ablation]
 
 
 def now_iso() -> str:
@@ -58,6 +94,11 @@ def atomic_write_json(path: Path, payload: dict) -> None:
     temporary = path.with_suffix(f"{path.suffix}.tmp")
     temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     os.replace(temporary, path)
+
+
+def write_batch_status(args, payload: dict) -> None:
+    atomic_write_json(args.output_root / "batch_status.json", payload)
+    atomic_write_json(args.batch_run_status_path, payload)
 
 
 def read_json(path: Path) -> dict:
@@ -169,13 +210,18 @@ def experiment_fingerprint(args, experiment: Experiment, caches: dict[str, Path]
         "topk": args.topk,
         "candidate_type": experiment.candidate_type,
         "model_type": experiment.model_type,
+        "ablation": experiment.ablation,
+        "ablation_overrides": ablation_overrides(experiment),
         "seed": experiment.seed,
         "cache_files": {split: cache_file_metadata(path) for split, path in caches.items()},
     }
 
 
 def experiment_dir(args, experiment: Experiment) -> Path:
-    return args.output_root / experiment.candidate_type / experiment.model_type / f"seed{experiment.seed}"
+    root = args.output_root / experiment.candidate_type / experiment.model_type
+    if experiment.ablation != "full":
+        root = root / experiment.ablation
+    return root / f"seed{experiment.seed}"
 
 
 def attempt_directories(root: Path) -> list[Path]:
@@ -192,10 +238,17 @@ def checkpoint_matches(path: Path, experiment: Experiment) -> bool:
             checkpoint = torch.load(path, map_location="cpu")
     except Exception:
         return False
-    return (
-        checkpoint.get("seed") == experiment.seed
-        and checkpoint.get("model_config", {}).get("model_type") == experiment.model_type
-    )
+    if checkpoint.get("seed") != experiment.seed:
+        return False
+    model_config = checkpoint.get("model_config", {})
+    if model_config.get("model_type") != experiment.model_type:
+        return False
+    training_config = checkpoint.get("training_config", {})
+    for key, expected in ablation_overrides(experiment).items():
+        source = model_config if key.startswith("use_") else training_config
+        if source.get(key) != expected:
+            return False
+    return True
 
 
 def training_complete(attempt_dir: Path, experiment: Experiment) -> bool:
@@ -216,8 +269,11 @@ def evaluation_complete(attempt_dir: Path, expect_mces: bool) -> bool:
         return False
     log_text = eval_log.read_text(encoding="utf-8", errors="replace")
     required = ["Total queries:", "BASE RESULTS", "RERANK RESULTS"]
-    required.append("Rerank MCES@1" if expect_mces else "MCES calculation skipped.")
-    return all(token in log_text for token in required)
+    if not all(token in log_text for token in required):
+        return False
+    if expect_mces:
+        return "Rerank MCES@1" in log_text
+    return "MCES calculation skipped." in log_text or "Rerank MCES@1" in log_text
 
 
 def process_is_alive(status: dict) -> bool:
@@ -261,8 +317,7 @@ def select_attempt(args, experiment: Experiment) -> tuple[str, Path]:
         if latest_status.get("state") in {"training", "evaluating"} and process_is_alive(latest_status):
             raise RuntimeError(f"Experiment is already running: {latest}")
         if (
-            latest_status.get("state") != "failed"
-            and attempt_matches_current_fingerprint(args, experiment, latest)
+            attempt_matches_current_fingerprint(args, experiment, latest)
             and training_complete(latest, experiment)
         ):
             if not evaluation_complete(latest, args.mces):
@@ -278,8 +333,9 @@ def build_train_command(
     attempt_dir: Path,
     experiment: Experiment,
     device: str,
+    train_k: int,
 ) -> list[str]:
-    return [
+    command = [
         sys.executable,
         str(repo_root / "train_rerank.py"),
         "--train_cache",
@@ -294,7 +350,25 @@ def build_train_command(
         str(experiment.seed),
         "--device",
         device,
+        "--train-k",
+        str(train_k),
     ]
+    flag_names = {
+        "use_base_score_feature": "--base-score-feature",
+        "use_residual_score": "--residual-score",
+        "use_rank_embedding": "--rank-embedding",
+        "use_product_feature": "--product-feature",
+        "use_abs_diff_feature": "--abs-diff-feature",
+        "shuffle_candidates": "--shuffle-candidates",
+    }
+    for key, value in ablation_overrides(experiment).items():
+        if key == "lambda_pair":
+            command.extend(["--lambda-pair", str(value)])
+        elif key in flag_names:
+            command.append(flag_names[key] if value else flag_names[key].replace("--", "--no-", 1))
+        else:
+            raise ValueError(f"Unsupported ablation override: {key}")
+    return command
 
 
 def build_eval_command(
@@ -336,6 +410,8 @@ def base_status(
         "state": "pending",
         "candidate_type": experiment.candidate_type,
         "model_type": experiment.model_type,
+        "ablation": experiment.ablation,
+        "ablation_overrides": ablation_overrides(experiment),
         "seed": experiment.seed,
         "device": device,
         "attempt_dir": str(attempt_dir),
@@ -399,9 +475,19 @@ def execute_experiment(
         if not path.exists():
             raise FileNotFoundError(f"{split} cache not found: {path}")
 
-    train_command = build_train_command(repo_root, caches, attempt_dir, experiment, device)
+    train_command = build_train_command(
+        repo_root,
+        caches,
+        attempt_dir,
+        experiment,
+        device,
+        args.topk,
+    )
     eval_command = build_eval_command(repo_root, caches, attempt_dir, device, args.mces)
-    label = f"{experiment.candidate_type}/{experiment.model_type}/seed{experiment.seed}"
+    label = (
+        f"{experiment.candidate_type}/{experiment.model_type}/"
+        f"{experiment.ablation}/seed{experiment.seed}"
+    )
 
     if action == "skip":
         print(f"Skipping completed experiment {label}: {attempt_dir}")
@@ -487,21 +573,62 @@ def parse_eval_metrics(eval_log: Path) -> dict[str, float]:
     return metrics
 
 
-def find_complete_attempt(args, experiment: Experiment) -> Path | None:
+def find_complete_attempt(
+    args,
+    experiment: Experiment,
+    *,
+    expect_mces: bool | None = None,
+) -> Path | None:
+    if expect_mces is None:
+        expect_mces = args.mces
     for attempt in reversed(attempt_directories(experiment_dir(args, experiment))):
         if (
             attempt_matches_current_fingerprint(args, experiment, attempt)
             and training_complete(attempt, experiment)
-            and evaluation_complete(attempt, args.mces)
+            and evaluation_complete(attempt, expect_mces)
         ):
             return attempt
     return None
 
 
+def experiment_key(experiment: Experiment) -> tuple[str, str, str, int]:
+    return (
+        experiment.candidate_type,
+        experiment.model_type,
+        experiment.ablation,
+        experiment.seed,
+    )
+
+
+def discover_experiments(args, requested: list[Experiment]) -> list[Experiment]:
+    discovered = {experiment_key(experiment): experiment for experiment in requested}
+    if not args.output_root.exists():
+        return sorted(discovered.values(), key=experiment_key)
+
+    for status_path in args.output_root.rglob("status.json"):
+        status = read_json(status_path)
+        candidate_type = status.get("candidate_type")
+        model_type = status.get("model_type")
+        ablation = status.get("ablation")
+        seed = status.get("seed")
+        if candidate_type not in {"mass", "formula"}:
+            continue
+        if model_type not in {"pointwise", "transformer"}:
+            continue
+        if ablation not in ABLATION_OVERRIDES or not isinstance(seed, int):
+            continue
+        experiment = Experiment(candidate_type, model_type, ablation, seed)
+        discovered[experiment_key(experiment)] = experiment
+    return sorted(discovered.values(), key=experiment_key)
+
+
 def write_summaries(args, experiments: list[Experiment]) -> None:
+    experiments = discover_experiments(args, experiments)
     rows = []
     for experiment in experiments:
-        attempt = find_complete_attempt(args, experiment)
+        # Ranking summaries remain complete when MCES is later recomputed for
+        # only a subset. MCES columns are parsed opportunistically per log.
+        attempt = find_complete_attempt(args, experiment, expect_mces=False)
         if attempt is None:
             continue
         row = asdict(experiment)
@@ -515,6 +642,7 @@ def write_summaries(args, experiments: list[Experiment]) -> None:
     preferred_fields = [
         "candidate_type",
         "model_type",
+        "ablation",
         "seed",
         "upper_bound_pct",
         "base_top1_pct",
@@ -541,27 +669,25 @@ def write_summaries(args, experiments: list[Experiment]) -> None:
     metric_fields = [field for field in fields if field.startswith("rerank_") and field != "rerank_mces"]
     if "rerank_mces" in fields:
         metric_fields.append("rerank_mces")
-    for candidate_type in args.candidate_types:
-        for model_type in args.model_types:
-            group = [
-                row
-                for row in rows
-                if row["candidate_type"] == candidate_type and row["model_type"] == model_type
-            ]
-            if not group:
+    groups: dict[tuple[str, str, str], list[dict]] = {}
+    for row in rows:
+        key = (row["candidate_type"], row["model_type"], row["ablation"])
+        groups.setdefault(key, []).append(row)
+    for (candidate_type, model_type, ablation), group in sorted(groups.items()):
+        aggregate = {
+            "candidate_type": candidate_type,
+            "model_type": model_type,
+            "ablation": ablation,
+            "num_seeds": len(group),
+        }
+        for metric in metric_fields:
+            values = [row[metric] for row in group if metric in row]
+            if not values:
                 continue
-            aggregate = {
-                "candidate_type": candidate_type,
-                "model_type": model_type,
-                "num_seeds": len(group),
-            }
-            for metric in metric_fields:
-                values = [row[metric] for row in group if metric in row]
-                if not values:
-                    continue
-                aggregate[f"{metric}_mean"] = statistics.mean(values)
-                aggregate[f"{metric}_std"] = statistics.stdev(values) if len(values) > 1 else 0.0
-            aggregate_rows.append(aggregate)
+            aggregate[f"{metric}_num_seeds"] = len(values)
+            aggregate[f"{metric}_mean"] = statistics.mean(values)
+            aggregate[f"{metric}_std"] = statistics.stdev(values) if len(values) > 1 else 0.0
+        aggregate_rows.append(aggregate)
 
     aggregate_fields = []
     for row in aggregate_rows:
@@ -576,7 +702,7 @@ def write_summaries(args, experiments: list[Experiment]) -> None:
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Run multi-seed pointwise/Transformer reranker experiments on reusable top-k caches."
+        description="Run multi-seed reranker variants and ablations on reusable top-k caches."
     )
     parser.add_argument("--run-prefix", required=True, help="Alignment run prefix used by existing cache directories.")
     parser.add_argument("--dataset-type", default="massspecgym")
@@ -592,6 +718,13 @@ def parse_args():
         nargs="+",
         choices=["pointwise", "transformer"],
         default=["pointwise", "transformer"],
+    )
+    parser.add_argument(
+        "--ablations",
+        nargs="+",
+        choices=list(ABLATION_OVERRIDES),
+        default=["full"],
+        help="Matched single-factor reranker ablations. Defaults to the full model.",
     )
     parser.add_argument("--seeds", nargs="+", type=int, default=[42, 43, 44])
     parser.add_argument("--devices", nargs="+", required=True, help="Explicit devices, for example cuda:0 cuda:1.")
@@ -620,6 +753,8 @@ def parse_args():
         parser.error("--seeds must contain only non-negative integers")
     if len(set(args.seeds)) != len(args.seeds):
         parser.error("--seeds must not contain duplicates")
+    if len(set(args.ablations)) != len(args.ablations):
+        parser.error("--ablations must not contain duplicates")
     if len(set(args.devices)) != len(args.devices):
         parser.error("--devices must not contain duplicates")
     if args.min_free_mib < 0:
@@ -633,7 +768,8 @@ def parse_args():
             parser.error(str(error))
 
     if args.output_root is None:
-        args.output_root = Path("checkpoints_rerank") / f"{args.run_prefix}_topk{args.topk}_multiseed"
+        suffix = "ablations" if any(name != "full" for name in args.ablations) else "multiseed"
+        args.output_root = Path("checkpoints_rerank") / f"{args.run_prefix}_topk{args.topk}_{suffix}"
     return args
 
 
@@ -652,9 +788,15 @@ def main():
         )
 
     experiments = [
-        Experiment(candidate_type=candidate_type, model_type=model_type, seed=seed)
+        Experiment(
+            candidate_type=candidate_type,
+            model_type=model_type,
+            ablation=ablation,
+            seed=seed,
+        )
         for candidate_type in args.candidate_types
         for model_type in args.model_types
+        for ablation in args.ablations
         for seed in args.seeds
     ]
 
@@ -676,8 +818,10 @@ def main():
         return
 
     args.output_root.mkdir(parents=True, exist_ok=True)
-    atomic_write_json(
-        args.output_root / "batch_status.json",
+    run_stamp = datetime.now().astimezone().strftime("%Y%m%dT%H%M%S%z")
+    args.batch_run_status_path = args.output_root / "batch_runs" / f"{run_stamp}_{os.getpid()}.json"
+    write_batch_status(
+        args,
         {
             "state": "running",
             "started_at": now_iso(),
@@ -722,7 +866,8 @@ def main():
                     results.append({**asdict(experiment), "state": state, "attempt_dir": str(attempt_dir)})
             except Exception as error:
                 message = (
-                    f"{experiment.candidate_type}/{experiment.model_type}/seed{experiment.seed} "
+                    f"{experiment.candidate_type}/{experiment.model_type}/"
+                    f"{experiment.ablation}/seed{experiment.seed} "
                     f"on {device}: {error}"
                 )
                 print(f"ERROR: {message}", file=sys.stderr, flush=True)
@@ -750,8 +895,8 @@ def main():
 
     write_summaries(args, experiments)
     final_state = "failed" if errors else "complete"
-    atomic_write_json(
-        args.output_root / "batch_status.json",
+    write_batch_status(
+        args,
         {
             "state": final_state,
             "finished_at": now_iso(),
@@ -761,6 +906,7 @@ def main():
             "runner_pid": os.getpid(),
             "hostname": socket.gethostname(),
             "devices": initial_gpu_states,
+            "experiments": [asdict(experiment) for experiment in experiments],
             "results": results,
             "errors": errors,
             "mces": args.mces,

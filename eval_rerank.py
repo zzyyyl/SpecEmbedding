@@ -73,6 +73,18 @@ def evaluate(model, loader, device, top_k):
     }
 
 
+def exclude_query_indices(dataset, query_indices: list[int]) -> int:
+    excluded = set(query_indices)
+    invalid = sorted(index for index in excluded if index < 0 or index >= len(dataset.queries))
+    if invalid:
+        raise ValueError(f"Excluded query indices are out of range: {invalid}")
+    original_size = len(dataset.indices)
+    dataset.indices = [index for index in dataset.indices if index not in excluded]
+    if not dataset.indices:
+        raise ValueError("Query exclusion removed every evaluation sample")
+    return original_size - len(dataset.indices)
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Evaluate reranked spectrum-to-molecule retrieval from a rerank cache."
@@ -103,6 +115,13 @@ def parse_args():
         default=config.rerank.eval.compute_mces,
         help="Enable MCES@1 calculation. Use --no-mces for quick metric-only evaluation.",
     )
+    parser.add_argument(
+        "--exclude-query-indices",
+        nargs="*",
+        type=int,
+        default=[],
+        help="Zero-based cache query indices excluded from a sensitivity evaluation.",
+    )
     args = parser.parse_args()
 
     args.batch_size = int(config.rerank.eval.batch_size)
@@ -115,6 +134,8 @@ def parse_args():
         parser.error("--checkpoint is required unless rerank.eval.checkpoint is set in params.yaml")
     if not args.top_k:
         parser.error("rerank.eval.top_k must contain at least one value")
+    if args.exclude_query_indices and not args.save_dir:
+        parser.error("--save_dir is required when --exclude-query-indices is used")
     return args
 
 
@@ -128,12 +149,21 @@ def main():
 
     checkpoint_path = Path(args.checkpoint)
     save_dir = Path(args.save_dir) if args.save_dir else checkpoint_path.parent
+    if args.exclude_query_indices and save_dir.resolve() == checkpoint_path.parent.resolve():
+        raise ValueError("Sensitivity evaluation --save_dir must differ from the checkpoint directory")
     save_dir.mkdir(parents=True, exist_ok=True)
     setup_logging(save_dir / "eval_rerank.log")
     startup_logging(args, "Evaluate SpecEmbedding reranker")
     device = resolve_device(args.device)
 
     dataset = RerankCacheDataset(args.cache, return_smiles=True, require_label=False)
+    excluded_count = exclude_query_indices(dataset, args.exclude_query_indices)
+    if excluded_count:
+        logging.info(
+            "Excluded %s cache queries for sensitivity evaluation: %s",
+            excluded_count,
+            sorted(set(args.exclude_query_indices)),
+        )
     loader = DataLoader(
         dataset,
         batch_size=args.batch_size,

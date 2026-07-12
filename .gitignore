@@ -21,6 +21,8 @@ test*.py
 
 temp/*
 tests/*
+!tests/
+!tests/test_rerank_ablation.py
 data/*
 checkpoints*/*
 paper/build/

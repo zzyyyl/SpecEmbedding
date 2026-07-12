@@ -5,7 +5,7 @@
 本次更新前代码状态：
 
 - 分支：`dev`
-- 最新提交：`cafb70c feat(rerank): 支持多随机种子批量实验`
+- 最新提交：`4c22bc6 docs(paper): 回填多种子实验并收窄论文结论`
 - 工作区：干净
 
 本文档用于后续开发、实验和论文协作时快速恢复上下文。它是内部协作材料，不应直接放入 ADMA 双盲补充材料。若本文档与代码、`params.yaml` 或实验日志冲突，以代码和原始日志为准。
@@ -454,7 +454,28 @@ rerank_cache/<run>/prepare_rerank_cache_{train,val,test}.log
 - 指标包含正例未被召回的查询。
 - 报告 top-$K$ recall upper bound。
 
-因此，“训练时保证监督列表有正例”本身不构成测试数据泄露。
+2026-07-11 的再审计结果：
+
+- mass 和 formula 的 top-40 cache meta 与生成日志均记录 train
+  `force_include_positive=true`、val/test `false`。
+- val/test 中 `label is not None` 与 `positive_in_base_topk` 完全一致，两类
+  cache 均为 0 mismatch；所有已标注 label 均指向 `true_smiles`。
+- MassSpecGym 原始 processed split 包含 194,119/19,429/17,556 条
+  train/val/test 谱图；三个划分的 identifier、原始 SMILES、InChIKey 和
+  RDKit 规范化 isomeric/non-isomeric SMILES 两两交集均为 0，fold 标记
+  无错配，未发现同分子标签跨 split 重复。
+- 按 mzs、intensities、precursor m/z、adduct、instrument 和 collision energy
+  组成的完全输入签名检查，发现 6 个 train--val 和 3 个 train--test
+  重复。这 9 个 eval 查询的标签分子与 train 不同，且全部为
+  `simulation_challenge=true`；它们不是正标签结构泄露，但属于输入样本重叠，
+  仍需报告剔除后的敏感性结果。三条 test cache 的统一 0-based 索引为
+  5908、5909 和 5910。
+- 非空 Murcko scaffold 在 train--val/train--test/val--test 间分别有
+  115/128/34 个交集。因此只能称使用 MassSpecGym 官方 structure-disjoint
+  相似性分组，不能进一步声称 scaffold-disjoint。
+
+因此，“训练时保证监督列表有正例”本身不构成测试正标签泄露，
+但上述 9 条输入重叠必须单独做敏感性评估。
 
 ### 7.2 必须明确披露的限制
 
@@ -697,6 +718,7 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - `91877d6`：添加 ADMA 2026 投稿待办清单。
 - `96fbaa9`：回填质量候选 MCES@1 结果。
 - `cafb70c`：支持多随机种子 pointwise/Transformer 批量实验。
+- `4c22bc6`：回填多种子结果并将论文核心结论收窄为非生成式残差学习排序。
 
 ## 14. 维护本记忆文档
 

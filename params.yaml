@@ -106,6 +106,12 @@ rerank:
     n_heads: 8
     dropout: 0.1
     alpha_init: 1.0
+    use_base_score_feature: true
+    use_residual_score: true
+    use_rank_embedding: true
+    use_product_feature: true
+    use_abs_diff_feature: true
+    shuffle_candidates: true
     lambda_pair: 0.2
     margin: 0.1
     grad_clip: 1.0
