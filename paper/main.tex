@@ -306,8 +306,9 @@ tensor position itself from becoming a shortcut.
 Positive insertion is restricted to the training split. Validation and test
 caches are produced with insertion disabled; a missing positive remains missing
 and lowers both the upper bound and every end-to-end metric. Candidate files are
-loaded from the official MassSpecGym release and no test spectrum, structure,
-or label is used to train either stage.
+loaded from the official MassSpecGym release. No record assigned to the test
+split, nor any test target or label, is used for parameter optimization or
+checkpoint selection in either stage.
 
 \subsection{Residual Reranker Variants}
 
@@ -390,6 +391,13 @@ training spectra, 19,429 validation spectra, and 17,556 test spectra, covering
 32,010 unique molecules in total. Its structure-disjoint split groups similar
 molecules and makes test structures substantially different from training
 structures.
+
+An exact audit of spectrum-input signatures (peak arrays, precursor $m/z$,
+adduct, instrument, and collision energy) found no target-molecule duplicates
+across splits, but six validation and three test signatures exactly matched
+training signatures. In all nine matched pairs, the target molecules differ
+and each evaluation query is marked \texttt{simulation\_challenge=true}. We
+report these cases as cross-split spectrum-input overlap.
 
 We evaluate both official retrieval settings. The mass-conditioned library uses
 precursor mass and a tolerance window. The formula-conditioned library assumes
@@ -518,6 +526,13 @@ additional benefit under the current protocol; the supported result is the
 value of supervised residual reranking with explicit interaction and retrieval
 features.
 
+As a test-overlap sensitivity check, we excluded the three affected test
+queries, leaving 17,553 queries. Across both candidate libraries and both
+rerankers, the three-seed mean Recall@1 decreased by 0.0045--0.0055 percentage
+points (maximum absolute seed-level change: 0.0056 points), and the paired
+comparison still yielded three Transformer wins out of six. The controlled
+conclusion is therefore unchanged.
+
 We do not report feature-removal, objective, candidate-order, or full top-$K$
 ablations; conclusions about those components are outside the present evidence.
 We also do not report parameter count, peak memory, cache construction time,
@@ -534,6 +549,11 @@ alignment checkpoint; the reported uncertainty therefore excludes first-stage
 variation. Candidate self-attention also shows no stable advantage over the
 pointwise control. These limitations preclude a definitive state-of-the-art or
 self-attention benefit claim.
+
+The six training--validation input overlaps were present in the validation data
+used for model selection. Although their target molecules differ from the
+corresponding training targets, their possible influence on validation MRR,
+early stopping, and checkpoint selection remains unquantified.
 
 Training-only positive insertion is a supervised sampling operation, not a
 valid evaluation protocol. We expose the pre-insertion training recall and

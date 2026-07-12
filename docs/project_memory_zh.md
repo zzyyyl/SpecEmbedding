@@ -1,11 +1,11 @@
 # SpecEmbedding 项目记忆
 
-最后更新：2026-07-11
+最后更新：2026-07-12
 
 本次更新前代码状态：
 
 - 分支：`dev`
-- 最新提交：`ddd5153 feat(rerank): 支持批量消融与敏感性评估`
+- 最新提交：`b20a2e8 feat(rerank): 添加输入重叠敏感性评估脚本`
 - 工作区：干净
 
 本文档用于后续开发、实验和论文协作时快速恢复上下文。它是内部协作材料，不应直接放入 ADMA 双盲补充材料。若本文档与代码、`params.yaml` 或实验日志冲突，以代码和原始日志为准。
@@ -382,6 +382,24 @@ mass MCES@1 的原始输出为 Base 16.4199、代表性 seed-42 Set Transformer 
 - 当前结果不支持“candidate self-attention 带来稳定独立收益”；不应将整体 reranking 提升归因于 self-attention。
 - 该误差只覆盖 reranker 训练变异，不覆盖 alignment 或完整端到端流水线的方差。
 
+2026-07-12 完成 train--test 完全相同输入的剔除敏感性评估。统一排除
+test cache 索引 5908、5909 和 5910，查询数从 17,556 降至 17,553；
+12/12 组实验均为 `complete`，`errors=[]`。三种子平均 Recall@1 为：
+
+| Candidate | Model | 原始 | 剔除后 | 变化（百分点） |
+| --- | --- | ---: | ---: | ---: |
+| mass | Pointwise | 67.8856 | 67.8801 | -0.0055 |
+| mass | Set Transformer | 67.7546 | 67.7491 | -0.0055 |
+| formula | Pointwise | 73.7735 | 73.7690 | -0.0045 |
+| formula | Set Transformer | 73.9804 | 73.9760 | -0.0045 |
+
+mass/formula 的 upper bound 分别从 82.1542%/87.3035% 变为
+82.1512%/87.3013%。单个 seed 的 Recall@1 最大绝对变化为 0.0056 个
+百分点，MRR 最大绝对变化为 0.0001（raw）；Transformer 的成对 Recall@1
+胜场仍为 3/6。因此，剔除这 3 条 train--test 输入重叠后，监督残差重排序
+有效而 candidate self-attention 无稳定额外收益的主结论不变。该批次按协议
+未重算 MCES@1。
+
 代表性 seed-42 Set Transformer 相对基础检索器：
 
 - mass Recall@1：+24.13 个百分点
@@ -436,6 +454,18 @@ checkpoints_rerank/d4c1f70_massspecgym_nopretrain_topk40_multiseed/batch_status.
 
 该批次共 12 组实验（2 candidate types $\times$ 2 reranker variants $\times$ 3 seeds），全部以 `complete` 状态结束，无失败 attempt。
 
+Train--test 输入重叠敏感性评估：
+
+```text
+checkpoints_rerank/d4c1f70_massspecgym_nopretrain_topk40_input_overlap_sensitivity/
+checkpoints_rerank/d4c1f70_massspecgym_nopretrain_topk40_input_overlap_sensitivity/summary.csv
+checkpoints_rerank/d4c1f70_massspecgym_nopretrain_topk40_input_overlap_sensitivity/summary_aggregate.csv
+checkpoints_rerank/d4c1f70_massspecgym_nopretrain_topk40_input_overlap_sensitivity/batch_status.json
+```
+
+该批次于 2026-07-12T10:30:23+08:00 完成，使用完整 commit
+`b20a2e842bf20034e1ba3321d26ccb06ae408d06`。
+
 关键日志：
 
 ```text
@@ -470,14 +500,17 @@ rerank_cache/<run>/prepare_rerank_cache_{train,val,test}.log
   组成的完全输入签名检查，发现 6 个 train--val 和 3 个 train--test
   重复。这 9 个 eval 查询的标签分子与 train 不同，且全部为
   `simulation_challenge=true`；它们不是正标签结构泄露，但属于输入样本重叠，
-  仍需报告剔除后的敏感性结果。三条 test cache 的统一 0-based 索引为
+  需要单独评估。三条 test cache 的统一 0-based 索引为
   5908、5909 和 5910。
 - 非空 Murcko scaffold 在 train--val/train--test/val--test 间分别有
   115/128/34 个交集。因此只能称使用 MassSpecGym 官方 structure-disjoint
   相似性分组，不能进一步声称 scaffold-disjoint。
 
-因此，“训练时保证监督列表有正例”本身不构成测试正标签泄露，
-但上述 9 条输入重叠必须单独做敏感性评估。
+2026-07-12 已完成 3 条 train--test 重叠输入的剔除敏感性评估：排除后
+Recall@1 的三种子均值仅变化 $-0.0045$ 至 $-0.0055$ 个百分点，主结论
+不变。因此，“训练时保证监督列表有正例”本身不构成测试正标签泄露，且
+train--test 输入重叠不会实质改变当前结果。剩余 6 条 train--val 输入重叠
+仍需评估其对 validation MRR、early stopping 和 checkpoint selection 的影响。
 
 ### 7.2 必须明确披露的限制
 
@@ -486,6 +519,7 @@ rerank_cache/<run>/prepare_rerank_cache_{train,val,test}.log
 - reranker 已使用 3 个随机种子，但 alignment 仍只有 seed 42，当前误差不覆盖端到端方差。
 - candidate self-attention 相对 pointwise 对照没有稳定优势，不能将整体增益归因于候选交互。
 - JESTR 和 GLMR 尚未在本代码库统一复现。
+- train--test 输入重叠敏感性已通过，但 6 条 train--val 输入重叠对模型选择的影响尚未量化。
 
 ## 8. 与 JESTR 和 GLMR 的比较
 
@@ -617,6 +651,8 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - AI assistance disclosure：已加入
 - mass MCES@1：已完成（Base 16.42，代表性 seed-42 Set Transformer 8.02）
 - 固定 alignment 的 reranker 多种子：12/12 组 pointwise/Transformer 实验已完成
+- train--test 输入重叠敏感性：12/12 组完成；剔除 3 条重叠输入后主结论不变
+- train--val 输入重叠：6 条尚待处理，其对 validation-based 模型选择的影响未量化
 - 中心主张：已收窄为非生成式残差 learning-to-rank，不再将 self-attention 作为已验证增益来源
 
 当前论文仍不是最终可提交版本；未完成消融、外部基线复现、方法图与投稿检查已明确记录为
@@ -651,13 +687,15 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 分开标注本地结果与外部 reported results。
 - 写明训练正例插入和测试无插入协议。
 - 写明 formula-conditioned setting 的限制。
+- 披露跨划分输入重叠，并报告 3 条 train--test 重叠的剔除敏感性结果。
+- 将 6 条 train--val 重叠对模型选择的潜在影响保留为明确限制。
 - 避免将联合嵌入本身作为本文创新。
 
 ## 11. 当前最高优先级待办
 
 完整清单以 `paper/ADMA2026_TODO.md` 为准。当前优先事项：
 
-1. 运行 `run_rerank_overlap_sensitivity.py`，确认剔除 5908/5909/5910 后主结论不变。
+1. 处理 6 条 train--val 完全相同输入，评估其对 validation MRR、early stopping 和 checkpoint selection 的影响。
 2. 完成 feature、loss、候选顺序和 top-$K$ 消融。
 3. 尽可能在统一协议下复现 JESTR 和 GLMR。
 4. 若不能复现，保留 `reported` 标记并撤回严格 SOTA 表述。
@@ -691,7 +729,13 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - reranker 相对本地 base 的提升可以归因于 reranker。
 - 本地端到端结果与 GLMR 的差异不能全部归因于 reranker。
 
-### 12.5 匿名补充材料风险
+### 12.5 输入重叠尚未全部闭环
+
+3 条 train--test 输入重叠的剔除敏感性评估已完成，结果变化可忽略；但
+6 条 train--val 输入重叠仍可能影响 early stopping 和 checkpoint selection。
+完成对应模型选择审计前，不能声称跨划分输入重叠问题已全部解决。
+
+### 12.6 匿名补充材料风险
 
 仓库中可能存在：
 
@@ -702,7 +746,7 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 
 匿名补充材料应使用无 `.git` 历史的独立归档，并执行身份字符串扫描。
 
-### 12.6 AI 披露
+### 12.7 AI 披露
 
 当前稿件使用一个全局声明说明 OpenAI Codex 用于全文起草和语言修改。ADMA CFP 的措辞较严格，提交前应再次确认该全局披露是否足以覆盖“任何使用 AI 文本的章节”。
 
@@ -723,6 +767,7 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - `cafb70c`：支持多随机种子 pointwise/Transformer 批量实验。
 - `4c22bc6`：回填多种子结果并将论文核心结论收窄为非生成式残差学习排序。
 - `ddd5153`：增加 feature/loss 批量消融、输入重叠敏感性评估入口和相关测试。
+- `b20a2e8`：添加可恢复的 train--test 输入重叠敏感性评估脚本及审计检查。
 
 ## 14. 维护本记忆文档
 
