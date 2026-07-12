@@ -5,7 +5,7 @@
 本次更新前代码状态：
 
 - 分支：`dev`
-- 最新提交：`4c22bc6 docs(paper): 回填多种子实验并收窄论文结论`
+- 最新提交：`ddd5153 feat(rerank): 支持批量消融与敏感性评估`
 - 工作区：干净
 
 本文档用于后续开发、实验和论文协作时快速恢复上下文。它是内部协作材料，不应直接放入 ADMA 双盲补充材料。若本文档与代码、`params.yaml` 或实验日志冲突，以代码和原始日志为准。
@@ -157,6 +157,8 @@ base_score = dot(normalize(z_s), normalize(z_m))
 - `train_rerank.py`
 - `eval_rerank.py`
 - `run_rerank_pipeline.py`
+- `run_rerank_multiseed.py`
+- `run_rerank_overlap_sensitivity.py`
 
 ### 4.1 设计目标
 
@@ -655,12 +657,13 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 
 完整清单以 `paper/ADMA2026_TODO.md` 为准。当前优先事项：
 
-1. 完成 feature、loss、候选顺序和 top-$K$ 消融。
-2. 尽可能在统一协议下复现 JESTR 和 GLMR。
-3. 若不能复现，保留 `reported` 标记并撤回严格 SOTA 表述。
-4. 测量参数量、显存、cache 时间、rerank latency 和端到端 latency。
-5. 制作正式方法图，替换 LaTeX 文本框。
-6. 对匿名补充材料执行身份信息清理。
+1. 运行 `run_rerank_overlap_sensitivity.py`，确认剔除 5908/5909/5910 后主结论不变。
+2. 完成 feature、loss、候选顺序和 top-$K$ 消融。
+3. 尽可能在统一协议下复现 JESTR 和 GLMR。
+4. 若不能复现，保留 `reported` 标记并撤回严格 SOTA 表述。
+5. 测量参数量、显存、cache 时间、rerank latency 和端到端 latency。
+6. 制作正式方法图，替换 LaTeX 文本框。
+7. 对匿名补充材料执行身份信息清理。
 
 ## 12. 已知风险与容易混淆的地方
 
@@ -719,6 +722,7 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - `96fbaa9`：回填质量候选 MCES@1 结果。
 - `cafb70c`：支持多随机种子 pointwise/Transformer 批量实验。
 - `4c22bc6`：回填多种子结果并将论文核心结论收窄为非生成式残差学习排序。
+- `ddd5153`：增加 feature/loss 批量消融、输入重叠敏感性评估入口和相关测试。
 
 ## 14. 维护本记忆文档
 

@@ -1,4 +1,5 @@
 import logging
+import re
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -168,3 +169,38 @@ def log_ranking_summary(name: str, summary: dict, top_k):
     for k in top_k:
         logging.info("  Top-%-2s Accuracy : %.4f%%", k, summary[f"top{k}"] * 100)
     logging.info("  MRR              : %.4f", summary["mrr"])
+
+
+def parse_rerank_eval_metrics(eval_log: str | Path) -> dict[str, float | int]:
+    eval_log = Path(eval_log)
+    metrics: dict[str, float | int] = {}
+    section = ""
+    for line in eval_log.read_text(encoding="utf-8", errors="replace").splitlines():
+        total_match = re.search(r"Total queries:\s+(\d+)", line)
+        if total_match:
+            metrics["total_queries"] = int(total_match.group(1))
+
+        excluded_match = re.search(r"Excluded\s+(\d+)\s+cache queries", line)
+        if excluded_match:
+            metrics["excluded_queries"] = int(excluded_match.group(1))
+
+        if "Pre-retrieval upper bound:" in line:
+            match = re.search(r"Pre-retrieval upper bound:\s+([0-9.]+)%", line)
+            if match:
+                metrics["upper_bound_pct"] = float(match.group(1))
+        elif "BASE RESULTS" in line:
+            section = "base"
+        elif "RERANK RESULTS" in line:
+            section = "rerank"
+        elif section:
+            top_match = re.search(r"Top-(\d+)\s+Accuracy\s+:\s+([0-9.]+)%", line)
+            if top_match:
+                metrics[f"{section}_top{top_match.group(1)}_pct"] = float(top_match.group(2))
+            mrr_match = re.search(r"MRR\s+:\s+([0-9.]+)", line)
+            if mrr_match:
+                metrics[f"{section}_mrr_raw"] = float(mrr_match.group(1))
+        if "Base   MCES@1" in line:
+            metrics["base_mces"] = float(line.rsplit(":", 1)[1].strip())
+        elif "Rerank MCES@1" in line:
+            metrics["rerank_mces"] = float(line.rsplit(":", 1)[1].strip())
+    return metrics

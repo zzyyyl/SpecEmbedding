@@ -24,7 +24,8 @@
 - [x] 在固定 alignment checkpoint 上为 pointwise/Transformer reranker 运行 seeds 42/43/44，报告均值和样本标准差。
 - [x] 确认验证集和测试集始终使用 `force_include_positive=false`；mass/formula cache meta、生成日志和 label 一致性检查均通过。
 - [x] 完成分子标签重复审计；identifier、原始/规范化 SMILES 和 InChIKey 两两交集均为 0，fold 标记无错配。
-- [ ] 对 6 个 train--val 和 3 个 train--test 完全相同谱图输入做剔除敏感性评估；test cache 索引为 5908/5909/5910，它们标签分子不同且均为 `simulation_challenge=true`。
+- [ ] 使用 `run_rerank_overlap_sensitivity.py` 对 3 个 train--test 完全相同谱图输入做剔除敏感性评估；test cache 索引为 5908/5909/5910，它们标签分子不同且均为 `simulation_challenge=true`。
+- [ ] 另行处理 6 个 train--val 完全相同谱图输入，并评估其对模型选择的影响。
 - [ ] 固化最终 checkpoint、`params.yaml`、代码 commit 和候选文件版本。
 - [x] 将正文中的 `Required Ablations`、`we will` 等待办式内容替换为已完成的三种子 pointwise/Transformer 结果。
 - [ ] 制作正式方法架构图，替换当前文本框占位图。

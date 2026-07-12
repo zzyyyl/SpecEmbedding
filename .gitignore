@@ -22,7 +22,7 @@ test*.py
 temp/*
 tests/*
 !tests/
-!tests/test_rerank_ablation.py
+!tests/test_*.py
 data/*
 checkpoints*/*
 paper/build/

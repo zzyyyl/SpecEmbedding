@@ -4,7 +4,6 @@ import hashlib
 import json
 import os
 import queue
-import re
 import socket
 import statistics
 import subprocess
@@ -15,6 +14,9 @@ from datetime import datetime
 from pathlib import Path
 
 import torch
+
+from SpecEmbedding.utils.gpu import parse_cuda_device, require_available_gpu
+from SpecEmbedding.utils.rerank import parse_rerank_eval_metrics
 
 
 @dataclass(frozen=True)
@@ -108,80 +110,6 @@ def read_json(path: Path) -> dict:
         return json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return {}
-
-
-def parse_device(device: str) -> int:
-    match = re.fullmatch(r"cuda:(\d+)", device)
-    if match is None:
-        raise ValueError(f"Device must use the explicit cuda:N form, got: {device}")
-    return int(match.group(1))
-
-
-def gpu_snapshot(device: str) -> tuple[dict, str]:
-    gpu_index = parse_device(device)
-    query_command = [
-        "nvidia-smi",
-        "-i",
-        str(gpu_index),
-        "--query-gpu=index,uuid,name,memory.total,memory.used,memory.free,utilization.gpu,temperature.gpu",
-        "--format=csv,noheader,nounits",
-    ]
-    query_result = subprocess.run(query_command, capture_output=True, text=True, check=True)
-    rows = list(csv.reader([query_result.stdout.strip()]))
-    if len(rows) != 1 or len(rows[0]) != 8:
-        raise RuntimeError(f"Unexpected nvidia-smi output for {device}: {query_result.stdout!r}")
-
-    row = [item.strip() for item in rows[0]]
-    state = {
-        "index": int(row[0]),
-        "uuid": row[1],
-        "name": row[2],
-        "memory_total_mib": int(row[3]),
-        "memory_used_mib": int(row[4]),
-        "memory_free_mib": int(row[5]),
-        "utilization_gpu_pct": int(row[6]),
-        "temperature_c": int(row[7]),
-    }
-    table_result = subprocess.run(
-        ["nvidia-smi", "-i", str(gpu_index)],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    snapshot_text = (
-        f"timestamp: {now_iso()}\n"
-        f"device: {device}\n"
-        f"query: {query_result.stdout.strip()}\n\n"
-        f"{table_result.stdout}"
-    )
-    return state, snapshot_text
-
-
-def require_available_gpu(
-    device: str,
-    min_free_mib: int,
-    max_utilization: int,
-    snapshot_path: Path | None = None,
-) -> dict:
-    state, snapshot_text = gpu_snapshot(device)
-    print(
-        f"GPU check {device}: free={state['memory_free_mib']} MiB, "
-        f"used={state['memory_used_mib']} MiB, util={state['utilization_gpu_pct']}%"
-    )
-    if snapshot_path is not None:
-        snapshot_path.parent.mkdir(parents=True, exist_ok=True)
-        snapshot_path.write_text(snapshot_text, encoding="utf-8")
-    if state["memory_free_mib"] < min_free_mib:
-        raise RuntimeError(
-            f"{device} has only {state['memory_free_mib']} MiB free; "
-            f"at least {min_free_mib} MiB is required."
-        )
-    if state["utilization_gpu_pct"] > max_utilization:
-        raise RuntimeError(
-            f"{device} utilization is {state['utilization_gpu_pct']}%; "
-            f"the allowed maximum is {max_utilization}%."
-        )
-    return state
 
 
 def cache_paths(args, experiment: Experiment) -> dict[str, Path]:
@@ -547,32 +475,6 @@ def execute_experiment(
         raise
 
 
-def parse_eval_metrics(eval_log: Path) -> dict[str, float]:
-    metrics: dict[str, float] = {}
-    section = ""
-    for line in eval_log.read_text(encoding="utf-8", errors="replace").splitlines():
-        if "Pre-retrieval upper bound:" in line:
-            match = re.search(r"Pre-retrieval upper bound:\s+([0-9.]+)%", line)
-            if match:
-                metrics["upper_bound_pct"] = float(match.group(1))
-        elif "BASE RESULTS" in line:
-            section = "base"
-        elif "RERANK RESULTS" in line:
-            section = "rerank"
-        elif section:
-            top_match = re.search(r"Top-(\d+)\s+Accuracy\s+:\s+([0-9.]+)%", line)
-            if top_match:
-                metrics[f"{section}_top{top_match.group(1)}_pct"] = float(top_match.group(2))
-            mrr_match = re.search(r"MRR\s+:\s+([0-9.]+)", line)
-            if mrr_match:
-                metrics[f"{section}_mrr_raw"] = float(mrr_match.group(1))
-        if "Base   MCES@1" in line:
-            metrics["base_mces"] = float(line.rsplit(":", 1)[1].strip())
-        elif "Rerank MCES@1" in line:
-            metrics["rerank_mces"] = float(line.rsplit(":", 1)[1].strip())
-    return metrics
-
-
 def find_complete_attempt(
     args,
     experiment: Experiment,
@@ -633,7 +535,7 @@ def write_summaries(args, experiments: list[Experiment]) -> None:
             continue
         row = asdict(experiment)
         row["attempt_dir"] = str(attempt)
-        row.update(parse_eval_metrics(attempt / "eval_rerank.log"))
+        row.update(parse_rerank_eval_metrics(attempt / "eval_rerank.log"))
         rows.append(row)
 
     if not rows:
@@ -763,7 +665,7 @@ def parse_args():
         parser.error("--max-utilization must be between 0 and 100")
     for device in args.devices:
         try:
-            parse_device(device)
+            parse_cuda_device(device)
         except ValueError as error:
             parser.error(str(error))
 

@@ -60,7 +60,8 @@ class RerankerAblationTest(unittest.TestCase):
         caches = cache_paths(args, experiment)
         for cache in caches.values():
             cache.parent.mkdir(parents=True, exist_ok=True)
-            cache.write_bytes(b"cache")
+            if not cache.exists():
+                cache.write_bytes(b"cache")
 
         attempt = experiment_dir(args, experiment) / "attempt_001"
         attempt.mkdir(parents=True, exist_ok=True)
