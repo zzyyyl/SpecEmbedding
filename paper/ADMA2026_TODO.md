@@ -1,6 +1,6 @@
 # ADMA 2026 投稿待办
 
-最后更新：2026-07-13
+最后更新：2026-07-14
 
 - 论文截止：2026-07-17 AoE
 - 补充材料截止：正文截止后 3 天
@@ -18,7 +18,7 @@
 ## P0：投稿前必须完成
 
 - [x] 计算历史 `d4c1f70` checkpoint 质量候选场景的 MCES@1（Base：16.4199；代表性 seed-42 Set Transformer：8.0209；越低越好）。
-- [ ] 执行 `run_overlap_clean_mces.sh`，使用最终 overlap-clean `a2280d2` checkpoint 重算 mass/formula 的 Base 和代表性 seed-42 Transformer MCES@1，不与历史 checkpoint 的 MCES@1 混用。
+- [x] 使用 `run_overlap_clean_mces.sh` 完成最终 overlap-clean `a2280d2` checkpoint 的 MCES@1 重算：mass Base/seed-42 Transformer 为 15.3681/7.7057，formula 为 5.4389/3.0913；四项均完成 17,556/17,556 条查询，batch 状态为 `complete`。
 - [ ] 在统一候选集、SMILES canonicalization 和评价代码下复现 JESTR。
 - [ ] 在相同协议下复现 GLMR。
 - [x] 当前采用无法完成统一复现时的降级方案：全文保留 `reported results` 标记，不声称严格 SOTA。
@@ -27,7 +27,7 @@
 - [x] 完成分子标签重复审计；identifier、原始/规范化 SMILES 和 InChIKey 两两交集均为 0，fold 标记无错配。
 - [x] 使用 `run_rerank_overlap_sensitivity.py` 对 3 个 train--test 完全相同谱图输入完成剔除敏感性评估；12/12 组完成，排除 test cache 索引 5908/5909/5910 后三种子平均 Recall@1 仅变化 $-0.0045$ 至 $-0.0055$ 个百分点，主结论不变；实验代码 commit 为 `b20a2e8`。
 - [x] 完成 6 个 train--val 完全相同输入的 overlap-clean 全流水线审计：排除 val 索引 7686/7687/7688/8464/8465/8466，alignment validation molecule keys 由 3386 降至 3384；best/stop epoch 仍为 16/21，reranker 12/12 完成、无错误，其中 9/12 组 best/stop epoch 对与历史流水线不同。实验代码 commit 为 `a2280d2`；该对比包含 alignment 重训，只能解释为流水线级敏感性，不是 6 条查询的隔离因果效应。
-- [ ] 固化最终 checkpoint、`params.yaml`、代码 commit 和候选文件版本。
+- [ ] 运行 `python freeze_adma2026_artifacts.py` 生成 `paper/adma2026_artifact_manifest.json`，固化最终 checkpoint、`params.yaml`、实验代码 commit、数据/候选文件、cache 和结果哈希。该 manifest 仅作内部 inventory；其中引用的原始 status/log 可能含主机、用户、进程和 GPU 信息，不能直接按清单打包匿名附件。
 - [x] 将正文中的 `Required Ablations`、`we will` 等待办式内容替换为已完成的三种子 pointwise/Transformer 结果。
 - [ ] 制作正式方法架构图，替换当前文本框占位图。
 - [ ] 检查 SpecEmbedding 既有工作的引用和增量说明，避免重复声明已有贡献。
@@ -73,7 +73,7 @@
 ## 投稿合规
 
 - [x] 使用 Springer LNCS/LNAI 模板。
-- [x] 英文稿当前为 10 页，低于 15 页限制。
+- [x] 英文稿当前为 11 页，低于 15 页限制。
 - [x] 作者、单位和 PDF 作者元数据已隐藏。
 - [x] 未包含致谢和基金信息。
 - [x] 已加入 AI 使用披露。
@@ -94,17 +94,20 @@
 
 | Candidate | Model | Recall@1 | Recall@5 | Recall@10 | Recall@20 | MRR | MCES@1 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| mass | Clean Base | 47.4596 | 63.5111 | 71.0242 | 77.7626 | 0.5503 | 待重算 |
+| mass | Clean Base | 47.4596 | 63.5111 | 71.0242 | 77.7626 | 0.5503 | 15.3681 |
 | mass | Pointwise | 67.4432±0.7357 | 77.0202±0.5911 | 80.1055±0.2077 | 82.2624±0.1588 | 0.7179±0.0066 | 不计算 |
-| mass | Transformer | 68.5824±0.2035 | 77.3582±0.3610 | 79.9935±0.3405 | 82.2036±0.0668 | 0.7260±0.0025 | 待重算 |
-| formula | Clean Base | 63.1009 | 75.7861 | 80.8669 | 84.9339 | 0.6886 | 待重算 |
+| mass | Transformer | 68.5824±0.2035 | 77.3582±0.3610 | 79.9935±0.3405 | 82.2036±0.0668 | 0.7260±0.0025 | 7.7057（seed 42） |
+| formula | Clean Base | 63.1009 | 75.7861 | 80.8669 | 84.9339 | 0.6886 | 5.4389 |
 | formula | Pointwise | 73.9709±0.5910 | 81.9359±0.2712 | 84.4934±0.0786 | 86.7813±0.2651 | 0.7764±0.0049 | 不计算 |
-| formula | Transformer | 74.5671±0.2819 | 81.9682±0.2645 | 84.3757±0.0821 | 86.7719±0.1392 | 0.7802±0.0026 | 待重算 |
+| formula | Transformer | 74.5671±0.2819 | 81.9682±0.2645 | 84.3757±0.0821 | 86.7719±0.1392 | 0.7802±0.0026 | 3.0913（seed 42） |
 
 overlap-clean 的 mass/formula top-40 upper bound 分别为 83.8802%/89.2572%；Pointwise 相对 Clean Base 的 Recall@1 增益为 +19.9836/+10.8700 个百分点，Transformer 为 +21.1228/+11.4662 个百分点。完整逐项与聚合结果分别见
 `checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/summary.csv`
 和
 `checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/summary_aggregate.csv`。
+
+overlap-clean MCES@1 batch 于 2026-07-13T15:35:46+08:00 完成，状态为 `complete`，四项均评估 17,556/17,556 条查询；source commit 为 `a2280d2`。mass 从 15.3681 降至 7.7057，绝对降低 7.6624（49.86%）；formula 从 5.4389 降至 3.0913，绝对降低 2.3476（43.16%）。结果与完整状态见
+`checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_mces_seed42_transformer/batch_status.json`。
 
 以下 `d4c1f70` 表格仅保留为历史 MCES@1 和 train--test 敏感性的追溯记录，不应与 overlap-clean 的 Recall/MRR 混合用于同一主结果表。
 
@@ -151,7 +154,8 @@ Train--val overlap-clean 审计排除 6 条 validation 查询（两个分子组�
 - [x] 7 月 10 日至 12 日：完成质量候选场景的 MCES@1。
 - [x] 7 月 10 日至 12 日：完成固定 alignment 的 reranker 多随机种子实验。
 - [x] 7 月 12 日：完成 train--val overlap-clean alignment/cache/reranker 全流水线及 12 组多种子评估。
-- [ ] 7 月 13 日：执行 `run_overlap_clean_mces.sh`，补算 overlap-clean 代表性 checkpoint 的 mass/formula MCES@1。
+- [x] 7 月 13 日：执行 `run_overlap_clean_mces.sh`，补算 overlap-clean 代表性 checkpoint 的 mass/formula MCES@1。
+- [ ] 7 月 14 日：执行 `python freeze_adma2026_artifacts.py`，生成不含本机绝对路径或 hostname 的内部实验 artifact manifest；其中仍记录 Git commit，且所引用的原始 status/log 需要脱敏，不得未审查就直接放入匿名补充材料。
 - [x] 7 月 10 日至 12 日：确定保留 reported-results 降级方案，不声称严格 SOTA；JESTR/GLMR 统一复现仍作为独立待办。
 - [ ] 7 月 13 日至 14 日：消融、效率和案例分析。
 - [ ] 7 月 15 日：更新图表和全文。

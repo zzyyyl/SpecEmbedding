@@ -451,9 +451,9 @@ affect exact values.
 We report Recall@1, Recall@5, Recall@20, and mean reciprocal rank (MRR) over all
 test queries. MCES@1 measures structural distance between the top prediction and
 target, so lower is better. Recall and MRR uncertainty is computed over three
-reranker seeds with a fixed base checkpoint. MCES@1 for the overlap-clean base
-and representative seed-42 Transformer checkpoints is pending and is therefore
-not reported in the local rows below.
+reranker seeds with a fixed base checkpoint. MCES@1 is computed for the
+overlap-clean base and representative seed-42 Transformer checkpoints; these
+single-checkpoint values do not include seed-level uncertainty.
 
 \subsection{Main Results}
 
@@ -463,8 +463,8 @@ not reported in the local rows below.
   Recall and MRR are percentages; MCES@1 is a distance (lower is better). JESTR
   and GLMR values are reported by Zhang et al.\ \cite{zhang2026glmr}; our rows
   use the local pipeline and official candidate files. The external rows are
-  used only as cross-paper context. A dash marks overlap-clean MCES@1 values
-  that remain to be computed.}
+  used only as cross-paper context. Local MCES@1 values use the overlap-clean
+  base and representative seed-42 Transformer checkpoints.}
   \label{tab:main_results}
   \small
   \begin{tabular}{llrrrrr}
@@ -474,14 +474,14 @@ not reported in the local rows below.
     \multirow{4}{*}{Mass}
       & JESTR (reported) & 17.62 & 40.36 & 64.76 & 29.12 & 15.82 \\
       & GLMR (reported) & 64.17 & 72.96 & 78.78 & 67.82 & 11.14 \\
-      & \base{} & 47.46 & 63.51 & 77.76 & 55.03 & -- \\
-      & Set Transformer & 68.74 & 77.77 & 82.18 & 72.87 & -- \\
+      & \base{} & 47.46 & 63.51 & 77.76 & 55.03 & 15.37 \\
+      & Set Transformer & 68.74 & 77.77 & 82.18 & 72.87 & 7.71 \\
     \midrule
     \multirow{4}{*}{Formula}
       & JESTR (reported) & 11.77 & 33.26 & 61.01 & 22.83 & 11.73 \\
       & GLMR (reported) & 68.48 & 78.09 & 84.22 & 72.47 & 5.05 \\
-      & \base{} & 63.10 & 75.79 & 84.93 & 68.86 & -- \\
-      & Set Transformer & 74.75 & 82.25 & 86.89 & 78.22 & -- \\
+      & \base{} & 63.10 & 75.79 & 84.93 & 68.86 & 5.44 \\
+      & Set Transformer & 74.75 & 82.25 & 86.89 & 78.22 & 3.09 \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -490,17 +490,19 @@ In the representative seed-42 run, the set Transformer adds 21.28 percentage
 points in mass-conditioned Recall@1 and 11.65 points in formula-conditioned
 Recall@1. The corresponding MRR gains are 17.84 and 9.36 points. Improvements
 at Recall@20 are smaller because the first-stage top-40 upper bound is already
-the dominant constraint.
+the dominant constraint. Relative to the matched overlap-clean base, the same
+seed-42 Transformer reduces MCES@1 from 15.3681 to 7.7057 for mass candidates
+($49.86\%$) and from 5.4389 to 3.0913 for formula candidates ($43.16\%$).
 
 Relative to the externally reported GLMR values, the representative Recall@1 is
 higher by 4.57 points for mass candidates and 6.27 points for formula
-candidates. Overlap-clean MCES@1 is pending, so no local structural-distance
-comparison is made here. The Recall figures are encouraging but do not by
-themselves prove that listwise reranking is superior to generation: our base
-retriever already differs substantially from the GLMR pre-retriever. A matched
-causal comparison would require rerunning the baselines or applying the
-reranker to identical frozen embeddings and candidate lists; we therefore treat
-the present comparison as contextual rather than causal.
+candidates; its MCES@1 values are also numerically lower. These cross-paper
+figures are encouraging but do not by themselves prove that listwise reranking
+is superior to generation: our base retriever already differs substantially
+from the GLMR pre-retriever. A matched causal comparison would require rerunning
+the baselines or applying the reranker to identical frozen embeddings and
+candidate lists; we therefore treat both the Recall and MCES comparisons as
+contextual rather than causal.
 
 \subsection{Controlled Reranker Ablation}
 

@@ -365,8 +365,8 @@ RTX 4090 上评估。
 
 评价指标为全部测试查询上的 Recall@1、Recall@5、Recall@20 和 MRR。MCES@1 表示
 top-1 预测与真实分子的结构距离，因此越低越好。Recall 和 MRR 的误差来自固定基础
-checkpoint 上的三个 reranker seeds。overlap-clean 基础模型和代表性 seed-42 Transformer
-的 MCES@1 尚待补算，因此下表的本地结果行暂不报告该指标。
+checkpoint 上的三个 reranker seeds。MCES@1 使用 overlap-clean 基础模型和代表性
+seed-42 Transformer checkpoint 计算；这些单 checkpoint 数值不包含随机种子不确定性。
 
 \subsection{主要结果}
 
@@ -374,8 +374,8 @@ checkpoint 上的三个 reranker seeds。overlap-clean 基础模型和代表性 
   \centering
   \caption{代表性 seed-42 MassSpecGym 结果和跨论文背景。Recall 和 MRR 以百分比报告；
   MCES@1 为距离，越低越好。JESTR 和 GLMR 数字来自 Zhang 等人 \cite{zhang2026glmr}；
-  本文行来自本地流水线和官方候选文件。外部结果仅用于跨论文背景对照。本地结果行中的
-  破折号表示 overlap-clean MCES@1 尚待补算。}
+  本文行来自本地流水线和官方候选文件。外部结果仅用于跨论文背景对照。本地 MCES@1
+  使用 overlap-clean 基础模型和代表性 seed-42 Transformer checkpoint。}
   \label{tab:main_results_cn}
   \small
   \begin{tabular}{llrrrrr}
@@ -385,28 +385,30 @@ checkpoint 上的三个 reranker seeds。overlap-clean 基础模型和代表性 
     \multirow{4}{*}{质量}
       & JESTR（reported） & 17.62 & 40.36 & 64.76 & 29.12 & 15.82 \\
       & GLMR（reported） & 64.17 & 72.96 & 78.78 & 67.82 & 11.14 \\
-      & \base{} & 47.46 & 63.51 & 77.76 & 55.03 & -- \\
-      & Set Transformer & 68.74 & 77.77 & 82.18 & 72.87 & -- \\
+      & \base{} & 47.46 & 63.51 & 77.76 & 55.03 & 15.37 \\
+      & Set Transformer & 68.74 & 77.77 & 82.18 & 72.87 & 7.71 \\
     \midrule
     \multirow{4}{*}{分子式}
       & JESTR（reported） & 11.77 & 33.26 & 61.01 & 22.83 & 11.73 \\
       & GLMR（reported） & 68.48 & 78.09 & 84.22 & 72.47 & 5.05 \\
-      & \base{} & 63.10 & 75.79 & 84.93 & 68.86 & -- \\
-      & Set Transformer & 74.75 & 82.25 & 86.89 & 78.22 & -- \\
+      & \base{} & 63.10 & 75.79 & 84.93 & 68.86 & 5.44 \\
+      & Set Transformer & 74.75 & 82.25 & 86.89 & 78.22 & 3.09 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 在代表性 seed-42 实验中，Set Transformer 在质量约束 Recall@1 上带来 21.28 个百分点提升，
 在分子式约束场景带来 11.65 个百分点提升；MRR 分别提升 17.84 和 9.36 个百分点。
-Recall@20 的提升较小，因为此时主要瓶颈已经变为基础 top-40 召回上界。
+Recall@20 的提升较小，因为此时主要瓶颈已经变为基础 top-40 召回上界。相对匹配的
+overlap-clean 基础模型，同一个 seed-42 Transformer 将质量候选 MCES@1 从 15.3681
+降低到 7.7057（$49.86\%$），将分子式候选 MCES@1 从 5.4389 降低到 3.0913
+（$43.16\%$）。
 
 相对 GLMR 论文报告的结果，代表性 Recall@1 在质量和分子式场景下分别高 4.57 和 6.27
-个百分点。由于 overlap-clean MCES@1 尚待补算，本文暂不作本地结构距离比较。上述 Recall
-结果值得继续验证，但不能单独证明 listwise reranking 优于生成式方法，因为我们的基础
-检索器与 GLMR 的 pre-retriever 已经有显著差异。匹配的因果比较需要统一复现基线，或在
-完全相同的冻结嵌入和候选列表上比较不同重排序器；因此本文只把该比较视为背景信息，不作
-因果解释。
+个百分点，MCES@1 在数值上也更低。这些跨论文结果值得继续验证，但不能单独证明 listwise
+reranking 优于生成式方法，因为我们的基础检索器与 GLMR 的 pre-retriever 已经有显著差异。
+匹配的因果比较需要统一复现基线，或在完全相同的冻结嵌入和候选列表上比较不同重排序器；
+因此本文只把 Recall 和 MCES 比较视为背景信息，不作因果解释。
 
 \subsection{受控 reranker 消融}
 

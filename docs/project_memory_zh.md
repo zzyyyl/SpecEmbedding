@@ -1,6 +1,6 @@
 # SpecEmbedding 项目记忆
 
-最后更新：2026-07-13
+最后更新：2026-07-14
 
 本次更新前代码状态：
 
@@ -159,6 +159,7 @@ base_score = dot(normalize(z_s), normalize(z_m))
 - `run_rerank_pipeline.py`
 - `run_rerank_multiseed.py`
 - `run_rerank_overlap_sensitivity.py`
+- `freeze_adma2026_artifacts.py`：验证并生成不含绝对路径或主机身份信息的内部实验 artifact manifest；manifest 仅作 inventory，其引用的原始 status/log 仍需在匿名发布前脱敏。
 
 ### 4.1 设计目标
 
@@ -356,14 +357,14 @@ Recall 指标以百分比表示。当前 overlap-clean 主结果表的 MRR 保�
 
 2026-07-12 完成 commit `a2280d2` 的 train--val overlap-clean 全流水线。该流水线排除 validation 索引 7686/7687/7688/8464/8465/8466，重训 alignment、重建 mass/formula top-40 cache，并完成 2 种候选库 $×$ 2 种 reranker $×$ 3 个 seeds 的 12 组训练与评估。12/12 组均为 `complete`，`errors=[]`。当前主结果应采用下表的 overlap-clean 数字：
 
-| Candidate | Model | Upper bound | Recall@1 | Recall@5 | Recall@10 | Recall@20 | MRR |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| mass | Clean Base | 83.8802 | 47.4596 | 63.5111 | 71.0242 | 77.7626 | 0.5503 |
-| mass | Pointwise | 83.8802 | 67.4432±0.7357 | 77.0202±0.5911 | 80.1055±0.2077 | 82.2624±0.1588 | 0.7179±0.0066 |
-| mass | Set Transformer | 83.8802 | 68.5824±0.2035 | 77.3582±0.3610 | 79.9935±0.3405 | 82.2036±0.0668 | 0.7260±0.0025 |
-| formula | Clean Base | 89.2572 | 63.1009 | 75.7861 | 80.8669 | 84.9339 | 0.6886 |
-| formula | Pointwise | 89.2572 | 73.9709±0.5910 | 81.9359±0.2712 | 84.4934±0.0786 | 86.7813±0.2651 | 0.7764±0.0049 |
-| formula | Set Transformer | 89.2572 | 74.5671±0.2819 | 81.9682±0.2645 | 84.3757±0.0821 | 86.7719±0.1392 | 0.7802±0.0026 |
+| Candidate | Model | Upper bound | Recall@1 | Recall@5 | Recall@10 | Recall@20 | MRR | MCES@1 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| mass | Clean Base | 83.8802 | 47.4596 | 63.5111 | 71.0242 | 77.7626 | 0.5503 | 15.3681 |
+| mass | Pointwise | 83.8802 | 67.4432±0.7357 | 77.0202±0.5911 | 80.1055±0.2077 | 82.2624±0.1588 | 0.7179±0.0066 | 未计算 |
+| mass | Set Transformer | 83.8802 | 68.5824±0.2035 | 77.3582±0.3610 | 79.9935±0.3405 | 82.2036±0.0668 | 0.7260±0.0025 | 7.7057（seed 42） |
+| formula | Clean Base | 89.2572 | 63.1009 | 75.7861 | 80.8669 | 84.9339 | 0.6886 | 5.4389 |
+| formula | Pointwise | 89.2572 | 73.9709±0.5910 | 81.9359±0.2712 | 84.4934±0.0786 | 86.7813±0.2651 | 0.7764±0.0049 | 未计算 |
+| formula | Set Transformer | 89.2572 | 74.5671±0.2819 | 81.9682±0.2645 | 84.3757±0.0821 | 86.7719±0.1392 | 0.7802±0.0026 | 3.0913（seed 42） |
 
 overlap-clean 受控结论：
 
@@ -371,7 +372,7 @@ overlap-clean 受控结论：
 - Set Transformer 相对 Pointwise 的平均 Recall@1 差异为 mass +1.1392、formula +0.5962 个百分点，在 6/6 个成对 seed--candidate Recall@1 比较中获胜；MRR raw 平均差分别为 +0.0081/+0.0038。
 - 上述 Transformer 优势与历史 `d4c1f70` 固定 alignment 结果（mass -0.13、formula +0.21 个百分点，胜场 3/6）不一致。因此只能说 clean run 呈现小幅一致优势，但尚不能确认 candidate self-attention 具有稳健独立收益。
 - $±$ 只覆盖 reranker seeds 42/43/44；alignment 仍只有 seed 42，不代表端到端方差。
-- 该批次按协议未计算 MCES@1。最终论文表不能将历史 `d4c1f70` checkpoint 的 MCES@1 与新 Recall/MRR 混用，需补算 clean Base 和 seed-42 Transformer 的 mass/formula MCES@1。
+- overlap-clean MCES@1 已使用同一 `a2280d2` 流水线补算完成：mass Clean Base/seed-42 Set Transformer 为 15.3681/7.7057，绝对降低 7.6624（49.86%）；formula 为 5.4389/3.0913，绝对降低 2.3476（43.16%）。四项均完成 17,556/17,556 条查询，batch 状态为 `complete`。
 
 Train--val 模型选择审计：
 
@@ -460,12 +461,16 @@ checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multise
 checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/summary.csv
 checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/summary_aggregate.csv
 checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/batch_status.json
+checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_mces_seed42_transformer/
+checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_mces_seed42_transformer/batch_status.json
 ```
 
 该批次于 2026-07-12T22:21:42+08:00 完成，记录的完整代码 commit 为
 `a2280d2828ce872da1f69319b49e0ef7f1bed572`，`params.yaml` SHA-256 为
 `b6260dad043f9c0f1cb4ff36dc7b7bf8bac4481998aa36b4d55f44392e1b0bc6`，alignment checkpoint SHA-256 为
 `ad5d1eb76805c51563349f259a4b4c935336064b6171a4e650472b78aeeaa06f`。
+
+MCES@1 batch 于 2026-07-13T15:35:46+08:00 完成，source commit 为 `a2280d2`，batch 与 mass/formula 两个子任务状态均为 `complete`；Base 与 reranker 四项均完成 17,556/17,556 条查询。
 
 以下为历史 `d4c1f70` 路径，用于追溯旧结果和 train--test 敏感性实验。
 
@@ -691,12 +696,12 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 中文稿：`paper/main_cn.tex`
 - 参考文献：`paper/references.bib`
 - 待办清单：`paper/ADMA2026_TODO.md`
-- 英文编译：成功，10 页
-- 中文编译：成功，9 页
+- 英文编译：成功，11 页
+- 中文编译：成功，10 页
 - 英文 PDF 作者元数据：空
 - 致谢和基金：未加入
 - AI assistance disclosure：已加入
-- 历史 `d4c1f70` mass MCES@1：已完成（Base 16.42，代表性 seed-42 Set Transformer 8.02）；overlap-clean mass/formula MCES@1 待重算
+- overlap-clean mass/formula MCES@1：已完成（mass Base/seed-42 Set Transformer 15.3681/7.7057；formula 5.4389/3.0913；四项均为 17,556/17,556，batch 状态 `complete`）
 - overlap-clean alignment/cache/reranker 全流水线：12/12 组 pointwise/Transformer 实验已完成
 - train--test 输入重叠敏感性：12/12 组完成；剔除 3 条重叠输入后主结论不变
 - train--val 输入重叠：overlap-clean 审计已完成；clean 与历史 alignment best/stop epoch 相同，reranker 9/12 组选择不同
@@ -742,13 +747,11 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 
 完整清单以 `paper/ADMA2026_TODO.md` 为准。当前优先事项：
 
-1. 执行 `run_overlap_clean_mces.sh`，补算 overlap-clean seed-42 Transformer 及 Clean Base 的 mass/formula MCES@1，避免混用历史 checkpoint 指标。
-2. MCES@1 完成后回填中英文主表、TODO 和本记忆文档，移除临时破折号。
-3. 固化最终 checkpoint、`params.yaml`/checkpoint/candidate hashes、代码 commit 和结果路径。
-4. 制作正式方法图，替换 LaTeX 文本框。
-5. 核对 SpecEmbedding 引用与本文增量，并完成页数、匿名、编译和补充材料检查。
-6. 时间允许时再完成 feature/loss/top-$K$ 消融、效率测量或多 alignment seeds；其中多 alignment seeds 对判断 self-attention 稳定性价值最高。
-7. 尽可能在统一协议下复现 JESTR/GLMR；若时间不足，继续保留 `reported` 标记且不主张严格 SOTA。
+1. 执行 `python freeze_adma2026_artifacts.py`，生成 `paper/adma2026_artifact_manifest.json`，固化最终 checkpoint、`params.yaml`/data/cache/candidate/result hashes 和实验代码 commit。
+2. 制作正式方法图，替换 LaTeX 文本框。
+3. 核对 SpecEmbedding 引用与本文增量，并完成页数、匿名、编译和补充材料检查。
+4. 时间允许时再完成 feature/loss/top-$K$ 消融、效率测量或多 alignment seeds；其中多 alignment seeds 对判断 self-attention 稳定性价值最高。
+5. 尽可能在统一协议下复现 JESTR/GLMR；若时间不足，继续保留 `reported` 标记且不主张严格 SOTA。
 
 ## 12. 已知风险与容易混淆的地方
 
