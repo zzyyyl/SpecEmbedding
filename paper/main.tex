@@ -70,13 +70,14 @@ the base score, and the base rank under listwise supervision. We compare a
 context-free pointwise scorer with a candidate-set Transformer across three
 reranker initializations while keeping the first-stage checkpoint and caches
 fixed. On the 17,556-query MassSpecGym test split, their Recall@1 values are
-$67.89\pm0.44$ and $67.75\pm0.31$ for mass-conditioned retrieval, and
-$73.77\pm0.19$ and $73.98\pm0.84$ for formula-conditioned retrieval, compared
-with fixed-base values of 43.78 and 58.49. The lack of a consistent Transformer
-advantage shows that the current evidence supports supervised residual
-reranking, rather than a distinct benefit from candidate self-attention. Both
-variants operate without autoregressive molecule generation or test-time
-positive insertion.
+$67.44\pm0.74$ and $68.58\pm0.20$ for mass-conditioned retrieval, and
+$73.97\pm0.59$ and $74.57\pm0.28$ for formula-conditioned retrieval, compared
+with fixed-base values of 47.46 and 63.10. The overlap-clean run gives the
+Transformer a modest advantage, but the same paired-win pattern is absent under
+an earlier alignment checkpoint. Thus, the current evidence strongly supports supervised
+residual reranking while not establishing a checkpoint-robust benefit from
+candidate self-attention. Both variants operate without autoregressive molecule
+generation or test-time positive insertion.
 \keywords{Data mining for bioinformatics \and Tandem mass spectrometry \and
 Molecule retrieval \and Learning to rank \and Multimodal representation
 learning}
@@ -136,9 +137,10 @@ Our contributions are:
   while keeping the first-stage embeddings cacheable.
   \item Under MassSpecGym's official candidate protocol, both implementations
   substantially improve the fixed base retriever across three reranker seeds.
-  The controlled comparison finds no stable advantage from candidate
-  self-attention, preventing the overall reranking gain from being incorrectly
-  attributed to candidate self-attention.
+  The overlap-clean comparison finds a modest candidate-set Transformer
+  advantage, but comparison across alignment checkpoints shows that this
+  advantage is not yet robust enough to attribute the overall reranking gain to
+  candidate self-attention.
 \end{itemize}
 
 \section{Related Work}
@@ -397,7 +399,11 @@ adduct, instrument, and collision energy) found no target-molecule duplicates
 across splits, but six validation and three test signatures exactly matched
 training signatures. In all nine matched pairs, the target molecules differ
 and each evaluation query is marked \texttt{simulation\_challenge=true}. We
-report these cases as cross-split spectrum-input overlap.
+report these cases as cross-split spectrum-input overlap. In the canonical
+pipeline reported below, all validation-dependent model selection excludes the
+six affected validation spectra, leaving 19,423 validation queries for the
+rerankers; alignment validation keys decrease from 3,386 to 3,384 molecular
+entries. We retain and evaluate all 17,556 official test queries.
 
 We evaluate both official retrieval settings. The mass-conditioned library uses
 precursor mass and a tolerance window. The formula-conditioned library assumes
@@ -411,7 +417,9 @@ setting and 35.73 for the formula setting.
 The aligned model uses 512-dimensional output embeddings. It does not load the
 separately pretrained SpecEmbedding checkpoint;
 the spectrum and molecular encoders are trained on the MassSpecGym training
-split with bidirectional contrastive alignment.
+split with bidirectional contrastive alignment. The canonical seed-42 alignment
+run applies the validation exclusion above; it selects epoch 16 and stops at
+epoch 21 after five epochs without improvement.
 
 The reranker has hidden width 512, a 32-dimensional rank embedding, and dropout
 0.1. The set-aware variant has two Transformer layers with eight attention
@@ -419,14 +427,15 @@ heads; the pointwise control removes both layers. We use AdamW with learning
 rate $10^{-4}$, batch size 16, at most 30 epochs, and early stopping on
 validation MRR with patience 5. The pairwise weight and margin are
 $\lambda=0.2$ and $\gamma=0.1$. With one fixed alignment checkpoint and fixed
-caches, each reranker variant is trained with seeds 42, 43, and 44. This measures
-reranker variation, not end-to-end alignment uncertainty. All models are
-selected without test-set access and evaluated on one NVIDIA RTX 4090.
+caches from the overlap-clean run, each reranker variant is trained with seeds
+42, 43, and 44. This measures reranker variation, not end-to-end alignment
+uncertainty. All models are selected without test-set access and evaluated on
+one NVIDIA RTX 4090.
 
-The top-40 base recall before supervised insertion is 92.59\% for mass and
-89.40\% for formula on the training split. Training lists are completed to
+The top-40 base recall before supervised insertion is 93.78\% for mass and
+90.42\% for formula on the training split. Training lists are completed to
 100\% labeled coverage as described above. On test, insertion is disabled and
-the corresponding upper bounds are 82.15\% and 87.30\%.
+the corresponding upper bounds are 83.88\% and 89.26\%.
 
 \subsection{Baselines and Metrics}
 
@@ -442,8 +451,9 @@ affect exact values.
 We report Recall@1, Recall@5, Recall@20, and mean reciprocal rank (MRR) over all
 test queries. MCES@1 measures structural distance between the top prediction and
 target, so lower is better. Recall and MRR uncertainty is computed over three
-reranker seeds with a fixed base checkpoint. MCES@1 was computed only for the
-representative seed-42 Transformer run.
+reranker seeds with a fixed base checkpoint. MCES@1 for the overlap-clean base
+and representative seed-42 Transformer checkpoints is pending and is therefore
+not reported in the local rows below.
 
 \subsection{Main Results}
 
@@ -453,7 +463,8 @@ representative seed-42 Transformer run.
   Recall and MRR are percentages; MCES@1 is a distance (lower is better). JESTR
   and GLMR values are reported by Zhang et al.\ \cite{zhang2026glmr}; our rows
   use the local pipeline and official candidate files. The external rows are
-  used only as cross-paper context.}
+  used only as cross-paper context. A dash marks overlap-clean MCES@1 values
+  that remain to be computed.}
   \label{tab:main_results}
   \small
   \begin{tabular}{llrrrrr}
@@ -463,31 +474,31 @@ representative seed-42 Transformer run.
     \multirow{4}{*}{Mass}
       & JESTR (reported) & 17.62 & 40.36 & 64.76 & 29.12 & 15.82 \\
       & GLMR (reported) & 64.17 & 72.96 & 78.78 & 67.82 & 11.14 \\
-      & \base{} & 43.78 & 61.10 & 75.55 & 51.96 & 16.42 \\
-      & Set Transformer & 67.91 & 76.00 & 80.45 & 71.62 & 8.02 \\
+      & \base{} & 47.46 & 63.51 & 77.76 & 55.03 & -- \\
+      & Set Transformer & 68.74 & 77.77 & 82.18 & 72.87 & -- \\
     \midrule
     \multirow{4}{*}{Formula}
       & JESTR (reported) & 11.77 & 33.26 & 61.01 & 22.83 & 11.73 \\
       & GLMR (reported) & 68.48 & 78.09 & 84.22 & 72.47 & 5.05 \\
-      & \base{} & 58.49 & 71.49 & 81.81 & 64.65 & 6.14 \\
-      & Set Transformer & 74.33 & 80.64 & 85.07 & 77.27 & 3.13 \\
+      & \base{} & 63.10 & 75.79 & 84.93 & 68.86 & -- \\
+      & Set Transformer & 74.75 & 82.25 & 86.89 & 78.22 & -- \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-In the representative seed-42 run, the set Transformer adds 24.13 percentage
-points in mass-conditioned Recall@1 and 15.84 points in formula-conditioned
-Recall@1. The corresponding MRR gains are 19.66 and 12.62 points. Improvements
+In the representative seed-42 run, the set Transformer adds 21.28 percentage
+points in mass-conditioned Recall@1 and 11.65 points in formula-conditioned
+Recall@1. The corresponding MRR gains are 17.84 and 9.36 points. Improvements
 at Recall@20 are smaller because the first-stage top-40 upper bound is already
 the dominant constraint.
 
-Relative to the externally reported GLMR values, the representative Recall@1 is higher
-by 3.74 points for mass candidates and 5.85 points for formula candidates. The
-MCES@1 distances decrease from the reported 11.14 to 8.02 for mass candidates
-and from 5.05 to 3.13 for formula candidates. These figures are encouraging but
-do not by themselves prove that listwise reranking is superior to generation:
-our base retriever already differs substantially from the GLMR pre-retriever. A
-matched causal comparison would require rerunning the baselines or applying the
+Relative to the externally reported GLMR values, the representative Recall@1 is
+higher by 4.57 points for mass candidates and 6.27 points for formula
+candidates. Overlap-clean MCES@1 is pending, so no local structural-distance
+comparison is made here. The Recall figures are encouraging but do not by
+themselves prove that listwise reranking is superior to generation: our base
+retriever already differs substantially from the GLMR pre-retriever. A matched
+causal comparison would require rerunning the baselines or applying the
 reranker to identical frozen embeddings and candidate lists; we therefore treat
 the present comparison as contextual rather than causal.
 
@@ -505,33 +516,44 @@ the present comparison as contextual rather than causal.
     Library & Method & R@1 & R@5 & R@20 & MRR \\
     \midrule
     \multirow{3}{*}{Mass}
-      & Base & 43.78 & 61.10 & 75.55 & 51.96 \\
-      & Pointwise & $67.89\pm0.44$ & $75.79\pm0.19$ & $80.63\pm0.05$ & $71.53\pm0.35$ \\
-      & Set Transformer & $67.75\pm0.31$ & $75.88\pm0.18$ & $80.63\pm0.15$ & $71.52\pm0.24$ \\
+      & Base & 47.46 & 63.51 & 77.76 & 55.03 \\
+      & Pointwise & $67.44\pm0.74$ & $77.02\pm0.59$ & $82.26\pm0.16$ & $71.79\pm0.66$ \\
+      & Set Transformer & $68.58\pm0.20$ & $77.36\pm0.36$ & $82.20\pm0.07$ & $72.60\pm0.25$ \\
     \midrule
     \multirow{3}{*}{Formula}
-      & Base & 58.49 & 71.49 & 81.81 & 64.65 \\
-      & Pointwise & $73.77\pm0.19$ & $80.55\pm0.12$ & $84.97\pm0.15$ & $76.88\pm0.16$ \\
-      & Set Transformer & $73.98\pm0.84$ & $80.27\pm0.54$ & $85.07\pm0.05$ & $76.95\pm0.69$ \\
+      & Base & 63.10 & 75.79 & 84.93 & 68.86 \\
+      & Pointwise & $73.97\pm0.59$ & $81.94\pm0.27$ & $86.78\pm0.27$ & $77.64\pm0.49$ \\
+      & Set Transformer & $74.57\pm0.28$ & $81.97\pm0.26$ & $86.77\pm0.14$ & $78.02\pm0.26$ \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Both learned rankers substantially outperform the fixed base model. However,
-the set Transformer differs from the pointwise model by only $-0.13$ Recall@1
-points for mass candidates and $+0.21$ points for formula candidates on average,
-and it wins only three of the six paired seed--candidate Recall@1 comparisons.
-MRR differences are likewise negligible. Candidate self-attention therefore provides no stable
-additional benefit under the current protocol; the supported result is the
-value of supervised residual reranking with explicit interaction and retrieval
-features.
+Both learned rankers substantially outperform the fixed base model. On the
+overlap-clean checkpoint, the set Transformer exceeds the pointwise model by
+$1.14$ Recall@1 points for mass candidates and $0.60$ points for formula
+candidates on average, and it wins all six paired seed--candidate comparisons.
+The corresponding MRR differences are $+0.81$ and $+0.38$ points. This is a
+modest, consistent advantage within the clean run. However, the earlier
+alignment checkpoint gave Recall@1 differences of $-0.13$ and $+0.21$ points
+and only three wins out of six. The evidence therefore supports supervised
+residual reranking and suggests a possible candidate-interaction benefit, but
+does not establish a checkpoint-robust independent contribution from
+self-attention.
 
-As a test-overlap sensitivity check, we excluded the three affected test
-queries, leaving 17,553 queries. Across both candidate libraries and both
-rerankers, the three-seed mean Recall@1 decreased by 0.0045--0.0055 percentage
-points (maximum absolute seed-level change: 0.0056 points), and the paired
-comparison still yielded three Transformer wins out of six. The controlled
-conclusion is therefore unchanged.
+As a separate test-overlap sensitivity check on the earlier fixed checkpoint,
+we excluded the three affected test queries, leaving 17,553 queries. Across
+both candidate libraries and both rerankers, the three-seed mean Recall@1
+decreased by 0.0045--0.0055 percentage points (maximum absolute seed-level
+change: 0.0056 points). Thus, the three test overlaps have a negligible effect
+on the aggregate retrieval metrics; the canonical tables nevertheless retain
+all official test queries.
+
+The validation-overlap audit has a larger model-selection implication. The
+clean and earlier pipelines select the same alignment epochs (best epoch 16,
+stop epoch 21), while their reranker best/stop epoch pairs differ in 9 of 12
+configurations. Because the alignment model was retrained and its test
+retrieval metrics also changed, this comparison measures end-to-end pipeline
+sensitivity rather than the causal effect of the six validation queries alone.
 
 We do not report feature-removal, objective, candidate-order, or full top-$K$
 ablations; conclusions about those components are outside the present evidence.
@@ -546,14 +568,18 @@ formula information that may itself require prediction in a real workflow. The
 current external JESTR and GLMR rows are reported rather than independently
 reproduced. The rerankers use three seeds, but all share one fixed seed-42
 alignment checkpoint; the reported uncertainty therefore excludes first-stage
-variation. Candidate self-attention also shows no stable advantage over the
-pointwise control. These limitations preclude a definitive state-of-the-art or
-self-attention benefit claim.
+variation. Candidate self-attention shows a modest advantage in the clean run,
+but that advantage is sensitive to the alignment checkpoint. These limitations
+preclude a definitive state-of-the-art or self-attention benefit claim.
 
-The six training--validation input overlaps were present in the validation data
-used for model selection. Although their target molecules differ from the
-corresponding training targets, their possible influence on validation MRR,
-early stopping, and checkpoint selection remains unquantified.
+The canonical model-selection pipeline excludes all six audited
+training--validation input overlaps. The clean and earlier pipelines select the
+same alignment epochs, while their reranker checkpoint selections differ in 9
+of 12 configurations. Since alignment was retrained rather than held bitwise
+fixed, the observed old-to-clean differences must be interpreted as
+pipeline-level sensitivity, not as a causal estimate for the six queries
+alone. Multiple alignment seeds would be required to quantify first-stage
+uncertainty.
 
 Training-only positive insertion is a supervised sampling operation, not a
 valid evaluation protocol. We expose the pre-insertion training recall and
@@ -571,11 +597,13 @@ supervision on top of a contrastively aligned base retriever. Controlled
 MassSpecGym results show large gains from learned reranking in every one of
 three reranker initializations on the fixed seed-42 base retriever under both
 mass- and formula-conditioned libraries. A matched three-seed comparison finds
-that the pointwise scorer performs on par with the candidate-set Transformer, so
-the current evidence supports direct residual learning to rank rather than a
-specific benefit from self-attention. Claims about matched external baselines,
-individual feature and loss contributions, and measured efficiency are outside
-the present evidence.
+that the candidate-set Transformer has a modest advantage over the pointwise
+scorer and wins all six paired comparisons on the overlap-clean checkpoint.
+Because this pattern differs from the earlier alignment checkpoint, the
+strongest supported conclusion is the value of direct residual learning to
+rank; a checkpoint-robust benefit from self-attention remains unestablished.
+Claims about matched external baselines, individual feature and loss
+contributions, and measured efficiency are outside the present evidence.
 
 \bibliographystyle{splncs04}
 \bibliography{references}
