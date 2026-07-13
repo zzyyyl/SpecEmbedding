@@ -702,6 +702,7 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 致谢和基金：未加入
 - AI assistance disclosure：已加入
 - overlap-clean mass/formula MCES@1：已完成（mass Base/seed-42 Set Transformer 15.3681/7.7057；formula 5.4389/3.0913；四项均为 17,556/17,556，batch 状态 `complete`）
+- 最终实验 artifact manifest：已生成 `paper/adma2026_artifact_manifest.json`，60 个 canonical artifacts 校验通过，SHA-256 为 `e00634b13d79ab1f4e7cbb38339f89302a98082e75f5daf54e3e0daef4702245`；仅作内部 inventory，匿名附件不得直接打包其引用的原始 status/log。
 - overlap-clean alignment/cache/reranker 全流水线：12/12 组 pointwise/Transformer 实验已完成
 - train--test 输入重叠敏感性：12/12 组完成；剔除 3 条重叠输入后主结论不变
 - train--val 输入重叠：overlap-clean 审计已完成；clean 与历史 alignment best/stop epoch 相同，reranker 9/12 组选择不同
@@ -747,11 +748,10 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 
 完整清单以 `paper/ADMA2026_TODO.md` 为准。当前优先事项：
 
-1. 执行 `python freeze_adma2026_artifacts.py`，生成 `paper/adma2026_artifact_manifest.json`，固化最终 checkpoint、`params.yaml`/data/cache/candidate/result hashes 和实验代码 commit。
-2. 制作正式方法图，替换 LaTeX 文本框。
-3. 核对 SpecEmbedding 引用与本文增量，并完成页数、匿名、编译和补充材料检查。
-4. 时间允许时再完成 feature/loss/top-$K$ 消融、效率测量或多 alignment seeds；其中多 alignment seeds 对判断 self-attention 稳定性价值最高。
-5. 尽可能在统一协议下复现 JESTR/GLMR；若时间不足，继续保留 `reported` 标记且不主张严格 SOTA。
+1. 制作正式方法图，替换 LaTeX 文本框。
+2. 核对 SpecEmbedding 引用与本文增量，并完成页数、匿名、编译和补充材料检查。
+3. 时间允许时再完成 feature/loss/top-$K$ 消融、效率测量或多 alignment seeds；其中多 alignment seeds 对判断 self-attention 稳定性价值最高。
+4. 尽可能在统一协议下复现 JESTR/GLMR；若时间不足，继续保留 `reported` 标记且不主张严格 SOTA。
 
 ## 12. 已知风险与容易混淆的地方
 

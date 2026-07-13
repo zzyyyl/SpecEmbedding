@@ -27,7 +27,7 @@
 - [x] 完成分子标签重复审计；identifier、原始/规范化 SMILES 和 InChIKey 两两交集均为 0，fold 标记无错配。
 - [x] 使用 `run_rerank_overlap_sensitivity.py` 对 3 个 train--test 完全相同谱图输入完成剔除敏感性评估；12/12 组完成，排除 test cache 索引 5908/5909/5910 后三种子平均 Recall@1 仅变化 $-0.0045$ 至 $-0.0055$ 个百分点，主结论不变；实验代码 commit 为 `b20a2e8`。
 - [x] 完成 6 个 train--val 完全相同输入的 overlap-clean 全流水线审计：排除 val 索引 7686/7687/7688/8464/8465/8466，alignment validation molecule keys 由 3386 降至 3384；best/stop epoch 仍为 16/21，reranker 12/12 完成、无错误，其中 9/12 组 best/stop epoch 对与历史流水线不同。实验代码 commit 为 `a2280d2`；该对比包含 alignment 重训，只能解释为流水线级敏感性，不是 6 条查询的隔离因果效应。
-- [ ] 运行 `python freeze_adma2026_artifacts.py` 生成 `paper/adma2026_artifact_manifest.json`，固化最终 checkpoint、`params.yaml`、实验代码 commit、数据/候选文件、cache 和结果哈希。该 manifest 仅作内部 inventory；其中引用的原始 status/log 可能含主机、用户、进程和 GPU 信息，不能直接按清单打包匿名附件。
+- [x] 已运行 `python freeze_adma2026_artifacts.py` 并生成 `paper/adma2026_artifact_manifest.json`：60 个 canonical artifacts 全部通过校验，manifest SHA-256 为 `e00634b13d79ab1f4e7cbb38339f89302a98082e75f5daf54e3e0daef4702245`。该 manifest 仅作内部 inventory；其中引用的原始 status/log 可能含主机、用户、进程和 GPU 信息，不能直接按清单打包匿名附件。
 - [x] 将正文中的 `Required Ablations`、`we will` 等待办式内容替换为已完成的三种子 pointwise/Transformer 结果。
 - [ ] 制作正式方法架构图，替换当前文本框占位图。
 - [ ] 检查 SpecEmbedding 既有工作的引用和增量说明，避免重复声明已有贡献。
@@ -155,7 +155,7 @@ Train--val overlap-clean 审计排除 6 条 validation 查询（两个分子组�
 - [x] 7 月 10 日至 12 日：完成固定 alignment 的 reranker 多随机种子实验。
 - [x] 7 月 12 日：完成 train--val overlap-clean alignment/cache/reranker 全流水线及 12 组多种子评估。
 - [x] 7 月 13 日：执行 `run_overlap_clean_mces.sh`，补算 overlap-clean 代表性 checkpoint 的 mass/formula MCES@1。
-- [ ] 7 月 14 日：执行 `python freeze_adma2026_artifacts.py`，生成不含本机绝对路径或 hostname 的内部实验 artifact manifest；其中仍记录 Git commit，且所引用的原始 status/log 需要脱敏，不得未审查就直接放入匿名补充材料。
+- [x] 7 月 14 日：执行 `python freeze_adma2026_artifacts.py`，生成不含本机绝对路径或 hostname 的内部实验 artifact manifest；60 个 artifacts 校验通过。其中仍记录 Git commit，且所引用的原始 status/log 需要脱敏，不得未审查就直接放入匿名补充材料。
 - [x] 7 月 10 日至 12 日：确定保留 reported-results 降级方案，不声称严格 SOTA；JESTR/GLMR 统一复现仍作为独立待办。
 - [ ] 7 月 13 日至 14 日：消融、效率和案例分析。
 - [ ] 7 月 15 日：更新图表和全文。

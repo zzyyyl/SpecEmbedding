@@ -1,0 +1,412 @@
+{
+  "artifact_count": 60,
+  "artifacts": [
+    {
+      "id": "alignment.best_checkpoint",
+      "location": "repo:checkpoints_align/a2280d2_massspecgym_nopretrain_valoverlapclean/best_model_stage2.pth",
+      "sha256": "ad5d1eb76805c51563349f259a4b4c935336064b6171a4e650472b78aeeaa06f",
+      "size_bytes": 36233914
+    },
+    {
+      "id": "alignment.selection",
+      "location": "repo:checkpoints_align/a2280d2_massspecgym_nopretrain_valoverlapclean/alignment_selection.json",
+      "sha256": "86a975ca926f42e63202a1d6063cc0de70e04be2cbfe81719ff81d04101edc78",
+      "size_bytes": 1157
+    },
+    {
+      "id": "cache.formula.test",
+      "location": "repo:rerank_cache/a2280d2_massspecgym_nopretrain_valoverlapclean_formula_topk40/massspecgym_formula_test.pt",
+      "sha256": "f2459430637f3495d22f40d242fe7c6210d35993aeca5c9667229a917372b0d0",
+      "size_bytes": 214897372
+    },
+    {
+      "id": "cache.formula.train",
+      "location": "repo:rerank_cache/a2280d2_massspecgym_nopretrain_valoverlapclean_formula_topk40/massspecgym_formula_train.pt",
+      "sha256": "eaaaae7879df430c0a16e8e0ebca8da116a47ede86ed9a601d12ef1047affce6",
+      "size_bytes": 1904322519
+    },
+    {
+      "id": "cache.formula.val",
+      "location": "repo:rerank_cache/a2280d2_massspecgym_nopretrain_valoverlapclean_formula_topk40/massspecgym_formula_val.pt",
+      "sha256": "2b161516a3225c835706e5aa9693e8772fa805e090fbfc9c18c98fee7bcbad41",
+      "size_bytes": 230418250
+    },
+    {
+      "id": "cache.mass.test",
+      "location": "repo:rerank_cache/a2280d2_massspecgym_nopretrain_valoverlapclean_mass_topk40/massspecgym_mass_test.pt",
+      "sha256": "6842fa615b7cf07fbf3c82825d75e72cddcd2e0da86dcdb3c5d8e3679f931ea6",
+      "size_bytes": 254506582
+    },
+    {
+      "id": "cache.mass.train",
+      "location": "repo:rerank_cache/a2280d2_massspecgym_nopretrain_valoverlapclean_mass_topk40/massspecgym_mass_train.pt",
+      "sha256": "88161fab81b82397d448dc3a00b3a3b0b6bf8431488f62caa7c9d904696cbe24",
+      "size_bytes": 2049728454
+    },
+    {
+      "id": "cache.mass.val",
+      "location": "repo:rerank_cache/a2280d2_massspecgym_nopretrain_valoverlapclean_mass_topk40/massspecgym_mass_val.pt",
+      "sha256": "397067892dd1a100cabdd363ad8dbc34093ba6fd4a2d677c108efcd87d5c8508",
+      "size_bytes": 279056811
+    },
+    {
+      "id": "config.params",
+      "location": "repo:params.yaml",
+      "sha256": "b6260dad043f9c0f1cb4ff36dc7b7bf8bac4481998aa36b4d55f44392e1b0bc6",
+      "size_bytes": 3407
+    },
+    {
+      "id": "data.candidates_formula",
+      "location": "data:MassSpecGym/candidates_formula.pkl",
+      "sha256": "0b0d8ffff166eeda9c9dc4060618f823ae4984a71d045119b13b01b5dd5f8194",
+      "size_bytes": 363414186
+    },
+    {
+      "id": "data.candidates_mass",
+      "location": "data:MassSpecGym/candidates_mass.pkl",
+      "sha256": "b4ddf39783ea2dceb32217eab68b71133572f63cc482ba9d17ed9a530c906a8f",
+      "size_bytes": 445944877
+    },
+    {
+      "id": "data.test",
+      "location": "data:MassSpecGym/test.pkl",
+      "sha256": "2309cd689b06a493c66e22f4aa70613b0cfbe2f8fd1d82e605d657f27015d660",
+      "size_bytes": 14232239
+    },
+    {
+      "id": "data.train",
+      "location": "data:MassSpecGym/train.pkl",
+      "sha256": "071b6c28ade639261118fdcb0da2510efcea764b2978e2a5d0b61a95a1960c48",
+      "size_bytes": 173277083
+    },
+    {
+      "id": "data.val",
+      "location": "data:MassSpecGym/val.pkl",
+      "sha256": "bd13a336e86fb35e77a534e9415cd40cc1a9f15b4a33174c85573b8639c9ca6e",
+      "size_bytes": 14984888
+    },
+    {
+      "id": "mces.batch_status",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_mces_seed42_transformer/batch_status.json",
+      "sha256": "7553cb4c35df324da3490573db68f0c6826ee4eb6e96175efb682148fd05bb1a",
+      "size_bytes": 491
+    },
+    {
+      "id": "mces.formula.driver_log",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_mces_seed42_transformer/formula/attempt_001/driver.log",
+      "sha256": "6c8493b6318c7953f09bbb9b077e220ab7d142628f87ee4fa3685b9185b88abc",
+      "size_bytes": 73279
+    },
+    {
+      "id": "mces.formula.eval_log",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_mces_seed42_transformer/formula/attempt_001/eval_rerank.log",
+      "sha256": "8c245f792c7713f6d55b1f2e4ae50c5232e03525ded7c3d595f5cc1c28c3cadc",
+      "size_bytes": 2493
+    },
+    {
+      "id": "mces.formula.status",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_mces_seed42_transformer/formula/attempt_001/status.json",
+      "sha256": "167d8221836bc86f4829c86bf60bcf9523d661de6a3d9ae9677e3827037d88f2",
+      "size_bytes": 2136
+    },
+    {
+      "id": "mces.mass.driver_log",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_mces_seed42_transformer/mass/attempt_001/driver.log",
+      "sha256": "b6d7cb2644e80c53c0d87a5ff5f30225c402cea096c79d4268443349cd60e465",
+      "size_bytes": 60983
+    },
+    {
+      "id": "mces.mass.eval_log",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_mces_seed42_transformer/mass/attempt_001/eval_rerank.log",
+      "sha256": "2dc8cff723b5961198c4928a2f409ec9b10a65a96a8c323c433fd3d054f9caa2",
+      "size_bytes": 2482
+    },
+    {
+      "id": "mces.mass.status",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_mces_seed42_transformer/mass/attempt_001/status.json",
+      "sha256": "8ab8b50ec6f2b4c62e20761a8a509b71940aff9776cf173d41d8506364c24130",
+      "size_bytes": 2111
+    },
+    {
+      "id": "reranker.batch_status",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/batch_status.json",
+      "sha256": "70a194c026fe39d03bfa39f316dc4f69447690ca847b425f89ba057d7b5fcbcb",
+      "size_bytes": 5789
+    },
+    {
+      "id": "reranker.formula.pointwise.seed42.best_checkpoint",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed42/attempt_001/best_reranker.pth",
+      "sha256": "b4fd1866ddf6d527b4e5cf1ae45bb1cc396f2b770df506518a9e7ecf425ed5ca",
+      "size_bytes": 5921560
+    },
+    {
+      "id": "reranker.formula.pointwise.seed42.eval_log",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed42/attempt_001/eval_rerank.log",
+      "sha256": "e38644623cc33142fdcd716e2b4a88d13554dcb07ae0805faf4c5db7318697a3",
+      "size_bytes": 2244
+    },
+    {
+      "id": "reranker.formula.pointwise.seed42.status",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed42/attempt_001/status.json",
+      "sha256": "b1a838f6f07212bf698b3a25b6989085ed086396d2ab47daaddd4c9fd1b8ff30",
+      "size_bytes": 5616
+    },
+    {
+      "id": "reranker.formula.pointwise.seed43.best_checkpoint",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed43/attempt_001/best_reranker.pth",
+      "sha256": "e3771ecab0267a9bf8099c2e590107bc1f59641cfad8632fd0ffe564116e229f",
+      "size_bytes": 5921560
+    },
+    {
+      "id": "reranker.formula.pointwise.seed43.eval_log",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed43/attempt_001/eval_rerank.log",
+      "sha256": "f9fea85a37aa62cb49f90546150c4cc9bb43cb3130318c7a0ed3fe75d032025b",
+      "size_bytes": 2244
+    },
+    {
+      "id": "reranker.formula.pointwise.seed43.status",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed43/attempt_001/status.json",
+      "sha256": "25638b16aed97b4dfc3c3f9785b7401df6efa72dc6918042e171364ccf3e1718",
+      "size_bytes": 5614
+    },
+    {
+      "id": "reranker.formula.pointwise.seed44.best_checkpoint",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed44/attempt_001/best_reranker.pth",
+      "sha256": "a07b5a0fe87a0db133af1f2361c7253d3da9f9a0280d18eb7a6c8c033fd9b650",
+      "size_bytes": 5921560
+    },
+    {
+      "id": "reranker.formula.pointwise.seed44.eval_log",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed44/attempt_001/eval_rerank.log",
+      "sha256": "9481c06f8d46d9a1ac7d757b0326123dd918d7b875d393b0c149212db8485b1c",
+      "size_bytes": 2244
+    },
+    {
+      "id": "reranker.formula.pointwise.seed44.status",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed44/attempt_001/status.json",
+      "sha256": "744f759a585ceb5594ac62eea02f090aee6d1784eaefe61c21cb3065d6faf078",
+      "size_bytes": 5613
+    },
+    {
+      "id": "reranker.formula.transformer.seed42.best_checkpoint",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed42/attempt_001/best_reranker.pth",
+      "sha256": "ca13cd793ba87b6eceefb6aa3c1dc46e95eb8d36a92ddeb31cca7d04cf552ba8",
+      "size_bytes": 31149856
+    },
+    {
+      "id": "reranker.formula.transformer.seed42.eval_log",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed42/attempt_001/eval_rerank.log",
+      "sha256": "c90d2019b56783d4a8bde3487f548ce325767149a4e946c0b7ba16927150d7d7",
+      "size_bytes": 2248
+    },
+    {
+      "id": "reranker.formula.transformer.seed42.status",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed42/attempt_001/status.json",
+      "sha256": "7154ebc59d487b2d6a0f6a4b3d8fd5463c8724fa7cff943cd6f923c164f88a92",
+      "size_bytes": 5630
+    },
+    {
+      "id": "reranker.formula.transformer.seed43.best_checkpoint",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed43/attempt_001/best_reranker.pth",
+      "sha256": "80752a976e1b388ddd8be853abfee09a0de00c46aa903d6f88d5c3e14498b511",
+      "size_bytes": 31149856
+    },
+    {
+      "id": "reranker.formula.transformer.seed43.eval_log",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed43/attempt_001/eval_rerank.log",
+      "sha256": "03d99b21003411bea95d1e2a81b71a8346abe9980876e64a2df4c21252330b48",
+      "size_bytes": 2248
+    },
+    {
+      "id": "reranker.formula.transformer.seed43.status",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed43/attempt_001/status.json",
+      "sha256": "e91675f90ee98e576729ca24cfec065850bfe9bf12bbb592963a70f322ba4917",
+      "size_bytes": 5628
+    },
+    {
+      "id": "reranker.formula.transformer.seed44.best_checkpoint",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed44/attempt_001/best_reranker.pth",
+      "sha256": "5155e0939cee590a0a81c4df6b02e2c6f1e7334106cebd0f176c5579b877b644",
+      "size_bytes": 31149856
+    },
+    {
+      "id": "reranker.formula.transformer.seed44.eval_log",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed44/attempt_001/eval_rerank.log",
+      "sha256": "2cdc6a7a80c055b8cd51c5c597668d0442fc14f72909a4f23935d89f6b25b052",
+      "size_bytes": 2248
+    },
+    {
+      "id": "reranker.formula.transformer.seed44.status",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed44/attempt_001/status.json",
+      "sha256": "e2873cb34b30a1620f06e8eb93e4e771754633dc1cc2c63a5e233176e028305a",
+      "size_bytes": 5630
+    },
+    {
+      "id": "reranker.mass.pointwise.seed42.best_checkpoint",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed42/attempt_001/best_reranker.pth",
+      "sha256": "f1c648b264fbcd3075ef24b791fcefcae1ec423a05dea40097016dc3c3d9ed7c",
+      "size_bytes": 5921496
+    },
+    {
+      "id": "reranker.mass.pointwise.seed42.eval_log",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed42/attempt_001/eval_rerank.log",
+      "sha256": "5c36c0020531ca3f0d541e9b8e3204557451e5786097e3b5de6bdc11f5ba0771",
+      "size_bytes": 2232
+    },
+    {
+      "id": "reranker.mass.pointwise.seed42.status",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed42/attempt_001/status.json",
+      "sha256": "b91c080be3b844a7ef5e66f7f2961e69df2e537473d4bd0efdabad24d56e5612",
+      "size_bytes": 5543
+    },
+    {
+      "id": "reranker.mass.pointwise.seed43.best_checkpoint",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed43/attempt_001/best_reranker.pth",
+      "sha256": "c0adbff7760210174ecfee7192c14a2dbf90dc3dae5db7674fd078e13991b439",
+      "size_bytes": 5921496
+    },
+    {
+      "id": "reranker.mass.pointwise.seed43.eval_log",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed43/attempt_001/eval_rerank.log",
+      "sha256": "fbb05ec38807680360d93ae72fc1a0f0aad88a120552bf032c6aac03b9277297",
+      "size_bytes": 2232
+    },
+    {
+      "id": "reranker.mass.pointwise.seed43.status",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed43/attempt_001/status.json",
+      "sha256": "ce04c92d504c7cc721dbaeb3c7d27566b7005f365b59e0de1e4aafd288f4f84a",
+      "size_bytes": 5544
+    },
+    {
+      "id": "reranker.mass.pointwise.seed44.best_checkpoint",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed44/attempt_001/best_reranker.pth",
+      "sha256": "25b88c07a5166337fffa6ec0239d53a4af7c5fba93917e4466cabb354f42e816",
+      "size_bytes": 5921496
+    },
+    {
+      "id": "reranker.mass.pointwise.seed44.eval_log",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed44/attempt_001/eval_rerank.log",
+      "sha256": "8f21a58b7813a9a78e1216ea5c6e61973b06befcb500a6053648f065cbc92205",
+      "size_bytes": 2232
+    },
+    {
+      "id": "reranker.mass.pointwise.seed44.status",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed44/attempt_001/status.json",
+      "sha256": "d6452735e13b8c79b23ee5e400833bb2f8d2383d35d15b54423bb5ea9a88f23f",
+      "size_bytes": 5544
+    },
+    {
+      "id": "reranker.mass.transformer.seed42.best_checkpoint",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed42/attempt_001/best_reranker.pth",
+      "sha256": "aedf5e82089ec8ec350da2ab04718a879f5019756f701c1a1e1da3559e541c57",
+      "size_bytes": 31149856
+    },
+    {
+      "id": "reranker.mass.transformer.seed42.eval_log",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed42/attempt_001/eval_rerank.log",
+      "sha256": "724417ef98135872ab1e2796377bc62200a0a7bf178e704a7db784a3c57df705",
+      "size_bytes": 2236
+    },
+    {
+      "id": "reranker.mass.transformer.seed42.status",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed42/attempt_001/status.json",
+      "sha256": "d0670bed9504587afe770ac71e8025d031e4dfd68d24acbb1565157a9dac8e50",
+      "size_bytes": 5556
+    },
+    {
+      "id": "reranker.mass.transformer.seed43.best_checkpoint",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed43/attempt_001/best_reranker.pth",
+      "sha256": "9066d7f3c798baf3078660907b45f71e0f09534e55c19271e0601da8b4892ac5",
+      "size_bytes": 31149856
+    },
+    {
+      "id": "reranker.mass.transformer.seed43.eval_log",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed43/attempt_001/eval_rerank.log",
+      "sha256": "886838ec149bb64fc0e09e20ce9795498047968170a12ce26702934d25a97dfd",
+      "size_bytes": 2236
+    },
+    {
+      "id": "reranker.mass.transformer.seed43.status",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed43/attempt_001/status.json",
+      "sha256": "56a4db8539ac289bed1b2954ce513f4c8f9c5b558ef9e3cab29f6d791cca871e",
+      "size_bytes": 5558
+    },
+    {
+      "id": "reranker.mass.transformer.seed44.best_checkpoint",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed44/attempt_001/best_reranker.pth",
+      "sha256": "2cc777f7bd14af68e4347f4d94d5c6fbad0021efc9087ad11f1000ff6186b186",
+      "size_bytes": 31149856
+    },
+    {
+      "id": "reranker.mass.transformer.seed44.eval_log",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed44/attempt_001/eval_rerank.log",
+      "sha256": "cd94d5adf9f9902a3bc77c80fe18f1d769a053176add2be20a6c681de8247a69",
+      "size_bytes": 2236
+    },
+    {
+      "id": "reranker.mass.transformer.seed44.status",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed44/attempt_001/status.json",
+      "sha256": "ccb9198cd1035c4d08718f8e4bb48be59578b759c1b3f3ab6e8d969dd750d7df",
+      "size_bytes": 5558
+    },
+    {
+      "id": "reranker.summary",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/summary.csv",
+      "sha256": "27cebd51c9e667ca14596809e716d7133d08f8a7aef1899140c8aac0659911ef",
+      "size_bytes": 3461
+    },
+    {
+      "id": "reranker.summary_aggregate",
+      "location": "repo:checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/summary_aggregate.csv",
+      "sha256": "46d66854a0ec8f94a87ed0855a6dc94b565f1d32f423063d937bcd2b5a732df7",
+      "size_bytes": 1917
+    }
+  ],
+  "experiment": {
+    "alignment_checkpoint_sha256": "ad5d1eb76805c51563349f259a4b4c935336064b6171a4e650472b78aeeaa06f",
+    "alignment_seed": 42,
+    "candidate_types": [
+      "mass",
+      "formula"
+    ],
+    "dataset": "MassSpecGym",
+    "params_sha256": "b6260dad043f9c0f1cb4ff36dc7b7bf8bac4481998aa36b4d55f44392e1b0bc6",
+    "reranker_seeds": [
+      42,
+      43,
+      44
+    ],
+    "run_prefix": "a2280d2_massspecgym_nopretrain_valoverlapclean",
+    "source_commit": "a2280d2828ce872da1f69319b49e0ef7f1bed572",
+    "test_queries": 17556,
+    "top_k": 40,
+    "validation_query_exclusions": [
+      7686,
+      7687,
+      7688,
+      8464,
+      8465,
+      8466
+    ]
+  },
+  "mces_at_1": {
+    "formula": {
+      "base_mces_at_1": 5.4389,
+      "base_top1_accuracy_pct": 63.1009,
+      "rerank_mces_at_1": 3.0913,
+      "rerank_top1_accuracy_pct": 74.7494,
+      "total_queries": 17556
+    },
+    "mass": {
+      "base_mces_at_1": 15.3681,
+      "base_top1_accuracy_pct": 47.4596,
+      "rerank_mces_at_1": 7.7057,
+      "rerank_top1_accuracy_pct": 68.74,
+      "total_queries": 17556
+    }
+  },
+  "packaging_policy": "Inventory only, not an anonymous bundle allowlist. Redact referenced status and log files before release because they may contain host, user, process, GPU, or timestamp data.",
+  "purpose": "Internal ADMA 2026 canonical experiment artifact freeze",
+  "release_note": "Not for direct submission; review the recorded Git commit for anonymity.",
+  "schema_version": 1
+}
