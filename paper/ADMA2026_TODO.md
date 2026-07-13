@@ -29,7 +29,7 @@
 - [x] 完成 6 个 train--val 完全相同输入的 overlap-clean 全流水线审计：排除 val 索引 7686/7687/7688/8464/8465/8466，alignment validation molecule keys 由 3386 降至 3384；best/stop epoch 仍为 16/21，reranker 12/12 完成、无错误，其中 9/12 组 best/stop epoch 对与历史流水线不同。实验代码 commit 为 `a2280d2`；该对比包含 alignment 重训，只能解释为流水线级敏感性，不是 6 条查询的隔离因果效应。
 - [x] 已运行 `python freeze_adma2026_artifacts.py` 并生成 `paper/adma2026_artifact_manifest.json`：60 个 canonical artifacts 全部通过校验，manifest SHA-256 为 `e00634b13d79ab1f4e7cbb38339f89302a98082e75f5daf54e3e0daef4702245`。该 manifest 仅作内部 inventory；其中引用的原始 status/log 可能含主机、用户、进程和 GPU 信息，不能直接按清单打包匿名附件。
 - [x] 将正文中的 `Required Ablations`、`we will` 等待办式内容替换为已完成的三种子 pointwise/Transformer 结果。
-- [ ] 制作正式方法架构图，替换当前文本框占位图。
+- [x] 使用共享 TikZ 矢量源 `paper/figures/method_overview.tex` 制作正式方法架构图，并替换中英文稿的文本框占位图；图中区分跨模态对齐、top-40 检索/缓存和监督残差重排序，标明 pointwise/set-aware 两种变体、基础分数跳连以及训练/验证测试协议。
 - [ ] 检查 SpecEmbedding 既有工作的引用和增量说明，避免重复声明已有贡献。
 - [ ] 确认 AI 使用披露形式满足 ADMA 要求；必要时咨询 Program Chair。
 
@@ -156,9 +156,10 @@ Train--val overlap-clean 审计排除 6 条 validation 查询（两个分子组�
 - [x] 7 月 12 日：完成 train--val overlap-clean alignment/cache/reranker 全流水线及 12 组多种子评估。
 - [x] 7 月 13 日：执行 `run_overlap_clean_mces.sh`，补算 overlap-clean 代表性 checkpoint 的 mass/formula MCES@1。
 - [x] 7 月 14 日：执行 `python freeze_adma2026_artifacts.py`，生成不含本机绝对路径或 hostname 的内部实验 artifact manifest；60 个 artifacts 校验通过。其中仍记录 Git commit，且所引用的原始 status/log 需要脱敏，不得未审查就直接放入匿名补充材料。
+- [x] 7 月 14 日：完成共享中英文标签的 TikZ 正式方法图，替换两稿文本占位图；英文/中文稿编译后仍为 11/10 页。
 - [x] 7 月 10 日至 12 日：确定保留 reported-results 降级方案，不声称严格 SOTA；JESTR/GLMR 统一复现仍作为独立待办。
 - [ ] 7 月 13 日至 14 日：消融、效率和案例分析。
-- [ ] 7 月 15 日：更新图表和全文。
+- [ ] 7 月 15 日：更新其余图表并完成全文核对。
 - [ ] 7 月 16 日：执行双盲、页数、引用和补充材料检查。
 - [ ] 7 月 17 日 AoE：提交论文。
 - [ ] 7 月 20 日 AoE 前：提交匿名补充材料。

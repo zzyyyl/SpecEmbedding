@@ -26,6 +26,8 @@
 \usepackage{graphicx}
 \usepackage{multirow}
 \usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc,fit,positioning}
 \usepackage{hyperref}
 
 \hypersetup{
@@ -200,17 +202,12 @@ $\candidates_s$ 之外的分子，端到端 Recall@$k$ 的上界为
 
 \begin{figure}[t]
   \centering
-  \fbox{
-    \parbox{0.88\linewidth}{
-      \centering
-      MS/MS 谱图 $\rightarrow$ 对齐谱图嵌入
-      $\rightarrow$ top-$K$ 分子候选
-      $\rightarrow$ pointwise 或 set-aware 残差打分
-      $\rightarrow$ 残差重排序
-    }
-  }
-  \caption{\method{} 总体流程。第二阶段只重排已检索分子，测试时既不生成分子，
-  也不插入真实分子。}
+  \input{figures/method_overview.tex}
+  \methodoverview{1}
+  \caption{\method{} 总体流程。面板 1 对齐谱图 Transformer 和分子 GINE；面板 2
+  使用冻结、缓存的嵌入构造 top-40 列表；面板 3 在共享候选特征上采用 pointwise
+  打分或候选集合自注意力，并向基础分数加入残差。虚线表示仅训练时使用的操作；验证
+  和测试均不插入正例，整个流程不生成分子。}
   \label{fig:overview_cn}
 \end{figure}
 

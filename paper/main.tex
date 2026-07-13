@@ -30,6 +30,8 @@
 \usepackage{graphicx}
 \usepackage{multirow}
 \usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc,fit,positioning}
 \usepackage{hyperref}
 
 \hypersetup{
@@ -254,17 +256,14 @@ the reranker is trained, so their embeddings can be computed once and reused.
 
 \begin{figure}[t]
   \centering
-  \fbox{
-    \parbox{0.88\linewidth}{
-      \centering
-      MS/MS spectrum $\rightarrow$ aligned spectrum embedding
-      $\rightarrow$ top-$K$ molecular candidates
-      $\rightarrow$ pointwise or set-aware residual scorer
-      $\rightarrow$ residual reranking
-    }
-  }
-  \caption{Overview of \method{}. The second stage only reorders retrieved
-  molecules and never generates or inserts a molecule at test time.}
+  \input{figures/method_overview.tex}
+  \methodoverview{0}
+  \caption{Overview of \method{}. Panel 1 aligns the spectrum Transformer and
+  molecular GINE. Panel 2 uses their frozen, cached embeddings to produce the
+  top-40 list. Panel 3 applies shared pair features with either pointwise
+  scoring or candidate-set self-attention and adds a residual to the base
+  score. Dashed arrows denote training-only operations. Positives are never
+  inserted at validation/test, and no molecule is generated.}
   \label{fig:overview}
 \end{figure}
 

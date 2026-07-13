@@ -1,0 +1,150 @@
+% Shared vector overview for paper/main.tex and paper/main_cn.tex.
+% Usage: \methodoverview{0} for English, \methodoverview{1} for Chinese.
+\newcommand{\methodoverview}[1]{%
+  \begingroup
+  \def\molabel##1##2{\ifnum#1=0\relax##1\else##2\fi}%
+  \begin{tikzpicture}[
+    x=1cm,
+    y=1cm,
+    font=\scriptsize,
+    >=Latex,
+    moPanel/.style={
+      draw=black!55,
+      rounded corners=2pt,
+      line width=0.55pt,
+      fill=black!2
+    },
+    moAlignPanel/.style={moPanel, fill=blue!5},
+    moRetrievePanel/.style={moPanel, fill=orange!6},
+    moRerankPanel/.style={moPanel, fill=green!5},
+    moBox/.style={
+      draw=black!65,
+      rounded corners=1.5pt,
+      line width=0.5pt,
+      fill=white,
+      align=center,
+      inner sep=1.7pt,
+      minimum height=0.50cm
+    },
+    moInput/.style={moBox, fill=blue!8},
+    moFrozen/.style={moBox, draw=blue!55!black, densely dotted, fill=blue!4},
+    moTrain/.style={moBox, draw=orange!75!black, dashed, fill=orange!7},
+    moChoice/.style={moBox, draw=green!45!black, fill=green!7},
+    moOutput/.style={moBox, draw=purple!55!black, fill=purple!5},
+    moArrow/.style={-{Latex[length=1.2mm,width=0.8mm]}, line width=0.65pt},
+    moTrainArrow/.style={
+      -{Latex[length=1.2mm,width=0.8mm]},
+      dashed,
+      draw=orange!80!black,
+      line width=0.6pt
+    },
+    moSmall/.style={font=\scriptsize, align=center},
+    moTitle/.style={font=\footnotesize\bfseries, align=center}
+  ]
+    \path[use as bounding box] (0,0) rectangle (12,5.60);
+
+    % Stage panels remain distinguishable in grayscale through borders and titles.
+    \node[moAlignPanel, anchor=south west, minimum width=3.95cm,
+      minimum height=2.70cm] at (0,2.90) {};
+    \node[moRetrievePanel, anchor=south west, minimum width=7.90cm,
+      minimum height=2.70cm] at (4.10,2.90) {};
+    \node[moRerankPanel, anchor=south west, minimum width=12.00cm,
+      minimum height=2.75cm] at (0,0) {};
+
+    \node[moTitle] at (1.975,5.31)
+      {\molabel{1. Cross-modal alignment}{1. 跨模态对齐}};
+    \node[moTitle] at (8.05,5.31)
+      {\molabel{2. Top-$K$ retrieval and caching}{2. Top-$K$ 检索与缓存}};
+    \node[moTitle] at (6.00,2.51)
+      {\molabel{3. Supervised residual reranking}{3. 监督残差重排序}};
+
+    % Stage 1: spectrum and molecule encoders in a common normalized space.
+    \node[moInput, text width=1.20cm] (spectrum) at (0.68,4.47)
+      {\molabel{MS/MS\\peaks}{MS/MS\\峰序列}};
+    \node[moBox, text width=1.65cm] (specenc) at (2.24,4.47)
+      {\molabel{Peak\\Transformer}{谱图\\Transformer}};
+    \node[moBox, circle, inner sep=1.3pt, minimum size=0.52cm] (zs) at (3.55,4.47)
+      {$\mathbf z_s$};
+
+    \node[moInput, text width=1.20cm] (molecule) at (0.68,3.42)
+      {\molabel{Molecule\\graphs}{候选\\分子图}};
+    \node[moBox, text width=1.65cm] (molenc) at (2.24,3.42)
+      {\molabel{GINE + size\\features}{GINE +\\图规模特征}};
+    \node[moBox, circle, inner sep=1.3pt, minimum size=0.52cm] (zm) at (3.55,3.42)
+      {$\mathbf z_{m,i}$};
+
+    \draw[moArrow] (spectrum) -- (specenc);
+    \draw[moArrow] (specenc) -- (zs);
+    \draw[moArrow] (molecule) -- (molenc);
+    \draw[moArrow] (molenc) -- (zm);
+    \draw[<->, dashed, draw=orange!80!black, line width=0.6pt]
+      (zs.south) -- node[left, xshift=-1pt, moSmall, text=orange!70!black,
+      fill=blue!5, inner sep=0.5pt]
+      {$\mathcal L_{\mathrm{align}}$} (zm.north);
+
+    % Stage 2: score the official candidate library and retain a reusable list.
+    \node[moBox, text width=1.48cm] (base) at (5.02,4.30)
+      {\molabel{Cosine base score}{余弦基础分数}\\$b_i=\mathbf z_s^\top\mathbf z_{m,i}$};
+    \node[moBox, text width=1.12cm] (topk) at (6.60,4.30)
+      {\molabel{Sort and keep}{排序并保留}\\top-$K=40$};
+    \node[moOutput, text width=1.70cm] (cache) at (8.25,4.30)
+      {\molabel{Cached list}{缓存候选列表}\\$\{\mathbf z_{m,i},b_i,r_i\}$, $i=1{:}K$};
+    \node[moFrozen, text width=2.05cm] (frozen) at (10.55,4.30)
+      {\molabel{Encoders frozen;\\embeddings reused}{编码器冻结；\\嵌入重复使用}};
+    \node[moSmall, text width=2.30cm] (protocol) at (10.55,3.38)
+      {\molabel{Official mass/formula\\candidates}
+      {官方质量/分子式\\候选}};
+
+    \draw[moArrow] (zs.east) -| ([yshift=1.4mm]base.west);
+    \draw[moArrow] (zm.east) -| ([yshift=-1.4mm]base.west);
+    \draw[moArrow] (base) -- (topk);
+    \draw[moArrow] (topk) -- (cache);
+    \draw[densely dotted, line width=0.55pt, draw=blue!55!black]
+      (cache.east) -- (frozen.west);
+
+    % Stage 3: matched pointwise/set-aware variants and a shared residual path.
+    \node[moBox, text width=3.12cm, minimum height=0.78cm] (features) at (1.72,1.55)
+      {\molabel{Pair features}{候选配对特征}\\[-1pt]
+       $\mathbf x_i=[\mathbf z_s,\mathbf z_{m,i},\mathbf z_s\!\odot\!\mathbf z_{m,i},$\\[-2pt]
+       $|\mathbf z_s-\mathbf z_{m,i}|,b_i,\mathbf e(r_i)]$};
+    \node[moBox, text width=0.90cm] (mlp) at (3.98,1.55)
+      {\molabel{Shared}{共享}\\MLP\\$\mathbf h_i$};
+    \node[moChoice, text width=1.70cm] (pointwise) at (5.62,1.86)
+      {\textbf{Pointwise}\\\molabel{no list context}{无列表上下文}};
+    \node[moChoice, text width=1.70cm] (setaware) at (5.62,1.16)
+      {\textbf{Set-aware}\\\molabel{self-attention}{集合自注意力}};
+    \node[moBox, text width=0.90cm] (head) at (7.20,1.55)
+      {\molabel{Score head}{打分头}\\$\Delta_i$};
+    \node[moBox, text width=1.42cm] (residual) at (8.82,1.55)
+      {\molabel{Residual score}{残差分数}\\$q_i=\alpha b_i+\Delta_i$};
+    \node[moOutput, text width=1.72cm] (output) at (10.82,1.55)
+      {\molabel{Sort by $q_i$}{按 $q_i$ 排序}\\\molabel{same top-$K$ molecules}{仍为同一 top-$K$ 集合}};
+
+    \draw[moArrow] (cache.south) -- (8.25,2.82) -- (0.02,2.82) |- (features.west);
+    \draw[moArrow] (features) -- (mlp);
+    \draw[moArrow] (mlp.east) -- ++(0.12,0) |- (pointwise.west);
+    \draw[moArrow] (mlp.east) -- ++(0.12,0) |- (setaware.west);
+    \draw[moArrow] (pointwise.east) -- ++(0.10,0) |- ([yshift=1.2mm]head.west);
+    \draw[moArrow] (setaware.east) -- ++(0.10,0) |- ([yshift=-1.2mm]head.west);
+    \draw[moArrow] (head) -- (residual);
+    \draw[moArrow] (residual) -- (output);
+
+    % Base-score skip and training/test protocol annotations.
+    \draw[moArrow, draw=blue!60!black]
+      (cache.south east) -- ++(0.12,-0.10) -| node[pos=0.88, right,
+      moSmall, text=blue!60!black, fill=green!5, inner sep=1pt]
+      {\molabel{base path}{基础路径}: $\alpha b_i$} (residual.north);
+    \node[moTrain, text width=4.18cm, minimum height=0.40cm, moSmall] (trainnote) at (5.05,0.45)
+      {\molabel{Training only: $\mathcal L_{\mathrm{list}}+\lambda\mathcal L_{\mathrm{pair}}$;
+       missing-$m^+$ insertion}
+      {仅训练：$\mathcal L_{\mathrm{list}}+\lambda\mathcal L_{\mathrm{pair}}$；
+       插入缺失正例 $m^+$}};
+    \node[moFrozen, text width=2.95cm, minimum height=0.40cm, moSmall] (testnote) at (10.15,0.45)
+      {\molabel{Val./test: reorder only; no insertion/generation}
+      {验证/测试：只重排；不插入、不生成}};
+    \draw[moTrainArrow] (residual.south west) |- (trainnote.east);
+    \draw[densely dotted, line width=0.55pt, draw=blue!55!black]
+      (output.south) -- (testnote.north);
+  \end{tikzpicture}%
+  \endgroup
+}
