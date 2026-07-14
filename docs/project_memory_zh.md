@@ -674,7 +674,7 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 通知：2026-09-02
 - Camera-ready：2026-09-11
 - 会议：2026-11-13 至 2026-11-15
-- 补充材料：论文截止后 3 天
+- 补充材料：可选；若提交，截止为 2026-07-20 AoE（论文截止后 3 天）
 
 关键要求：
 
@@ -688,7 +688,7 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 禁止同时投稿其他 archival venue。
 - 评审期间不要新上传 arXiv 或个人主页。
 - 使用 AI 生成或修改的文本必须披露。
-- 补充材料单文件不超过 20 MB，或使用匿名仓库。
+- 若提交补充材料，CMT 单文件不超过 20 MB 且必须匿名；也可使用匿名仓库。
 
 当前完成状态：
 
@@ -700,7 +700,9 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 中文编译：成功，10 页
 - 英文 PDF 作者元数据：空
 - 致谢和基金：未加入
-- AI assistance disclosure：已加入
+- AI assistance disclosure：已移入 Introduction，并明确覆盖所有章节、代码编辑、实验编排和一致性审计；数值来自软件流水线，作者核验并承担全部责任。
+- SpecEmbedding 增量审计：已完成；正文在引言、相关工作和方法中就地归因继承的峰序列 Transformer，区分原工作的重复谱图 SupCon + Tanimoto-MSE 与本文从零训练的跨模态目标，并将本文贡献限定为第二阶段非生成式残差 learning-to-rank。
+- SpecEmbedding 书目信息：已按 ACS 正式页面补齐为 Analytical Chemistry 2025, 97(37), 20137--20146。
 - 正式方法架构图：已使用共享 TikZ 源 `paper/figures/method_overview.tex` 替换中英文稿文本占位图；图中包含三阶段流程、两种 reranker 变体、残差跳连和训练/测试协议。
 - overlap-clean mass/formula MCES@1：已完成（mass Base/seed-42 Set Transformer 15.3681/7.7057；formula 5.4389/3.0913；四项均为 17,556/17,556，batch 状态 `complete`）
 - 最终实验 artifact manifest：已生成 `paper/adma2026_artifact_manifest.json`，60 个 canonical artifacts 校验通过，SHA-256 为 `e00634b13d79ab1f4e7cbb38339f89302a98082e75f5daf54e3e0daef4702245`；仅作内部 inventory，匿名附件不得直接打包其引用的原始 status/log。
@@ -709,8 +711,8 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - train--val 输入重叠：overlap-clean 审计已完成；clean 与历史 alignment best/stop epoch 相同，reranker 9/12 组选择不同
 - 中心主张：已收窄为非生成式残差 learning-to-rank；clean run 中 self-attention 有小幅优势，但暂不将其作为已验证的稳健增益来源
 
-当前论文仍不是最终可提交版本；未完成消融、外部基线复现与投稿检查已明确记录为
-当前证据范围之外的待办。
+当前论文仍不是最终可提交版本；未完成消融和外部基线复现已明确记录为当前证据范围
+之外，匿名补充包、CMT 作者/COI 及最终 PDF 检查仍待完成。
 
 ## 10. 论文文件与结构
 
@@ -745,15 +747,18 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 披露跨划分输入重叠，并报告 3 条 train--test 重叠的剔除敏感性结果。
 - 完成 6 条 train--val 重叠的 overlap-clean 模型选择审计，并将 9/12 组 reranker 选择差异及“非隔离因果效应”限制同步到中英文稿。
 - 使用共享 TikZ 矢量源完成三阶段正式方法图，并明确两种 reranker 变体、残差基础分数路径、训练时正例插入及验证/测试只重排协议。
+- 完成 SpecEmbedding 既有贡献核对，在引言和方法处明确 backbone 继承、随机初始化及跨模态适配边界，并补齐正式卷期页。
+- 将 AI 披露移入 Introduction，并按 ADMA 与 Springer 要求覆盖实际辅助范围和作者责任。
 - 避免将联合嵌入本身作为本文创新。
 
 ## 11. 当前最高优先级待办
 
 完整清单以 `paper/ADMA2026_TODO.md` 为准。当前优先事项：
 
-1. 核对 SpecEmbedding 引用与本文增量，并完成页数、匿名、编译和补充材料检查。
-2. 时间允许时再完成 feature/loss/top-$K$ 消融、效率测量或多 alignment seeds；其中多 alignment seeds 对判断 self-attention 稳定性价值最高。
-3. 尽可能在统一协议下复现 JESTR/GLMR；若时间不足，继续保留 `reported` 标记且不主张严格 SOTA。
+1. 使用显式 allowlist 准备可选匿名补充包，并扫描姓名、用户名、本地路径、Git 远端和公开项目链接；不要直接打包整个仓库或内部 artifact manifest。
+2. 完成最终英文 PDF、CMT 作者列表/COI、既有公开版本及双盲合规检查。
+3. 时间允许时再完成 feature/loss/top-$K$ 消融、效率测量或多 alignment seeds；其中多 alignment seeds 对判断 self-attention 稳定性价值最高。
+4. 尽可能在统一协议下复现 JESTR/GLMR；若时间不足，继续保留 `reported` 标记且不主张严格 SOTA。
 
 ## 12. 已知风险与容易混淆的地方
 
@@ -801,7 +806,17 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 
 ### 12.7 AI 披露
 
-当前稿件使用一个全局声明说明 OpenAI Codex 用于全文起草和语言修改。ADMA CFP 的措辞较严格，提交前应再次确认该全局披露是否足以覆盖“任何使用 AI 文本的章节”。
+当前英文稿已将全局声明置于 Introduction 内，说明 OpenAI Codex 用于所有章节的文字
+起草/修改，以及代码编辑、实验编排和结果一致性审计；同时明确实验数值来自软件流水线、
+作者核验 AI 辅助内容并承担全部责任。这与 2026-07-14 核对的 ADMA CFP 和 Springer
+Nature book AI policy 一致。若实际使用范围继续扩大，提交前必须同步更新声明。
+
+### 12.8 SpecEmbedding 继承边界
+
+SpecEmbedding 原工作是谱图--谱图表示学习：以同分子增强/重复谱图作为监督对比正例，
+并额外拟合 Tanimoto 结构相似度。本文只继承峰序列 Transformer 架构，不加载其预训练
+checkpoint，也不沿用原谱图--谱图目标；第一阶段改为从零训练的谱图--分子跨模态对齐，
+论文主张则集中在第二阶段残差 learning-to-rank。方法描述必须持续保留这一归因边界。
 
 ## 13. 关键提交历史
 

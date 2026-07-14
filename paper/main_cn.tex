@@ -1,15 +1,15 @@
 \documentclass[UTF8,11pt]{ctexart}
 
 % 本稿用于中文讨论，正式 ADMA 2026 投稿必须使用英文稿 paper/main.tex。
-% 根据 2026-07-10 核对的官方 CFP：
+% 根据 2026-07-14 核对的官方 CFP：
 % - Research paper 截止时间为 2026-07-17（AoE）。
 % - 正文必须为英文，使用 Springer LNAI/LNCS 格式，总长度不超过 15 页；
 %   参考文献、致谢和 limitation claims 均计入页数。
 % - 采用双盲评审，PDF、补充材料及其元数据均不得暴露作者身份；投稿时的作者
 %   列表为最终列表。
 % - 评审稿不得包含致谢和基金信息。
-% - 补充材料在正文截止后三天截止，单个匿名 ZIP/PDF 不超过 20 MB；也可使用
-%   匿名代码仓库。
+% - 若提交补充材料，其截止时间为正文截止后三天；单个匿名 ZIP/PDF 不超过
+%   20 MB，也可使用匿名代码仓库。
 % - 禁止同时向其他 archival venue 投稿，评审期间不得新公开预印本。
 % - 使用 AI 生成或修改的文字必须披露；下方披露覆盖本稿所有章节。
 %
@@ -54,8 +54,8 @@
 \begin{abstract}
 从串联质谱中检索分子结构具有较大挑战，因为大量候选分子可能具有相同或相近的质量、
 分子式和子结构。联合嵌入方法按谱图--分子相似度排序，生成式检索则可能引入自回归
-分子解码器。本文研究第三种技术路线：直接对已检索分子列表进行非生成式学习排序。
-我们提出 \method{}：第一阶段对齐峰序列谱图编码器和分子图编码器；第二阶段在 listwise
+分子解码器。本文研究另一种技术路线：直接对已检索分子列表进行非生成式学习排序。
+我们构建 \method{}：第一阶段对齐峰序列谱图编码器和分子图编码器；第二阶段在 listwise
 监督下，综合谱图与候选嵌入、显式交互特征、基础分数和原始排名进行残差重排序。
 我们在固定第一阶段 checkpoint 和 cache 的条件下，使用三个 reranker 随机种子比较不含上下文的
 pointwise 打分器与候选集合 Transformer。在包含 17,556 条测试查询的 MassSpecGym 上，
@@ -68,11 +68,6 @@ checkpoint 未复现相同的成对胜场模式。因此，当前证据有力支
 
 \noindent\textbf{关键词：}
 生物信息学数据挖掘；串联质谱；分子检索；学习排序；多模态表示学习
-
-\paragraph{AI 使用披露。}
-本稿所有章节均使用 OpenAI Codex 辅助文字起草和语言修改，但未使用其生成实验观测。
-作者已核验技术论述、引用、代码和实验结果，并对稿件的准确性、完整性和原创性承担
-全部责任。
 
 \section{引言}
 
@@ -94,24 +89,31 @@ JESTR 使用 contrastive multiview coding 学习谱图--分子联合空间，并
 第二阶段排序器直接区分 hard candidates，以及候选间显式交互是否比 pointwise 残差打分提供
 额外收益。
 
-为此，我们提出 \method{} 两阶段框架。第一阶段对齐 Transformer 谱图编码器和 GINE
-分子图编码器；第二阶段只处理基础检索的 top-$K$ 列表，显式构造谱图--候选交互特征，
-将基础分数和排名作为检索先验，并预测对基础分数的残差修正。本文比较 pointwise 与候选
-集合 Transformer 两种实现。
+本文基于 SpecEmbedding 提出的峰序列谱图架构 \cite{xiong2025specembedding} 构建
+\method{} 两阶段框架。第一阶段从零训练该谱图塔，并将其与 GINE 分子图编码器对齐；
+第二阶段只处理基础检索的 top-$K$ 列表，显式构造谱图--候选交互特征，将基础分数和排名
+作为检索先验，并预测对基础分数的残差修正。本文比较 pointwise 与候选集合 Transformer
+两种实现。
 
 本文贡献如下：
 
 \begin{itemize}
-  \item 提出面向 MS/MS 分子检索的直接、非生成式残差 learning-to-rank 方案，
+  \item 将面向 MS/MS 分子检索的直接、非生成式残差 learning-to-rank 构建为可评估方案，
   同时避免固定余弦打分和自回归分子解码。
-  \item 联合使用多模态嵌入、对称交互特征、基础分数和排名嵌入，通过 listwise 与
-  hard-negative pairwise 目标训练，并在缓存的同一第一阶段嵌入上受控比较 pointwise 和
-  self-attentive 两种实现。
-  \item 在 MassSpecGym 官方候选协议下，两种实现均在三个 reranker seeds 上显著优于固定
+  \item 使用多模态嵌入、对称交互特征、基础分数和排名嵌入实现残差排序器，通过
+  listwise 与 hard-negative pairwise 目标训练，并在缓存的同一第一阶段嵌入上受控比较
+  pointwise 和 self-attentive 两种实现。
+  \item 在 MassSpecGym 官方候选协议下，两种实现均在三个 reranker seeds 上大幅优于固定
   基础检索器；去除验证重叠后的受控对比中，候选集合 Transformer 呈现小幅优势，但跨
   alignment checkpoint 的比较表明该优势尚不稳健，因此不能把整体重排序增益归因于
   候选间自注意力。
 \end{itemize}
+
+\paragraph{AI 使用披露。}
+OpenAI Codex 在本稿所有章节中辅助文字起草和语言修改，并在项目过程中辅助代码编辑、
+实验编排和结果一致性审计。文中实验观测和数值来自所述软件流水线，而非 AI 模型生成。
+作者已审阅全部 AI 辅助文字与代码，核验技术论述、引用、保存的实验工件和报告结果，
+并对稿件的准确性、完整性和原创性承担全部责任。
 
 \section{相关工作}
 
@@ -123,10 +125,11 @@ formula-aware Transformer 预测结构相关指纹 \cite{goldman2023mist}；CMSS
 预训练对齐谱图和分子表示 \cite{chen2024cmssp}。这些方法说明直接跨模态检索具有潜力，
 但没有显式优化下游候选列表。
 
-本文的谱图编码器源自 SpecEmbedding。该方法利用同一分子的重复谱图和结构相似度进行
-监督对比学习 \cite{xiong2025specembedding}。在本工作中，我们将它与分子图编码器配对，
-并针对跨模态检索而非谱图--谱图检索进行优化。当前结果使用从零训练的对齐模型，没有
-加载额外的 SpecEmbedding 预训练权重，因此重排序增益不依赖外部谱图预训练检查点。
+SpecEmbedding 是谱图--谱图表示方法：它把同一分子的增强谱图与重复谱图作为监督对比
+正例，并额外加入拟合 Tanimoto 结构相似度的回归项 \cite{xiong2025specembedding}。
+本文复用其峰序列 Transformer 架构，但不复用预训练权重或原有谱图--谱图训练目标；
+谱图塔改为与分子图编码器配对，并从零训练用于跨模态检索。因此，重排序增益不依赖
+外部谱图预训练检查点。
 
 \subsection{JESTR：联合空间余弦排序}
 
@@ -213,9 +216,10 @@ $\candidates_s$ 之外的分子，端到端 Recall@$k$ 的上界为
 
 \subsection{跨模态基础检索器}
 
-谱图编码器结合正弦 $m/z$ 特征和 Transformer，处理峰的 $m/z$ 与强度序列。分子编码器
-是基于原子和化学键特征的 GINE，并将 mean-pooled 图特征与显式图规模特征拼接。两个
-投影头将编码结果映射到统一的 $d$ 维空间：
+谱图编码器沿用 SpecEmbedding 的峰序列架构 \cite{xiong2025specembedding}：结合正弦
+$m/z$ 特征和 Transformer，处理峰的 $m/z$ 与强度序列。本文从零初始化该谱图塔，并将
+它用于谱图--分子而非谱图--谱图对齐。分子编码器是基于原子和化学键特征的 GINE，并将
+mean-pooled 图特征与显式图规模特征拼接。两个投影头将编码结果映射到统一的 $d$ 维空间：
 
 \begin{equation}
   \zs=\frac{p_s(f_s(s))}{\lVert p_s(f_s(s))\rVert_2},
@@ -223,8 +227,8 @@ $\candidates_s$ 之外的分子，端到端 Recall@$k$ 的上界为
   \zm=\frac{p_m(f_m(m))}{\lVert p_m(f_m(m))\rVert_2}.
 \end{equation}
 
-基础模型使用双向多正例对比损失。具有相同分子标签的谱图和分子均作为正例，从而避免
-把同一分子的重复谱图误当成负例。使用可学习温度尺度 $a$，基础 logits 为
+基础模型使用双向跨模态多正例对比损失。具有相同分子标签的谱图和分子均作为正例，
+从而避免把同一分子的重复谱图误当成负例。使用可学习温度尺度 $a$，基础 logits 为
 
 \begin{equation}
   \ell_{ij}=a\,\mathbf{z}_{s_i}^{\top}\mathbf{z}_{m_j}.
@@ -335,10 +339,10 @@ canonical 流水线在所有依赖验证集的模型选择阶段排除这 6 条�
 
 \subsection{实现细节}
 
-对齐模型输出 512 维嵌入。当前实验没有加载单独预训练的 SpecEmbedding 检查点，而是
-直接在 MassSpecGym 训练集上使用双向对比学习训练谱图和分子编码器。canonical seed-42
-alignment 实验应用上述验证排除，选择 epoch 16，并在连续 5 个 epoch 未改善后于 epoch 21
-停止训练。
+对齐模型输出 512 维嵌入。当前实验随机初始化源于 SpecEmbedding 架构的谱图塔，不加载
+其已发布的预训练检查点；谱图和分子编码器直接在 MassSpecGym 训练集上使用双向对比
+学习训练。canonical seed-42 alignment 实验应用上述验证排除，选择 epoch 16，并在连续
+5 个 epoch 未改善后于 epoch 21 停止训练。
 
 reranker 隐藏维度为 512，rank embedding 为 32 维，dropout 为 0.1。set-aware 变体
 使用两层 Transformer 和八个 attention heads，pointwise 对照移除这两层。优化器为 AdamW，
@@ -403,7 +407,7 @@ overlap-clean 基础模型，同一个 seed-42 Transformer 将质量候选 MCES@
 
 相对 GLMR 论文报告的结果，代表性 Recall@1 在质量和分子式场景下分别高 4.57 和 6.27
 个百分点，MCES@1 在数值上也更低。这些跨论文结果值得继续验证，但不能单独证明 listwise
-reranking 优于生成式方法，因为我们的基础检索器与 GLMR 的 pre-retriever 已经有显著差异。
+reranking 优于生成式方法，因为我们的基础检索器与 GLMR 的 pre-retriever 已经明显不同。
 匹配的因果比较需要统一复现基线，或在完全相同的冻结嵌入和候选列表上比较不同重排序器；
 因此本文只把 Recall 和 MCES 比较视为背景信息，不作因果解释。
 
@@ -432,7 +436,7 @@ reranking 优于生成式方法，因为我们的基础检索器与 GLMR 的 pre
   \end{tabular}
 \end{table}
 
-两种学习排序器都显著优于固定基础模型。在 overlap-clean checkpoint 上，Set Transformer
+两种学习排序器都大幅优于固定基础模型。在 overlap-clean checkpoint 上，Set Transformer
 的平均 Recall@1 相对 Pointwise 在质量和分子式场景分别高 $1.14$ 和 $0.60$ 个百分点，
 并赢得全部六个成对的 seed--candidate 比较；对应 MRR 分别高 $0.81$ 和 $0.38$ 个百分点。
 这说明 clean 实验内部存在小幅且一致的优势。然而，较早 alignment checkpoint 上的 Recall@1
@@ -475,7 +479,7 @@ top-40 的查询。最后，作为闭集候选重排序器，本方法不能提�
 
 \section{结论}
 
-本文提出 \method{}，一个面向 MS/MS 分子检索的非生成式残差学习排序框架。该方法在
+本文研究并评估 \method{}，一个面向 MS/MS 分子检索的非生成式残差学习排序框架。该方法在
 对比对齐的基础检索器之上，引入显式 pair features、检索先验、残差打分和 listwise 监督。
 MassSpecGym 上的受控实验表明，在固定 seed-42 基础检索器的三个 reranker 初始化中，学习式
 重排序在质量约束和分子式约束候选库上均带来大幅提升。在 overlap-clean checkpoint 上，

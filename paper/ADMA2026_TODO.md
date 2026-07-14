@@ -3,7 +3,7 @@
 最后更新：2026-07-14
 
 - 论文截止：2026-07-17 AoE
-- 补充材料截止：正文截止后 3 天
+- 补充材料：可选；若提交，截止为 2026-07-20 AoE（正文截止后 3 天）
 - 官方征稿页面：https://adma2026.github.io/call_for_research_papers.html
 - 英文稿：`paper/main.tex`
 - 中文稿：`paper/main_cn.tex`
@@ -30,8 +30,8 @@
 - [x] 已运行 `python freeze_adma2026_artifacts.py` 并生成 `paper/adma2026_artifact_manifest.json`：60 个 canonical artifacts 全部通过校验，manifest SHA-256 为 `e00634b13d79ab1f4e7cbb38339f89302a98082e75f5daf54e3e0daef4702245`。该 manifest 仅作内部 inventory；其中引用的原始 status/log 可能含主机、用户、进程和 GPU 信息，不能直接按清单打包匿名附件。
 - [x] 将正文中的 `Required Ablations`、`we will` 等待办式内容替换为已完成的三种子 pointwise/Transformer 结果。
 - [x] 使用共享 TikZ 矢量源 `paper/figures/method_overview.tex` 制作正式方法架构图，并替换中英文稿的文本框占位图；图中区分跨模态对齐、top-40 检索/缓存和监督残差重排序，标明 pointwise/set-aware 两种变体、基础分数跳连以及训练/验证测试协议。
-- [ ] 检查 SpecEmbedding 既有工作的引用和增量说明，避免重复声明已有贡献。
-- [ ] 确认 AI 使用披露形式满足 ADMA 要求；必要时咨询 Program Chair。
+- [x] 对照 SpecEmbedding 原文与 ACS 正式书目信息完成引用和增量审计：在引言、相关工作和方法处就地归因峰序列 Transformer backbone，准确区分其“重复谱图 SupCon + Tanimoto-MSE”与本文从零训练的跨模态目标；将本文贡献收窄为第二阶段非生成式残差 learning-to-rank；补齐 `97(37):20137--20146`。
+- [x] 对照 ADMA CFP 与 Springer Nature AI policy 修正 AI 使用披露：声明移入 Introduction，覆盖全部章节，以及代码编辑、实验编排和一致性审计；明确数值来自软件流水线、作者核验全部 AI 辅助内容并承担责任。
 
 ## P1：核心消融实验
 
@@ -76,7 +76,7 @@
 - [x] 英文稿当前为 11 页，低于 15 页限制。
 - [x] 作者、单位和 PDF 作者元数据已隐藏。
 - [x] 未包含致谢和基金信息。
-- [x] 已加入 AI 使用披露。
+- [x] 已在 Introduction 中加入覆盖全部章节和实际辅助范围的 AI 使用披露。
 - [ ] 最终确认正文、参考文献和 limitation 总计不超过 15 页。
 - [ ] 检查 PDF、源文件和补充材料中是否含姓名、用户名、单位或本地路径。
 - [ ] 清理 `/data1/zyl`、Git 远端地址、公开仓库链接及 Git 历史信息。
@@ -86,6 +86,7 @@
 - [ ] 在 CMT 中确认最终作者列表。
 - [ ] 在 CMT 中完整申报利益冲突。
 - [ ] 确认稿件未同时投稿其他 archival venue。
+- [ ] 由作者确认是否存在与本稿相关的既有公开 preprint、paper announcement 或 workshop 版本；若存在，按官方 CFP 至少提前 24 小时联系 Program Chair 并完成披露。
 - [ ] 评审期间不新上传 arXiv 或个人主页。
 
 ## 实验结果记录
@@ -157,12 +158,13 @@ Train--val overlap-clean 审计排除 6 条 validation 查询（两个分子组�
 - [x] 7 月 13 日：执行 `run_overlap_clean_mces.sh`，补算 overlap-clean 代表性 checkpoint 的 mass/formula MCES@1。
 - [x] 7 月 14 日：执行 `python freeze_adma2026_artifacts.py`，生成不含本机绝对路径或 hostname 的内部实验 artifact manifest；60 个 artifacts 校验通过。其中仍记录 Git commit，且所引用的原始 status/log 需要脱敏，不得未审查就直接放入匿名补充材料。
 - [x] 7 月 14 日：完成共享中英文标签的 TikZ 正式方法图，替换两稿文本占位图；英文/中文稿编译后仍为 11/10 页。
+- [x] 7 月 14 日：完成 SpecEmbedding 贡献边界、正式书目信息和 ADMA/Springer AI 披露审计，并同步修正中英文稿。
 - [x] 7 月 10 日至 12 日：确定保留 reported-results 降级方案，不声称严格 SOTA；JESTR/GLMR 统一复现仍作为独立待办。
 - [ ] 7 月 13 日至 14 日：消融、效率和案例分析。
 - [ ] 7 月 15 日：更新其余图表并完成全文核对。
-- [ ] 7 月 16 日：执行双盲、页数、引用和补充材料检查。
+- [ ] 7 月 16 日：执行最终双盲、页数、引用和可选补充材料检查。
 - [ ] 7 月 17 日 AoE：提交论文。
-- [ ] 7 月 20 日 AoE 前：提交匿名补充材料。
+- [ ] 7 月 20 日 AoE 前：若选择提交补充材料，上传匿名单文件或冻结匿名仓库。
 
 ## 临时记录
 

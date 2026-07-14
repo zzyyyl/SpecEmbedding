@@ -1,16 +1,16 @@
 \documentclass[runningheads]{llncs}
 
 % ADMA 2026 submission checklist, verified against the official CFP on
-% 2026-07-10:
+% 2026-07-14:
 % - Research-paper deadline: July 17, 2026 (AoE).
 % - English, unpublished work, Springer LNAI/LNCS format, at most 15 pages.
 %   The limit includes references, acknowledgements, and limitation claims.
 % - Double-blind PDF and supplementary material. Remove author-identifying
 %   text and metadata. The author list entered at submission is final.
 % - Do not include acknowledgements or funding information in the review PDF.
-% - Supplementary material is due three days after the paper deadline and must
-%   be a single anonymous ZIP/PDF of at most 20 MB, unless an anonymous
-%   repository is used.
+% - If submitted, supplementary material is due three days after the paper
+%   deadline and must be a single anonymous ZIP/PDF of at most 20 MB, unless an
+%   anonymous repository is used.
 % - No simultaneous archival submission and no new public preprint during
 %   review.
 % - Text produced with AI assistance must be disclosed. The disclosure below
@@ -64,8 +64,8 @@ Retrieving molecular structures from tandem mass spectra is difficult because
 many candidates share mass, formula, and substructure information. Joint
 embedding methods rank candidates by spectrum--molecule similarity, whereas
 generative retrieval can introduce an autoregressive molecular decoder. We
-investigate a third design point: direct, non-generative learning to rerank a
-retrieved molecular list. Our framework, \method{}, first aligns a peak-sequence
+investigate an alternative design point: direct, non-generative learning to
+rerank a retrieved molecular list. Our framework, \method{}, first aligns a peak-sequence
 spectrum encoder and a molecular graph encoder. A second-stage residual ranker
 then combines spectrum and candidate embeddings, explicit interaction features,
 the base score, and the base rank under listwise supervision. We compare a
@@ -85,16 +85,10 @@ Molecule retrieval \and Learning to rank \and Multimodal representation
 learning}
 \end{abstract}
 
-\paragraph{AI-assistance disclosure.}
-OpenAI Codex was used for drafting and language revision throughout this
-manuscript. It was not used to produce experimental observations. The authors
-verified the technical claims, citations, code, and reported results and assume
-full responsibility for the manuscript.
-
 \section{Introduction}
 
-Tandem mass spectrometry (MS/MS) is widely used to identify small molecules in
-metabolomics, natural-product discovery, and related biomedical applications.
+MS/MS is widely used to identify small molecules in metabolomics,
+natural-product discovery, and related biomedical applications.
 An observed spectrum is only a partial, condition-dependent view of a molecular
 structure: different molecules can yield similar fragments, while the same
 molecule can produce different spectra across instruments, adducts, and
@@ -119,31 +113,42 @@ candidates can instead be separated directly in embedding space by a supervised
 second-stage ranker, and whether explicit candidate interaction adds value beyond
 a pointwise residual scorer.
 
-We propose \method{}, a two-stage retrieval and reranking framework. The first
-stage aligns a Transformer spectrum encoder with a GINE molecular graph encoder.
-The second stage operates only on the first-stage top-$K$ list. It constructs
-explicit spectrum--candidate interaction features, injects the original score
-and rank as retrieval priors, and predicts a residual correction to the base
-score. We instantiate this framework with pointwise and candidate-set
-Transformer variants.
+Building on the peak-sequence spectrum architecture introduced by SpecEmbedding
+\cite{xiong2025specembedding}, we construct \method{}, a two-stage retrieval and
+reranking framework. The first stage trains that spectrum tower from scratch and
+aligns it with a GINE molecular graph encoder. The second stage operates only on
+the first-stage top-$K$ list. It constructs explicit spectrum--candidate
+interaction features, injects the original score and rank as retrieval priors,
+and predicts a residual correction to the base score. We instantiate this
+framework with pointwise and candidate-set Transformer variants.
 
 Our contributions are:
 
 \begin{itemize}
-  \item We introduce a direct, non-generative residual learning-to-rank
-  formulation for MS/MS-to-molecule retrieval, avoiding both fixed cosine-only
-  ranking and autoregressive molecular decoding.
-  \item We combine multimodal embeddings, symmetric interaction features, base
-  scores, and rank embeddings under listwise and hard-negative pairwise
-  supervision, and compare matched pointwise and self-attentive implementations
-  while keeping the first-stage embeddings cacheable.
+  \item We formulate and evaluate direct, non-generative residual
+  learning-to-rank for MS/MS-to-molecule retrieval, avoiding both fixed
+  cosine-only ranking and autoregressive molecular decoding.
+  \item We instantiate the residual ranker with multimodal embeddings,
+  symmetric interaction features, base scores, and rank embeddings under
+  listwise and hard-negative pairwise supervision, and compare matched
+  pointwise and self-attentive implementations while keeping the first-stage
+  embeddings cacheable.
   \item Under MassSpecGym's official candidate protocol, both implementations
-  substantially improve the fixed base retriever across three reranker seeds.
+  improve the fixed base retriever by large margins across three reranker seeds.
   The overlap-clean comparison finds a modest candidate-set Transformer
   advantage, but comparison across alignment checkpoints shows that this
   advantage is not yet robust enough to attribute the overall reranking gain to
   candidate self-attention.
 \end{itemize}
+
+\paragraph{AI-assistance disclosure.}
+OpenAI Codex assisted throughout all sections with drafting and language
+revision, and during the project with code editing, experiment orchestration,
+and consistency audits. Reported observations and numerical results came from
+the stated software pipeline, not model generation. The authors reviewed all
+AI-assisted text and code, verified the technical claims, citations, saved
+artifacts, and reported results, and assume full responsibility for the
+manuscript.
 
 \section{Related Work}
 
@@ -159,13 +164,14 @@ contrastive pretraining \cite{chen2024cmssp}. These studies motivate direct
 cross-modal retrieval but do not explicitly optimize a downstream candidate
 list.
 
-Our spectrum encoder originates from SpecEmbedding, which uses replicated
-spectra and structural similarity in supervised contrastive learning
-\cite{xiong2025specembedding}. In this work, it is paired with a molecular graph
-encoder and optimized for cross-modal rather than spectrum-to-spectrum
-retrieval. The aligned model used here is trained
-from scratch, so the observed reranking gains do not rely on an external
-pretrained spectrum checkpoint.
+SpecEmbedding is a spectrum-to-spectrum representation method: it treats
+augmented and replicate spectra from the same compound as positives in
+supervised contrastive learning and adds a Tanimoto-similarity regression term
+\cite{xiong2025specembedding}. We reuse its peak-sequence Transformer
+architecture, but neither its pretrained weights nor its spectrum-to-spectrum
+training objective. Instead, the spectrum tower is paired with a molecular graph
+encoder and trained from scratch for cross-modal retrieval, so the observed
+reranking gains do not rely on an external spectrum checkpoint.
 
 \subsection{JESTR: Joint-Space Cosine Ranking}
 
@@ -269,10 +275,12 @@ the reranker is trained, so their embeddings can be computed once and reused.
 
 \subsection{Cross-Modal Base Retriever}
 
-The spectrum encoder processes a sequence of peak $m/z$ values and intensities
-with sinusoidal $m/z$ features and a Transformer. The molecular encoder is a
-GINE network over atom and bond features. Mean-pooled graph features are
-augmented with explicit graph-size features. Two projection heads map the
+The spectrum encoder follows SpecEmbedding's peak-sequence architecture
+\cite{xiong2025specembedding}: it processes peak $m/z$ values and intensities
+with sinusoidal $m/z$ features and a Transformer. We initialize this tower from
+scratch and train it against molecules rather than spectra. The molecular
+encoder is a GINE network over atom and bond features. Mean-pooled graph features
+are augmented with explicit graph-size features. Two projection heads map the
 encoders to a common $d$-dimensional space:
 
 \begin{equation}
@@ -281,10 +289,10 @@ encoders to a common $d$-dimensional space:
   \zm = \frac{p_m(f_m(m))}{\lVert p_m(f_m(m))\rVert_2}.
 \end{equation}
 
-We use a bidirectional contrastive loss that permits multiple positives.
-Spectra and molecules sharing a molecular label form positives, which avoids
-treating replicate spectra as false negatives. With a learned temperature
-scale $a$, the base logits are
+We use a bidirectional cross-modal contrastive loss that permits multiple
+positives. Spectra and molecules sharing a molecular label form positives,
+which avoids treating replicate spectra as false negatives. With a learned
+temperature scale $a$, the base logits are
 
 \begin{equation}
   \ell_{ij}=a\,\mathbf{z}_{s_i}^{\top}\mathbf{z}_{m_j}.
@@ -413,12 +421,13 @@ setting and 35.73 for the formula setting.
 
 \subsection{Implementation Details}
 
-The aligned model uses 512-dimensional output embeddings. It does not load the
-separately pretrained SpecEmbedding checkpoint;
-the spectrum and molecular encoders are trained on the MassSpecGym training
-split with bidirectional contrastive alignment. The canonical seed-42 alignment
-run applies the validation exclusion above; it selects epoch 16 and stops at
-epoch 21 after five epochs without improvement.
+The aligned model uses 512-dimensional output embeddings. It randomly
+initializes the SpecEmbedding-derived spectrum tower rather than loading the
+published pretrained checkpoint; the spectrum and molecular encoders are
+trained on the MassSpecGym training split with bidirectional contrastive
+alignment. The canonical seed-42 alignment run applies the validation exclusion
+above; it selects epoch 16 and stops at epoch 21 after five epochs without
+improvement.
 
 The reranker has hidden width 512, a 32-dimensional rank embedding, and dropout
 0.1. The set-aware variant has two Transformer layers with eight attention
