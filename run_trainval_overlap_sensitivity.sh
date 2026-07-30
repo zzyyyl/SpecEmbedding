@@ -8,7 +8,15 @@ CONDA_ENV="${CONDA_ENV:-specembedding}"
 DATA_PATH="${DATA_PATH:-/data1/zyl/SpecEmbedding/processed}"
 TOKENSET_CACHE="${TOKENSET_CACHE:-/data1/zyl/SpecEmbedding/train_cache/tokenset_massspecgym.pkl}"
 CURRENT_COMMIT="$(git rev-parse --short HEAD)"
-RUN_PREFIX="${RUN_PREFIX:-${CURRENT_COMMIT}_massspecgym_nopretrain_valoverlapclean}"
+ALIGNMENT_SEED="${ALIGNMENT_SEED:-42}"
+DEFAULT_RUN_PREFIX="${CURRENT_COMMIT}_massspecgym_nopretrain_valoverlapclean"
+if [[ -z "${RUN_PREFIX:-}" ]]; then
+  if [[ "$ALIGNMENT_SEED" == 42 ]]; then
+    RUN_PREFIX="$DEFAULT_RUN_PREFIX"
+  else
+    RUN_PREFIX="${DEFAULT_RUN_PREFIX}_alignseed${ALIGNMENT_SEED}"
+  fi
+fi
 ALIGN_DEVICE="${ALIGN_DEVICE:-cuda:1}"
 RERANK_DEVICE_LIST="${RERANK_DEVICE_LIST:-cuda:1}"
 read -r -a RERANK_DEVICES <<< "$RERANK_DEVICE_LIST"
@@ -46,6 +54,10 @@ if [[ "$#" -ne 0 ]]; then
 fi
 if [[ "${#RERANK_DEVICES[@]}" -eq 0 ]]; then
   echo "RERANK_DEVICE_LIST must contain at least one explicit cuda:N device." >&2
+  exit 2
+fi
+if ! [[ "$ALIGNMENT_SEED" =~ ^[0-9]+$ ]]; then
+  echo "ALIGNMENT_SEED must be a non-negative integer." >&2
   exit 2
 fi
 
@@ -107,6 +119,8 @@ check_sha256 "$DATA_PATH/MassSpecGym/candidates_formula.pkl" "$EXPECTED_FORMULA_
 echo "Validated audited data fingerprints."
 echo "Validation indices: ${VAL_INDICES[*]}"
 echo "Matching train indices: ${TRAIN_INDICES[*]}"
+echo "Alignment seed: $ALIGNMENT_SEED"
+echo "Run prefix: $RUN_PREFIX"
 
 run_on_gpu() {
   local device="$1"
@@ -151,13 +165,13 @@ import json
 import sys
 from pathlib import Path
 
-summary_path, checkpoint_path, tokenset_cache, *raw_indices = sys.argv[1:]
+summary_path, checkpoint_path, tokenset_cache, expected_seed, *raw_indices = sys.argv[1:]
 summary = json.loads(Path(summary_path).read_text(encoding="utf-8"))
 indices = [int(index) for index in raw_indices]
 report = summary["validation_exclusion_report"]
 stage2 = summary["stages"]["stage2"]
 assert summary["dataset_type"] == "massspecgym"
-assert summary["seed"] == 42
+assert summary["seed"] == int(expected_seed)
 assert Path(summary["tokenset_cache"]).resolve() == Path(tokenset_cache).resolve()
 assert summary["exclude_val_query_indices"] == indices
 assert report["query_indices"] == indices
@@ -174,7 +188,9 @@ assert stage2["metric_for_best"] == "validation_contrastive_loss"
 assert isinstance(stage2["best_epoch"], int)
 assert isinstance(stage2["best_val_loss"], float)
 assert stage2["stop_epoch"] >= stage2["best_epoch"]
-' "$ALIGN_SELECTION" "$ALIGN_CHECKPOINT" "$TOKENSET_CACHE" "${VAL_INDICES[@]}" >/dev/null
+' \
+      "$ALIGN_SELECTION" "$ALIGN_CHECKPOINT" "$TOKENSET_CACHE" "$ALIGNMENT_SEED" \
+      "${VAL_INDICES[@]}" >/dev/null
 }
 
 cache_valid() {
@@ -284,6 +300,7 @@ else
       --tokenset-cache "$TOKENSET_CACHE" \
       --save_dir "$ALIGN_DIR" \
       --device "$ALIGN_DEVICE" \
+      --seed "$ALIGNMENT_SEED" \
       --exclude-val-query-indices "${VAL_INDICES[@]}"
   if [[ "$DRY_RUN" == false ]] && ! alignment_complete; then
     echo "Filtered-validation alignment artifacts failed validation: $ALIGN_DIR" >&2

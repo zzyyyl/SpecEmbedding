@@ -3,6 +3,8 @@ import os
 import subprocess
 import sys
 
+from SpecEmbedding.config import config
+
 
 def get_commit_hash():
     try:
@@ -30,12 +32,16 @@ def main():
     parser.add_argument("--save_dir", help="Explicit save directory (optional)")
     parser.add_argument("--device", help='Device to use, for example "cpu", "cuda", "cuda:0", or "cuda:1"')
     parser.add_argument("--mol_norm_type", choices=["layernorm", "rmsnorm"], help="Normalization used in the molecule GINE encoder.")
+    parser.add_argument("--seed", type=int, default=config.general.seed, help="Random seed for alignment training")
 
     args = parser.parse_args()
+    if args.seed < 0:
+        parser.error("--seed must be a non-negative integer")
 
     commit_hash = get_commit_hash()
     suffix = "_nopretrain" if args.no_pretrain else ""
-    save_dir = args.save_dir or f"checkpoints_align/{commit_hash}_{args.dataset_type}{suffix}"
+    seed_suffix = "" if args.seed == config.general.seed else f"_seed{args.seed}"
+    save_dir = args.save_dir or f"checkpoints_align/{commit_hash}_{args.dataset_type}{suffix}{seed_suffix}"
 
     do_train = args.mode in ["train", "all"]
     do_eval = args.mode in ["eval", "test", "all"]
@@ -51,7 +57,8 @@ def main():
         train_cmd = [
             "python", "train_align.py",
             "--dataset_type", args.dataset_type,
-            "--save_dir", save_dir
+            "--save_dir", save_dir,
+            "--seed", str(args.seed),
         ]
         append_optional_arg(train_cmd, "--device", args.device)
         append_optional_arg(train_cmd, "--mol_norm_type", args.mol_norm_type)
