@@ -69,7 +69,8 @@ rerank a retrieved molecular list. Our framework, \method{}, first aligns a peak
 spectrum encoder and a molecular graph encoder. A second-stage residual ranker
 then combines spectrum and candidate embeddings, explicit interaction features,
 the base score, and the base rank under listwise supervision. We compare a
-context-free pointwise scorer with a candidate-set Transformer across three
+pointwise scorer without learned cross-candidate interaction with a
+candidate-set Transformer across three
 reranker initializations while keeping the first-stage checkpoint and caches
 fixed. On the 17,556-query MassSpecGym test split, their Recall@1 values are
 $67.44\pm0.74$ and $68.58\pm0.20$ for mass-conditioned retrieval, and
@@ -79,7 +80,7 @@ Transformer a modest advantage, but the same paired-win pattern is absent under
 an earlier alignment checkpoint. Thus, the current evidence strongly supports supervised
 residual reranking while not establishing a checkpoint-robust benefit from
 candidate self-attention. Both variants operate without autoregressive molecule
-generation or test-time positive insertion.
+generation or forcing the target into the test top-40 list.
 \keywords{Data mining for bioinformatics \and Tandem mass spectrometry \and
 Molecule retrieval \and Learning to rank \and Multimodal representation
 learning}
@@ -130,9 +131,9 @@ Our contributions are:
   cosine-only ranking and autoregressive molecular decoding.
   \item We instantiate the residual ranker with multimodal embeddings,
   symmetric interaction features, base scores, and rank embeddings under
-  listwise and hard-negative pairwise supervision, and compare matched
-  pointwise and self-attentive implementations while keeping the first-stage
-  embeddings cacheable.
+  listwise and retrieved-negative pairwise supervision. The pointwise and
+  self-attentive variants match features, score heads, objectives, and
+  optimization, while the first-stage embeddings remain cacheable.
   \item Under MassSpecGym's official candidate protocol, both implementations
   improve the fixed base retriever by large margins across three reranker seeds.
   The overlap-clean comparison finds a modest candidate-set Transformer
@@ -269,7 +270,8 @@ the reranker is trained, so their embeddings can be computed once and reused.
   top-40 list. Panel 3 applies shared pair features with either pointwise
   scoring or candidate-set self-attention and adds a residual to the base
   score. Dashed arrows denote training-only operations. Positives are never
-  inserted at validation/test, and no molecule is generated.}
+  forced into the truncated top-40 list at validation/test, and no molecule is
+  generated.}
   \label{fig:overview}
 \end{figure}
 
@@ -277,11 +279,17 @@ the reranker is trained, so their embeddings can be computed once and reused.
 
 The spectrum encoder follows SpecEmbedding's peak-sequence architecture
 \cite{xiong2025specembedding}: it processes peak $m/z$ values and intensities
-with sinusoidal $m/z$ features and a Transformer. We initialize this tower from
-scratch and train it against molecules rather than spectra. The molecular
-encoder is a GINE network over atom and bond features. Mean-pooled graph features
-are augmented with explicit graph-size features. Two projection heads map the
-encoders to a common $d$-dimensional space:
+with sinusoidal $m/z$ features and a Transformer. Each spectrum is represented
+by at most 100 tokens: a precursor-$m/z$ token with intensity 2, followed by up
+to 99 fragment peaks selected by intensity. Selected fragments retain their
+source-array order, and their intensities are normalized by the largest selected
+fragment intensity. Only these $m/z$--intensity tokens enter the spectrum
+encoder; adduct, instrument, and collision-energy metadata are not explicit
+inputs. We initialize this tower from scratch and train it against molecules
+rather than spectra. The molecular encoder is a GINE network over atom and bond
+features. Mean-pooled graph features are augmented with explicit graph-size
+features. Two projection heads map the encoders to a common $d$-dimensional
+space:
 
 \begin{equation}
   \zs = \frac{p_s(f_s(s))}{\lVert p_s(f_s(s))\rVert_2},
@@ -291,15 +299,26 @@ encoders to a common $d$-dimensional space:
 
 We use a bidirectional cross-modal contrastive loss that permits multiple
 positives. Spectra and molecules sharing a molecular label form positives,
-which avoids treating replicate spectra as false negatives. With a learned
-temperature scale $a$, the base logits are
+which avoids treating replicate spectra as false negatives. For a minibatch of
+size $B$, let $P(i)$ be the indices sharing the label of item $i$. With a
+learned inverse-temperature scale $a$, the base logits are
 
 \begin{equation}
   \ell_{ij}=a\,\mathbf{z}_{s_i}^{\top}\mathbf{z}_{m_j}.
 \end{equation}
 
-The loss averages the two retrieval directions over all positives in a batch.
-At inference, the normalized dot product
+The spectrum-to-molecule term is
+
+\begin{equation}
+  \mathcal{L}_{s\rightarrow m}
+  =-\frac{1}{B}\sum_{i=1}^{B}\frac{1}{|P(i)|}
+  \sum_{j\in P(i)}
+  \log\frac{\exp(\ell_{ij})}{\sum_{k=1}^{B}\exp(\ell_{ik})},
+\end{equation}
+
+and the molecule-to-spectrum term applies the same expression to
+$\ell^\top$. The alignment loss is their mean. The implementation parameterizes
+$a=\exp(u)$ and caps it at 100. At inference, the normalized dot product
 $b_i=\zs^\top\mathbf{z}_{m_i}$ is the base score.
 
 \subsection{Candidate Construction and Training Protocol}
@@ -308,14 +327,18 @@ For each query, the base retriever scores the corresponding MassSpecGym
 candidate library and keeps its top $K=40$ molecules. Training lists must
 contain a labeled positive for supervised learning. If the true training
 molecule lies below rank 40, it replaces the last retrieved molecule while its
-original base rank is retained. Candidate order is shuffled during reranker
-training, but the base rank remains an explicit feature. This prevents the
-tensor position itself from becoming a shortcut.
+full-library base rank is retained in the cache. This rank is one plus the
+number of candidates with a strictly higher base score. The rank embedding
+receives $\bar r_i=\min\{\max(r_i,0),512\}$, with index 0 reserved for padding.
+Candidate order is also shuffled during reranker training while the embedding,
+base score, and rank move with their candidate; this is an additional safeguard
+against cache-order artifacts.
 
-Positive insertion is restricted to the training split. Validation and test
-caches are produced with insertion disabled; a missing positive remains missing
-and lowers both the upper bound and every end-to-end metric. Candidate files are
-loaded from the official MassSpecGym release. No record assigned to the test
+Forcing a positive into the truncated list is restricted to the training split.
+In the official files used here, every full candidate list already contains its
+target; at validation and test we do not perform forced post-retrieval top-40
+replacement. A target ranked below 40 therefore remains absent and lowers both
+the upper bound and every end-to-end metric. No record assigned to the test
 split, nor any test target or label, is used for parameter optimization or
 checkpoint selection in either stage.
 
@@ -326,11 +349,11 @@ For candidate $m_i$ with base rank $r_i$, we construct
 \begin{equation}
   \mathbf{x}_i =
   [\zs,\ \mathbf{z}_{m_i},\ \zs\odot\mathbf{z}_{m_i},\
-  |\zs-\mathbf{z}_{m_i}|,\ b_i,\ \mathbf{e}(r_i)],
+  |\zs-\mathbf{z}_{m_i}|,\ b_i,\ \mathbf{e}(\bar r_i)],
   \label{eq:features}
 \end{equation}
 
-where $\mathbf{e}(r_i)$ is a learned rank embedding. The direct embeddings
+where $\mathbf{e}(\bar r_i)$ is a learned rank embedding. The direct embeddings
 retain modality-specific evidence, while product and absolute-difference terms
 make symmetric matching cues explicit. An MLP projects each vector:
 
@@ -338,8 +361,16 @@ make symmetric matching cues explicit. An MLP projects each vector:
   \mathbf{h}_i=\operatorname{MLP}(\mathbf{x}_i).
 \end{equation}
 
-The candidate-set variant uses a Transformer encoder to exchange information
-across candidates \cite{vaswani2017attention}:
+Both variants receive only the frozen spectrum embedding, frozen candidate
+embeddings, cosine base scores, clipped base-rank embeddings, and the candidate
+padding mask. Raw peaks, SMILES tokens, precursor mass or formula, and
+acquisition metadata are not passed directly to the reranker. Mass and formula
+constraints affect candidate-library construction only; no explicit
+candidate--candidate structural-similarity feature is provided.
+
+The candidate-set variant uses a Transformer encoder without candidate
+positional encodings to exchange information across candidates
+\cite{vaswani2017attention}:
 
 \begin{equation}
   [\tilde{\mathbf{h}}_1,\ldots,\tilde{\mathbf{h}}_K]
@@ -347,35 +378,49 @@ across candidates \cite{vaswani2017attention}:
   ([\mathbf{h}_1,\ldots,\mathbf{h}_K]).
 \end{equation}
 
-Padding masks support variable-sized lists. The matched pointwise control sets
+Padding masks support variable-sized lists. Consequently, jointly permuting the
+candidates and their attached embeddings, scores, and ranks permutes the output
+scores in the same way. The pointwise control sets
 $\tilde{\mathbf{h}}_i=\mathbf{h}_i$, retaining the same features, score head,
-residual path, and training losses while removing all candidate interaction. A
-score head predicts a correction $\Delta_i$, and the final score is residual:
+residual path, and training losses while removing learned cross-candidate
+interaction after the retrieval priors have been constructed. It is not
+parameter- or capacity-matched because it removes the two Transformer layers:
+the pointwise and candidate-set variants contain exactly 1,478,690 and
+7,783,458 trainable reranker parameters, respectively. A score head predicts a
+correction $\Delta_i$, and the final score is residual:
 
 \begin{equation}
   q_i=\alpha b_i+\Delta_i,
   \label{eq:residual}
 \end{equation}
 
-where $\alpha$ is learned. The residual path lets the model preserve a useful
-base order rather than relearn retrieval from scratch.
+where $\alpha$ is initialized to 1.0 and learned without a sign constraint. The
+residual path provides a direct shortcut from the base score; it does not
+guarantee preservation of the base order.
 
 \subsection{Learning Objective}
 
-Let $y$ be the positive index in a training list. The primary objective is
-listwise cross-entropy:
+For the labeled queries $\mathcal{B}_{L}$ in a minibatch, let $V_n$ be the valid
+candidate set and $y_n$ the positive index. The primary objective averages
+listwise cross-entropy over labeled queries:
 
 \begin{equation}
   \mathcal{L}_{\mathrm{list}}
-  =-\log\frac{\exp(q_y)}{\sum_{i=1}^{K}\exp(q_i)}.
+  =-\frac{1}{|\mathcal{B}_{L}|}
+  \sum_{n\in\mathcal{B}_{L}}
+  \log\frac{\exp(q_{ny_n})}{\sum_{i\in V_n}\exp(q_{ni})}.
 \end{equation}
 
-We also contrast the positive with every hard candidate using
+We also contrast each positive with every other valid candidate retrieved for
+that query. The implementation averages over all valid positive--negative pairs
+in the minibatch:
 
 \begin{equation}
   \mathcal{L}_{\mathrm{pair}}
-  =\frac{1}{K-1}\sum_{i\ne y}
-  \log\left(1+\exp(q_i-q_y+\gamma)\right).
+  =\frac{
+  \sum_{n\in\mathcal{B}_{L}}\sum_{i\in V_n\setminus\{y_n\}}
+  \log\!\left(1+\exp(q_{ni}-q_{ny_n}+\gamma)\right)}
+  {\sum_{n\in\mathcal{B}_{L}}\left(|V_n|-1\right)}.
 \end{equation}
 
 The complete objective is
@@ -386,27 +431,27 @@ The complete objective is
   +\lambda\mathcal{L}_{\mathrm{pair}}.
 \end{equation}
 
-For hidden width $h$, the set-aware variant adds $O(K^2h)$ attention cost over
-the pointwise scorer. Neither variant decodes molecules token by token. An
-empirical latency comparison with GLMR is not reported, so we make no measured
-efficiency claim.
+For $L$ Transformer layers and hidden width $h$, the set-aware variant adds
+$O(L(Kh^2+K^2h))$ computation and $O(LK^2)$ attention memory over the pointwise
+scorer. Neither variant decodes molecules token by token. An empirical latency
+comparison with GLMR is not reported, so we make no measured efficiency claim.
 
 \section{Experiments}
 
 \subsection{Dataset and Candidate Libraries}
 
 We use the official MassSpecGym split \cite{bushuiev2024massspecgym}: 194,119
-training spectra, 19,429 validation spectra, and 17,556 test spectra, covering
-32,010 unique molecules in total. Its structure-disjoint split groups similar
-molecules and makes test structures substantially different from training
-structures.
+training spectra, 19,429 validation spectra, and 17,556 test spectra. These
+counts total 231,104 spectra; the benchmark reports approximately 29,000 unique
+molecular structures. Its structure-disjoint split groups similar molecules and
+makes test structures substantially different from training structures.
 
-An exact audit of spectrum-input signatures (peak arrays, precursor $m/z$,
+An exact audit of spectrum-record signatures (peak arrays, precursor $m/z$,
 adduct, instrument, and collision energy) found no target-molecule duplicates
 across splits, but six validation and three test signatures exactly matched
 training signatures. In all nine matched pairs, the target molecules differ
 and each evaluation query is marked \texttt{simulation\_challenge=true}. We
-report these cases as cross-split spectrum-input overlap. In the canonical
+report these cases as cross-split spectrum-record overlap. In the canonical
 pipeline reported below, all validation-dependent model selection excludes the
 six affected validation spectra, leaving 19,423 validation queries for the
 rerankers; alignment validation keys decrease from 3,386 to 3,384 molecular
@@ -440,16 +485,17 @@ caches from the overlap-clean run, each reranker variant is trained with seeds
 uncertainty. All models are selected without test-set access and evaluated on
 one NVIDIA RTX 4090.
 
-The top-40 base recall before supervised insertion is 93.78\% for mass and
-90.42\% for formula on the training split. Training lists are completed to
-100\% labeled coverage as described above. On test, insertion is disabled and
-the corresponding upper bounds are 83.88\% and 89.26\%.
+Before training-only positive forcing, top-40 base recall is 93.78\% for mass
+and 90.42\% for formula on the training split. Training lists are then completed
+to 100\% labeled coverage as described above. No target is forced into the test
+top-40 lists, whose corresponding upper bounds are 83.88\% and 89.26\%.
 
 \subsection{Baselines and Metrics}
 
 The controlled baselines are the same aligned retriever without the second-stage
 ranker and a pointwise reranker that removes candidate self-attention while
-retaining all other inputs and objectives. We also show JESTR and GLMR values
+retaining all other inputs and objectives, but not the same parameter count. We
+also show JESTR and GLMR values
 from Table 1 of the GLMR paper
 \cite{zhang2026glmr}. These external numbers provide context but are not a
 controlled ablation: JESTR and GLMR were not independently reproduced in our codebase, and
@@ -457,8 +503,24 @@ small differences in molecular canonicalization or candidate handling may
 affect exact values.
 
 We report Recall@1, Recall@5, Recall@20, and mean reciprocal rank (MRR) over all
-test queries. MCES@1 measures structural distance between the top prediction and
-target, so lower is better. Recall and MRR uncertainty is computed over three
+test queries. For every query, including those whose target is absent from the
+retrieved top-40, let $\hat m_n^{(1)}$ be the top-ranked candidate. We report
+
+\begin{equation}
+  \operatorname{MCES@1}
+  =\frac{1}{N}\sum_{n=1}^{N}
+  \tilde d_{15}\!\left(\hat m_n^{(1)},m_n^+\right),
+  \qquad N=17{,}556.
+\end{equation}
+
+Here $\tilde d_{15}$ is the output of \texttt{myopic-MCES} v1.0.1 with threshold
+15 and the stronger-bound option enabled \cite{kretschmer2025coverage}. It is
+exact for sufficiently close pairs; for
+distant pairs it may return the threshold or a computed lower bound rather than
+the unconstrained exact MCES distance. Thus, the reported quantity is
+thresholded myopic MCES, and lower is better. Exact SMILES-string matches are
+assigned zero. The canonical runs selected \texttt{PULP\_CBC\_CMD}, and no MCES
+worker failures were logged. Recall and MRR uncertainty is computed over three
 reranker seeds with a fixed base checkpoint. MCES@1 is computed for the
 overlap-clean base and representative seed-42 Transformer checkpoints; these
 single-checkpoint values do not include seed-level uncertainty.
@@ -468,11 +530,13 @@ single-checkpoint values do not include seed-level uncertainty.
 \begin{table}[t]
   \centering
   \caption{Representative seed-42 MassSpecGym results and cross-paper context.
-  Recall and MRR are percentages; MCES@1 is a distance (lower is better). JESTR
+  Recall and MRR are percentages; MCES@1 is the thresholded myopic-MCES output
+  (lower is better). JESTR
   and GLMR values are reported by Zhang et al.\ \cite{zhang2026glmr}; our rows
   use the local pipeline and official candidate files. The external rows are
   used only as cross-paper context. Local MCES@1 values use the overlap-clean
-  base and representative seed-42 Transformer checkpoints.}
+  base and representative seed-42 Transformer checkpoints; external MCES
+  implementations and solver settings may differ.}
   \label{tab:main_results}
   \small
   \begin{tabular}{llrrrrr}
@@ -483,22 +547,22 @@ single-checkpoint values do not include seed-level uncertainty.
       & JESTR (reported) & 17.62 & 40.36 & 64.76 & 29.12 & 15.82 \\
       & GLMR (reported) & 64.17 & 72.96 & 78.78 & 67.82 & 11.14 \\
       & \base{} & 47.46 & 63.51 & 77.76 & 55.03 & 15.37 \\
-      & Set Transformer & 68.74 & 77.77 & 82.18 & 72.87 & 7.71 \\
+      & Candidate-set Transformer & 68.74 & 77.77 & 82.18 & 72.87 & 7.71 \\
     \midrule
     \multirow{4}{*}{Formula}
       & JESTR (reported) & 11.77 & 33.26 & 61.01 & 22.83 & 11.73 \\
       & GLMR (reported) & 68.48 & 78.09 & 84.22 & 72.47 & 5.05 \\
       & \base{} & 63.10 & 75.79 & 84.93 & 68.86 & 5.44 \\
-      & Set Transformer & 74.75 & 82.25 & 86.89 & 78.22 & 3.09 \\
+      & Candidate-set Transformer & 74.75 & 82.25 & 86.89 & 78.22 & 3.09 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-In the representative seed-42 run, the set Transformer adds 21.28 percentage
+In the representative seed-42 run, the candidate-set Transformer adds 21.28 percentage
 points in mass-conditioned Recall@1 and 11.65 points in formula-conditioned
 Recall@1. The corresponding MRR gains are 17.84 and 9.36 points. Improvements
 at Recall@20 are smaller because the first-stage top-40 upper bound is already
-the dominant constraint. Relative to the matched overlap-clean base, the same
+the dominant constraint. Relative to the corresponding fixed overlap-clean base, the same
 seed-42 Transformer reduces MCES@1 from 15.3681 to 7.7057 for mass candidates
 ($49.86\%$) and from 5.4389 to 3.0913 for formula candidates ($43.16\%$).
 
@@ -528,22 +592,24 @@ contextual rather than causal.
     \multirow{3}{*}{Mass}
       & Base & 47.46 & 63.51 & 77.76 & 55.03 \\
       & Pointwise & $67.44\pm0.74$ & $77.02\pm0.59$ & $82.26\pm0.16$ & $71.79\pm0.66$ \\
-      & Set Transformer & $68.58\pm0.20$ & $77.36\pm0.36$ & $82.20\pm0.07$ & $72.60\pm0.25$ \\
+      & Candidate-set Transformer & $68.58\pm0.20$ & $77.36\pm0.36$ & $82.20\pm0.07$ & $72.60\pm0.25$ \\
     \midrule
     \multirow{3}{*}{Formula}
       & Base & 63.10 & 75.79 & 84.93 & 68.86 \\
       & Pointwise & $73.97\pm0.59$ & $81.94\pm0.27$ & $86.78\pm0.27$ & $77.64\pm0.49$ \\
-      & Set Transformer & $74.57\pm0.28$ & $81.97\pm0.26$ & $86.77\pm0.14$ & $78.02\pm0.26$ \\
+      & Candidate-set Transformer & $74.57\pm0.28$ & $81.97\pm0.26$ & $86.77\pm0.14$ & $78.02\pm0.26$ \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 Both learned rankers substantially outperform the fixed base model. On the
-overlap-clean checkpoint, the set Transformer exceeds the pointwise model by
+overlap-clean checkpoint, the candidate-set Transformer exceeds the pointwise model by
 $1.14$ Recall@1 points for mass candidates and $0.60$ points for formula
 candidates on average, and it wins all six paired seed--candidate comparisons.
 The corresponding MRR differences are $+0.81$ and $+0.38$ points. This is a
-modest, consistent advantage within the clean run. However, the earlier
+modest, consistent architectural difference within the clean run. Because the
+Transformer also has 6.30M more trainable parameters, the comparison does not
+isolate candidate interaction from increased capacity. However, the earlier
 alignment checkpoint gave Recall@1 differences of $-0.13$ and $+0.21$ points
 and only three wins out of six. The evidence therefore supports supervised
 residual reranking and suggests a possible candidate-interaction benefit, but
@@ -567,8 +633,8 @@ sensitivity rather than the causal effect of the six validation queries alone.
 
 We do not report feature-removal, objective, candidate-order, or full top-$K$
 ablations; conclusions about those components are outside the present evidence.
-We also do not report parameter count, peak memory, cache construction time,
-reranker latency, or end-to-end latency.
+We also do not report peak memory, cache construction time, reranker latency, or
+end-to-end latency.
 
 \section{Limitations and Responsible Evaluation}
 
@@ -579,8 +645,11 @@ current external JESTR and GLMR rows are reported rather than independently
 reproduced. The rerankers use three seeds, but all share one fixed seed-42
 alignment checkpoint; the reported uncertainty therefore excludes first-stage
 variation. Candidate self-attention shows a modest advantage in the clean run,
-but that advantage is sensitive to the alignment checkpoint. These limitations
-preclude a definitive state-of-the-art or self-attention benefit claim.
+but that advantage is sensitive to the alignment checkpoint. The set-aware
+model also has 5.26 times as many trainable reranker parameters as the pointwise
+model, so their difference does not isolate candidate interaction from capacity.
+These limitations preclude a definitive state-of-the-art or self-attention
+benefit claim.
 
 The canonical model-selection pipeline excludes all six audited
 training--validation input overlaps. The clean and earlier pipelines select the
@@ -591,10 +660,11 @@ pipeline-level sensitivity, not as a causal estimate for the six queries
 alone. Multiple alignment seeds would be required to quantify first-stage
 uncertainty.
 
-Training-only positive insertion is a supervised sampling operation, not a
-valid evaluation protocol. We expose the pre-insertion training recall and
-disable insertion for validation and test. We also evaluate every test query,
-including those whose positives are missing from the top-40 list. Finally, as a
+Training-only forced top-40 replacement is a supervised sampling operation, not
+a valid evaluation protocol. We expose the pre-replacement training recall and
+disable forced post-retrieval replacement for validation and test. We also
+evaluate every test query, including those whose positives are missing from the
+top-40 list. Finally, as a
 closed-library reranker, the method cannot propose novel structures outside the
 candidate database; this is a limitation relative to de novo generation, even
 though it avoids generation validity failures.
@@ -606,7 +676,8 @@ explicit pair features, retrieval priors, residual scoring, and listwise
 supervision on top of a contrastively aligned base retriever. Controlled
 MassSpecGym results show large gains from learned reranking in every one of
 three reranker initializations on the fixed seed-42 base retriever under both
-mass- and formula-conditioned libraries. A matched three-seed comparison finds
+mass- and formula-conditioned libraries. A paired three-seed comparison on
+identical fixed caches finds
 that the candidate-set Transformer has a modest advantage over the pointwise
 scorer and wins all six paired comparisons on the overlap-clean checkpoint.
 Because this pattern differs from the earlier alignment checkpoint, the
