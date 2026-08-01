@@ -153,77 +153,83 @@ manuscript.
 
 \section{Related Work}
 
-\subsection{Spectrum-to-Molecule Retrieval}
+\subsection{Annotation Paradigms}
 
-Earlier annotation systems compare an experimental spectrum with reference
-spectra, predict a molecular fingerprint, or simulate a spectrum from each
-candidate. Their coverage or accuracy is limited by reference libraries,
-intermediate reconstruction error, or simulation quality. MIST predicts
-structure-related fingerprints with formula-aware Transformers
-\cite{goldman2023mist}; CMSSP aligns spectral and molecular representations by
-contrastive pretraining \cite{chen2024cmssp}. These studies motivate direct
-cross-modal retrieval but do not explicitly optimize a downstream candidate
-list.
+Computational MS/MS annotation differs in both the retrieved object and the
+ranking signal. Spectral-library systems return measured reference spectra, so
+their reach depends on library coverage and acquisition compatibility.
+MS2Query uses Spec2Vec and MS2DeepScore similarities together with
+precursor-mass evidence for exact and analogue search \cite{dejonge2023ms2query}. This
+task complements MassSpecGym retrieval, which
+ranks molecular structures from query-specific chemical candidate libraries
+\cite{bushuiev2024massspecgym}.
 
-SpecEmbedding is a spectrum-to-spectrum representation method: it treats
-augmented and replicate spectra from the same compound as positives in
-supervised contrastive learning and adds a Tanimoto-similarity regression term
-\cite{xiong2025specembedding}. We reuse its peak-sequence Transformer
-architecture, but neither its pretrained weights nor its spectrum-to-spectrum
-training objective. Instead, the spectrum tower is paired with a molecular graph
-encoder and trained from scratch for cross-modal retrieval, so the observed
-reranking gains do not rely on an external spectrum checkpoint.
+Within structure-database retrieval, CSI:FingerID and MIST predict molecular
+fingerprints from spectra \cite{duhrkop2015csifingerid,goldman2023mist}.
+CMSSP, JESTR, and MVP instead learn joint spectrum--molecule spaces by
+contrastive alignment \cite{chen2024cmssp,kalia2025jestr,chen2026mvp}; MVP
+aligns molecular graphs and fingerprints with individual and consensus spectra.
+These methods ultimately order candidates using a predicted-fingerprint score
+or cross-modal similarity. SpecEmbedding addresses spectrum--spectrum
+representation learning \cite{xiong2025specembedding}. We reuse only its
+peak-sequence architecture, train it from scratch against molecular graphs, and
+study the complementary second-stage problem of learning the order within an
+already retrieved hard-candidate list.
 
-\subsection{JESTR: Joint-Space Cosine Ranking}
+Simulation and generation use different intermediate representations.
+MassFormer predicts tandem mass spectra from molecular graphs
+\cite{young2024massformer}; MSNovelist generates structures from
+MS/MS-derived fingerprints \cite{stravs2022msnovelist}. GLMR aligns spectra and
+molecules, conditions a molecular decoder on retrieved candidates, and orders
+those candidates by similarity to the generated molecule \cite{zhang2026glmr}.
+Our method does not decode a structure: it remains a closed-library reranker and
+cannot return a molecule outside the first-stage list, but directly optimizes
+the scores of available candidates.
 
-JESTR represents a molecule with a GCN and a spectrum with an MLP over
-1-Da-binned peaks. Contrastive multiview coding aligns matched
-spectrum--molecule pairs with an InfoNCE objective. During the final 3\% of
-training, JESTR additionally pushes away PubChem molecules sharing the target
-formula; its final score remains the cosine similarity between the query and
-each candidate \cite{kalia2025jestr}. This design is simple and non-generative,
-but candidates are scored independently and there is no learned downstream
-ranking objective. The same-formula regularizer was also reported to provide
-little or inconsistent improvement on the structure-disjoint MassSpecGym split,
-which suggests that candidate-aware supervision alone is not sufficient unless
-the ranking function can use it effectively.
+\subsection{Learning to Rank Candidate Sets}
 
-\subsection{GLMR: Generation-Mediated Reranking}
-
-GLMR first aligns a Transformer spectrum encoder with a frozen ChemFormer
-molecule encoder using dual-path InfoNCE. Its top-$K$ molecules become
-contextual priors for a cross-attention fusion module and ChemFormer decoder.
-The decoder autoregressively generates a SMILES string, which is embedded and
-compared with each pre-retrieved candidate to produce the final order
-\cite{zhang2026glmr}. This converts cross-modal matching into molecular
-similarity and yields strong MassSpecGym results. Its benefits, however, are
-coupled to generation quality, decoding cost, and molecular validity.
+Learning-to-rank objectives define supervision over preferences or complete
+lists rather than treating similarity sorting as a fixed post-processing step.
+RankNet learns pairwise preferences, whereas ListNet defines a probability
+model over a ranked list \cite{burges2005ranknet,cao2007listnet}. Ranking
+functions can also exploit relations among competing items. Set Transformer
+provides attention-based blocks for set-structured inputs
+\cite{lee2019settransformer}, and SetRank jointly models cross-document
+interactions while preserving permutation equivariance \cite{pang2020setrank}.
+We transfer these principles to spectrum--molecule retrieval using cached
+cross-modal embeddings, explicit pair interactions, and first-stage score and
+rank priors. Our contribution is not self-attention or listwise learning by
+themselves, but their residual candidate-level formulation for MS/MS retrieval
+and a controlled comparison with a pointwise scorer using the same candidate
+features and objectives.
 
 \subsection{Positioning of Our Method}
 
-Table~\ref{tab:method_comparison} isolates the ranking mechanism of the three
-methods. Our claim is deliberately narrower than improving cross-modal
-embeddings: the proposed contribution is direct non-generative residual ranking
-over existing spectrum and molecule embeddings. Candidate self-attention is an
-evaluated architectural option rather than an assumed source of improvement.
+Table~\ref{tab:method_comparison} isolates the ranking mechanisms of the closest
+MassSpecGym approaches. The proposed contribution is direct, non-generative
+residual ranking over existing spectrum and molecule embeddings; candidate
+self-attention is an evaluated option rather than an assumed source of gain.
 
 \begin{table}[t]
   \centering
-  \caption{Methodological comparison with the two closest approaches.}
+  \caption{Mechanistic comparison with the closest MassSpecGym approaches.}
   \label{tab:method_comparison}
-  \small
-  \begin{tabular}{p{1.15cm}p{2.35cm}p{2.15cm}p{1.55cm}p{2.2cm}}
+  \footnotesize
+  \begin{tabular}{>{\raggedright\arraybackslash}p{1.1cm}
+                  >{\raggedright\arraybackslash}p{2.1cm}
+                  >{\raggedright\arraybackslash}p{2.1cm}
+                  >{\raggedright\arraybackslash}p{1.5cm}
+                  >{\raggedright\arraybackslash}p{2.5cm}}
     \toprule
-    Method & Final ranking signal & Candidate interaction & Generates a molecule
-    & Training signal \\
+    Model & Ranking signal & Candidate interaction & Generates & Training stages \\
     \midrule
     JESTR & Spectrum--candidate cosine & None at inference & No
-      & InfoNCE plus candidate regularization \\
-    GLMR & Generated--candidate cosine & Cross-attention inside generator & Yes
-      & Autoregressive generation loss \\
+      & InfoNCE plus formula-candidate regularizer \\
+    GLMR & Generated--candidate cosine & Generator cross-attention & Yes
+      & Dual-path InfoNCE plus generation \\
     Ours & Residual score from pair features and retrieval priors
-      & Optional self-attention in set-aware variant & No
-      & Listwise CE plus pairwise margin \\
+      & Optional candidate self-attention & No
+      & Cross-modal InfoNCE plus listwise/pairwise reranking \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -247,6 +253,7 @@ Recall@$k$ is upper-bounded by
 \begin{equation}
   U_K = \frac{1}{N}\sum_{n=1}^{N}
   \mathbb{I}[m_n^+\in\candidates_{s_n}].
+  \label{eq:upper_bound}
 \end{equation}
 
 We therefore report both $U_K$ and ranking metrics over all queries, assigning
@@ -287,8 +294,8 @@ fragment intensity. Only these $m/z$--intensity tokens enter the spectrum
 encoder; adduct, instrument, and collision-energy metadata are not explicit
 inputs. We initialize this tower from scratch and train it against molecules
 rather than spectra. The molecular encoder is a GINE network over atom and bond
-features. Mean-pooled graph features are augmented with explicit graph-size
-features. Two projection heads map the encoders to a common $d$-dimensional
+features \cite{hu2020pretraininggnn}. Mean-pooled graph features are augmented
+with explicit graph-size features. Two projection heads map the encoders to a common $d$-dimensional
 space:
 
 \begin{equation}
@@ -380,7 +387,9 @@ positional encodings to exchange information across candidates
 
 Padding masks support variable-sized lists. Consequently, jointly permuting the
 candidates and their attached embeddings, scores, and ranks permutes the output
-scores in the same way. The pointwise control sets
+scores in the same way; the base rank is a candidate-attached retrieval prior,
+not a tensor-slot position encoding \cite{lee2019settransformer,pang2020setrank}.
+The pointwise control sets
 $\tilde{\mathbf{h}}_i=\mathbf{h}_i$, retaining the same features, score head,
 residual path, and training losses while removing learned cross-candidate
 interaction after the retrieval priors have been constructed. It is not
@@ -636,38 +645,70 @@ ablations; conclusions about those components are outside the present evidence.
 We also do not report peak memory, cache construction time, reranker latency, or
 end-to-end latency.
 
+\section{Discussion}
+
+Equation~\ref{eq:upper_bound} separates first-stage coverage from within-list
+ordering. Because a query whose target is absent receives zero credit,
+$\mathrm{R@1}/U_{40}$ is the top-1 success rate conditional on the target
+entering the first-stage list. Using the displayed three-seed means, this rate
+increases from 56.58\% for the base retriever to 80.40\% for the pointwise model
+and 81.76\% for the candidate-set Transformer under mass conditioning. The
+corresponding formula-conditioned rates are 70.69\%, 82.87\%, and 83.54\%.
+
+Another view is the fraction of attainable top-1 headroom recovered,
+
+\begin{equation}
+  H=\frac{\mathrm{R@1}_{\mathrm{rerank}}-\mathrm{R@1}_{\mathrm{base}}}
+  {U_{40}-\mathrm{R@1}_{\mathrm{base}}}.
+\end{equation}
+
+The pointwise and candidate-set models recover 54.86\% and 57.99\% of this
+headroom for mass candidates, and 41.55\% and 43.85\% for formula candidates.
+The pointwise gain is also 94.60\% and 94.77\% of the total candidate-set gain
+over the base model in the two settings. Thus, most of the observed improvement
+is already achieved by supervised pointwise residual reranking with the shared
+features and losses; the candidate-set variant adds only a modest increment.
+At Recall@20, the candidate-set means are only 1.68 and 2.49 points below
+$U_{40}$; first-stage coverage is therefore the dominant remaining limitation
+for that metric under this top-40 protocol. These algebraic summaries of existing
+results are not additional estimates and do not causally isolate individual
+features, objectives, interaction, or capacity.
+
 \section{Limitations and Responsible Evaluation}
 
-\method{} cannot recover a molecule absent from the base top-$K$ list, so its
-utility depends on first-stage recall. The formula-conditioned setting assumes
-formula information that may itself require prediction in a real workflow. The
-current external JESTR and GLMR rows are reported rather than independently
-reproduced. The rerankers use three seeds, but all share one fixed seed-42
-alignment checkpoint; the reported uncertainty therefore excludes first-stage
-variation. Candidate self-attention shows a modest advantage in the clean run,
-but that advantage is sensitive to the alignment checkpoint. The set-aware
-model also has 5.26 times as many trainable reranker parameters as the pointwise
-model, so their difference does not isolate candidate interaction from capacity.
-These limitations preclude a definitive state-of-the-art or self-attention
-benefit claim.
+\method{} cannot recover a molecule absent from the base top-$K$ list, and the
+formula-conditioned setting assumes information that may first need to be
+predicted. Reranker seeds within each comparison share one alignment checkpoint,
+so their uncertainty omits first-stage variation; the candidate-set advantage
+also differs across the two examined checkpoints. That model has 5.26 times the
+pointwise model's trainable parameters (6,304,768 more; $+426\%$), confounding
+interaction with capacity. External JESTR and GLMR rows were not reproduced
+under identical software and candidate handling, so we make no definitive
+state-of-the-art, causal-component, or self-attention-benefit claim.
 
-The canonical model-selection pipeline excludes all six audited
-training--validation input overlaps. The clean and earlier pipelines select the
-same alignment epochs, while their reranker checkpoint selections differ in 9
-of 12 configurations. Since alignment was retrained rather than held bitwise
-fixed, the observed old-to-clean differences must be interpreted as
-pipeline-level sensitivity, not as a causal estimate for the six queries
-alone. Multiple alignment seeds would be required to quantify first-stage
-uncertainty.
+Only training uses forced post-retrieval top-40 replacement. Model selection
+excludes the six audited training--validation record overlaps, and every official
+test query remains. The artifact manifest records the source commit and SHA-256
+checksums for processed splits, candidate files, caches, checkpoints, and logs.
+A 2026 MassSpecGym audit preprint reports leakage, shortcut learning,
+implementation bugs, and metric divergence, and releases benchmark v1.5
+\cite{liu2026massspecgymwild}. The manifest pins this evaluation but does not
+prove v1.5 equivalence; scores are artifact- and protocol-specific.
 
-Training-only forced top-40 replacement is a supervised sampling operation, not
-a valid evaluation protocol. We expose the pre-replacement training recall and
-disable forced post-retrieval replacement for validation and test. We also
-evaluate every test query, including those whose positives are missing from the
-top-40 list. Finally, as a
-closed-library reranker, the method cannot propose novel structures outside the
-candidate database; this is a limitation relative to de novo generation, even
-though it avoids generation validity failures.
+Each test spectrum is one query, so molecules with multiple spectra receive
+greater aggregate weight. Recall on a closed, query-specific candidate list
+measures prioritization, not confirmed identification. Established frameworks
+distinguish annotation-confidence levels, while COSMIC addresses high-confidence
+annotation for structures absent from spectral libraries
+\cite{schymanski2014confidence,hoffmann2022cosmic}. Our model provides neither
+calibrated probabilities nor abstention and returns a top-ranked candidate when
+the target is absent; orthogonal experimental evidence remains necessary.
+
+Finally, the spectrum tower receives selected peaks and precursor $m/z$ but no
+explicit adduct, instrument, or collision-energy inputs. Robustness to acquisition
+shift, other benchmarks, larger lists, and external libraries is untested. The
+closed-library method cannot propose structures outside the supplied database,
+despite avoiding autoregressive generation-validity failures.
 
 \section{Conclusion}
 
@@ -683,7 +724,7 @@ scorer and wins all six paired comparisons on the overlap-clean checkpoint.
 Because this pattern differs from the earlier alignment checkpoint, the
 strongest supported conclusion is the value of direct residual learning to
 rank; a checkpoint-robust benefit from self-attention remains unestablished.
-Claims about matched external baselines, individual feature and loss
+Claims about controlled external-baseline comparisons, individual feature and loss
 contributions, and measured efficiency are outside the present evidence.
 
 \bibliographystyle{splncs04}

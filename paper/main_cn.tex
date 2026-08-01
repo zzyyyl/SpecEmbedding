@@ -119,60 +119,65 @@ OpenAI Codex 在本稿所有章节中辅助文字起草和语言修改，并在�
 
 \section{相关工作}
 
-\subsection{谱图到分子的检索}
+\subsection{结构注释范式}
 
-早期结构注释系统通常比较实验谱图和参考谱图、预测分子指纹，或为每个候选模拟谱图。
-这些方法分别受到谱图库覆盖率、中间表示重建误差和谱图模拟质量的限制。MIST 使用
-formula-aware Transformer 预测结构相关指纹 \cite{goldman2023mist}；CMSSP 通过对比
-预训练对齐谱图和分子表示 \cite{chen2024cmssp}。这些方法说明直接跨模态检索具有潜力，
-但没有显式优化下游候选列表。
+计算式 MS/MS 注释方法在检索对象和排序信号上均有差异。谱图库方法返回实测参考谱图，
+因此覆盖范围取决于谱图库和采集条件的兼容性。MS2Query 将 Spec2Vec、MS2DeepScore
+相似度与前体质量证据结合，用于谱图库中的精确和类似物搜索
+\cite{dejonge2023ms2query}。这一任务与 MassSpecGym 结构检索互补；后者需要在每条
+查询对应的化学候选库中排序分子结构 \cite{bushuiev2024massspecgym}。
 
-SpecEmbedding 是谱图--谱图表示方法：它把同一分子的增强谱图与重复谱图作为监督对比
-正例，并额外加入拟合 Tanimoto 结构相似度的回归项 \cite{xiong2025specembedding}。
-本文复用其峰序列 Transformer 架构，但不复用预训练权重或原有谱图--谱图训练目标；
-谱图塔改为与分子图编码器配对，并从零训练用于跨模态检索。因此，重排序增益不依赖
-外部谱图预训练检查点。
+在结构数据库检索中，CSI:FingerID 和 MIST 从谱图预测分子指纹
+\cite{duhrkop2015csifingerid,goldman2023mist}。CMSSP、JESTR 和 MVP 则通过对比学习
+建立谱图--分子联合空间 \cite{chen2024cmssp,kalia2025jestr,chen2026mvp}；其中 MVP
+同时对齐分子图、指纹、单条谱图和 consensus spectra。这些方法最终使用预测指纹分数或
+跨模态相似度排序候选。SpecEmbedding 研究谱图--谱图表示学习
+\cite{xiong2025specembedding}。本文只复用其峰序列架构，并从零开始将其与分子图对齐，
+研究互补的第二阶段问题：如何学习已有 hard-candidate 列表内部的顺序。
 
-\subsection{JESTR：联合空间余弦排序}
+谱图模拟与结构生成使用不同的中间表示。MassFormer 根据分子图预测串联质谱
+\cite{young2024massformer}；MSNovelist 根据 MS/MS 推导的指纹生成结构
+\cite{stravs2022msnovelist}。GLMR 对齐谱图和分子表示，以预检索候选为条件生成分子，
+再按生成分子与候选的相似度排序 \cite{zhang2026glmr}。本文不解码结构，而是闭集候选
+重排序器：它不能返回第一阶段列表之外的分子，但直接优化已有候选的分数。
 
-JESTR 使用 GCN 表示分子，并使用 MLP 编码 1 Da 分箱后的谱图。它通过 InfoNCE
-目标对齐匹配的谱图--分子对；在最后 3\% 的训练轮次中，JESTR 还将与真实分子具有
-相同分子式的 PubChem 候选推离查询谱图。尽管引入候选正则，其最终分数仍然是查询谱图
-与每个候选分子之间的余弦相似度 \cite{kalia2025jestr}。该方案简单且无需生成，但候选
-在推理时相互独立，也没有学习下游排序函数。JESTR 论文还指出，同分子式候选正则在
-结构不重叠的 MassSpecGym 划分上提升很小或不稳定。这说明使用候选监督并不自动等价于
-有效利用候选集合。
+\subsection{学习排序与候选集合建模}
 
-\subsection{GLMR：生成式中介重排序}
-
-GLMR 首先使用 dual-path InfoNCE 对齐 Transformer 谱图编码器和冻结的 ChemFormer
-分子编码器。预检索 top-$K$ 分子作为上下文，由 cross-attention fusion 模块和
-ChemFormer decoder 自回归生成 SMILES。生成分子被再次编码，并通过其与各候选分子的
-余弦相似度得到最终排序 \cite{zhang2026glmr}。该方法将跨模态匹配转化为同模态分子
-相似度，在 MassSpecGym 上表现很强，但其收益与生成质量、解码成本和分子有效性耦合。
+learning-to-rank 使用候选偏好或完整列表定义监督，而不是把相似度排序作为固定后处理。
+RankNet 学习 pairwise 偏好，ListNet 则对完整排序列表建立概率模型
+\cite{burges2005ranknet,cao2007listnet}。排序函数还可利用竞争候选之间的关系。
+Set Transformer 为集合输入提供基于注意力的模块 \cite{lee2019settransformer}；SetRank
+在保持置换等变性的同时联合建模文档间交互 \cite{pang2020setrank}。本文将这些原则迁移到
+谱图--分子检索，结合缓存的跨模态嵌入、显式 pair interactions 以及第一阶段分数和排名
+先验。本文的贡献并非重新提出 self-attention 或 listwise 学习，而是将其构造成 MS/MS
+检索中的候选级残差排序，并与使用相同候选特征和目标的 pointwise 打分器进行受控比较。
 
 \subsection{本文方法的定位}
 
-表~\ref{tab:method_comparison_cn} 对比三种方法最终的排序机制。本文并不将创新点表述为
-再次提出联合嵌入，而是强调在已有谱图、分子嵌入之上进行直接的非生成式残差排序。候选
-间自注意力是被受控评估的架构选项，而不是预先假定的增益来源。
+表~\ref{tab:method_comparison_cn} 对比最接近的 MassSpecGym 方法的排序机制。本文强调
+在已有谱图、分子嵌入之上进行直接的非生成式残差排序；候选间自注意力是被受控评估的
+架构选项，而不是预先假定的增益来源。
 
 \begin{table}[t]
   \centering
-  \caption{本文方法与两个最相关工作的机制对比。}
+  \caption{本文方法与最接近 MassSpecGym 方法的机制对比。}
   \label{tab:method_comparison_cn}
   \small
-  \begin{tabular}{p{1.4cm}p{3.1cm}p{2.8cm}p{1.8cm}p{3.0cm}}
+  \begin{tabular}{>{\raggedright\arraybackslash}p{1.4cm}
+                  >{\raggedright\arraybackslash}p{3.1cm}
+                  >{\raggedright\arraybackslash}p{2.8cm}
+                  >{\raggedright\arraybackslash}p{1.8cm}
+                  >{\raggedright\arraybackslash}p{3.0cm}}
     \toprule
-    方法 & 最终排序信号 & 候选间交互 & 生成分子 & 训练信号 \\
+    方法 & 最终排序信号 & 候选间交互 & 生成分子 & 优化阶段 \\
     \midrule
     JESTR & 谱图--候选余弦相似度 & 推理时无 & 否
-      & InfoNCE 加候选正则 \\
+      & InfoNCE 加分子式候选正则 \\
     GLMR & 生成分子--候选余弦相似度 & 生成器内部 cross-attention & 是
-      & 自回归生成损失 \\
+      & dual-path InfoNCE 加自回归生成 \\
     本文 & pair 特征和检索先验预测的残差分数
       & set-aware 变体可选 self-attention & 否
-      & listwise CE 加 pairwise margin \\
+      & 跨模态 InfoNCE 加 listwise/pairwise 重排序 \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -193,6 +198,7 @@ $\candidates_s$ 之外的分子，端到端 Recall@$k$ 的上界为
 \begin{equation}
   U_K=\frac{1}{N}\sum_{n=1}^{N}
   \mathbb{I}[m_n^+\in\candidates_{s_n}].
+  \label{eq:upper_bound_cn}
 \end{equation}
 
 因此，我们同时报告 $U_K$ 和面向全部查询的排序指标。如果正例不在 top-$K$ 中，该
@@ -223,7 +229,8 @@ $m/z$ 特征和 Transformer，处理峰的 $m/z$ 与强度序列。每条谱图�
 第一个 token 是强度设为 2 的前体 $m/z$，其后为按强度选出的至多 99 个碎片峰。被选碎片
 恢复其在源数组中的顺序，强度除以所选碎片的最大强度。谱图编码器只接收这些 $m/z$--强度
 token；加合物、仪器和碰撞能量元数据均不是显式输入。本文从零初始化该谱图塔，并将它用于
-谱图--分子而非谱图--谱图对齐。分子编码器是基于原子和化学键特征的 GINE，并将
+谱图--分子而非谱图--谱图对齐。分子编码器是基于原子和化学键特征的 GINE
+\cite{hu2020pretraininggnn}，并将
 mean-pooled 图特征与显式图规模特征拼接。两个投影头将编码结果映射到统一的 $d$ 维空间：
 
 \begin{equation}
@@ -301,7 +308,8 @@ set-aware 变体使用不含候选位置编码的 Transformer encoder 在候选�
 \end{equation}
 
 padding mask 支持不同长度的候选列表。因此，将候选及其对应的嵌入、分数和排名共同置换，
-输出分数也按同一方式置换；排名是随候选移动的检索先验，而不是张量槽位编码。pointwise
+输出分数也按同一方式置换；排名是随候选移动的检索先验，而不是张量槽位编码。这一设计
+与置换等变的集合排序表述一致 \cite{lee2019settransformer,pang2020setrank}。pointwise
 对照令 $\tilde{\mathbf{h}}_i=\mathbf{h}_i$，保留相同输入特征、pair MLP、score head、
 残差路径、训练损失和优化协议，仅移除构造检索先验之后的学习式候选间交互。该对照没有
 匹配参数量或模型容量：pointwise 与候选集合 Transformer 分别包含 1,478,690 和
@@ -363,7 +371,7 @@ $O(L(Kh^2+K^2h))$ 计算和 $O(LK^2)$ 注意力内存。两者都不需要逐 to
 对完整谱图记录签名（峰数组、前体 $m/z$、加合物、仪器和碰撞能量）的精确审计未发现
 跨划分标签分子重复，但有 6 条验证签名和 3 条测试签名与训练签名精确匹配。这 9 个
 匹配对的标签分子均不相同，且对应评价查询均标记为
-\texttt{simulation\_challenge=true}。本文将其报告为跨划分谱图输入重叠。下文采用的
+\texttt{simulation\_challenge=true}。本文将其报告为跨划分谱图记录重叠。下文采用的
 canonical 流水线在所有依赖验证集的模型选择阶段排除这 6 条验证谱图，使 reranker
 验证查询数变为 19,423；alignment 的验证分子键数从 3,386 降至 3,384。测试阶段仍保留
 并评价官方全部 17,556 条查询。
@@ -510,25 +518,55 @@ reranking 优于生成式方法，因为我们的基础检索器与 GLMR 的 pre
 贡献作出结论。除上述解析得到的 reranker 参数量外，本文不报告峰值显存、cache 构造时间、
 reranker latency 或端到端 latency。
 
+\section{讨论}
+
+式~\eqref{eq:upper_bound_cn} 将第一阶段候选覆盖率与列表内部排序能力区分开。由于真实目标
+缺失的查询记为零，$\mathrm{R@1}/U_{40}$ 正好是“真实目标已进入第一阶段列表”条件下的
+top-1 成功率。根据表中三种子均值，质量约束场景下该比例从基础检索器的 56.58\% 提升到
+pointwise 的 80.40\% 和候选集合 Transformer 的 81.76\%；分子式约束场景对应为
+70.69\%、82.87\% 和 83.54\%。
+
+还可以计算可达 top-1 改进空间的恢复比例：
+
+\begin{equation}
+  H=\frac{\mathrm{R@1}_{\mathrm{rerank}}-\mathrm{R@1}_{\mathrm{base}}}
+  {U_{40}-\mathrm{R@1}_{\mathrm{base}}}.
+\end{equation}
+
+pointwise 与候选集合模型在质量场景下分别恢复 54.86\% 和 57.99\% 的空间，在分子式
+场景下分别恢复 41.55\% 和 43.85\%。pointwise 的增益还分别占候选集合模型相对基础模型
+总增益的 94.60\% 和 94.77\%。因此，大部分观测提升已经由使用共享特征和损失的监督
+pointwise 残差重排序实现，候选集合变体只增加了小幅增量。候选集合模型的 Recall@20 均值
+距离 $U_{40}$ 仅 1.68 和 2.49 个百分点；因此，在该 top-40 协议下，第一阶段覆盖率是
+Recall@20 的主要剩余限制。这些对现有结果的代数重表达不是新增估计，也不能因果分离
+具体特征、目标、交互或容量的贡献。
+
 \section{局限性与负责任评估}
 
-\method{} 无法恢复不在基础 top-$K$ 列表中的分子，因此其效果依赖第一阶段召回率。
-分子式约束场景假设已知分子式，而真实工作流中可能需要先预测分子式。当前 JESTR 和
-GLMR 数字来自原论文而非独立复现。reranker 已使用三个随机种子，但它们共享同一个
-seed-42 alignment checkpoint，因此当前误差不包含第一阶段变异。候选间自注意力在 clean
-实验中呈现小幅优势，但该优势对 alignment checkpoint 敏感。set-aware 模型的可训练
-reranker 参数量还是 pointwise 模型的 5.26 倍，因此两者差异也不能单独归因于候选交互。
-这些限制使当前结果无法支持确定的 SOTA 或 self-attention 增益声明。
+\method{} 无法恢复不在基础 top-$K$ 列表中的分子，分子式约束场景还假设已知可能需要先
+预测的分子式。每个对比中的 reranker seeds 共享一个 alignment checkpoint，因此误差不
+包含第一阶段变异；候选集合优势在检查的两个 checkpoint 之间也有差异。候选集合模型的
+可训练参数总量是 pointwise 的 5.26 倍（多 6,304,768 个，约 $+426\%$），因此关系建模
+与容量没有被分离。外部 JESTR 与 GLMR 结果未在相同软件和候选处理下复现；故本文不作
+确定的 SOTA、组件因果贡献或 self-attention 收益声明。
 
-canonical 模型选择流水线已经排除审计出的全部 6 条 train--validation 输入重叠查询。
-clean 与较早流水线的 alignment epoch 选择相同，但 12 组 reranker 配置中有 9 组的 checkpoint
-选择不同。由于 alignment 被重新训练而不是逐位固定，新旧差异只能解释为流水线级敏感性，
-不能视为这 6 条查询的因果效应估计。量化第一阶段不确定性仍需要多个 alignment seeds。
+只有训练阶段执行检索后强制 top-40 替换。模型选择排除审计出的 6 条 train--validation
+记录重叠，并保留全部官方测试查询。artifact manifest 记录源码 commit，以及 processed
+splits、候选文件、cache、checkpoint 和日志的 SHA-256。2026 年 MassSpecGym 审计预印本
+报告了数据泄漏、shortcut learning、实现错误和指标不一致风险，并发布 v1.5
+\cite{liu2026massspecgymwild}。manifest 固定了本文实际评价的内容，但不能证明其与 v1.5
+等价；本文分数与已记录工件和协议绑定。
 
-训练阶段的强制 top-40 正例替换是一种监督采样策略，不能用于验证和测试。我们报告替换前
-的训练召回，并在验证、测试中关闭这种检索后强制替换；所有测试查询均参与评价，包括真实
-分子未进入 top-40 的查询。最后，作为闭集候选重排序器，本方法不能提出候选数据库以外的新结构。
-相对于 de novo generation，这是明确限制，但同时避免了无效生成结构带来的失败。
+每条测试谱图都是一个查询，因此拥有多条谱图的分子在聚合指标中权重更高。闭集、
+查询特定候选库上的 Recall 衡量候选优先级，而不等于确认的分子鉴定。已有框架区分
+不同的结构注释置信度，COSMIC 则研究谱图库缺失结构的高置信度注释
+\cite{schymanski2014confidence,hoffmann2022cosmic}。
+本文模型既不输出校准概率，也不提供 abstention；即使真实目标缺失仍会返回 top-1 候选，
+因此实际鉴定仍需要正交实验验证。
+
+最后，谱图塔接收选定峰和前体 $m/z$，但不显式使用加合物、仪器或碰撞能量。模型在采集
+条件迁移、其他基准、更大候选列表和外部分子库上的稳健性未经验证。闭集方法也不能提出
+给定数据库之外的结构，即便它避免了自回归生成有效性失败。
 
 \section{结论}
 
