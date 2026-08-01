@@ -59,7 +59,8 @@
 监督下，综合谱图与候选嵌入、显式交互特征、基础分数和原始排名进行残差重排序。
 我们在固定第一阶段 checkpoint 和 cache 的条件下，使用三个 reranker 随机种子比较不含学习式
 跨候选交互的 pointwise 打分器与候选集合 Transformer。在包含 17,556 条测试查询的 MassSpecGym 上，
-两者在质量约束场景的 Recall@1 分别为 $67.44\pm0.74$ 和 $68.58\pm0.20$，在分子式
+两者的 Recall@1（三种子均值 $\pm$ 样本标准差）在质量约束场景分别为
+$67.44\pm0.74$ 和 $68.58\pm0.20$，在分子式
 约束场景分别为 $73.97\pm0.59$ 和 $74.57\pm0.28$，而固定基础检索器分别为 47.46 和
 63.10。去除验证重叠后的实验中 Transformer 呈现小幅优势，但较早的 alignment
 checkpoint 未复现相同的成对胜场模式。因此，当前证据有力支持监督残差重排序，但尚不能确认候选间
@@ -75,11 +76,11 @@ checkpoint 未复现相同的成对胜场模式。因此，当前证据有力支
 串联质谱（MS/MS）被广泛用于代谢组学、天然产物发现和相关生物医学任务中的小分子
 鉴定。实验谱图只是分子结构在特定实验条件下的部分观测：不同分子可能产生相似碎片，
 同一分子也可能因仪器、加合物和碰撞能量不同而产生差异明显的谱图。因此，结构注释
-天然属于一个大规模数据挖掘问题，即根据查询谱图，从受化学条件约束的候选库中检索并
+天然属于一个大规模数据挖掘问题，即根据查询谱图，从受化学条件约束的候选池中检索并
 排序正确分子。
 
 MassSpecGym 提供了结构不重叠的数据划分，以及标准化的质量约束和分子式约束检索
-候选库 \cite{bushuiev2024massspecgym}。现有方法主要尝试缩小谱图和分子之间的模态差距。
+候选池 \cite{bushuiev2024massspecgym}。现有方法主要尝试缩小谱图和分子之间的模态差距。
 JESTR 使用 contrastive multiview coding 学习谱图--分子联合空间，并直接按余弦相似度
 排序候选 \cite{kalia2025jestr,tian2020cmc}。GLMR 则先检索上下文候选，再利用条件
 语言模型生成 refined molecule，最后根据分子--分子相似度重排候选
@@ -105,8 +106,9 @@ JESTR 使用 contrastive multiview coding 学习谱图--分子联合空间，并
   listwise 与全部检索负例的 pairwise 目标训练，并在相同输入特征、score head、损失和
   优化协议下比较 pointwise 和 self-attentive 两种实现；第一阶段嵌入在两者中均可缓存，
   但两种实现不匹配参数量。
-  \item 在 MassSpecGym 官方候选协议下，两种实现均在三个 reranker seeds 上大幅优于固定
-  基础检索器；去除验证重叠后的受控对比中，候选集合 Transformer 呈现小幅优势，但跨
+  \item 在 MassSpecGym 划分和候选文件上，并按本地 cache 的 exact-SMILES 身份规则评价，
+  两种实现均在三个 reranker seeds 上大幅优于固定基础检索器；去除验证重叠后的受控
+  对比中，候选集合 Transformer 呈现小幅优势，但跨
   alignment checkpoint 的比较表明该优势尚不稳健，因此不能把整体重排序增益归因于
   候选间自注意力。
 \end{itemize}
@@ -121,11 +123,14 @@ OpenAI Codex 在本稿所有章节中辅助文字起草和语言修改，并在�
 
 \subsection{结构注释范式}
 
-计算式 MS/MS 注释方法在检索对象和排序信号上均有差异。谱图库方法返回实测参考谱图，
-因此覆盖范围取决于谱图库和采集条件的兼容性。MS2Query 将 Spec2Vec、MS2DeepScore
-相似度与前体质量证据结合，用于谱图库中的精确和类似物搜索
-\cite{dejonge2023ms2query}。这一任务与 MassSpecGym 结构检索互补；后者需要在每条
-查询对应的化学候选库中排序分子结构 \cite{bushuiev2024massspecgym}。
+计算式 MS/MS 注释方法在检索对象和排序证据上均有差异，候选分数修正和二阶段重排也并非
+本文首次提出。MetFusion 融合 MetFrag 的 in-silico fragmentation 结果与 MassBank 谱图库证据，
+以改善候选化合物排序 \cite{gerlich2013metfusion}。MS2Query 先用 MS2DeepScore 选取 top-2000
+谱图库匹配，再用包含五个特征的随机森林重排，并允许按分数阈值过滤低可信匹配
+\cite{dejonge2023ms2query}。LC-MS2Struct 则将已有 MS/MS scorer 与同一液相色谱实验中的
+观测保留顺序结合，联合排序多个待注释物的结构候选 \cite{bach2022lcms2struct}。这些谱图库邻居
+或保留时间证据与 MassSpecGym 的查询特定结构候选排序互补
+\cite{bushuiev2024massspecgym}。
 
 在结构数据库检索中，CSI:FingerID 和 MIST 从谱图预测分子指纹
 \cite{duhrkop2015csifingerid,goldman2023mist}。CMSSP、JESTR 和 MVP 则通过对比学习
@@ -149,14 +154,16 @@ RankNet 学习 pairwise 偏好，ListNet 则对完整排序列表建立概率模
 Set Transformer 为集合输入提供基于注意力的模块 \cite{lee2019settransformer}；SetRank
 在保持置换等变性的同时联合建模文档间交互 \cite{pang2020setrank}。本文将这些原则迁移到
 谱图--分子检索，结合缓存的跨模态嵌入、显式 pair interactions 以及第一阶段分数和排名
-先验。本文的贡献并非重新提出 self-attention 或 listwise 学习，而是将其构造成 MS/MS
-检索中的候选级残差排序，并与使用相同候选特征和目标的 pointwise 打分器进行受控比较。
+先验。本文的贡献并非 reranking、self-attention 或 listwise 学习本身，而是在冻结的
+谱图--分子跨模态表示和检索先验上，对 query-specific spectrum-to-structure top-$K$ 列表执行
+非生成式残差学习排序，并将可选的同查询候选交互与使用相同候选特征和目标的 pointwise
+打分器进行受控比较。本方法不依赖谱图库邻居或保留时间。
 
 \subsection{本文方法的定位}
 
-表~\ref{tab:method_comparison_cn} 对比最接近的 MassSpecGym 方法的排序机制。本文强调
-在已有谱图、分子嵌入之上进行直接的非生成式残差排序；候选间自注意力是被受控评估的
-架构选项，而不是预先假定的增益来源。
+表~\ref{tab:method_comparison_cn} 对比最接近的 MassSpecGym 方法的排序机制。结合上述先例，
+本文贡献并非重排序本身，而是冻结跨模态表示上的查询特定、非生成式残差排序；候选间
+自注意力是被受控评估的架构选项，而不是预先假定的增益来源。
 
 \begin{table}[t]
   \centering
@@ -185,7 +192,7 @@ Set Transformer 为集合输入提供基于注意力的模块 \cite{lee2019settr
 \section{问题定义}
 
 记 $s$ 为一条 MS/MS 谱图，$m^+$ 为真实分子，$\mathcal{D}_s$ 为查询对应的质量约束
-或分子式约束候选库。基础检索器为每个 $m\in\mathcal{D}_s$ 计算
+或分子式约束的所提供候选池。基础检索器为每个 $m\in\mathcal{D}_s$ 计算
 
 \begin{equation}
   b(s,m)=\operatorname{sim}(f_s(s),f_m(m)),
@@ -201,8 +208,22 @@ $\candidates_s$ 之外的分子，端到端 Recall@$k$ 的上界为
   \label{eq:upper_bound_cn}
 \end{equation}
 
-因此，我们同时报告 $U_K$ 和面向全部查询的排序指标。如果正例不在 top-$K$ 中，该
-查询在排序指标中记为零，而不是只在成功召回的子集上计算条件准确率。
+对已进入 top-$K$ 的正例，定义条件排序成功率
+
+\begin{equation}
+  A_{k\mid K}=
+  \frac{\sum_{n=1}^{N}\mathbb{I}[m_n^+\in\candidates_{s_n},\,
+  \operatorname{rank}_g(m_n^+)\le k]}
+  {\sum_{n=1}^{N}\mathbb{I}[m_n^+\in\candidates_{s_n}]},
+  \qquad
+  \mathrm{Recall@}k=U_K A_{k\mid K}\le U_K.
+  \label{eq:coverage_decomposition_cn}
+\end{equation}
+
+这是指标定义的恒等分解。在固定 top-$K$ cache 时，reranker 只能改变列表内的
+$A_{k\mid K}$，不能改变第一阶段覆盖率 $U_K$。因此，我们同时报告 $U_K$ 和面向
+全部查询的排序指标；如果正例不在 top-$K$ 中，该查询记为零，而不是只在成功召回的
+子集上报告条件准确率。
 
 \section{方法}
 
@@ -262,16 +283,19 @@ $b_i=\zs^\top\mathbf{z}_{m_i}$ 作为基础分数。
 
 \subsection{候选构造与训练协议}
 
-基础检索器对每条查询对应的 MassSpecGym 官方候选库打分，并保留 top-$K$，当前实验
+基础检索器对每条查询对应的 MassSpecGym 所提供候选池打分，并保留 top-$K$，当前实验
 取 $K=40$。监督训练要求候选列表中存在正例。如果真实训练分子未进入基础 top-40，则
-用它替换最后一个候选，同时在 cache 中保留其完整候选库基础排名；该排名等于基础分数
-严格高于它的候选数加一。排名嵌入接收
+用它替换最后一个候选，同时在 cache 中保留其在所提供完整候选池中的基础排名；
+该目标排名等于基础分数严格高于它的候选数加一，与目标同分的候选不计为排名更高。
+排名嵌入接收
 $\bar r_i=\min\{\max(r_i,0),512\}$，其中索引 0 专用于 padding。训练 reranker 时随机
 打乱候选顺序，但每个候选的嵌入、基础分数和排名始终同步移动；这是防止 cache 顺序
 伪特征的额外保护。
 
-仅训练集执行将正例强制放入截断列表的操作。本文使用的官方文件中，每个完整候选列表
-均已包含真实目标；验证和测试不执行检索后的强制 top-40 替换。未进入基础 top-40 的
+待打分候选池是标签目标与文件候选按 exact SMILES 去重后的并集。静态审计显示，目标已经
+存在于全部 32,010 个冻结候选池中，因此该并集没有扩大候选池。与此不同，仅训练集执行
+检索后的强制替换：它将未进入基础 top-40 的 exact target 放入截断列表。验证和测试不执行
+该替换。未进入基础 top-40 的
 真实目标因此保持缺失，并降低召回上界和全部端到端指标。任何被分配到测试划分的记录、
 测试目标或标签都不用于任一阶段的参数优化或 checkpoint 选择。
 
@@ -295,7 +319,7 @@ $\bar r_i=\min\{\max(r_i,0),512\}$，其中索引 0 专用于 padding。训练 r
 
 两种变体的实际输入仅包括冻结的谱图嵌入、冻结的候选分子嵌入、余弦基础分数、截断后的
 基础排名嵌入和候选 padding mask。原始谱峰、SMILES token、前体质量或分子式以及采集
-元数据均不直接输入 reranker。质量与分子式约束只影响候选库构造，模型也不接收显式的
+元数据均不直接输入 reranker。质量与分子式约束只影响候选池构造，模型也不接收显式的
 候选--候选结构相似度特征。
 
 set-aware 变体使用不含候选位置编码的 Transformer encoder 在候选之间交换信息
@@ -307,7 +331,8 @@ set-aware 变体使用不含候选位置编码的 Transformer encoder 在候选�
   ([\mathbf{h}_1,\ldots,\mathbf{h}_K]).
 \end{equation}
 
-padding mask 支持不同长度的候选列表。因此，将候选及其对应的嵌入、分数和排名共同置换，
+padding mask 支持不同长度的候选列表。因此，在关闭 dropout 的确定性推理时，将候选及其对应的
+嵌入、分数和排名共同置换，
 输出分数也按同一方式置换；排名是随候选移动的检索先验，而不是张量槽位编码。这一设计
 与置换等变的集合排序表述一致 \cite{lee2019settransformer,pang2020setrank}。pointwise
 对照令 $\tilde{\mathbf{h}}_i=\mathbf{h}_i$，保留相同输入特征、pair MLP、score head、
@@ -322,7 +347,8 @@ padding mask 支持不同长度的候选列表。因此，将候选及其对应�
 
 标量 $\alpha$ 初始化为 1.0，训练时不施加符号或取值范围约束；$\Delta_i$ 同样不受约束。
 因此，该 shortcut 使排序器能够直接访问基础分数，但既不约束 $q_i$ 必须接近 $b_i$，也不
-保证最终排序保留基础顺序。
+保证最终排序保留基础顺序。由于 $b_i$ 还是 $\mathbf{x}_i$ 的输入，残差分支可学习额外的
+score-dependent effect，因而 $\alpha$ 不能单独解释为“保留基础分数的比例”。
 
 \subsection{训练目标}
 
@@ -355,6 +381,9 @@ listwise cross-entropy：
   =\mathcal{L}_{\mathrm{list}}
   +\lambda\mathcal{L}_{\mathrm{pair}}.
 \end{equation}
+其中 listwise 项是一正例、多候选的 top-one likelihood，不规定负例之间的完整全序。
+两个损失都对同一查询内全部 $q_i$ 加上任意相同常数保持不变。因此，原始 $q_i$ 是相对
+排序分数而非概率；本文既未执行也未评价概率校准。
 
 对于 $L$ 层 Transformer 和隐藏维度 $h$，set-aware 变体比 pointwise 打分额外引入
 $O(L(Kh^2+K^2h))$ 计算和 $O(LK^2)$ 注意力内存。两者都不需要逐 token 生成分子。
@@ -362,7 +391,7 @@ $O(L(Kh^2+K^2h))$ 计算和 $O(LK^2)$ 注意力内存。两者都不需要逐 to
 
 \section{实验}
 
-\subsection{数据集与候选库}
+\subsection{数据集与候选池}
 
 我们使用 MassSpecGym 官方划分 \cite{bushuiev2024massspecgym}，包含 194,119 条训练
 谱图、19,429 条验证谱图和 17,556 条测试谱图，共计 231,104 条谱图；基准论文报告约
@@ -376,22 +405,37 @@ canonical 流水线在所有依赖验证集的模型选择阶段排除这 6 条�
 验证查询数变为 19,423；alignment 的验证分子键数从 3,386 降至 3,384。测试阶段仍保留
 并评价官方全部 17,556 条查询。
 
-实验评估两个官方检索场景。质量约束候选库使用前体质量和容差窗口；分子式约束候选库
-假设已知分子式，因此应解释为 formula-conditioned retrieval，而不是完全开放的未知
-结构注释。经过基础 top-40 截断后，测试列表在质量场景下平均包含 40.00 个候选，在
-分子式场景下平均包含 35.73 个候选。
+实验评估 MassSpecGym 提供的两种候选设置。质量约束候选池使用前体质量和容差窗口；
+分子式约束候选池假设已知分子式，因此应解释为 formula-conditioned retrieval，而不是
+完全开放的未知结构注释。冻结候选池至多包含 256 个候选。截断前，测试查询的候选数在
+质量和分子式场景下平均为 253.88 和 165.75；对应 17,556 条查询中，分别只有 1 条和
+3,159 条的候选数少于 40。经过 top-40 截断后，平均候选数为 40.00 和 35.73。
+
+本地 cache 和 evaluator 以 exact target-SMILES equality 定义唯一正例。在官方代码
+commit \texttt{4f501b3} 中，\footnote{MassSpecGym
+\href{https://github.com/pluskal-lab/MassSpecGym/blob/4f501b3207c9f466bc745a0353f61dbfaf150d32/massspecgym/data/datasets.py}{reference loader}
+与 \href{https://github.com/pluskal-lab/MassSpecGym/blob/4f501b3207c9f466bc745a0353f61dbfaf150d32/massspecgym/data/transforms.py}{label transform}，
+访问日期：2026-08-01。}参考 loader 默认使用二维 InChIKey 等价规则，可能标出多个正例。
+因此，本文 Recall 和 MRR 使用所提供候选文件上的 exact-SMILES 本地协议；身份规则差异的
+影响尚未量化。
 
 \subsection{实现细节}
 
-对齐模型输出 512 维嵌入。当前实验随机初始化源于 SpecEmbedding 架构的谱图塔，不加载
-其已发布的预训练检查点；谱图和分子编码器直接在 MassSpecGym 训练集上使用双向对比
-学习训练。canonical seed-42 alignment 实验应用上述验证排除，选择 epoch 16，并在连续
-5 个 epoch 未改善后于 epoch 21 停止训练。
+对齐模型输出 512 维嵌入。谱图 Transformer 为 4 层、16 个 attention heads、宽度 512；
+分子 GINE 为 4 层、隐藏宽度 128、dropout 0.2。当前实验不加载已发布的 SpecEmbedding
+checkpoint，因此跳过原本会冻结预训练谱图塔的 alignment 阶段，并在 MassSpecGym 训练集上
+端到端优化两个编码塔。alignment 使用 AdamW，batch size 128，学习率 $10^{-4}$，weight
+decay $10^{-4}$，cosine schedule，gradient-norm clipping 为 1，最多 100 个 epoch，early
+stopping patience 为 5。每个 epoch 对每个唯一分子标签采样 10 次，每次随机选择一条关联
+谱图。谱图和分子图增强分别以 0.5 概率启用：谱图增强删除归一化强度低于 0.3 的碎片峰中
+20\%（向下取整），并进行 $\pm15\%$ 强度扰动；图增强执行 10\% node dropout 和 10\%
+directed edge-entry dropout。验证关闭增强，但在固定随机流下保留关联谱图的随机采样。
+canonical seed-42 alignment 实验应用上述验证排除，选择 epoch 16，并于 epoch 21 停止。
 
 reranker 隐藏维度为 512，rank embedding 为 32 维，dropout 为 0.1。set-aware 变体
 使用两层 Transformer 和八个 attention heads，pointwise 对照移除这两层。优化器为 AdamW，
 学习率 $10^{-4}$，batch size 16，最多训练 30 个 epoch，并根据验证集 MRR 进行 patience 为 5
-的 early stopping。$\lambda=0.2$，$\gamma=0.1$。在固定 overlap-clean alignment checkpoint
+的 early stopping。$\lambda=0.2$，$\gamma=0.1$。在固定的验证重叠清理（overlap-clean）alignment checkpoint
 和 cache 的条件下，两种变体均使用 seeds 42、43 和 44 训练。这只衡量 reranker 的变异，
 不包含端到端 alignment 不确定性。所有模型均不访问测试集进行选择，并在单张 NVIDIA
 RTX 4090 上评估。
@@ -405,8 +449,8 @@ RTX 4090 上评估。
 受控基线包括与 reranker 使用同一对齐 checkpoint 的基础检索器，以及保留全部输入和损失、
 仅移除候选间自注意力但不匹配参数量的 pointwise reranker。表中还列出 GLMR 论文表 1
 报告的 JESTR 和 GLMR 结果 \cite{zhang2026glmr}。这些外部数字只能提供背景，不是严格
-受控的消融：我们未在当前代码库中独立复现 JESTR 和 GLMR，分子 canonicalization 或
-候选处理的细微差异可能影响结果。
+受控的消融：我们未在当前代码库中独立复现 JESTR 和 GLMR，且其身份与 canonicalization
+规则可能不同于本文的 exact-SMILES 单正例协议。
 
 评价指标为全部测试查询上的 Recall@1、Recall@5、Recall@20 和 MRR。对每条测试查询，
 包括真实目标未进入检索 top-40 的查询，记 $\hat m_n^{(1)}$ 为排序第一的候选。本文报告
@@ -418,7 +462,7 @@ RTX 4090 上评估。
   \qquad N=17{,}556.
 \end{equation}
 
-其中，$\tilde d_{15}$ 是 \texttt{myopic-MCES} v1.0.1 在阈值 15、启用 stronger-bound
+其中，$\tilde d_{15}$ 是 \texttt{myopic-MCES} 在阈值 15、启用 stronger-bound
 选项设置下的输出 \cite{kretschmer2025coverage}。对于足够接近的分子对该值是精确 MCES；对于较远分子对，
 它可能返回阈值或计算得到的下界，而不是无约束的精确 MCES 距离。因此，本文数值是经过
 阈值处理的 myopic MCES，越低越好。完全相同的 SMILES 字符串直接记为 0。规范实验选择
@@ -433,14 +477,15 @@ seed-42 Transformer checkpoint 计算；这些单 checkpoint 数值不包含随�
   \caption{代表性 seed-42 MassSpecGym 结果和跨论文背景。Recall 和 MRR 以百分比报告；
   MCES@1 为经过阈值处理的 myopic-MCES 输出，越低越好。JESTR 和 GLMR 数字来自
   Zhang 等人 \cite{zhang2026glmr}；
-  本文行来自本地流水线和官方候选文件。外部结果仅用于跨论文背景对照。本地 MCES@1
+  本文行来自本地 exact-SMILES 流水线和 MassSpecGym 提供的候选文件。外部结果仅用于
+  跨论文背景对照。本地 MCES@1
   使用 overlap-clean 基础模型和代表性 seed-42 Transformer checkpoint；外部论文的
   MCES 实现与 solver 设置可能不同。}
   \label{tab:main_results_cn}
   \small
   \begin{tabular}{llrrrrr}
     \toprule
-    候选库 & 方法 & R@1 & R@5 & R@20 & MRR & MCES@1 \\
+    候选池 & 方法 & R@1 & R@5 & R@20 & MRR & MCES@1 \\
     \midrule
     \multirow{4}{*}{质量}
       & JESTR（reported） & 17.62 & 40.36 & 64.76 & 29.12 & 15.82 \\
@@ -480,7 +525,7 @@ reranking 优于生成式方法，因为我们的基础检索器与 GLMR 的 pre
   \scriptsize
   \begin{tabular}{llcccc}
     \toprule
-    候选库 & 方法 & R@1 & R@5 & R@20 & MRR \\
+    候选池 & 方法 & R@1 & R@5 & R@20 & MRR \\
     \midrule
     \multirow{3}{*}{质量}
       & Base & 47.46 & 63.51 & 77.76 & 55.03 \\
@@ -505,7 +550,7 @@ reranking 优于生成式方法，因为我们的基础检索器与 GLMR 的 pre
 的稳健独立贡献。
 
 作为较早固定 checkpoint 上单独进行的测试重叠敏感性检查，我们剔除上述 3 条测试查询，
-保留 17,553 条查询。在两类候选库和两种 reranker 中，三种子平均 Recall@1 下降
+保留 17,553 条查询。在两种候选设置和两种 reranker 中，三种子平均 Recall@1 下降
 0.0045--0.0055 个百分点，单种子绝对变化最大为 0.0056 个百分点。因此，3 条测试重叠对
 聚合检索指标的影响可忽略；canonical 表格仍保留官方全部测试查询。
 
@@ -520,11 +565,11 @@ reranker latency 或端到端 latency。
 
 \section{讨论}
 
-式~\eqref{eq:upper_bound_cn} 将第一阶段候选覆盖率与列表内部排序能力区分开。由于真实目标
-缺失的查询记为零，$\mathrm{R@1}/U_{40}$ 正好是“真实目标已进入第一阶段列表”条件下的
-top-1 成功率。根据表中三种子均值，质量约束场景下该比例从基础检索器的 56.58\% 提升到
-pointwise 的 80.40\% 和候选集合 Transformer 的 81.76\%；分子式约束场景对应为
-70.69\%、82.87\% 和 83.54\%。
+式~\eqref{eq:upper_bound_cn}--\eqref{eq:coverage_decomposition_cn} 将第一阶段候选覆盖率与
+列表内部排序能力区分开。当 $k=1$、$K=40$ 时，已定义的条件量 $A_{1\mid40}$ 等于
+$\mathrm{R@1}/U_{40}$。根据表中三种子均值，质量约束场景下，该量从基础检索器的
+56.58\% 提升到 pointwise 的 80.40\% 和候选集合 Transformer 的 81.76\%；分子式约束
+场景对应为 70.69\%、82.87\% 和 83.54\%。
 
 还可以计算可达 top-1 改进空间的恢复比例：
 
@@ -543,37 +588,42 @@ Recall@20 的主要剩余限制。这些对现有结果的代数重表达不是�
 
 \section{局限性与负责任评估}
 
-\method{} 无法恢复不在基础 top-$K$ 列表中的分子，分子式约束场景还假设已知可能需要先
-预测的分子式。每个对比中的 reranker seeds 共享一个 alignment checkpoint，因此误差不
-包含第一阶段变异；候选集合优势在检查的两个 checkpoint 之间也有差异。候选集合模型的
-可训练参数总量是 pointwise 的 5.26 倍（多 6,304,768 个，约 $+426\%$），因此关系建模
-与容量没有被分离。外部 JESTR 与 GLMR 结果未在相同软件和候选处理下复现；故本文不作
-确定的 SOTA、组件因果贡献或 self-attention 收益声明。
+三个 reranker 随机种子的均值 $\pm$ 样本标准差和 paired-win 次数只是描述性统计，不是
+置信区间或显著性检验。这些种子共享一个 alignment checkpoint，因此未包含第一阶段变异；
+候选集合优势在检查的两个 checkpoint 之间也有差异。候选集合模型的可训练参数总量还是
+pointwise 的 5.26 倍（多 6,304,768 个，约 $+426\%$），因而候选交互与模型容量没有被
+分离。外部 JESTR 与 GLMR 结果未在相同软件和候选处理下复现；本文不作确定的 SOTA、
+组件因果贡献或 self-attention 收益声明。
 
-只有训练阶段执行检索后强制 top-40 替换。模型选择排除审计出的 6 条 train--validation
-记录重叠，并保留全部官方测试查询。artifact manifest 记录源码 commit，以及 processed
-splits、候选文件、cache、checkpoint 和日志的 SHA-256。2026 年 MassSpecGym 审计预印本
-报告了数据泄漏、shortcut learning、实现错误和指标不一致风险，并发布 v1.5
-\cite{liu2026massspecgymwild}。manifest 固定了本文实际评价的内容，但不能证明其与 v1.5
-等价；本文分数与已记录工件和协议绑定。
+训练专用的正例替换改变了检索列表分布，也不能解决比例为 $1-U_K$ 的覆盖失败。冻结的完整
+候选池包含 exact target，因此评价在完整池层面属于闭集，即使目标可能在 top-40 截断后缺失。
+本文未量化 exact-SMILES 身份规则相对参考二维 InChIKey 规则的影响。精确记录重叠审计也不能
+排除近重复样本或相关数据来源。模型选择排除审计出的 6 条 train--validation 记录重叠，并
+保留全部测试查询。artifact manifest 固定源码和工件校验和，但环境配置没有完全锁定
+PyTorch、RDKit、PyG 和 \texttt{myopic-MCES} 的确切版本。2026 年 MassSpecGym 审计预印本
+还报告了数据泄漏、shortcut learning、实现错误和指标不一致风险，并发布 v1.5
+\cite{liu2026massspecgymwild}；本文分数与冻结工件和本地协议绑定，不能据此证明与 v1.5 等价。
 
-每条测试谱图都是一个查询，因此拥有多条谱图的分子在聚合指标中权重更高。闭集、
-查询特定候选库上的 Recall 衡量候选优先级，而不等于确认的分子鉴定。已有框架区分
-不同的结构注释置信度，COSMIC 则研究谱图库缺失结构的高置信度注释
-\cite{schymanski2014confidence,hoffmann2022cosmic}。
-本文模型既不输出校准概率，也不提供 abstention；即使真实目标缺失仍会返回 top-1 候选，
-因此实际鉴定仍需要正交实验验证。
+alignment 采样近似平衡分子标签，而最终指标把每条测试谱图作为一个查询，因此具有重复谱图的
+分子在聚合指标中权重更高。查询特定候选池上的 Recall 衡量候选优先级，而不等于确认的分子
+鉴定。已有框架区分结构注释置信度，COSMIC 则研究谱图库缺失结构的注释
+\cite{schymanski2014confidence,hoffmann2022cosmic}。Conformal retrieval 可在
+exchangeability 且目标属于候选池等假设下生成具有边际覆盖率的谱图特异预测集
+\cite{rakhshaninejad2026conformal}，但该保证不会自动覆盖目标未进入检索 top-40 的情况。
+本文既未执行概率校准，也不提供 abstention；目标缺失时仍会返回 top-1 候选，实际鉴定
+仍需要正交实验证据。
 
-最后，谱图塔接收选定峰和前体 $m/z$，但不显式使用加合物、仪器或碰撞能量。模型在采集
-条件迁移、其他基准、更大候选列表和外部分子库上的稳健性未经验证。闭集方法也不能提出
-给定数据库之外的结构，即便它避免了自回归生成有效性失败。
+最后，分子式约束场景假设分子式可用。谱图塔接收选定峰和前体 $m/z$，但不显式使用加合物、
+仪器或碰撞能量。模型在采集条件迁移、其他检索器与嵌入几何、不同身份规则与候选池构造、
+更大列表、其他基准和外部分子库上的稳健性未经验证。闭集方法也不能提出所提供候选池之外的
+结构，即便它避免了自回归生成有效性失败。
 
 \section{结论}
 
 本文研究并评估 \method{}，一个面向 MS/MS 分子检索的非生成式残差学习排序框架。该方法在
 对比对齐的基础检索器之上，引入显式 pair features、检索先验、残差打分和 listwise 监督。
 MassSpecGym 上的受控实验表明，在固定 seed-42 基础检索器的三个 reranker 初始化中，学习式
-重排序在质量约束和分子式约束候选库上均带来大幅提升。在 overlap-clean checkpoint 上，
+重排序在质量约束和分子式约束候选设置上均带来大幅提升。在 overlap-clean checkpoint 上，
 候选集合 Transformer 相对 pointwise 打分器呈现小幅三种子优势，并赢得全部六个配对比较。
 由于该模式与较早 alignment checkpoint 不同，最稳健的结论仍是直接残差 learning-to-rank
 本身的价值；self-attention 是否具有跨 checkpoint 的稳健收益尚未确定。匹配外部基线、各
