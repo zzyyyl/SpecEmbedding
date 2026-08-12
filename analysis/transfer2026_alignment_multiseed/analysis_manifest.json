@@ -1,0 +1,1576 @@
+{
+  "analysis": "cross_alignment_multiseed_paired_differences",
+  "canonical_cache_crosscheck": {
+    "path": "paper/adma2026_artifact_manifest.json",
+    "sha256": "e00634b13d79ab1f4e7cbb38339f89302a98082e75f5daf54e3e0daef4702245",
+    "size_bytes": 20423
+  },
+  "claim_gate": {
+    "by_candidate": {
+      "formula": {
+        "alignment_mean_deltas": [
+          0.0038000000000000256,
+          -0.0018333333333333164,
+          0.002066666666666661
+        ],
+        "alignment_seeds": [
+          42,
+          43,
+          44
+        ],
+        "directions": [
+          "positive",
+          "negative",
+          "positive"
+        ]
+      },
+      "mass": {
+        "alignment_mean_deltas": [
+          0.008066666666666666,
+          0.0016333333333333755,
+          -0.0031000000000000285
+        ],
+        "alignment_seeds": [
+          42,
+          43,
+          44
+        ],
+        "directions": [
+          "positive",
+          "positive",
+          "negative"
+        ]
+      }
+    },
+    "criterion": "Transformer - Pointwise alignment-level paired means must be positive for every candidate and alignment seed; magnitude still requires review.",
+    "primary_metric": "rerank_mrr_raw",
+    "reason": "The direction of the alignment-level paired MRR difference is not uniformly positive.",
+    "status": "fail"
+  },
+  "compatibility": {
+    "params_sha256": "b6260dad043f9c0f1cb4ff36dc7b7bf8bac4481998aa36b4d55f44392e1b0bc6",
+    "same_source_commit": false,
+    "source_commits": [
+      "28bdce232402cea3d656c790b12a9f32d1cc5382",
+      "a2280d2828ce872da1f69319b49e0ef7f1bed572"
+    ]
+  },
+  "counts": {
+    "alignment_candidate_rows": 6,
+    "attempts": 36,
+    "cache_artifacts": 18,
+    "cache_total_size_bytes": 15377576140,
+    "cross_alignment_rows": 2,
+    "paired_rows": 18,
+    "summary_rows": 36
+  },
+  "design": {
+    "alignment_seeds": [
+      42,
+      43,
+      44
+    ],
+    "candidate_types": [
+      "mass",
+      "formula"
+    ],
+    "cross_alignment_unit": "alignment_seed",
+    "model_types": [
+      "pointwise",
+      "transformer"
+    ],
+    "n_alignment_seeds": 3,
+    "pairing_key": [
+      "alignment_seed",
+      "candidate_type",
+      "reranker_seed"
+    ],
+    "reranker_seeds": [
+      42,
+      43,
+      44
+    ],
+    "validation_query_exclusions": [
+      7686,
+      7687,
+      7688,
+      8464,
+      8465,
+      8466
+    ]
+  },
+  "inputs": [
+    {
+      "alignment_seed": 42,
+      "checkpoint_sha256": "ad5d1eb76805c51563349f259a4b4c935336064b6171a4e650472b78aeeaa06f",
+      "files": {
+        "attempts": [
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed42/attempt_001/best_reranker.pth",
+              "sha256": "b4fd1866ddf6d527b4e5cf1ae45bb1cc396f2b770df506518a9e7ecf425ed5ca",
+              "size_bytes": 5921560
+            },
+            "candidate_type": "formula",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed42/attempt_001/eval_rerank.log",
+              "sha256": "e38644623cc33142fdcd716e2b4a88d13554dcb07ae0805faf4c5db7318697a3",
+              "size_bytes": 2244
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed42/attempt_001/last_reranker.pth",
+              "sha256": "c8ee285835ec97832905ca2c09c985ec465afbce36319a433be17df1a83357c2",
+              "size_bytes": 5921304
+            },
+            "model_type": "pointwise",
+            "reranker_seed": 42,
+            "status": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed42/attempt_001/status.json",
+              "sha256": "b1a838f6f07212bf698b3a25b6989085ed086396d2ab47daaddd4c9fd1b8ff30",
+              "size_bytes": 5616
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed42/attempt_001/train_rerank.log",
+              "sha256": "88d6b5a74c007dddf8dbcbb5b887a029fdb58aed92c27030daf0fe2723d4ace1",
+              "size_bytes": 9110
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed43/attempt_001/best_reranker.pth",
+              "sha256": "e3771ecab0267a9bf8099c2e590107bc1f59641cfad8632fd0ffe564116e229f",
+              "size_bytes": 5921560
+            },
+            "candidate_type": "formula",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed43/attempt_001/eval_rerank.log",
+              "sha256": "f9fea85a37aa62cb49f90546150c4cc9bb43cb3130318c7a0ed3fe75d032025b",
+              "size_bytes": 2244
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed43/attempt_001/last_reranker.pth",
+              "sha256": "2290d669a04acf8f9c5e3d3c80cb39cf3afcf6f11988664e82f69c32c514c373",
+              "size_bytes": 5921304
+            },
+            "model_type": "pointwise",
+            "reranker_seed": 43,
+            "status": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed43/attempt_001/status.json",
+              "sha256": "25638b16aed97b4dfc3c3f9785b7401df6efa72dc6918042e171364ccf3e1718",
+              "size_bytes": 5614
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed43/attempt_001/train_rerank.log",
+              "sha256": "655274e25055422a5f632979541e4fffd2cf800fad0c85ebe68afc55176c548a",
+              "size_bytes": 5659
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed44/attempt_001/best_reranker.pth",
+              "sha256": "a07b5a0fe87a0db133af1f2361c7253d3da9f9a0280d18eb7a6c8c033fd9b650",
+              "size_bytes": 5921560
+            },
+            "candidate_type": "formula",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed44/attempt_001/eval_rerank.log",
+              "sha256": "9481c06f8d46d9a1ac7d757b0326123dd918d7b875d393b0c149212db8485b1c",
+              "size_bytes": 2244
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed44/attempt_001/last_reranker.pth",
+              "sha256": "87afc5414024c37b391b264cb742875f81a4afb71b8651bcc9a8a149ab8a4887",
+              "size_bytes": 5921304
+            },
+            "model_type": "pointwise",
+            "reranker_seed": 44,
+            "status": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed44/attempt_001/status.json",
+              "sha256": "744f759a585ceb5594ac62eea02f090aee6d1784eaefe61c21cb3065d6faf078",
+              "size_bytes": 5613
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/pointwise/seed44/attempt_001/train_rerank.log",
+              "sha256": "9a01947bf8c9e90d298063a0f8e63df2bdaf3215d066064401cf052d401fcb69",
+              "size_bytes": 6105
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed42/attempt_001/best_reranker.pth",
+              "sha256": "ca13cd793ba87b6eceefb6aa3c1dc46e95eb8d36a92ddeb31cca7d04cf552ba8",
+              "size_bytes": 31149856
+            },
+            "candidate_type": "formula",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed42/attempt_001/eval_rerank.log",
+              "sha256": "c90d2019b56783d4a8bde3487f548ce325767149a4e946c0b7ba16927150d7d7",
+              "size_bytes": 2248
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed42/attempt_001/last_reranker.pth",
+              "sha256": "e9b66111764e4bf5dfacc06f293715a11082473313b2f77ae2d31dbcab25edb6",
+              "size_bytes": 31149600
+            },
+            "model_type": "transformer",
+            "reranker_seed": 42,
+            "status": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed42/attempt_001/status.json",
+              "sha256": "7154ebc59d487b2d6a0f6a4b3d8fd5463c8724fa7cff943cd6f923c164f88a92",
+              "size_bytes": 5630
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed42/attempt_001/train_rerank.log",
+              "sha256": "10f0bfacdd9dcea951cd078c793981abd47b634d0fd7477267b913c401264868",
+              "size_bytes": 7023
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed43/attempt_001/best_reranker.pth",
+              "sha256": "80752a976e1b388ddd8be853abfee09a0de00c46aa903d6f88d5c3e14498b511",
+              "size_bytes": 31149856
+            },
+            "candidate_type": "formula",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed43/attempt_001/eval_rerank.log",
+              "sha256": "03d99b21003411bea95d1e2a81b71a8346abe9980876e64a2df4c21252330b48",
+              "size_bytes": 2248
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed43/attempt_001/last_reranker.pth",
+              "sha256": "0607f8521466702e9c9643b7e7844e60bcbff83d362f1500a6b3309690a724c9",
+              "size_bytes": 31149600
+            },
+            "model_type": "transformer",
+            "reranker_seed": 43,
+            "status": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed43/attempt_001/status.json",
+              "sha256": "e91675f90ee98e576729ca24cfec065850bfe9bf12bbb592963a70f322ba4917",
+              "size_bytes": 5628
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed43/attempt_001/train_rerank.log",
+              "sha256": "da79fa1ce9ed0379c95846783d5f397076dacc71513ecd3960b9d1ade6728e89",
+              "size_bytes": 5225
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed44/attempt_001/best_reranker.pth",
+              "sha256": "5155e0939cee590a0a81c4df6b02e2c6f1e7334106cebd0f176c5579b877b644",
+              "size_bytes": 31149856
+            },
+            "candidate_type": "formula",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed44/attempt_001/eval_rerank.log",
+              "sha256": "2cdc6a7a80c055b8cd51c5c597668d0442fc14f72909a4f23935d89f6b25b052",
+              "size_bytes": 2248
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed44/attempt_001/last_reranker.pth",
+              "sha256": "82855efaadc7a99481ab704136851ab70b18e4d22378820eefa64608a856b64d",
+              "size_bytes": 31149600
+            },
+            "model_type": "transformer",
+            "reranker_seed": 44,
+            "status": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed44/attempt_001/status.json",
+              "sha256": "e2873cb34b30a1620f06e8eb93e4e771754633dc1cc2c63a5e233176e028305a",
+              "size_bytes": 5630
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed44/attempt_001/train_rerank.log",
+              "sha256": "8eb9d4323617a02f4f9508f35a982d35b3378447612102ab01acd31b91bf08a4",
+              "size_bytes": 6510
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed42/attempt_001/best_reranker.pth",
+              "sha256": "f1c648b264fbcd3075ef24b791fcefcae1ec423a05dea40097016dc3c3d9ed7c",
+              "size_bytes": 5921496
+            },
+            "candidate_type": "mass",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed42/attempt_001/eval_rerank.log",
+              "sha256": "5c36c0020531ca3f0d541e9b8e3204557451e5786097e3b5de6bdc11f5ba0771",
+              "size_bytes": 2232
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed42/attempt_001/last_reranker.pth",
+              "sha256": "ea9d212bc72e6de6c6f22257b888e9464902604476db6a79299c777afef74742",
+              "size_bytes": 5921304
+            },
+            "model_type": "pointwise",
+            "reranker_seed": 42,
+            "status": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed42/attempt_001/status.json",
+              "sha256": "b91c080be3b844a7ef5e66f7f2961e69df2e537473d4bd0efdabad24d56e5612",
+              "size_bytes": 5543
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed42/attempt_001/train_rerank.log",
+              "sha256": "6708ef5d12553bc00990bef5919a371121345d7d40f1b1084393c5af5ce0956c",
+              "size_bytes": 5818
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed43/attempt_001/best_reranker.pth",
+              "sha256": "c0adbff7760210174ecfee7192c14a2dbf90dc3dae5db7674fd078e13991b439",
+              "size_bytes": 5921496
+            },
+            "candidate_type": "mass",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed43/attempt_001/eval_rerank.log",
+              "sha256": "fbb05ec38807680360d93ae72fc1a0f0aad88a120552bf032c6aac03b9277297",
+              "size_bytes": 2232
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed43/attempt_001/last_reranker.pth",
+              "sha256": "14d5e50f7cf671518888e6bea9e6e6edff9a42e7f40829ee53673c9c3f726474",
+              "size_bytes": 5921304
+            },
+            "model_type": "pointwise",
+            "reranker_seed": 43,
+            "status": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed43/attempt_001/status.json",
+              "sha256": "ce04c92d504c7cc721dbaeb3c7d27566b7005f365b59e0de1e4aafd288f4f84a",
+              "size_bytes": 5544
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed43/attempt_001/train_rerank.log",
+              "sha256": "e6f45c3b98e0d5efc9695447a0a43e76cf6ef73aa98fc6bf5c2f250724d9a8c8",
+              "size_bytes": 6327
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed44/attempt_001/best_reranker.pth",
+              "sha256": "25b88c07a5166337fffa6ec0239d53a4af7c5fba93917e4466cabb354f42e816",
+              "size_bytes": 5921496
+            },
+            "candidate_type": "mass",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed44/attempt_001/eval_rerank.log",
+              "sha256": "8f21a58b7813a9a78e1216ea5c6e61973b06befcb500a6053648f065cbc92205",
+              "size_bytes": 2232
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed44/attempt_001/last_reranker.pth",
+              "sha256": "1bc2649270addde650f51cc3b65b0c5daedbc436bd0e230d71bc16f0312e0ea8",
+              "size_bytes": 5921304
+            },
+            "model_type": "pointwise",
+            "reranker_seed": 44,
+            "status": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed44/attempt_001/status.json",
+              "sha256": "d6452735e13b8c79b23ee5e400833bb2f8d2383d35d15b54423bb5ea9a88f23f",
+              "size_bytes": 5544
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/pointwise/seed44/attempt_001/train_rerank.log",
+              "sha256": "d943c965f385fd19e451225356d5bf7153cbf831c26a5f4c10761655c7c84b3f",
+              "size_bytes": 7659
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed42/attempt_001/best_reranker.pth",
+              "sha256": "aedf5e82089ec8ec350da2ab04718a879f5019756f701c1a1e1da3559e541c57",
+              "size_bytes": 31149856
+            },
+            "candidate_type": "mass",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed42/attempt_001/eval_rerank.log",
+              "sha256": "724417ef98135872ab1e2796377bc62200a0a7bf178e704a7db784a3c57df705",
+              "size_bytes": 2236
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed42/attempt_001/last_reranker.pth",
+              "sha256": "1593818fd6da2428f5da4cb03c888a7d421bca854397d08bbd4f4ba616ea2bff",
+              "size_bytes": 31149600
+            },
+            "model_type": "transformer",
+            "reranker_seed": 42,
+            "status": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed42/attempt_001/status.json",
+              "sha256": "d0670bed9504587afe770ac71e8025d031e4dfd68d24acbb1565157a9dac8e50",
+              "size_bytes": 5556
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed42/attempt_001/train_rerank.log",
+              "sha256": "d546b8ac70705a91426a54465e1648d1691ef941fce0eb2d3fd7a1650116d7d7",
+              "size_bytes": 5450
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed43/attempt_001/best_reranker.pth",
+              "sha256": "9066d7f3c798baf3078660907b45f71e0f09534e55c19271e0601da8b4892ac5",
+              "size_bytes": 31149856
+            },
+            "candidate_type": "mass",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed43/attempt_001/eval_rerank.log",
+              "sha256": "886838ec149bb64fc0e09e20ce9795498047968170a12ce26702934d25a97dfd",
+              "size_bytes": 2236
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed43/attempt_001/last_reranker.pth",
+              "sha256": "ef12b861bac5a464c64347f7fd155b40cb5bf302e5573bc2951acbb3286b5f92",
+              "size_bytes": 31149600
+            },
+            "model_type": "transformer",
+            "reranker_seed": 43,
+            "status": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed43/attempt_001/status.json",
+              "sha256": "56a4db8539ac289bed1b2954ce513f4c8f9c5b558ef9e3cab29f6d791cca871e",
+              "size_bytes": 5558
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed43/attempt_001/train_rerank.log",
+              "sha256": "0ec2164691fb00eb2a45406d4e1c08e6c5bdad4934f0ef634d022cf11c74572f",
+              "size_bytes": 6729
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed44/attempt_001/best_reranker.pth",
+              "sha256": "2cc777f7bd14af68e4347f4d94d5c6fbad0021efc9087ad11f1000ff6186b186",
+              "size_bytes": 31149856
+            },
+            "candidate_type": "mass",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed44/attempt_001/eval_rerank.log",
+              "sha256": "cd94d5adf9f9902a3bc77c80fe18f1d769a053176add2be20a6c681de8247a69",
+              "size_bytes": 2236
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed44/attempt_001/last_reranker.pth",
+              "sha256": "732e4fbcd4245a62c6ea55b3c0643e970a7971401c3a65fc3e4bde1b97c54f61",
+              "size_bytes": 31149600
+            },
+            "model_type": "transformer",
+            "reranker_seed": 44,
+            "status": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed44/attempt_001/status.json",
+              "sha256": "ccb9198cd1035c4d08718f8e4bb48be59578b759c1b3f3ab6e8d969dd750d7df",
+              "size_bytes": 5558
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/mass/transformer/seed44/attempt_001/train_rerank.log",
+              "sha256": "8bb06b5c2e953a898dd1ceb7d9bbbcd0c0a5413229c1fbb1329fcf54f1f41c66",
+              "size_bytes": 7875
+            }
+          }
+        ],
+        "batch_status": {
+          "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/batch_status.json",
+          "sha256": "70a194c026fe39d03bfa39f316dc4f69447690ca847b425f89ba057d7b5fcbcb",
+          "size_bytes": 5789
+        },
+        "cache_files": [
+          {
+            "candidate_type": "formula",
+            "id": "alignment42.cache.formula.test",
+            "path": "rerank_cache/a2280d2_massspecgym_nopretrain_valoverlapclean_formula_topk40/massspecgym_formula_test.pt",
+            "sha256": "f2459430637f3495d22f40d242fe7c6210d35993aeca5c9667229a917372b0d0",
+            "size_bytes": 214897372,
+            "split": "test"
+          },
+          {
+            "candidate_type": "formula",
+            "id": "alignment42.cache.formula.train",
+            "path": "rerank_cache/a2280d2_massspecgym_nopretrain_valoverlapclean_formula_topk40/massspecgym_formula_train.pt",
+            "sha256": "eaaaae7879df430c0a16e8e0ebca8da116a47ede86ed9a601d12ef1047affce6",
+            "size_bytes": 1904322519,
+            "split": "train"
+          },
+          {
+            "candidate_type": "formula",
+            "id": "alignment42.cache.formula.val",
+            "path": "rerank_cache/a2280d2_massspecgym_nopretrain_valoverlapclean_formula_topk40/massspecgym_formula_val.pt",
+            "sha256": "2b161516a3225c835706e5aa9693e8772fa805e090fbfc9c18c98fee7bcbad41",
+            "size_bytes": 230418250,
+            "split": "val"
+          },
+          {
+            "candidate_type": "mass",
+            "id": "alignment42.cache.mass.test",
+            "path": "rerank_cache/a2280d2_massspecgym_nopretrain_valoverlapclean_mass_topk40/massspecgym_mass_test.pt",
+            "sha256": "6842fa615b7cf07fbf3c82825d75e72cddcd2e0da86dcdb3c5d8e3679f931ea6",
+            "size_bytes": 254506582,
+            "split": "test"
+          },
+          {
+            "candidate_type": "mass",
+            "id": "alignment42.cache.mass.train",
+            "path": "rerank_cache/a2280d2_massspecgym_nopretrain_valoverlapclean_mass_topk40/massspecgym_mass_train.pt",
+            "sha256": "88161fab81b82397d448dc3a00b3a3b0b6bf8431488f62caa7c9d904696cbe24",
+            "size_bytes": 2049728454,
+            "split": "train"
+          },
+          {
+            "candidate_type": "mass",
+            "id": "alignment42.cache.mass.val",
+            "path": "rerank_cache/a2280d2_massspecgym_nopretrain_valoverlapclean_mass_topk40/massspecgym_mass_val.pt",
+            "sha256": "397067892dd1a100cabdd363ad8dbc34093ba6fd4a2d677c108efcd87d5c8508",
+            "size_bytes": 279056811,
+            "split": "val"
+          }
+        ],
+        "checkpoint": {
+          "path": "checkpoints_align/a2280d2_massspecgym_nopretrain_valoverlapclean/best_model_stage2.pth",
+          "sha256": "ad5d1eb76805c51563349f259a4b4c935336064b6171a4e650472b78aeeaa06f",
+          "size_bytes": 36233914
+        },
+        "selection": {
+          "path": "checkpoints_align/a2280d2_massspecgym_nopretrain_valoverlapclean/alignment_selection.json",
+          "sha256": "86a975ca926f42e63202a1d6063cc0de70e04be2cbfe81719ff81d04101edc78",
+          "size_bytes": 1157
+        },
+        "summary": {
+          "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/summary.csv",
+          "sha256": "27cebd51c9e667ca14596809e716d7133d08f8a7aef1899140c8aac0659911ef",
+          "size_bytes": 3461
+        },
+        "summary_aggregate": {
+          "path": "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/summary_aggregate.csv",
+          "sha256": "46d66854a0ec8f94a87ed0855a6dc94b565f1d32f423063d937bcd2b5a732df7",
+          "size_bytes": 1917
+        }
+      },
+      "params_sha256": "b6260dad043f9c0f1cb4ff36dc7b7bf8bac4481998aa36b4d55f44392e1b0bc6",
+      "source_git_commit": "a2280d2828ce872da1f69319b49e0ef7f1bed572"
+    },
+    {
+      "alignment_seed": 43,
+      "checkpoint_sha256": "898966d71ed28da7f4716f3c2b699128638506f3d6f710d20a6af1a0dfab2f8b",
+      "files": {
+        "attempts": [
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/pointwise/seed42/attempt_001/best_reranker.pth",
+              "sha256": "1a4f0635fbc9cdd3439808fd8e2e4bbecf2554369d53fec7b6a7dd8481a9ea16",
+              "size_bytes": 5921560
+            },
+            "candidate_type": "formula",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/pointwise/seed42/attempt_001/eval_rerank.log",
+              "sha256": "68fea5c66d6a86caefd30968dd2fd5582a8e7abe2190af257f4c58089459e058",
+              "size_bytes": 2295
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/pointwise/seed42/attempt_001/last_reranker.pth",
+              "sha256": "87f3359fe517b459aee7d99e54317548c02ce65e184fd80e476955ff2151b6fb",
+              "size_bytes": 5921368
+            },
+            "model_type": "pointwise",
+            "reranker_seed": 42,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/pointwise/seed42/attempt_001/status.json",
+              "sha256": "5ef7de36cd6e12d31c1707185bb1d33f13a51257a0080c48cb639d61b151155b",
+              "size_bytes": 5853
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/pointwise/seed42/attempt_001/train_rerank.log",
+              "sha256": "1d3d039b901785e784851b0c27b71e55eb040468c6b4033e0370ed5f62554238",
+              "size_bytes": 5140
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/pointwise/seed43/attempt_001/best_reranker.pth",
+              "sha256": "088f87163a03164b50f612307f39e9fa9519a263675c96ec8f17a186dc96f48b",
+              "size_bytes": 5921560
+            },
+            "candidate_type": "formula",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/pointwise/seed43/attempt_001/eval_rerank.log",
+              "sha256": "5ed786f7f0948f09aa930e56c9a0c6f9a4ead1f50b1c1b423e3db7df101d5319",
+              "size_bytes": 2295
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/pointwise/seed43/attempt_001/last_reranker.pth",
+              "sha256": "944d8fdc607ba285285daf784e799015e627919d85916c01db3f52c2a50b947e",
+              "size_bytes": 5921368
+            },
+            "model_type": "pointwise",
+            "reranker_seed": 43,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/pointwise/seed43/attempt_001/status.json",
+              "sha256": "7d56ac28b8a8c02b63ea3595a3b815d29ebba5b6d8f187d260cf8be07330c958",
+              "size_bytes": 5853
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/pointwise/seed43/attempt_001/train_rerank.log",
+              "sha256": "d922b36c3e64f755335bcc98fbecdb4ef7136b9044e019045cabf043d79865f5",
+              "size_bytes": 6196
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/pointwise/seed44/attempt_001/best_reranker.pth",
+              "sha256": "9c4d6fa4051f34bbebcb7ca7fb8ee5d6e32b022918b486cf25c7d448552433a1",
+              "size_bytes": 5921560
+            },
+            "candidate_type": "formula",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/pointwise/seed44/attempt_001/eval_rerank.log",
+              "sha256": "69b48c4f0f7bf0612a6106afac149d9ed15d1c4f8101568d4ec16291d7392a94",
+              "size_bytes": 2295
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/pointwise/seed44/attempt_001/last_reranker.pth",
+              "sha256": "61659eeace6a7684569162ac6f906d4c2b9b37d483585c988b4e184a9dcf2540",
+              "size_bytes": 5921368
+            },
+            "model_type": "pointwise",
+            "reranker_seed": 44,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/pointwise/seed44/attempt_001/status.json",
+              "sha256": "dadc410208d10560b0f6ade14f07d48e8bc29e47348cf632d74e6a5437794fa5",
+              "size_bytes": 5852
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/pointwise/seed44/attempt_001/train_rerank.log",
+              "sha256": "120508d7d18de95f50017c5f7a1a05b6550f91ca8a9c71501ca3966c544e8212",
+              "size_bytes": 4948
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/transformer/seed42/attempt_001/best_reranker.pth",
+              "sha256": "feed4ae69b4047bed54a30ad4f83580b323a46acbf8375a26d21e96d42d7242a",
+              "size_bytes": 31149920
+            },
+            "candidate_type": "formula",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/transformer/seed42/attempt_001/eval_rerank.log",
+              "sha256": "1bd6dc05234d5a29bfad25bd40a2428d89023133e7bffe322d0ecef76b62a44f",
+              "size_bytes": 2299
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/transformer/seed42/attempt_001/last_reranker.pth",
+              "sha256": "24dccc78aa7eeba222357a92c354d431995e3d6caa52f7961162b37301a895fe",
+              "size_bytes": 31149664
+            },
+            "model_type": "transformer",
+            "reranker_seed": 42,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/transformer/seed42/attempt_001/status.json",
+              "sha256": "3c4a72a6cae3be420bfff214370ae9b8c4db35efbcc7d41790b6d06bda4a2e9d",
+              "size_bytes": 5868
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/transformer/seed42/attempt_001/train_rerank.log",
+              "sha256": "1ad642d71b9f64dd1721ec3ea9096a27ec8bb86d0ec4ce8bd221f84410015068",
+              "size_bytes": 7511
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/transformer/seed43/attempt_001/best_reranker.pth",
+              "sha256": "49dc93b5eba9d0c7f078666fafe1bb6362265bfd65477f8b3e059e9ded178061",
+              "size_bytes": 31149920
+            },
+            "candidate_type": "formula",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/transformer/seed43/attempt_001/eval_rerank.log",
+              "sha256": "26d6dc9714be760ea5403dfaac75dc9584b3ec6772acd7bff69490709762a93c",
+              "size_bytes": 2299
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/transformer/seed43/attempt_001/last_reranker.pth",
+              "sha256": "e39e64619d2d5f47223a8013dbb7939ee92050f0d0c61cbc82069b9d1fea2e6a",
+              "size_bytes": 31149664
+            },
+            "model_type": "transformer",
+            "reranker_seed": 43,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/transformer/seed43/attempt_001/status.json",
+              "sha256": "69e938ba833a1184ea6d77b9996804ff1dbdc35e00a294a06ecccf912a06b20c",
+              "size_bytes": 5867
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/transformer/seed43/attempt_001/train_rerank.log",
+              "sha256": "f0c236e7ec52874214a14b16afae13e40484069a962a483624afb96fa3a249eb",
+              "size_bytes": 5152
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/transformer/seed44/attempt_001/best_reranker.pth",
+              "sha256": "2cf1ab578e4e996242d015e75cac3fe3e84a428e136e4b6fadb9fa16f1905302",
+              "size_bytes": 31149920
+            },
+            "candidate_type": "formula",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/transformer/seed44/attempt_001/eval_rerank.log",
+              "sha256": "411581c8aa1a5244e4648543accae3b147ace07366c255dda783206b073ede8b",
+              "size_bytes": 2299
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/transformer/seed44/attempt_001/last_reranker.pth",
+              "sha256": "66beb18a1678e72786c12d867487b15cdfc91d60c4b7ef8e91bcf6202d48288b",
+              "size_bytes": 31149664
+            },
+            "model_type": "transformer",
+            "reranker_seed": 44,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/transformer/seed44/attempt_001/status.json",
+              "sha256": "f8dae35845e75911e6640cdf51eb563fc6ae0e1613c411a301897923f24de3c9",
+              "size_bytes": 5867
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/formula/transformer/seed44/attempt_001/train_rerank.log",
+              "sha256": "f878e46bac07020b6608c0c3a36a2483079ac67b7dd6b76c0b6283e150b9083c",
+              "size_bytes": 5828
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/pointwise/seed42/attempt_001/best_reranker.pth",
+              "sha256": "120d813393a2c0653911320aa6abfb4ca5f55a3a65e7886e172d28721a9c2447",
+              "size_bytes": 5921560
+            },
+            "candidate_type": "mass",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/pointwise/seed42/attempt_001/eval_rerank.log",
+              "sha256": "5fce50d0dcb3d3c9e1e72c9fe9c2c4129cc681b8fe09e50d83f7538dbbb82de8",
+              "size_bytes": 2283
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/pointwise/seed42/attempt_001/last_reranker.pth",
+              "sha256": "a716bb95205292605387e376b39b32fe0a0a5bc24ee56d8a094de503083c004a",
+              "size_bytes": 5921368
+            },
+            "model_type": "pointwise",
+            "reranker_seed": 42,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/pointwise/seed42/attempt_001/status.json",
+              "sha256": "1efcf8ca9da9b0fc90831d07192c4daab7cecbf0375ffb742c39f798b9d429ab",
+              "size_bytes": 5782
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/pointwise/seed42/attempt_001/train_rerank.log",
+              "sha256": "70f6d9a7a0d7a75238cec751a3189df34ac9f0d58a1de363be56ab74d6549c5d",
+              "size_bytes": 6599
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/pointwise/seed43/attempt_001/best_reranker.pth",
+              "sha256": "5f777c46b73fa27409ddd65fe14a03663dcd241e7fd9a0f4edc379bae4dd1d1a",
+              "size_bytes": 5921560
+            },
+            "candidate_type": "mass",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/pointwise/seed43/attempt_001/eval_rerank.log",
+              "sha256": "89629beb54d9b45a82364530adc01552ecaaca7fdd9005a24c4b8a0e25603a4e",
+              "size_bytes": 2283
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/pointwise/seed43/attempt_001/last_reranker.pth",
+              "sha256": "7e2b965892d0691a4eb296249c8a66450788121756e01e76685706e0aeeab70b",
+              "size_bytes": 5921368
+            },
+            "model_type": "pointwise",
+            "reranker_seed": 43,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/pointwise/seed43/attempt_001/status.json",
+              "sha256": "8fdb0d1c31ada966456694cca258ef54b83be2eb53085adefd788d721dfb24d6",
+              "size_bytes": 5782
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/pointwise/seed43/attempt_001/train_rerank.log",
+              "sha256": "9e96d2ce2a86a141ee59fd54732140a764b5d829f2efa85b81bc85acdf81e17d",
+              "size_bytes": 7265
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/pointwise/seed44/attempt_001/best_reranker.pth",
+              "sha256": "bce4e4f99b788ac83148148f877fa7a9e94cfb6988f56b74bb219fda5321c22d",
+              "size_bytes": 5921560
+            },
+            "candidate_type": "mass",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/pointwise/seed44/attempt_001/eval_rerank.log",
+              "sha256": "7685bfc2319c671481235aa344b783b7395d5cbde7cded43b8cc439aec2743aa",
+              "size_bytes": 2283
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/pointwise/seed44/attempt_001/last_reranker.pth",
+              "sha256": "a3ec7161579326c5ece786596cc180103e1ff2542c9369eb4d112e4931cb7a85",
+              "size_bytes": 5921368
+            },
+            "model_type": "pointwise",
+            "reranker_seed": 44,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/pointwise/seed44/attempt_001/status.json",
+              "sha256": "595fa633c7c8c0ad23b8715087a31490ccfd21a873dc6484d72d5631bb1aa666",
+              "size_bytes": 5781
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/pointwise/seed44/attempt_001/train_rerank.log",
+              "sha256": "8853ff20213ab3434cdfcf495f1279662d4f5602d00ee5b4291416cb62c33f61",
+              "size_bytes": 5830
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/transformer/seed42/attempt_001/best_reranker.pth",
+              "sha256": "ac3dbe5f7a3cf313af1578445758b0f65a5db5f3b3e887d933103ff9198379e1",
+              "size_bytes": 31149920
+            },
+            "candidate_type": "mass",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/transformer/seed42/attempt_001/eval_rerank.log",
+              "sha256": "2ed7cc8094f95678921fd4986da2ff691d1440ecbe1735015afaaee8107acc97",
+              "size_bytes": 2287
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/transformer/seed42/attempt_001/last_reranker.pth",
+              "sha256": "150e8d8de808e415c527ab24b6f1be3ef19fa721f0518d0461127a607939187e",
+              "size_bytes": 31149664
+            },
+            "model_type": "transformer",
+            "reranker_seed": 42,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/transformer/seed42/attempt_001/status.json",
+              "sha256": "6d7b59862c45a0076de2c2d374568662fb48231b1363fa2a3763c105f23a1c71",
+              "size_bytes": 5796
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/transformer/seed42/attempt_001/train_rerank.log",
+              "sha256": "eaff0080327dc9a2bd1682a315e776f49799d541eebf670c606e6435984d17e8",
+              "size_bytes": 6421
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/transformer/seed43/attempt_001/best_reranker.pth",
+              "sha256": "ff577c9b7e795811192bf7f6744d3fe8561c61524564eb8491d746389965d826",
+              "size_bytes": 31149920
+            },
+            "candidate_type": "mass",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/transformer/seed43/attempt_001/eval_rerank.log",
+              "sha256": "47b99b712fa78e699fd764e3230f786f22f1454dbf409a1b1c9392d2b9ffa0de",
+              "size_bytes": 2287
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/transformer/seed43/attempt_001/last_reranker.pth",
+              "sha256": "a7e3d5cef658b828d6eddd5511bf46c58fb12beb626826be5a4ba2d2ef33452a",
+              "size_bytes": 31149664
+            },
+            "model_type": "transformer",
+            "reranker_seed": 43,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/transformer/seed43/attempt_001/status.json",
+              "sha256": "e2ffcc82f8243002a57df6fdd66a4b65371c430d104b81368eddcace8ca672d8",
+              "size_bytes": 5794
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/transformer/seed43/attempt_001/train_rerank.log",
+              "sha256": "a4b748d5e41dcddf1df3c977a423677019c191aec9dc5e8bd37c7bc3063b9e69",
+              "size_bytes": 4933
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/transformer/seed44/attempt_001/best_reranker.pth",
+              "sha256": "4b8ceaa6f387d280c2790602800c6206d4d75ec815564f556044d87ba58fed1f",
+              "size_bytes": 31149920
+            },
+            "candidate_type": "mass",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/transformer/seed44/attempt_001/eval_rerank.log",
+              "sha256": "a62e085977c2a2a5f9d4656c3738c3d60bc3faab92d30017770d7b88a7740541",
+              "size_bytes": 2287
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/transformer/seed44/attempt_001/last_reranker.pth",
+              "sha256": "e9f493f7f893802c9d4453545d00171810937c7b239ba1603c8357f8991bfff2",
+              "size_bytes": 31149664
+            },
+            "model_type": "transformer",
+            "reranker_seed": 44,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/transformer/seed44/attempt_001/status.json",
+              "sha256": "a92d15be29a8ff7a3b6fd235bbdf669764c5c215136e305199be9db5748612f9",
+              "size_bytes": 5794
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/mass/transformer/seed44/attempt_001/train_rerank.log",
+              "sha256": "105ac155e475c212f057bc6b324b58d0e0c40dc517a1584e94182df2bd5923a8",
+              "size_bytes": 5652
+            }
+          }
+        ],
+        "batch_status": {
+          "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/batch_status.json",
+          "sha256": "a20dc5babdaf9250e7ec3fee3c3515e8d2145c60d3d45c2287dfb8e8dd1b6442",
+          "size_bytes": 5993
+        },
+        "cache_files": [
+          {
+            "candidate_type": "formula",
+            "id": "alignment43.cache.formula.test",
+            "path": "rerank_cache/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_formula_topk40/massspecgym_formula_test.pt",
+            "sha256": "ead585e9d9edb6fd4b9261d8cb11197f254ac3cd5b26f34077bd73b1557832ce",
+            "size_bytes": 237452700,
+            "split": "test"
+          },
+          {
+            "candidate_type": "formula",
+            "id": "alignment43.cache.formula.train",
+            "path": "rerank_cache/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_formula_topk40/massspecgym_formula_train.pt",
+            "sha256": "31857f81507a24e443a4a1b58b9fe5dc2b80f3c730b18c4ced4c68470b42a121",
+            "size_bytes": 2013523159,
+            "split": "train"
+          },
+          {
+            "candidate_type": "formula",
+            "id": "alignment43.cache.formula.val",
+            "path": "rerank_cache/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_formula_topk40/massspecgym_formula_val.pt",
+            "sha256": "a2a03267a5350211b6e8f80fecfbe116b1d82beffb9da49e9ad32e0b358a7ed7",
+            "size_bytes": 253825738,
+            "split": "val"
+          },
+          {
+            "candidate_type": "mass",
+            "id": "alignment43.cache.mass.test",
+            "path": "rerank_cache/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_mass_topk40/massspecgym_mass_test.pt",
+            "sha256": "fcda98527a1c0e583410c31b87ce0c41adc9e64fe62dc9f95100c501c1dd3a66",
+            "size_bytes": 272286870,
+            "split": "test"
+          },
+          {
+            "candidate_type": "mass",
+            "id": "alignment43.cache.mass.train",
+            "path": "rerank_cache/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_mass_topk40/massspecgym_mass_train.pt",
+            "sha256": "2c4a236e350e875015693bbbae0bbe24a632dbcfcffc65eecb01c3a1f0fc85c6",
+            "size_bytes": 2126436934,
+            "split": "train"
+          },
+          {
+            "candidate_type": "mass",
+            "id": "alignment43.cache.mass.val",
+            "path": "rerank_cache/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_mass_topk40/massspecgym_mass_val.pt",
+            "sha256": "ae0046142b993dcd452f4b84b3eda7ec138d4579c9bfa088ecbbf12cf21df572",
+            "size_bytes": 295049643,
+            "split": "val"
+          }
+        ],
+        "checkpoint": {
+          "path": "checkpoints_align/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43/best_model_stage2.pth",
+          "sha256": "898966d71ed28da7f4716f3c2b699128638506f3d6f710d20a6af1a0dfab2f8b",
+          "size_bytes": 36233914
+        },
+        "selection": {
+          "path": "checkpoints_align/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43/alignment_selection.json",
+          "sha256": "c45d960c70a819e2004f9004008b2eeeeda603a38c46f34db9fa6b996c05ff28",
+          "size_bytes": 1174
+        },
+        "summary": {
+          "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/summary.csv",
+          "sha256": "4a37d042cc29fb6bcaec1746c4026c194cb2295ad37793523a20d8a33254cbf0",
+          "size_bytes": 3656
+        },
+        "summary_aggregate": {
+          "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed43_topk40_multiseed/summary_aggregate.csv",
+          "sha256": "c74ac1e376b0bf072a241b95d3d7f6b74fa30f5038e65d9651b2a539c2f622a2",
+          "size_bytes": 1930
+        }
+      },
+      "params_sha256": "b6260dad043f9c0f1cb4ff36dc7b7bf8bac4481998aa36b4d55f44392e1b0bc6",
+      "source_git_commit": "28bdce232402cea3d656c790b12a9f32d1cc5382"
+    },
+    {
+      "alignment_seed": 44,
+      "checkpoint_sha256": "d007f832cfde8c02f61c053ee2b4098664c631868571f23ee83a96e107935a5c",
+      "files": {
+        "attempts": [
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/pointwise/seed42/attempt_001/best_reranker.pth",
+              "sha256": "97c6d874d5ba54ea2bfd931914f15c541736c421a0812fe3c2389f31a65a1499",
+              "size_bytes": 5921560
+            },
+            "candidate_type": "formula",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/pointwise/seed42/attempt_001/eval_rerank.log",
+              "sha256": "7f5cfcbc18f737be148c66a0ca17f7ebec3bd3333a863fb6c15a93ab9862c9c9",
+              "size_bytes": 2295
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/pointwise/seed42/attempt_001/last_reranker.pth",
+              "sha256": "04ea58a54ddf25c9cb7a927b86e4ce94040874332f41895640b09499942af77b",
+              "size_bytes": 5921368
+            },
+            "model_type": "pointwise",
+            "reranker_seed": 42,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/pointwise/seed42/attempt_001/status.json",
+              "sha256": "cb89d7400d0a1e2a4c16fba42f49b004845d8b86c975c9cd2b459af7b4630a42",
+              "size_bytes": 5853
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/pointwise/seed42/attempt_001/train_rerank.log",
+              "sha256": "6e36136625c64f27abfb03a2e85685b0100d1b92c426f32b65494c58c7cf79d4",
+              "size_bytes": 6148
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/pointwise/seed43/attempt_001/best_reranker.pth",
+              "sha256": "40933a1d59a1156767a92f477c2da8da916437fb505ad82e90680681b6c61a7c",
+              "size_bytes": 5921560
+            },
+            "candidate_type": "formula",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/pointwise/seed43/attempt_001/eval_rerank.log",
+              "sha256": "2cba7a282d1e8b6a26b4e418de132cdb5fca8d20b916d7055d34a3b689c0cb4b",
+              "size_bytes": 2295
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/pointwise/seed43/attempt_001/last_reranker.pth",
+              "sha256": "7b6e144233a891283fd9fba02d0b2009340dc8fd16d2bcdd6bef71f4a956cb7d",
+              "size_bytes": 5921368
+            },
+            "model_type": "pointwise",
+            "reranker_seed": 43,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/pointwise/seed43/attempt_001/status.json",
+              "sha256": "b1718824fa72bec5cadafa8324a2ba6c8f1d9ab88f95ed2c74436740499d7a9d",
+              "size_bytes": 5853
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/pointwise/seed43/attempt_001/train_rerank.log",
+              "sha256": "1cf158101a63c25b06ee2ff547e742e6ce3afdf3bad3a6e914f0703c62d02caa",
+              "size_bytes": 5284
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/pointwise/seed44/attempt_001/best_reranker.pth",
+              "sha256": "ffb665877a9dd5614058721ae51696d2c8ceaaef25a9fc0bf301106f74b5a85d",
+              "size_bytes": 5921560
+            },
+            "candidate_type": "formula",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/pointwise/seed44/attempt_001/eval_rerank.log",
+              "sha256": "2cde1a969e6231777852603e8d045e4da708801ab7f7304933dacac23e4ed279",
+              "size_bytes": 2295
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/pointwise/seed44/attempt_001/last_reranker.pth",
+              "sha256": "359fc5d197959f5aefd819f5223896ba40ed3640dc30a8715f1ca763da4fc39b",
+              "size_bytes": 5921368
+            },
+            "model_type": "pointwise",
+            "reranker_seed": 44,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/pointwise/seed44/attempt_001/status.json",
+              "sha256": "ebc3525053202f2d245295432d6a52945bcb8852c6a9d10785a71480226e5e14",
+              "size_bytes": 5854
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/pointwise/seed44/attempt_001/train_rerank.log",
+              "sha256": "3ea549fa21e874cb92bdd3d4d591af34ad29497cf277b08b4b909d76ddfdace3",
+              "size_bytes": 9317
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/transformer/seed42/attempt_001/best_reranker.pth",
+              "sha256": "297bb00e3fa55bc8fedb7356c3d8d74d9b799e2c01168dcfd2d90d55da0d1dee",
+              "size_bytes": 31149920
+            },
+            "candidate_type": "formula",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/transformer/seed42/attempt_001/eval_rerank.log",
+              "sha256": "3241888471baa3137df4af948d98ab4fec866ddc6ac2eb06f4577e042ae96175",
+              "size_bytes": 2299
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/transformer/seed42/attempt_001/last_reranker.pth",
+              "sha256": "eb557fc6ea74f83eb7e6f6b5f4b40a6511be52faff53e303531f179b04e552e7",
+              "size_bytes": 31149664
+            },
+            "model_type": "transformer",
+            "reranker_seed": 42,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/transformer/seed42/attempt_001/status.json",
+              "sha256": "573ff7c154fb1da3c00c1eb7baac810850fc98bf84b8e5d7c2b6848f37478cf7",
+              "size_bytes": 5866
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/transformer/seed42/attempt_001/train_rerank.log",
+              "sha256": "4e0a7ed7253bef691b5e8e8ee34ab2a4b0c9d4dc7ecc5048251e01c87df4c13f",
+              "size_bytes": 5828
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/transformer/seed43/attempt_001/best_reranker.pth",
+              "sha256": "8a6eadec8d62d104eaa712ceec64291e754ec7775668fdd2a67175a152a8f907",
+              "size_bytes": 31149920
+            },
+            "candidate_type": "formula",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/transformer/seed43/attempt_001/eval_rerank.log",
+              "sha256": "ac7270f2d78352b0bdf0e8d0f511a023f45d5f485e1b0aa235d7218abc433fbc",
+              "size_bytes": 2299
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/transformer/seed43/attempt_001/last_reranker.pth",
+              "sha256": "2e743ae6c82d57862858140cf09c1090bf2798a974be6321506f4d2fbf003cab",
+              "size_bytes": 31149664
+            },
+            "model_type": "transformer",
+            "reranker_seed": 43,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/transformer/seed43/attempt_001/status.json",
+              "sha256": "f68c40c3bd5061e3ac51dca5b804814056d8c951f11be4750f00c4935660d367",
+              "size_bytes": 5867
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/transformer/seed43/attempt_001/train_rerank.log",
+              "sha256": "12ac70d3ae8041c7225f9fca0258f7809bb76433a148d1d47f94b10a5445deec",
+              "size_bytes": 6212
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/transformer/seed44/attempt_001/best_reranker.pth",
+              "sha256": "238a04783e94f65b4c7d8daf75a8169533671cdfc185edb88dc62f98ec5c580d",
+              "size_bytes": 31149920
+            },
+            "candidate_type": "formula",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/transformer/seed44/attempt_001/eval_rerank.log",
+              "sha256": "7223efbd3a1d0ab5ddbbaea500b5a412eae380f4ede08129cf090196fb87dd9c",
+              "size_bytes": 2299
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/transformer/seed44/attempt_001/last_reranker.pth",
+              "sha256": "b6fab81a745c7bc34f5060e041c06ce235b75b9a2451a77718e3f30117fed407",
+              "size_bytes": 31149664
+            },
+            "model_type": "transformer",
+            "reranker_seed": 44,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/transformer/seed44/attempt_001/status.json",
+              "sha256": "63e7214194998a2358d56a48f82f62bfeed7244a2f3f65db1e3b69e77631ed95",
+              "size_bytes": 5868
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/formula/transformer/seed44/attempt_001/train_rerank.log",
+              "sha256": "75d7469fdee0863f1070b25e495363a047ebd13bb31074875c924cfcc828d1bc",
+              "size_bytes": 6259
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/pointwise/seed42/attempt_001/best_reranker.pth",
+              "sha256": "0f222f43e22e1acbeae6362df0c7f597e23e62b27c03a5d45e45c6317211bbd6",
+              "size_bytes": 5921560
+            },
+            "candidate_type": "mass",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/pointwise/seed42/attempt_001/eval_rerank.log",
+              "sha256": "ed54e989f9492d764502deeea0b45ae7d74287b4c6e1dc9ab0795149d4325bf0",
+              "size_bytes": 2283
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/pointwise/seed42/attempt_001/last_reranker.pth",
+              "sha256": "ac95e088435bea72b64d50fdf1ccaa6d2b8036f1abc6151a38e267e9ddb4ca3d",
+              "size_bytes": 5921368
+            },
+            "model_type": "pointwise",
+            "reranker_seed": 42,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/pointwise/seed42/attempt_001/status.json",
+              "sha256": "831e11b86b80b4f4fbe18933d2cd7b11858cd499e301bbc3dbdf3d8a25f292cc",
+              "size_bytes": 5781
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/pointwise/seed42/attempt_001/train_rerank.log",
+              "sha256": "73cac64d1a3d322db622b291e0f6d2747316b2e21c5e48d3b0ccd8144b101a0e",
+              "size_bytes": 5971
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/pointwise/seed43/attempt_001/best_reranker.pth",
+              "sha256": "3bc86d329c016f3ff16f11b6f72428145226cab5c92ba6b6a66b619b4d804d20",
+              "size_bytes": 5921560
+            },
+            "candidate_type": "mass",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/pointwise/seed43/attempt_001/eval_rerank.log",
+              "sha256": "f38efeac2b7df88db7ce0cadaf153a89ddafb20ce9af09e73c0e16f53b473830",
+              "size_bytes": 2283
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/pointwise/seed43/attempt_001/last_reranker.pth",
+              "sha256": "96df49e5e97963a77d9aeb4f1590252bfc3ead16f2876e4febfedec3a8ec8258",
+              "size_bytes": 5921368
+            },
+            "model_type": "pointwise",
+            "reranker_seed": 43,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/pointwise/seed43/attempt_001/status.json",
+              "sha256": "df14e547180a3c802c4d1c8ea3ea1409caa2b980423c26bd46c7c31d08a1f44b",
+              "size_bytes": 5782
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/pointwise/seed43/attempt_001/train_rerank.log",
+              "sha256": "e5f4304f13157cc0017508770c90f8461edec9a002cf70dc181229361a9a7915",
+              "size_bytes": 7496
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/pointwise/seed44/attempt_001/best_reranker.pth",
+              "sha256": "2be0d1acaa33e4eb8f768f28271a53fd10bc6d3c0e1ea8ce477c39cc79fd539a",
+              "size_bytes": 5921560
+            },
+            "candidate_type": "mass",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/pointwise/seed44/attempt_001/eval_rerank.log",
+              "sha256": "daa283ad816b0ebdf242f45deeaff78fcdeee92bbe87eb2db7407e725e84d82a",
+              "size_bytes": 2283
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/pointwise/seed44/attempt_001/last_reranker.pth",
+              "sha256": "4daa66d54c82c115e56fde872418c9afe68aaef13e8b5a1e79ad7d8291b51490",
+              "size_bytes": 5921368
+            },
+            "model_type": "pointwise",
+            "reranker_seed": 44,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/pointwise/seed44/attempt_001/status.json",
+              "sha256": "37952d026732ed1530d5d7579742604a0844e728bd8b3dc4a3d5f089d1be731c",
+              "size_bytes": 5782
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/pointwise/seed44/attempt_001/train_rerank.log",
+              "sha256": "63c57444d5303fa0cd3f409171c1c5e6b5e5de0dd584ab256d428dd397048f25",
+              "size_bytes": 7931
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/transformer/seed42/attempt_001/best_reranker.pth",
+              "sha256": "d48a8be8e9e4014301244200ac6f2589ec035d8067463dbcd85e2bdf9927d910",
+              "size_bytes": 31149920
+            },
+            "candidate_type": "mass",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/transformer/seed42/attempt_001/eval_rerank.log",
+              "sha256": "2ecaa9c95cb8557d525f373dd0fae06de1f4fa204969f8d4b03b0418f0ba0a24",
+              "size_bytes": 2287
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/transformer/seed42/attempt_001/last_reranker.pth",
+              "sha256": "c8e4d96de9983696ebb948e54c06dc29813153415a9685bca89e6ba362506677",
+              "size_bytes": 31149664
+            },
+            "model_type": "transformer",
+            "reranker_seed": 42,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/transformer/seed42/attempt_001/status.json",
+              "sha256": "8cc8ec1a047c3d9fd11e9d47189a89c86dbfdd0aca93739d127af9875d506b3c",
+              "size_bytes": 5796
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/transformer/seed42/attempt_001/train_rerank.log",
+              "sha256": "aaf321d7b2debf4cf90376df1a67e9b98aade245da4f917c6e71180b7abc7273",
+              "size_bytes": 8002
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/transformer/seed43/attempt_001/best_reranker.pth",
+              "sha256": "fe6df0d731389579f8f0461666e42da7e65b25c8b726dd4b188d1db8e6c3b882",
+              "size_bytes": 31149920
+            },
+            "candidate_type": "mass",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/transformer/seed43/attempt_001/eval_rerank.log",
+              "sha256": "5afd0e3b717715a711cf470bfaa5bfd4fc2d47e37cddc039286f2ed3024964c3",
+              "size_bytes": 2287
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/transformer/seed43/attempt_001/last_reranker.pth",
+              "sha256": "92411050da26119a828cd752668e7eeaed3d661cec77c280fcae0dee30e4196f",
+              "size_bytes": 31149664
+            },
+            "model_type": "transformer",
+            "reranker_seed": 43,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/transformer/seed43/attempt_001/status.json",
+              "sha256": "3c839bf04fceb79bfdfd126b35dabcb64191bda901f9a29c157b3b5344e72166",
+              "size_bytes": 5796
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/transformer/seed43/attempt_001/train_rerank.log",
+              "sha256": "c1200016e5fb670950bf1321877cf8aeed45f178889b331bc5a6c5f45b45fb4b",
+              "size_bytes": 8431
+            }
+          },
+          {
+            "best_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/transformer/seed44/attempt_001/best_reranker.pth",
+              "sha256": "d0bd742153a6a177945fcec74be612f0a92f8a9744448e021fd3e5b5beb77ab9",
+              "size_bytes": 31149920
+            },
+            "candidate_type": "mass",
+            "evaluation_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/transformer/seed44/attempt_001/eval_rerank.log",
+              "sha256": "65d2044d3f47fdcb79781e143bd4a06ad78b4c38baba4a737775ce394b669dad",
+              "size_bytes": 2287
+            },
+            "last_checkpoint": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/transformer/seed44/attempt_001/last_reranker.pth",
+              "sha256": "ebfec1bb7c0c6532fcf43c4c3ee21b722c01d11b20bec320071086affaf2d21b",
+              "size_bytes": 31149664
+            },
+            "model_type": "transformer",
+            "reranker_seed": 44,
+            "status": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/transformer/seed44/attempt_001/status.json",
+              "sha256": "7af4a9074c4cf7796386f85a239c3e8fce605aab73ff36c3fe2bc559e6fcf29b",
+              "size_bytes": 5796
+            },
+            "training_log": {
+              "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/mass/transformer/seed44/attempt_001/train_rerank.log",
+              "sha256": "4f7f83d4f8a2f7dc9389b31323563efc3d45ef8e660a4d6f6ec49b1107038da2",
+              "size_bytes": 6658
+            }
+          }
+        ],
+        "batch_status": {
+          "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/batch_status.json",
+          "sha256": "dc612e021af83d91012421ab85b2dacb81f6100da096cd80eb018262b72a13d7",
+          "size_bytes": 5993
+        },
+        "cache_files": [
+          {
+            "candidate_type": "formula",
+            "id": "alignment44.cache.formula.test",
+            "path": "rerank_cache/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_formula_topk40/massspecgym_formula_test.pt",
+            "sha256": "5b17dc7c3846430c3b23cf298a0baf043e7e13b626c46db96dabdd82ee5503b1",
+            "size_bytes": 246947548,
+            "split": "test"
+          },
+          {
+            "candidate_type": "formula",
+            "id": "alignment44.cache.formula.train",
+            "path": "rerank_cache/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_formula_topk40/massspecgym_formula_train.pt",
+            "sha256": "54b70f911a9c987dd5b33596d928d74f52c5f7cfa77da18eeccce4f18f8bfd85",
+            "size_bytes": 2034172439,
+            "split": "train"
+          },
+          {
+            "candidate_type": "formula",
+            "id": "alignment44.cache.formula.val",
+            "path": "rerank_cache/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_formula_topk40/massspecgym_formula_val.pt",
+            "sha256": "6e310323b85e8b9a2b6df34eabdb02660d9725bb8cbbc399f25e43036e5c027c",
+            "size_bytes": 263781706,
+            "split": "val"
+          },
+          {
+            "candidate_type": "mass",
+            "id": "alignment44.cache.mass.test",
+            "path": "rerank_cache/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_mass_topk40/massspecgym_mass_test.pt",
+            "sha256": "43573109f259599604b6638a004a45f2a55d0c00e86a9c55fdef1f4ebb3a1647",
+            "size_bytes": 281191638,
+            "split": "test"
+          },
+          {
+            "candidate_type": "mass",
+            "id": "alignment44.cache.mass.train",
+            "path": "rerank_cache/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_mass_topk40/massspecgym_mass_train.pt",
+            "sha256": "731b9fe803d52c13a377a5ebea111a7b0250c83f743b24225158ad7e6b1d0289",
+            "size_bytes": 2114609926,
+            "split": "train"
+          },
+          {
+            "candidate_type": "mass",
+            "id": "alignment44.cache.mass.val",
+            "path": "rerank_cache/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_mass_topk40/massspecgym_mass_val.pt",
+            "sha256": "13a824606ba663941eb519197425e2d233ac05028a3218cfb9d08da677c96067",
+            "size_bytes": 305367851,
+            "split": "val"
+          }
+        ],
+        "checkpoint": {
+          "path": "checkpoints_align/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44/best_model_stage2.pth",
+          "sha256": "d007f832cfde8c02f61c053ee2b4098664c631868571f23ee83a96e107935a5c",
+          "size_bytes": 36233914
+        },
+        "selection": {
+          "path": "checkpoints_align/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44/alignment_selection.json",
+          "sha256": "dd1a340c0c656bcad87ec793ce0e6f759f8cc845e6d07ed82b31d1cc5a779171",
+          "size_bytes": 1175
+        },
+        "summary": {
+          "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/summary.csv",
+          "sha256": "8a7246b9201ddec9c2e0127c1000b86ebe08fd1f54c5cb650d22f1fbeb4d0d33",
+          "size_bytes": 3665
+        },
+        "summary_aggregate": {
+          "path": "checkpoints_rerank/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_topk40_multiseed/summary_aggregate.csv",
+          "sha256": "8c900ff757a657edc1d0aeba7a99d741f7dc16d9e17e26dafb11a05d4ae101f3",
+          "size_bytes": 1957
+        }
+      },
+      "params_sha256": "b6260dad043f9c0f1cb4ff36dc7b7bf8bac4481998aa36b4d55f44392e1b0bc6",
+      "source_git_commit": "28bdce232402cea3d656c790b12a9f32d1cc5382"
+    }
+  ],
+  "outputs": {
+    "alignment_summary": {
+      "path": "analysis/transfer2026_alignment_multiseed/alignment_summary.csv",
+      "sha256": "5589c4a2a524e03c958f0c0d910969bf82b927bbbf013773a3d59195f6cb2e18",
+      "size_bytes": 5055
+    },
+    "cross_alignment_summary": {
+      "path": "analysis/transfer2026_alignment_multiseed/cross_alignment_summary.csv",
+      "sha256": "120b3c73ea9778b272eb186dc4d19a61c5f7bb5ebfda2a4cd5591ae0d0286ede",
+      "size_bytes": 5814
+    },
+    "paired_deltas": {
+      "path": "analysis/transfer2026_alignment_multiseed/paired_deltas.csv",
+      "sha256": "39ec269811ec73dbdde99122612dabf2e8c5b220fb9195145439a0a41d2ca850",
+      "size_bytes": 3760
+    },
+    "report": {
+      "path": "analysis/transfer2026_alignment_multiseed/report.md",
+      "sha256": "2a006c2e7843e03902d3888e2737fef6fe7655ec1a3feb5a2d1959120a7f2297",
+      "size_bytes": 3075
+    },
+    "summary_long": {
+      "path": "analysis/transfer2026_alignment_multiseed/summary_long.csv",
+      "sha256": "4b5050e01b10d1e4bde6287c8bf6864af9acd279f7a1924f6c4b6d7a8f523703",
+      "size_bytes": 16929
+    }
+  },
+  "residual_vs_base_gate": {
+    "checks": [
+      {
+        "alignment_seed": 42,
+        "both_positive": true,
+        "candidate_type": "mass",
+        "delta_mrr_raw": 0.16759999999999997,
+        "delta_top1_pct": 19.983633333333337,
+        "model_type": "pointwise"
+      },
+      {
+        "alignment_seed": 42,
+        "both_positive": true,
+        "candidate_type": "mass",
+        "delta_mrr_raw": 0.17566666666666664,
+        "delta_top1_pct": 21.122833333333325,
+        "model_type": "transformer"
+      },
+      {
+        "alignment_seed": 42,
+        "both_positive": true,
+        "candidate_type": "formula",
+        "delta_mrr_raw": 0.08776666666666666,
+        "delta_top1_pct": 10.869999999999997,
+        "model_type": "pointwise"
+      },
+      {
+        "alignment_seed": 42,
+        "both_positive": true,
+        "candidate_type": "formula",
+        "delta_mrr_raw": 0.09156666666666669,
+        "delta_top1_pct": 11.466199999999994,
+        "model_type": "transformer"
+      },
+      {
+        "alignment_seed": 43,
+        "both_positive": true,
+        "candidate_type": "mass",
+        "delta_mrr_raw": 0.2608999999999999,
+        "delta_top1_pct": 31.00183333333333,
+        "model_type": "pointwise"
+      },
+      {
+        "alignment_seed": 43,
+        "both_positive": true,
+        "candidate_type": "mass",
+        "delta_mrr_raw": 0.2625333333333333,
+        "delta_top1_pct": 31.2695,
+        "model_type": "transformer"
+      },
+      {
+        "alignment_seed": 43,
+        "both_positive": true,
+        "candidate_type": "formula",
+        "delta_mrr_raw": 0.2029333333333334,
+        "delta_top1_pct": 24.5614,
+        "model_type": "pointwise"
+      },
+      {
+        "alignment_seed": 43,
+        "both_positive": true,
+        "candidate_type": "formula",
+        "delta_mrr_raw": 0.20110000000000006,
+        "delta_top1_pct": 24.223466666666674,
+        "model_type": "transformer"
+      },
+      {
+        "alignment_seed": 44,
+        "both_positive": true,
+        "candidate_type": "mass",
+        "delta_mrr_raw": 0.28956666666666664,
+        "delta_top1_pct": 33.870599999999996,
+        "model_type": "pointwise"
+      },
+      {
+        "alignment_seed": 44,
+        "both_positive": true,
+        "candidate_type": "mass",
+        "delta_mrr_raw": 0.28646666666666665,
+        "delta_top1_pct": 33.511766666666674,
+        "model_type": "transformer"
+      },
+      {
+        "alignment_seed": 44,
+        "both_positive": true,
+        "candidate_type": "formula",
+        "delta_mrr_raw": 0.2626666666666666,
+        "delta_top1_pct": 31.026466666666664,
+        "model_type": "pointwise"
+      },
+      {
+        "alignment_seed": 44,
+        "both_positive": true,
+        "candidate_type": "formula",
+        "delta_mrr_raw": 0.26473333333333327,
+        "delta_top1_pct": 31.08533333333333,
+        "model_type": "transformer"
+      }
+    ],
+    "criterion": "Every alignment/candidate/model aggregate must improve both test Top-1 and MRR over its fixed base ranking. This is descriptive and does not establish statistical significance or generalization.",
+    "positive_cells": 12,
+    "status": "pass_descriptive",
+    "total_cells": 12
+  },
+  "schema_version": 2,
+  "units": {
+    "delta": "transformer_minus_pointwise",
+    "mrr": "raw_[0,1]",
+    "topk_metrics": "percentage_points"
+  }
+}

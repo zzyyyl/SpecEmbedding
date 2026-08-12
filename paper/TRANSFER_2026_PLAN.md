@@ -1,6 +1,6 @@
 # SpecEmbedding 转投稿件完成计划
 
-- 最后更新：2026-07-30
+- 最后更新：2026-08-12
 - 计划完成日期：2026-08-31
 - 转投开发分支：`codex/transfer-2026-0831`
 
@@ -87,6 +87,31 @@ python freeze_adma2026_artifacts.py --check
 - 保留失败、重试和恢复状态，不复用 fingerprint 不一致的 attempt。
 - 正确性修复后的结果必须使用新的 provenance，不能继续标记为 `a2280d2`。
 
+### 3.3 多 alignment seeds 验收记录（2026-08-12）
+
+alignment seeds 42、43、44 的端到端结果已经完成：
+
+- 每个 alignment seed 均覆盖 mass/formula、Pointwise/Set Transformer 和
+  reranker seeds 42/43/44，共 12 组；三组 alignment 合计 36/36 完整。
+- 新增 alignment seeds 43、44 的 24 组结果均为 `complete`，批次
+  `errors=[]`；checkpoint、selection metadata 和两类 top-40 cache 均存在。
+- 三组实验的 `params.yaml` 哈希和 validation 排除协议一致；alignment seed 42
+  来自冻结提交 `a2280d2`，seeds 43、44 来自提交 `28bdce2`，不得把三者统一
+  标记为同一个 source commit。
+- 18 个固定 top-40 cache（3 alignment seeds × 2 candidate types ×
+  train/validation/test）的路径、字节数和 SHA-256 已冻结于分析 manifest，合计
+  15,377,576,140 bytes；seed 42 的六项同时与 canonical artifact manifest
+  交叉核验。36 组 attempt 的 status、训练/评估日志和 best/last checkpoint 也已
+  内容寻址并纳入 provenance。
+- 跨 alignment 分层分析固定由 `analyze_alignment_multiseed.py` 从三个原始
+  `summary.csv` 重新生成，派生结果写入
+  `analysis/transfer2026_alignment_multiseed/`。
+
+同 reranker seed 的 Transformer - Pointwise 配对差异在不同 alignment
+checkpoint 下方向混合。因此 2.2 节的主张升级门槛未通过：后续稿件不突出
+`set-aware reranking`，继续以“监督残差重排序有效”为核心结论，并将候选交互
+的独立收益表述为尚未确立。
+
 ## 4. 工作优先级
 
 ### 4.1 P0：投稿前必须完成
@@ -152,6 +177,37 @@ python freeze_adma2026_artifacts.py --check
 
 Pointwise 已作为“移除 candidate self-attention”的受控基线，不要求为每个
 feature ablation 再重复 Pointwise 全矩阵。
+
+2026-08-12 在查看消融结果之前锁定以下执行协议：
+
+- 固定使用 canonical overlap-clean alignment seed 42 及其既有 mass/formula
+  top-40 train/validation/test cache，避免按新增 checkpoint 表现事后挑选基线。
+- 仅运行 Set Transformer 的 `no_residual`、`no_base_score`、
+  `no_rank_embedding`、`no_interaction_features`、`listwise_only`，不扩展 P2
+  消融。
+- reranker seeds 固定为 42、43、44；validation 排除索引保持
+  `7686 7687 7688 8464 8465 8466`；test 不排除查询且不计算逐 seed MCES。
+- 使用独立输出目录
+  `checkpoints_rerank/transfer2026_canonicalalignseed42_topk40_core_ablations`，
+  不覆盖 canonical artifacts；正式任务通过脱离终端的 `tmux` 会话运行。
+
+锁定的 runner 参数为：
+
+```bash
+conda run -n specembedding python run_rerank_multiseed.py \
+  --run-prefix a2280d2_massspecgym_nopretrain_valoverlapclean \
+  --dataset-type massspecgym --topk 40 \
+  --candidate-types mass formula --model-types transformer \
+  --ablations no_residual no_base_score no_rank_embedding \
+    no_interaction_features listwise_only \
+  --seeds 42 43 44 --devices cuda:0 cuda:1 \
+  --min-free-mib 16000 --max-utilization 20 \
+  --cache-root rerank_cache \
+  --output-root \
+    checkpoints_rerank/transfer2026_canonicalalignseed42_topk40_core_ablations \
+  --exclude-val-query-indices 7686 7687 7688 8464 8465 8466 \
+  --no-mces
+```
 
 验收标准：
 
@@ -316,8 +372,8 @@ JESTR/GLMR 统一复现必须满足：
 
 ### 科学结果
 
-- [ ] alignment seeds 42/43/44 均完成并有完整 provenance。
-- [ ] 新增 24 组端到端 reranker 实验全部完成。
+- [x] alignment seeds 42/43/44 均完成并有完整 provenance。
+- [x] 新增 24 组端到端 reranker 实验全部完成。
 - [ ] 五类核心消融全部完成。
 - [ ] top-\(K\)、效率和排名迁移达到最终保留范围。
 - [ ] val/test 无正例插入，所有 test queries 进入指标。
