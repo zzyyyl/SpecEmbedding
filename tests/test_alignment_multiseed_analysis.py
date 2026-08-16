@@ -356,12 +356,23 @@ class AlignmentMultiseedAnalysisTest(unittest.TestCase):
             self.assertEqual(manifest["counts"]["cache_artifacts"], 18)
             self.assertEqual(manifest["counts"]["attempts"], 36)
             self.assertEqual(manifest["design"]["n_alignment_seeds"], 3)
+            self.assertEqual(
+                manifest["evaluation_identity_protocol"],
+                analysis.EVALUATION_IDENTITY_PROTOCOL,
+            )
+            self.assertFalse(
+                manifest["evaluation_identity_protocol"][
+                    "official_evaluator_equivalent"
+                ]
+            )
             self.assertEqual(manifest["claim_gate"]["status"], "fail")
             self.assertEqual(
                 manifest["residual_vs_base_gate"]["status"], "pass_descriptive"
             )
             report = (output / "report.md").read_text(encoding="utf-8")
             self.assertIn("produced by 3 source commit(s)", report)
+            self.assertIn("exact-target-SMILES single-positive rule", report)
+            self.assertIn("not official-evaluator-equivalent results", report)
             with (output / "paired_deltas.csv").open(encoding="utf-8") as handle:
                 paired = list(csv.DictReader(handle))
             row = next(

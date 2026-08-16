@@ -12,6 +12,11 @@ from pathlib import Path
 from statistics import mean, stdev
 from typing import Any
 
+from evaluation_protocol import (
+    EVALUATION_IDENTITY_PROTOCOL,
+    EVALUATION_IDENTITY_PROTOCOL_NOTE,
+)
+
 EXPECTED_ALIGNMENT_SEEDS = (42, 43, 44)
 CANDIDATE_TYPES = ("mass", "formula")
 MODEL_TYPES = ("pointwise", "transformer")
@@ -914,6 +919,10 @@ def build_report(
         "Reranker-seed combinations are paired within each alignment checkpoint; cross-alignment",
         "statistics use the three alignment-level estimates rather than flattening nine runs.",
         "",
+        "## Evaluation identity protocol",
+        "",
+        EVALUATION_IDENTITY_PROTOCOL_NOTE,
+        "",
         "## Provenance",
         "",
         "| Alignment seed | Source commit | Params SHA256 | Checkpoint SHA256 |",
@@ -1066,8 +1075,9 @@ def run_analysis(specs: list[RunSpec], output_root: Path, repo_root: Path) -> di
     atomic_write_text(paths["report"], report)
 
     manifest = {
-        "schema_version": 2,
+        "schema_version": 3,
         "analysis": "cross_alignment_multiseed_paired_differences",
+        "evaluation_identity_protocol": dict(EVALUATION_IDENTITY_PROTOCOL),
         "design": {
             "alignment_seeds": list(EXPECTED_ALIGNMENT_SEEDS),
             "candidate_types": list(CANDIDATE_TYPES),

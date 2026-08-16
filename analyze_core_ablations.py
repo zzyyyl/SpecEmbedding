@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import Any
 
 import analyze_alignment_multiseed as common
+from evaluation_protocol import (
+    EVALUATION_IDENTITY_PROTOCOL,
+    EVALUATION_IDENTITY_PROTOCOL_NOTE,
+)
 
 ALIGNMENT_SEED = 42
 CANDIDATE_TYPES = common.CANDIDATE_TYPES
@@ -766,6 +770,10 @@ def build_report(
         "component removals at canonical alignment seed 42. Reranker seeds are paired",
         "within candidate protocol; statistics are descriptive sample means/SDs (n=3).",
         "",
+        "## Evaluation identity protocol",
+        "",
+        EVALUATION_IDENTITY_PROTOCOL_NOTE,
+        "",
         "Delta is defined as `full - ablation`: positive values favor the full model.",
         "Top-1 differences are percentage points; MRR uses the raw [0, 1] scale.",
         "",
@@ -924,8 +932,9 @@ def run_analysis(
         build_report(full, ablations, summary_rows, gate, changed_paths),
     )
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "analysis": "canonical_alignment_seed42_core_component_ablations",
+        "evaluation_identity_protocol": dict(EVALUATION_IDENTITY_PROTOCOL),
         "design": {
             "alignment_seed": ALIGNMENT_SEED,
             "candidate_types": list(CANDIDATE_TYPES),

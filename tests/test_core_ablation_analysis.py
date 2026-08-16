@@ -151,6 +151,8 @@ class CoreAblationAnalysisTest(unittest.TestCase):
         self.assertIn("candidate self-attention remains enabled", report)
         self.assertIn("not a single-factor feature ablation", report)
         self.assertIn("not justify selecting a new post-hoc main model", report)
+        self.assertIn("exact-target-SMILES single-positive rule", report)
+        self.assertIn("not official-evaluator-equivalent results", report)
 
     def test_retry_status_accepts_historical_failures_but_requires_success(self):
         history = [

@@ -25,6 +25,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from evaluation_protocol import EVALUATION_IDENTITY_PROTOCOL
 
 REPO_ROOT = Path(__file__).resolve().parent
 SOURCE_COMMIT = "a2280d2828ce872da1f69319b49e0ef7f1bed572"
@@ -710,7 +711,7 @@ def build_manifest() -> dict[str, Any]:
     artifacts.sort(key=lambda item: item["id"])
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "purpose": "Internal ADMA 2026 canonical experiment artifact freeze",
         "release_note": "Not for direct submission; review the recorded Git commit for anonymity.",
         "packaging_policy": (
@@ -730,6 +731,7 @@ def build_manifest() -> dict[str, Any]:
             "validation_query_exclusions": VAL_EXCLUSIONS,
             "test_queries": 17556,
         },
+        "evaluation_identity_protocol": dict(EVALUATION_IDENTITY_PROTOCOL),
         "mces_at_1": mces_metrics,
         "artifact_count": len(artifacts),
         "artifacts": artifacts,

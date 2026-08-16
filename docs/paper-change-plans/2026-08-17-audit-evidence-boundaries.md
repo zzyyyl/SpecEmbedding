@@ -77,6 +77,8 @@
   identity-protocol 声明，重新生成确定性工件。
 - [ ] `analyze_core_ablations.py` 及相应测试/派生产物：加入相同声明，并明确统计对象为
   canonical alignment seed 42 下的 reranker seeds 42--44。
+- [ ] `freeze_adma2026_artifacts.py` / `paper/adma2026_artifact_manifest.json`：在 canonical
+  工件清单中加入相同的结构化评价身份协议，避免最上游结果 manifest 缺少协议标签。
 - [ ] `README.md` / `docs/README_zh.md`：在论文主结果复现入口附近加入本地身份规则、
   非官方 evaluator 等价和 fixed/cross-alignment 统计口径说明。
 - [ ] `paper/ADMA2026_TODO.md` / `docs/project_memory_zh.md`：同步多 alignment 完成状态、
@@ -176,8 +178,8 @@ context，不承担公平比较。
 ## 7. 分步执行清单
 
 - [x] 步骤 1：提交本计划；开始任何论文正文修改前将状态改为 `执行中`。
-- [ ] 步骤 2：修改两份分析脚本和测试，加入身份协议与统计单位字段；重新生成派生产物并
-  验证数值、输入/输出哈希和字节级确定性。
+- [ ] 步骤 2：修改 canonical freeze 与两份分析脚本和测试，加入身份协议与统计单位字段；
+  重新生成 manifest/派生产物并验证数值、输入/输出哈希和字节级确定性。
 - [ ] 步骤 3：修改英文稿的全局协议标签、外部结果视觉分区、跨 alignment 结果、讨论、
   局限和结论。
 - [ ] 步骤 4：逐项同步中文稿，核对表格数字、正负方向、术语和结论强度。
