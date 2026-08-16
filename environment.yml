@@ -17,6 +17,7 @@ dependencies:
   - matplotlib
   - scipy
   - scikit-learn
+  - pytest>=8,<9
   - huggingface_hub
   - pip
   - pip:

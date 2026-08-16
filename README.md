@@ -22,16 +22,39 @@ Python: 3.12
 
 PyTorch: 2.6.0 with CUDA 12.4
 
-> ⚠️ Note for Windows Users: When running on Windows, you may encounter numerical errors during cosine similarity computation. This is caused by @njit decorators from the numba library. You can fix it by commenting out all @njit decorators in the code.
-
-### 1.1 Development Tools
-
-Ruff is configured for linting and import sorting, but it is intentionally kept out of `environment.yml` so production/runtime environments do not install it by default.
-
-Install development-only tools when needed:
+Create the canonical Conda environment from the repository root:
 
 ```bash
-pip install -r requirements-dev.txt
+conda env create -f environment.yml
+conda activate specembedding
+```
+
+If the environment already exists, synchronize it with the checked-in
+specification before running tests or experiments:
+
+```bash
+conda env update -n specembedding -f environment.yml --prune
+conda activate specembedding
+```
+
+> ⚠️ Note for Windows Users: When running on Windows, you may encounter numerical errors during cosine similarity computation. This is caused by @njit decorators from the numba library. You can fix it by commenting out all @njit decorators in the code.
+
+### 1.1 Development and Test Tools
+
+Pytest is the repository acceptance-test entry point and is included in
+`environment.yml`. Ruff is configured for linting and import sorting, but it is
+kept out of the runtime environment. For an existing environment, install or
+refresh both development tools with:
+
+```bash
+python -m pip install -r requirements-dev.txt
+```
+
+From the repository root, run the complete test suite with the environment's
+Python interpreter:
+
+```bash
+python -m pytest -q
 ```
 
 Run Ruff checks:

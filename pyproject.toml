@@ -13,3 +13,8 @@ select = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["SpecEmbedding", "src"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["."]
