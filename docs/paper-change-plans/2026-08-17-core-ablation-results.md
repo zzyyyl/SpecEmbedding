@@ -147,15 +147,15 @@
 
 ## 7. 分步执行清单
 
-- [ ] 步骤 1：核验 full 与 30 组消融的矩阵、status、日志、checkpoint、cache、params、
+- [x] 步骤 1：核验 full 与 30 组消融的矩阵、status、日志、checkpoint、cache、params、
   validation/test 协议及两个 source commits 间的运行时代码兼容性。
-- [ ] 步骤 2：实现 `analyze_core_ablations.py` 与单元测试，固定配对方向、单位、
+- [x] 步骤 2：实现 `analyze_core_ablations.py` 与单元测试，固定配对方向、单位、
   组件门槛和失败条件。
-- [ ] 步骤 3：从原始工件生成 `analysis/transfer2026_core_ablations/`，重复运行确认
+- [x] 步骤 3：从原始工件生成 `analysis/transfer2026_core_ablations/`，重复运行确认
   字节级确定性，并核对所有 input/output hashes。
-- [ ] 步骤 4：回填 `paper/TRANSFER_2026_PLAN.md` 的核心消融验收记录、实验冻结状态和
+- [x] 步骤 4：回填 `paper/TRANSFER_2026_PLAN.md` 的核心消融验收记录、实验冻结状态和
   下一步顺序；仍缺失项目不误勾选。
-- [ ] 步骤 5：提交分析与计划回填，记录分析 commit；真正修改论文前将本计划状态改为
+- [x] 步骤 5：提交分析与计划回填，记录分析 commit；真正修改论文前将本计划状态改为
   `执行中`。
 - [ ] 步骤 6：按 claim gate 重写英文稿相关表格、贡献、结果、讨论、限制与结论。
 - [ ] 步骤 7：同步中文稿件，自动反查所有表格数字、delta、符号和单位。
@@ -202,16 +202,31 @@
 
 ## 10. 执行记录
 
-尚未执行。
+### 2026-08-17：论文修改前的分析准备完成
 
-执行时按日期记录完成内容、工件审计、组件门槛、双语修改、验证结果、用户确认和必要偏差。
+- 新增 `analyze_core_ablations.py`、9 项定向测试和
+  `analysis/transfer2026_core_ablations/` 五个受版本控制的派生产物。
+- 审计 6 个 full Transformer attempts、30 个最终消融 attempts、38 个历史 attempt
+  statuses、6 个 canonical cache hashes、训练/评价日志、checkpoint、selection、
+  params、validation exclusions、17,556-query test 协议和 source-commit 运行代码。
+- 36 条长表、30 个同 seed 配对差值和 10 个聚合单元全部通过独立数字反查；delta
+  固定为 `full - ablation`，sample SD 使用 `ddof=1`。
+- claim gate 为 `component_claims_require_narrowing`，0/5 组件通过严格描述性门槛；
+  `no_rank_embedding` 在两候选协议、全部六个配对单元同时提高 Top-1 和 MRR。
+- 连续两次全量生成的五个输出字节一致；manifest 中 241 个唯一文件的路径、大小和
+  SHA-256 经独立审计全部匹配，且未包含绝对路径、主机名、用户名或 GPU UUID。
+- 验证通过：70 项完整单元测试、Ruff、`py_compile`、`git diff --check`。
+- 分析与转投计划回填 commit：
+  `2701782a1e193d442e09a9fc49668fbd161416f5`。
+- 当前仍未修改 `paper/main.tex` 或 `paper/main_cn.tex`，因此本专项计划继续保持
+  `未执行`；进入双语稿修改前必须先把状态改为 `执行中`。
 
 ## 11. 最终结果
 
 - 完成日期：尚未完成
 - 最终状态：`未执行`
-- 验证结果：尚未验证
-- 分析 commit：尚未提交
+- 验证结果：分析准备阶段已验证；论文修改、双语编译和最终验收尚未执行
+- 分析 commit：`2701782a1e193d442e09a9fc49668fbd161416f5`
 - 论文修改 commit：尚未提交
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：无/尚未记录
