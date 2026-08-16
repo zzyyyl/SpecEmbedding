@@ -51,7 +51,7 @@
     },
     {
       "id": "config.params",
-      "location": "repo:params.yaml",
+      "location": "git:a2280d2828ce872da1f69319b49e0ef7f1bed572:params.yaml",
       "sha256": "b6260dad043f9c0f1cb4ff36dc7b7bf8bac4481998aa36b4d55f44392e1b0bc6",
       "size_bytes": 3407
     },
@@ -362,6 +362,17 @@
       "size_bytes": 1917
     }
   ],
+  "evaluation_identity_protocol": {
+    "candidate_source": "MassSpecGym-supplied candidate files",
+    "dataset": "MassSpecGym",
+    "identity_rule_effect_quantified": false,
+    "local_positive_cardinality": "single_positive_per_query",
+    "local_positive_identity": "exact_target_smiles_equality",
+    "official_evaluator_equivalent": false,
+    "reference_code_commit": "4f501b3207c9f466bc745a0353f61dbfaf150d32",
+    "reference_default_identity": "two_dimensional_inchikey_equivalence",
+    "reference_positive_cardinality": "may_be_multi_positive"
+  },
   "experiment": {
     "alignment_checkpoint_sha256": "ad5d1eb76805c51563349f259a4b4c935336064b6171a4e650472b78aeeaa06f",
     "alignment_seed": 42,
@@ -406,7 +417,8 @@
     }
   },
   "packaging_policy": "Inventory only, not an anonymous bundle allowlist. Redact referenced status and log files before release because they may contain host, user, process, GPU, or timestamp data.",
+  "provenance_policy": "Experiment runtime and configuration remain bound to source_commit; config.params is hashed from that Git tree rather than the current worktree.",
   "purpose": "Internal ADMA 2026 canonical experiment artifact freeze",
   "release_note": "Not for direct submission; review the recorded Git commit for anonymity.",
-  "schema_version": 1
+  "schema_version": 2
 }

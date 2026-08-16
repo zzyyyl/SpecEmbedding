@@ -261,6 +261,17 @@
       8466
     ]
   },
+  "evaluation_identity_protocol": {
+    "candidate_source": "MassSpecGym-supplied candidate files",
+    "dataset": "MassSpecGym",
+    "identity_rule_effect_quantified": false,
+    "local_positive_cardinality": "single_positive_per_query",
+    "local_positive_identity": "exact_target_smiles_equality",
+    "official_evaluator_equivalent": false,
+    "reference_code_commit": "4f501b3207c9f466bc745a0353f61dbfaf150d32",
+    "reference_default_identity": "two_dimensional_inchikey_equivalence",
+    "reference_positive_cardinality": "may_be_multi_positive"
+  },
   "inputs": {
     "ablations": {
       "files": {
@@ -1504,19 +1515,19 @@
     "analysis_runtime": {
       "core_ablation_script": {
         "path": "analyze_core_ablations.py",
-        "sha256": "11e51407427af5d4d4bc53f390779a980c81a3989ee8ed578085bab7a6d77846",
-        "size_bytes": 42153
+        "sha256": "60810cea66f91fb3396779379d775eae0e949a18fec2e2dd936788c0aeabe7cf",
+        "size_bytes": 42448
       },
       "shared_validation_script": {
         "path": "analyze_alignment_multiseed.py",
-        "sha256": "e503ac1ff468351b22ad91138a14301744875bbc03975bb9717cc8545e928372",
-        "size_bytes": 48376
+        "sha256": "d673828eb19f7fa77e18864a0593a4d773bbf6554fe763cf99ae6a0a5d2d0810",
+        "size_bytes": 48672
       }
     },
     "canonical_artifact_manifest": {
       "path": "paper/adma2026_artifact_manifest.json",
-      "sha256": "e00634b13d79ab1f4e7cbb38339f89302a98082e75f5daf54e3e0daef4702245",
-      "size_bytes": 20423
+      "sha256": "ad92596e1ca60e8edc6b7be594bde7cbe314f5d08a0421551ba88eaad8207875",
+      "size_bytes": 21194
     },
     "full": {
       "files": {
@@ -1975,8 +1986,8 @@
     },
     "report": {
       "path": "analysis/transfer2026_core_ablations/report.md",
-      "sha256": "adfc809562dcae072fdba08334364595e3bb7ca16bea8c7d67f38607f5a50664",
-      "size_bytes": 4786
+      "sha256": "e1e0e2db1f0ad0416e7a36d28f8ba3a7041a29c1cbd846348034dc457d7eed3b",
+      "size_bytes": 5152
     },
     "summary_long": {
       "path": "analysis/transfer2026_core_ablations/summary_long.csv",
@@ -1984,7 +1995,7 @@
       "size_bytes": 9826
     }
   },
-  "schema_version": 1,
+  "schema_version": 2,
   "units": {
     "delta": "full_minus_ablation",
     "mrr": "raw_[0,1]",

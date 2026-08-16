@@ -4,6 +4,10 @@ This report compares the frozen full Set Transformer with five pre-registered
 component removals at canonical alignment seed 42. Reranker seeds are paired
 within candidate protocol; statistics are descriptive sample means/SDs (n=3).
 
+## Evaluation identity protocol
+
+Recall and MRR use MassSpecGym-supplied candidate files with a local exact-target-SMILES single-positive rule. The reference loader defaults to two-dimensional InChIKey equivalence and may yield multiple positives. The effect of this identity-rule difference is unquantified, so these are not official-evaluator-equivalent results.
+
 Delta is defined as `full - ablation`: positive values favor the full model.
 Top-1 differences are percentage points; MRR uses the raw [0, 1] scale.
 

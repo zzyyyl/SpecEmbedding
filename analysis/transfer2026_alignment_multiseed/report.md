@@ -4,6 +4,10 @@ This report is generated from the three original per-run `summary.csv` files.
 Reranker-seed combinations are paired within each alignment checkpoint; cross-alignment
 statistics use the three alignment-level estimates rather than flattening nine runs.
 
+## Evaluation identity protocol
+
+Recall and MRR use MassSpecGym-supplied candidate files with a local exact-target-SMILES single-positive rule. The reference loader defaults to two-dimensional InChIKey equivalence and may yield multiple positives. The effect of this identity-rule difference is unquantified, so these are not official-evaluator-equivalent results.
+
 ## Provenance
 
 | Alignment seed | Source commit | Params SHA256 | Checkpoint SHA256 |
