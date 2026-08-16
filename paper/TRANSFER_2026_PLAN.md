@@ -1,6 +1,6 @@
 # SpecEmbedding 转投稿件完成计划
 
-- 最后更新：2026-08-12
+- 最后更新：2026-08-17
 - 计划完成日期：2026-08-31
 - 转投开发分支：`codex/transfer-2026-0831`
 
@@ -112,6 +112,33 @@ checkpoint 下方向混合。因此 2.2 节的主张升级门槛未通过：后�
 `set-aware reranking`，继续以“监督残差重排序有效”为核心结论，并将候选交互
 的独立收益表述为尚未确立。
 
+### 3.4 核心组件消融验收记录（2026-08-17）
+
+预注册的五类核心消融已于 2026-08-15 完成：
+
+- mass/formula、五类消融和 reranker seeds 42/43/44 的 30/30 组实验均已完成；
+  最终 `batch_status.json` 为 `state=complete`、`errors=[]`，30 组结果均已进入
+  `summary.csv`。
+- 后台 supervisor 共处理 8 次可恢复的 GPU 门禁或运行中抢占；这些失败 attempt
+  均已保留，后续 attempt 全部恢复完成，最终每组实验的最新状态均为
+  `complete`。未将失败 attempt 当作科学结果。
+- 完整模型基线来自冻结提交 `a2280d2`，消融运行提交为 `8bd2ca4`。两提交间用于
+  reranker 训练、评估、数据读取、模型、损失和运行辅助的相关代码路径无 diff；
+  因此完整模型与消融结果不存在这些运行路径上的实现漂移。
+- 30 组实验使用相同的 `params.yaml`、既有 `a2280d2` mass/formula top-40 cache、
+  数据划分、validation 排除索引、模型选择指标和训练预算；除预注册的消融开关
+  外，协议保持一致。
+- 原始工件和运行状态保存在
+  `checkpoints_rerank/transfer2026_canonicalalignseed42_topk40_core_ablations/`。
+  确定性分析由 `analyze_core_ablations.py` 从原始工件重建，派生结果写入
+  `analysis/transfer2026_core_ablations/`；36 条 seed-level 结果、30 个同 seed
+  配对差值和 10 个 candidate × ablation 聚合单元均已通过工件与数字反查，连续
+  两次生成的输出字节一致。
+- 组件主张门槛为 `component_claims_require_narrowing`：五个组件中没有一个在
+  mass/formula 和三个配对 seeds 上获得方向一致的 MRR 支持。去除 rank embedding
+  后，两个候选协议的全部六个配对单元均同时提高 Top-1 和 MRR；该组件不获当前
+  证据支持。其余组件呈候选协议依赖或随机种子方向混合，不能写成稳健独立贡献。
+
 ## 4. 工作优先级
 
 ### 4.1 P0：投稿前必须完成
@@ -156,9 +183,9 @@ checkpoint 下方向混合。因此 2.2 节的主张升级门槛未通过：后�
 - 汇总表同时展示 base、Pointwise、Transformer 和分层不确定性。
 - 形成是否升级 self-attention 主张的明确结论。
 
-#### B. 核心组件消融
+#### B. 核心组件消融（实验与分析已完成，待入稿）
 
-在固定的 overlap-clean alignment/cache 上，对完整 Set Transformer 补充：
+已在固定的 overlap-clean alignment/cache 上，对完整 Set Transformer 完成：
 
 - `no_residual`
 - `no_base_score`
@@ -209,10 +236,10 @@ conda run -n specembedding python run_rerank_multiseed.py \
   --no-mces
 ```
 
-验收标准：
+实验运行与分析验收已完成，具体 provenance、恢复记录和主张门槛见 3.4 节。
+下一步入稿验收仍包括：
 
-- 所有消融保持相同 cache、数据划分、模型选择指标和训练预算。
-- feature ablation 保持 MLP 宽度和参数量可比。
+- 核验 feature ablation 的 MLP 宽度和参数量可比性。
 - 主文至少报告 residual/base pathway、rank embedding、interaction features
   和 pairwise loss 四类结论。
 - 每个保留在贡献列表中的组件都有实验支撑；否则从贡献中删除。
@@ -348,6 +375,11 @@ JESTR/GLMR 统一复现必须满足：
 | 8/24–8/28 | venue 模板、环境复演、匿名包、独立技术审读 | 8/28 代码与补充材料冻结 |
 | 8/29–8/31 | 数字反查、英文终审、PDF/身份/合规检查 | 8/31 完成可投稿版本 |
 
+实际冻结记录（截至 2026-08-17）：多 alignment-seed 实验已完成，核心消融
+30/30 于 8 月 15 日完成，赶在 8 月 16 日实验冻结前验收。top-\(K\)、效率和
+排名迁移截至冻结点仍未完成，继续保持未验收状态，不据此补写结果或扩大已冻结
+实验矩阵。
+
 8 月 16 日之后只允许：
 
 - 修复明确的正确性错误；
@@ -374,7 +406,7 @@ JESTR/GLMR 统一复现必须满足：
 
 - [x] alignment seeds 42/43/44 均完成并有完整 provenance。
 - [x] 新增 24 组端到端 reranker 实验全部完成。
-- [ ] 五类核心消融全部完成。
+- [x] 五类核心消融全部完成。
 - [ ] top-\(K\)、效率和排名迁移达到最终保留范围。
 - [ ] val/test 无正例插入，所有 test queries 进入指标。
 - [ ] uncertainty 作用域准确。
@@ -401,10 +433,13 @@ JESTR/GLMR 统一复现必须满足：
 
 ## 10. 下一步执行顺序
 
-本计划提交后，按以下顺序开始实现：
+截至 2026-08-17，后续按以下顺序执行：
 
-1. 为 alignment 训练增加显式 seed 参数，并在 selection metadata 中记录。
-2. 增加多 alignment-seed 端到端 runner、dry-run 和测试。
-3. 使用新 run prefix 完成 seed 43 的小规模 smoke。
-4. smoke 验收后启动 seeds 43/44 正式实验。
-5. GPU 实验运行期间并行完成核心消融编排与 venue 规则矩阵。
+1. 审计冻结的核心消融结果：用分析脚本核验 30 组结果的完整性、provenance、
+   聚合口径和组件效应，并据此确定消融表及可保留的主张边界。
+2. 在分析结论通过核验后同步写入中英文稿，统一摘要、贡献、结果、限制、结论和
+   表图中的口径与数字。
+3. 确定并核对目标 venue 的模板、页数、匿名、AI 使用、补充材料和预印本规则，
+   同步完成环境复演与匿名代码包验收。
+4. 执行最终数字反查、引用与双语一致性检查、英文终审，以及 PDF、源码和归档包
+   的身份与合规扫描，形成 2026-08-31 可投稿版本。
