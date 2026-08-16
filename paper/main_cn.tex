@@ -16,7 +16,7 @@
 % 投稿前必须完成：
 % 1. 在同一 canonicalization 和候选协议下复现 JESTR/GLMR，或始终明确标注
 %    reported results，不能直接声称公平超越。
-% 2. 补齐剩余 feature/loss/top-K 消融和效率结果。
+% 2. 补齐剩余 top-K 消融和效率结果。
 % 3. 检查英文 PDF 不超过 15 页，并清理可识别作者身份的元数据。
 
 \usepackage[margin=1in]{geometry}
@@ -63,9 +63,11 @@
 $67.44\pm0.74$ 和 $68.58\pm0.20$，在分子式
 约束场景分别为 $73.97\pm0.59$ 和 $74.57\pm0.28$，而固定基础检索器分别为 47.46 和
 63.10。去除验证重叠后的实验中 Transformer 呈现小幅优势，但较早的 alignment
-checkpoint 未复现相同的成对胜场模式。因此，当前证据有力支持监督残差重排序，但尚不能确认候选间
-自注意力具有跨 checkpoint 的稳健收益。两种变体都不需要自回归分子生成，测试时也不把真实目标
-强制放入截断后的 top-40 列表。
+checkpoint 未复现相同的成对胜场模式。固定 alignment 的五项移除设置审计中，没有任何设置使完整
+模型在两类候选协议的每个按 reranker seed 配对的比较中均获得更高 MRR；去除排名嵌入反而在
+全部六个候选协议与种子的配对中同时提高 Recall@1 和 MRR。因此，当前证据支持监督、非生成式
+第二阶段重排序框架，但尚不能确认候选间自注意力或任一受审计组件具有稳健的独立收益。两种
+变体都不需要自回归分子生成，测试时也不把真实目标强制放入截断后的 top-40 列表。
 \end{abstract}
 
 \noindent\textbf{关键词：}
@@ -100,17 +102,16 @@ JESTR 使用 contrastive multiview coding 学习谱图--分子联合空间，并
 本文贡献如下：
 
 \begin{itemize}
-  \item 将面向 MS/MS 分子检索的直接、非生成式残差 learning-to-rank 构建为可评估方案，
+  \item 将面向 MS/MS 分子检索的直接、非生成式第二阶段 learning-to-rank 构建为可评估方案，
   同时避免固定余弦打分和自回归分子解码。
-  \item 使用多模态嵌入、对称交互特征、基础分数和排名嵌入实现残差排序器，通过
-  listwise 与全部检索负例的 pairwise 目标训练，并在相同输入特征、score head、损失和
-  优化协议下比较 pointwise 和 self-attentive 两种实现；第一阶段嵌入在两者中均可缓存，
-  但两种实现不匹配参数量。
+  \item 在相同输入特征、score head、损失和优化协议下比较 pointwise 与 self-attentive
+  两种实现，并保持第一阶段嵌入可缓存；在相同固定 cache 上进一步审计残差 shortcut、联合
+  基础分数路径、排名嵌入、乘积/绝对差特征和 pairwise loss 五项设计选择。
   \item 在 MassSpecGym 划分和候选文件上，并按本地 cache 的 exact-SMILES 身份规则评价，
   两种实现均在三个 reranker seeds 上大幅优于固定基础检索器；去除验证重叠后的受控
-  对比中，候选集合 Transformer 呈现小幅优势，但跨
-  alignment checkpoint 的比较表明该优势尚不稳健，因此不能把整体重排序增益归因于
-  候选间自注意力。
+  对比中，候选集合 Transformer 呈现小幅优势，但跨 alignment checkpoint 的比较未能
+  建立稳健的自注意力收益；在固定 alignment 的组件审计中，五项移除设置也均未使完整模型在
+  两类候选协议下取得一致的成对 MRR 优势。
 \end{itemize}
 
 \paragraph{AI 使用披露。}
@@ -155,15 +156,15 @@ Set Transformer 为集合输入提供基于注意力的模块 \cite{lee2019settr
 在保持置换等变性的同时联合建模文档间交互 \cite{pang2020setrank}。本文将这些原则迁移到
 谱图--分子检索，结合缓存的跨模态嵌入、显式 pair interactions 以及第一阶段分数和排名
 先验。本文的贡献并非 reranking、self-attention 或 listwise 学习本身，而是在冻结的
-谱图--分子跨模态表示和检索先验上，对 query-specific spectrum-to-structure top-$K$ 列表执行
-非生成式残差学习排序，并将可选的同查询候选交互与使用相同候选特征和目标的 pointwise
-打分器进行受控比较。本方法不依赖谱图库邻居或保留时间。
+跨模态表示上进行查询特定、非生成式第二阶段排序，并在相同固定候选列表上受控比较 pointwise
+打分器、候选集合模型及五项组件移除；pointwise 与候选集合架构比较使用匹配的特征和目标。
+本方法不依赖谱图库邻居或保留时间。
 
 \subsection{本文方法的定位}
 
 表~\ref{tab:method_comparison_cn} 对比最接近的 MassSpecGym 方法的排序机制。结合上述先例，
-本文贡献并非重排序本身，而是冻结跨模态表示上的查询特定、非生成式残差排序；候选间
-自注意力是被受控评估的架构选项，而不是预先假定的增益来源。
+本文贡献并非重排序本身，而是冻结跨模态表示上的查询特定、非生成式第二阶段排序；残差打分
+和候选间自注意力均是被受控评估的设计选项，而不是预先假定的增益来源。
 
 \begin{table}[t]
   \centering
@@ -437,8 +438,11 @@ reranker 隐藏维度为 512，rank embedding 为 32 维，dropout 为 0.1。set
 学习率 $10^{-4}$，batch size 16，最多训练 30 个 epoch，并根据验证集 MRR 进行 patience 为 5
 的 early stopping。$\lambda=0.2$，$\gamma=0.1$。在固定的验证重叠清理（overlap-clean）alignment checkpoint
 和 cache 的条件下，两种变体均使用 seeds 42、43 和 44 训练。这只衡量 reranker 的变异，
-不包含端到端 alignment 不确定性。所有模型均不访问测试集进行选择，并在单张 NVIDIA
-RTX 4090 上评估。
+不包含端到端 alignment 不确定性。组件审计使用相同 cache 和种子，其五项移除分别为：
+只关闭残差 shortcut、但仍保留基础分数作为 MLP 输入；同时关闭基础分数特征和残差路径；
+以零向量替代排名嵌入并保持输入宽度；
+去除乘积与绝对差特征但保留 self-attention；以及令 $\lambda=0$、只保留 listwise 训练。
+所有模型均不访问测试集进行选择，并在单张 NVIDIA RTX 4090 上评估。
 
 训练集中，执行仅训练使用的强制正例替换之前，基础 top-40 召回上界在质量和分子式场景下
 分别为 93.78\% 和 90.42\%；按前述训练协议补全后，训练列表的 labeled coverage 为
@@ -515,27 +519,46 @@ reranking 优于生成式方法，因为我们的基础检索器与 GLMR 的 pre
 匹配的因果比较需要统一复现基线，或在完全相同的冻结嵌入和候选列表上比较不同重排序器；
 因此本文只把 Recall 和 MCES 比较视为背景信息，不作因果解释。
 
-\subsection{受控 reranker 消融}
+\subsection{受控 reranker 比较与组件消融}
 
 \begin{table}[t]
   \centering
-  \caption{固定同一基础检索器的受控比较。reranker 结果是 seeds 42、43 和 44 的
-  均值 $\pm$ 样本标准差；Base 在各次运行中固定。所有数值均为百分比。}
+  \caption{冻结 alignment seed 42 的基础检索器和 cache 后进行的 reranker 与组件比较。
+  Base 行固定；其余行报告 reranker seeds 42--44 的均值 $\pm$ 样本标准差。Recall@1 和
+  MRR 均为百分比。移除行是围绕预先确定的完整候选集合 Transformer 配置、使用相同 cache
+  和种子分别训练的审计变体，不用于事后选择主模型。}
   \label{tab:reranker_ablation_cn}
   \scriptsize
-  \begin{tabular}{llcccc}
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{@{}>{\raggedright\arraybackslash}p{5.0cm}cccc@{}}
     \toprule
-    候选池 & 方法 & R@1 & R@5 & R@20 & MRR \\
+    & \multicolumn{2}{c}{质量} & \multicolumn{2}{c}{分子式} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}
+    方法 & R@1 & MRR & R@1 & MRR \\
     \midrule
-    \multirow{3}{*}{质量}
-      & Base & 47.46 & 63.51 & 77.76 & 55.03 \\
-      & Pointwise & $67.44\pm0.74$ & $77.02\pm0.59$ & $82.26\pm0.16$ & $71.79\pm0.66$ \\
-      & 候选集合 Transformer & $68.58\pm0.20$ & $77.36\pm0.36$ & $82.20\pm0.07$ & $72.60\pm0.25$ \\
+    Base & 47.46 & 55.03 & 63.10 & 68.86 \\
+    Pointwise
+      & $67.44\pm0.74$ & $71.79\pm0.66$
+      & $73.97\pm0.59$ & $77.64\pm0.49$ \\
+    候选集合 Transformer（完整）
+      & $68.58\pm0.20$ & $72.60\pm0.25$
+      & $74.57\pm0.28$ & $78.02\pm0.26$ \\
     \midrule
-    \multirow{3}{*}{分子式}
-      & Base & 63.10 & 75.79 & 84.93 & 68.86 \\
-      & Pointwise & $73.97\pm0.59$ & $81.94\pm0.27$ & $86.78\pm0.27$ & $77.64\pm0.49$ \\
-      & 候选集合 Transformer & $74.57\pm0.28$ & $81.97\pm0.26$ & $86.77\pm0.14$ & $78.02\pm0.26$ \\
+    去除残差 shortcut
+      & $68.16\pm0.06$ & $72.33\pm0.06$
+      & $75.01\pm0.54$ & $78.38\pm0.42$ \\
+    去除基础分数特征与残差路径
+      & $68.07\pm0.20$ & $72.28\pm0.18$
+      & $74.39\pm0.55$ & $77.93\pm0.38$ \\
+    去除排名嵌入
+      & $70.12\pm0.30$ & $73.75\pm0.28$
+      & $76.62\pm0.69$ & $79.38\pm0.58$ \\
+    去除乘积/绝对差特征
+      & $68.10\pm0.85$ & $72.29\pm0.66$
+      & $75.76\pm0.55$ & $78.90\pm0.38$ \\
+    仅 listwise（$\lambda=0$）
+      & $68.91\pm0.76$ & $72.86\pm0.46$
+      & $74.24\pm0.25$ & $77.71\pm0.25$ \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -546,8 +569,16 @@ reranking 优于生成式方法，因为我们的基础检索器与 GLMR 的 pre
 这说明 clean 实验内部存在小幅且一致的架构差异。由于 Transformer 还多出约 630 万个
 可训练参数，该对比无法把候选交互与模型容量增加的影响分离。然而，较早 alignment checkpoint 上的 Recall@1
 差异分别为 $-0.13$ 和 $+0.21$ 个百分点，Transformer 只赢得 3/6 个配对。因此，现有证据
-支持监督残差重排序，也提示候选交互可能有益，但尚不能确认 self-attention 具有跨 checkpoint
+支持监督第二阶段重排序，也提示候选交互可能有益，但尚不能确认 self-attention 具有跨 checkpoint
 的稳健独立贡献。
+
+五项移除行是在同一固定 alignment checkpoint 上进行的描述性组件审计。没有任何移除设置使完整
+模型在两类候选协议的三个同种子配对中均获得更高 MRR。去除排名嵌入在全部六个候选协议与
+种子的配对中同时提高 Recall@1 和 MRR：相对完整模型，其质量候选的平均提升分别为 1.54 和 1.15
+个百分点，分子式候选分别为 2.05 和 1.36 个百分点。残差 shortcut、显式乘积/绝对差特征
+和 pairwise loss 的方向随候选协议变化。联合去除基础分数特征与残差路径时，完整模型的平均
+MRR 高 0.32 和 0.08 个百分点，且种子级方向混合。这些三种子比较不是显著性检验；本文
+保留预先确定的完整配置作为报告参照，不在查看结果后把某个移除版本升级为新主模型。
 
 作为较早固定 checkpoint 上单独进行的测试重叠敏感性检查，我们剔除上述 3 条测试查询，
 保留 17,553 条查询。在两种候选设置和两种 reranker 中，三种子平均 Recall@1 下降
@@ -559,9 +590,8 @@ reranking 优于生成式方法，因为我们的基础检索器与 GLMR 的 pre
 不同。由于 alignment 也被重新训练，且其测试检索指标发生变化，该对比应解释为端到端流水线
 敏感性，而不是这 6 条验证查询本身的因果效应。
 
-本文不报告 feature removal、loss、候选顺序或完整 top-$K$ 消融，因此不对这些组件的独立
-贡献作出结论。除上述解析得到的 reranker 参数量外，本文不报告峰值显存、cache 构造时间、
-reranker latency 或端到端 latency。
+本文不报告候选顺序或完整 top-$K$ 消融。除上述解析得到的 reranker 参数量外，本文不报告
+峰值显存、cache 构造时间、reranker latency 或端到端 latency。
 
 \section{讨论}
 
@@ -580,17 +610,23 @@ $\mathrm{R@1}/U_{40}$。根据表中三种子均值，质量约束场景下，�
 
 pointwise 与候选集合模型在质量场景下分别恢复 54.86\% 和 57.99\% 的空间，在分子式
 场景下分别恢复 41.55\% 和 43.85\%。pointwise 的增益还分别占候选集合模型相对基础模型
-总增益的 94.60\% 和 94.77\%。因此，大部分观测提升已经由使用共享特征和损失的监督
-pointwise 残差重排序实现，候选集合变体只增加了小幅增量。候选集合模型的 Recall@20 均值
-距离 $U_{40}$ 仅 1.68 和 2.49 个百分点；因此，在该 top-40 协议下，第一阶段覆盖率是
-Recall@20 的主要剩余限制。这些对现有结果的代数重表达不是新增估计，也不能因果分离
-具体特征、目标、交互或容量的贡献。
+总增益的 94.60\% 和 94.77\%。因此，大部分观测提升已经由当前配置下的监督 pointwise
+第二阶段排序器实现，候选集合变体只增加了小幅增量。候选集合模型的 Recall@20 三种子均值
+分别为 82.20\% 和 86.77\%，距离 $U_{40}$ 仅 1.68 和 2.49 个百分点；因此，在该 top-40
+协议下，第一阶段覆盖率是
+Recall@20 的主要剩余限制。组件审计进一步表明，五项设计均未使完整模型在两类候选协议下
+获得一致的成对 MRR 优势，而去除排名嵌入提高了每一个成对 Recall@1 和 MRR。本文因此把
+预先确定的完整配置保留为报告参照，把总体增益解释为第二阶段重排序框架的证据，而不解释为残差、
+特征、排名、损失或注意力组件的独立收益。这些代数重表达和移除比较不是因果估计。
 
 \section{局限性与负责任评估}
 
 三个 reranker 随机种子的均值 $\pm$ 样本标准差和 paired-win 次数只是描述性统计，不是
-置信区间或显著性检验。这些种子共享一个 alignment checkpoint，因此未包含第一阶段变异；
-候选集合优势在检查的两个 checkpoint 之间也有差异。候选集合模型的可训练参数总量还是
+置信区间或显著性检验。主表中的 pointwise--候选集合架构比较和全部组件移除共享 overlap-clean
+alignment checkpoint，因而未包含第一阶段变异；较早 checkpoint 只提供单独的流水线敏感性
+对照。组件审计既未建立跨 alignment 稳定性，也未建立因果组件效应：联合基础分数移除同时改变
+特征输入和残差路径，去除乘积/绝对差特征的条件仍保留候选间 self-attention；表现更好的无排名嵌入版本既未跨
+alignment 测试，也未在查看结果后被选为新主模型。候选集合模型的可训练参数总量还是
 pointwise 的 5.26 倍（多 6,304,768 个，约 $+426\%$），因而候选交互与模型容量没有被
 分离。外部 JESTR 与 GLMR 结果未在相同软件和候选处理下复现；本文不作确定的 SOTA、
 组件因果贡献或 self-attention 收益声明。
@@ -620,14 +656,14 @@ exchangeability 且目标属于候选池等假设下生成具有边际覆盖率�
 
 \section{结论}
 
-本文研究并评估 \method{}，一个面向 MS/MS 分子检索的非生成式残差学习排序框架。该方法在
-对比对齐的基础检索器之上，引入显式 pair features、检索先验、残差打分和 listwise 监督。
+本文研究并评估 \method{}，一个面向 MS/MS 分子检索的监督、非生成式第二阶段排序器。
 MassSpecGym 上的受控实验表明，在固定 seed-42 基础检索器的三个 reranker 初始化中，学习式
 重排序在质量约束和分子式约束候选设置上均带来大幅提升。在 overlap-clean checkpoint 上，
-候选集合 Transformer 相对 pointwise 打分器呈现小幅三种子优势，并赢得全部六个配对比较。
-由于该模式与较早 alignment checkpoint 不同，最稳健的结论仍是直接残差 learning-to-rank
-本身的价值；self-attention 是否具有跨 checkpoint 的稳健收益尚未确定。匹配外部基线、各
-特征与损失的独立贡献以及实测效率均超出当前证据范围。
+候选集合 Transformer 相对 pointwise 打分器呈现小幅成对优势，但该模式与较早 alignment
+checkpoint 不同。五项移除设置中也没有任何一项使完整模型在两类候选协议下均获得一致的成对 MRR
+优势；去除排名嵌入反而提高了全部六个固定 alignment 配对的 Recall@1 和 MRR。本文保留预先
+确定的完整配置作为报告参照；最稳健的结论是第二阶段重排序框架的价值，而不是 self-attention
+或任一受审计设计的独立收益。匹配外部基线和实测效率仍超出当前证据范围。
 
 \bibliographystyle{plain}
 \bibliography{references}

@@ -20,7 +20,7 @@
 % 1. Replace all provisional cross-paper comparisons with results obtained
 %    under one canonicalization/candidate protocol, or retain the explicit
 %    "reported result" qualification.
-% 2. Fill in the remaining feature/loss/top-K ablations and efficiency results.
+% 2. Fill in the remaining top-K ablations and efficiency results.
 % 3. Check the final PDF is <=15 pages and scrub identifying PDF metadata.
 
 \usepackage[T1]{fontenc}
@@ -78,10 +78,13 @@ $67.44\pm0.74$ and $68.58\pm0.20$ for mass-conditioned retrieval, and
 $73.97\pm0.59$ and $74.57\pm0.28$ for formula-conditioned retrieval, compared
 with fixed-base values of 47.46 and 63.10. The validation-overlap-clean run gives the
 Transformer a modest advantage, but the same paired-win pattern is absent under
-an earlier alignment checkpoint. Thus, the current evidence strongly supports supervised
-residual reranking while not establishing a checkpoint-robust benefit from
-candidate self-attention. Both variants operate without autoregressive molecule
-generation or forcing the target into the test top-40 list.
+an earlier alignment checkpoint. A fixed-alignment audit of five removal
+settings gives none a full-model MRR advantage in all six paired comparisons;
+removing the rank embedding improves Recall@1 and MRR in all six. Thus, the evidence
+supports a supervised, non-generative second-stage reranking framework, while
+checkpoint-robust self-attention and independent component benefits remain
+unestablished. Neither variant generates molecules or forces the target into
+the test top-40 list.
 \keywords{Data mining for bioinformatics \and Tandem mass spectrometry \and
 Molecule retrieval \and Learning to rank \and Multimodal representation
 learning}
@@ -127,21 +130,20 @@ framework with pointwise and candidate-set Transformer variants.
 Our contributions are:
 
 \begin{itemize}
-  \item We formulate and evaluate direct, non-generative residual
+  \item We formulate and evaluate direct, non-generative second-stage
   learning-to-rank for MS/MS-to-molecule retrieval, avoiding both fixed
   cosine-only ranking and autoregressive molecular decoding.
-  \item We instantiate the residual ranker with multimodal embeddings,
-  symmetric interaction features, base scores, and rank embeddings under
-  listwise and retrieved-negative pairwise supervision. The pointwise and
-  self-attentive variants match features, score heads, objectives, and
-  optimization, while the first-stage embeddings remain cacheable.
+  \item We compare pointwise and self-attentive rankers with matched features,
+  score heads, objectives, and optimization. On the same fixed caches, we then
+  audit five removal settings of the full configuration.
   \item Using the MassSpecGym split and candidate files under the exact-SMILES
   identity rule implemented in our caches, both implementations improve the
   fixed base retriever by large margins across three reranker seeds.
   The overlap-clean comparison finds a modest candidate-set Transformer
-  advantage, but comparison across alignment checkpoints shows that this
-  advantage is not yet robust enough to attribute the overall reranking gain to
-  candidate self-attention.
+  advantage, but comparison across alignment checkpoints does not establish a
+  robust self-attention benefit. Moreover, within the fixed-alignment audit, no
+  removal setting gives a uniform paired MRR advantage to the full model under
+  both candidate protocols.
 \end{itemize}
 
 \paragraph{AI-assistance disclosure.}
@@ -205,17 +207,17 @@ interactions while preserving permutation equivariance \cite{pang2020setrank}.
 We transfer these principles to spectrum--molecule retrieval using cached
 cross-modal embeddings, explicit pair interactions, and first-stage score and
 rank priors. Our contribution is not self-attention or listwise learning by
-themselves, but their residual candidate-level formulation for MS/MS retrieval
-and a controlled comparison with a pointwise scorer using the same candidate
-features and objectives.
+themselves, but a controlled non-generative second-stage formulation and
+evaluation for MS/MS retrieval.
 
 \subsection{Positioning of Our Method}
 
 Table~\ref{tab:method_comparison} isolates the ranking mechanisms of the closest
 MassSpecGym approaches. In light of the precedents above, our contribution is
-not reranking itself, but a query-specific, non-generative residual formulation
-over frozen cross-modal representations; candidate self-attention is an
-evaluated option rather than an assumed source of gain.
+not reranking itself, but a query-specific, non-generative second-stage
+formulation over frozen cross-modal representations. Residual scoring and
+candidate self-attention are evaluated design choices rather than assumed
+sources of gain.
 
 \begin{table}[t]
   \centering
@@ -537,8 +539,13 @@ validation MRR with patience 5. The pairwise weight and margin are
 $\lambda=0.2$ and $\gamma=0.1$. With one fixed alignment checkpoint and fixed
 caches from the overlap-clean run, each reranker variant is trained with seeds
 42, 43, and 44. This measures reranker variation, not end-to-end alignment
-uncertainty. All models are selected without test-set access and evaluated on
-one NVIDIA RTX 4090.
+uncertainty. The component audit uses these same caches and seeds. Its five
+removals respectively disable only the residual shortcut while retaining the
+base score as MLP input; jointly disable the base-score feature and shortcut;
+zero the rank embedding while preserving input width; remove product and
+absolute-difference features while retaining self-attention; or set $\lambda=0$
+for listwise-only training. All models are
+selected without test-set access and evaluated on one NVIDIA RTX 4090.
 
 Before training-only positive forcing, top-40 base recall is 93.78\% for mass
 and 90.42\% for formula on the training split. Training lists are then completed
@@ -636,24 +643,44 @@ contextual rather than causal.
 
 \begin{table}[t]
   \centering
-  \caption{Controlled comparison on one fixed base retriever. Reranker results
-  are mean $\pm$ sample standard deviation over seeds 42, 43, and 44; the base
-  row is fixed across runs. All values are percentages.}
+  \caption{Controlled comparison on fixed alignment-seed-42 caches. The base
+  row is fixed; learned rows report mean $\pm$ sample standard deviation over
+  reranker seeds 42--44. Recall@1 and MRR are percentages. Removal rows are
+  separately trained audits of the predefined full configuration, not post-hoc
+  model-selection candidates.}
   \label{tab:reranker_ablation}
   \scriptsize
-  \begin{tabular}{llcccc}
+  \setlength{\tabcolsep}{3pt}
+  \renewcommand{\arraystretch}{0.95}
+  \begin{tabular}{@{}>{\raggedright\arraybackslash}p{3.5cm}cccc@{}}
     \toprule
-    Pool & Method & R@1 & R@5 & R@20 & MRR \\
+    & \multicolumn{2}{c}{Mass} & \multicolumn{2}{c}{Formula} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}
+    Method & R@1 & MRR & R@1 & MRR \\
     \midrule
-    \multirow{3}{*}{Mass}
-      & Base & 47.46 & 63.51 & 77.76 & 55.03 \\
-      & Pointwise & $67.44\pm0.74$ & $77.02\pm0.59$ & $82.26\pm0.16$ & $71.79\pm0.66$ \\
-      & Candidate-set Transformer & $68.58\pm0.20$ & $77.36\pm0.36$ & $82.20\pm0.07$ & $72.60\pm0.25$ \\
+    Base & 47.46 & 55.03 & 63.10 & 68.86 \\
+    Pointwise
+      & $67.44\pm0.74$ & $71.79\pm0.66$
+      & $73.97\pm0.59$ & $77.64\pm0.49$ \\
+    Candidate-set Transformer (full)
+      & $68.58\pm0.20$ & $72.60\pm0.25$
+      & $74.57\pm0.28$ & $78.02\pm0.26$ \\
     \midrule
-    \multirow{3}{*}{Formula}
-      & Base & 63.10 & 75.79 & 84.93 & 68.86 \\
-      & Pointwise & $73.97\pm0.59$ & $81.94\pm0.27$ & $86.78\pm0.27$ & $77.64\pm0.49$ \\
-      & Candidate-set Transformer & $74.57\pm0.28$ & $81.97\pm0.26$ & $86.77\pm0.14$ & $78.02\pm0.26$ \\
+    No residual shortcut
+      & $68.16\pm0.06$ & $72.33\pm0.06$
+      & $75.01\pm0.54$ & $78.38\pm0.42$ \\
+    No base-score input/shortcut
+      & $68.07\pm0.20$ & $72.28\pm0.18$
+      & $74.39\pm0.55$ & $77.93\pm0.38$ \\
+    No rank embedding
+      & $70.12\pm0.30$ & $73.75\pm0.28$
+      & $76.62\pm0.69$ & $79.38\pm0.58$ \\
+    Product/absolute-difference removed
+      & $68.10\pm0.85$ & $72.29\pm0.66$
+      & $75.76\pm0.55$ & $78.90\pm0.38$ \\
+    Listwise only ($\lambda=0$)
+      & $68.91\pm0.76$ & $72.86\pm0.46$
+      & $74.24\pm0.25$ & $77.71\pm0.25$ \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -668,29 +695,33 @@ Transformer also has 6.30M more trainable parameters, the comparison does not
 isolate candidate interaction from increased capacity. However, the earlier
 alignment checkpoint gave Recall@1 differences of $-0.13$ and $+0.21$ points
 and only three wins out of six. The evidence therefore supports supervised
-residual reranking and suggests a possible candidate-interaction benefit, but
+second-stage reranking and suggests a possible candidate-interaction benefit, but
 does not establish a checkpoint-robust independent contribution from
 self-attention.
 
-As a separate test-overlap sensitivity check on the earlier fixed checkpoint,
-we excluded the three affected test queries, leaving 17,553 queries. Across
-both candidate settings and both rerankers, the three-seed mean Recall@1
-decreased by 0.0045--0.0055 percentage points (maximum absolute seed-level
-change: 0.0056 points). Thus, the three test overlaps have a negligible effect
-on the aggregate retrieval metrics; the canonical tables nevertheless retain
-all official test queries.
+The separately trained removal rows audit the full configuration on the same
+fixed alignment. No removal setting gives the full model higher MRR in all six
+paired comparisons. Removing the rank embedding improves both reported metrics in all
+six; its mean Recall@1/MRR gains are 1.54/1.15 mass points and 2.05/1.36 formula
+points. The residual shortcut, product/absolute-difference features, and
+pairwise loss have candidate-dependent directions. The full model's mean MRR
+lead over the joint base-score-pathway removal is only 0.32/0.08 points, with
+mixed seed signs. These are descriptive comparisons, not significance tests;
+the predefined full configuration remains the reporting reference.
 
-The validation-overlap audit has a larger model-selection implication. The
-clean and earlier pipelines select the same alignment epochs (best epoch 16,
-stop epoch 21), while their reranker best/stop epoch pairs differ in 9 of 12
-configurations. Because the alignment model was retrained and its test
-retrieval metrics also changed, this comparison measures end-to-end pipeline
-sensitivity rather than the causal effect of the six validation queries alone.
+On the earlier checkpoint, a sensitivity check excluded the three affected test
+queries, leaving 17,553. Across both candidate settings and rerankers, mean
+Recall@1 decreased by 0.0045--0.0055 points (maximum seed-level change: 0.0056),
+so the aggregate effect is negligible; canonical tables retain all test queries.
 
-We do not report feature-removal, objective, candidate-order, or full top-$K$
-ablations; conclusions about those components are outside the present evidence.
-We also do not report peak memory, cache construction time, reranker latency, or
-end-to-end latency.
+The clean and earlier pipelines select the same alignment epochs (best 16,
+stop 21), but reranker best/stop epochs differ in 9 of 12 configurations.
+Because alignment was retrained and its test metrics changed, this measures
+pipeline sensitivity rather than the causal effect of six validation queries.
+
+We do not report candidate-order or full top-$K$ ablations. We also do not
+report peak memory, cache construction time, reranker latency, or end-to-end
+latency.
 
 \section{Discussion}
 
@@ -713,24 +744,30 @@ The pointwise and candidate-set models recover 54.86\% and 57.99\% of this
 headroom for mass candidates, and 41.55\% and 43.85\% for formula candidates.
 The pointwise gain is also 94.60\% and 94.77\% of the total candidate-set gain
 over the base model in the two settings. Thus, most of the observed improvement
-is already achieved by supervised pointwise residual reranking with the shared
-features and losses; the candidate-set variant adds only a modest increment.
-At Recall@20, the candidate-set means are only 1.68 and 2.49 points below
-$U_{40}$; first-stage coverage is therefore the dominant remaining limitation
-for that metric under this top-40 protocol. These algebraic summaries of existing
-results are not additional estimates and do not causally isolate individual
-features, objectives, interaction, or capacity.
+is already achieved by the supervised pointwise second-stage ranker as
+configured; the candidate-set variant adds only a modest increment.
+At Recall@20, the candidate-set three-seed means of 82.20\% and 86.77\% are
+only 1.68 and 2.49 points below $U_{40}$; first-stage coverage is therefore the
+dominant remaining limitation for that metric under this top-40 protocol. The removals likewise support only
+a framework-level interpretation: none gives the full model uniform paired MRR
+support, whereas rank removal improves both metrics in every pair. The
+predefined full configuration remains the reporting reference; these algebraic
+and removal comparisons are not causal estimates of individual components.
 
 \section{Limitations and Responsible Evaluation}
 
 Three-seed sample standard deviations and paired-win counts are descriptive,
-not confidence intervals or significance tests. The seeds share one alignment
-checkpoint and omit first-stage variation; the candidate-set advantage also
-differs across two checkpoints. That model has 5.26 times the pointwise model's
-trainable parameters (6,304,768 more; $+426\%$), confounding interaction with
-capacity. External JESTR and GLMR rows were not reproduced under identical
-software and candidate handling; we make no definitive state-of-the-art,
-causal-component, or self-attention-benefit claim.
+not confidence intervals or significance tests. The main table fixes one
+alignment checkpoint; an earlier checkpoint only provides a pipeline-sensitivity comparison. Thus,
+the component audit establishes neither cross-alignment stability nor causal
+component effects: no-base-score jointly removes its MLP input and shortcut,
+product/absolute-difference removal retains self-attention, and the rank-free
+variant was neither tested across alignments nor selected post hoc. The
+candidate-set model also has 5.26 times the pointwise model's trainable
+parameters (6,304,768 more; $+426\%$), confounding interaction
+with capacity. External JESTR and GLMR rows were not reproduced under identical
+software and candidate handling; we claim neither definitive state of the art
+nor an independent component benefit.
 
 Training-only positive replacement changes the list distribution without
 addressing $1-U_K$. Because frozen full pools contain the exact target,
@@ -766,20 +803,17 @@ generation-validity failures.
 
 \section{Conclusion}
 
-We presented \method{} for MS/MS-based molecule retrieval. The framework uses
-explicit pair features, retrieval priors, residual scoring, and listwise
-supervision on top of a contrastively aligned base retriever. Controlled
-MassSpecGym results show large gains from learned reranking in every one of
-three reranker initializations on the fixed seed-42 base retriever under both
-mass- and formula-conditioned candidate settings. A paired three-seed comparison on
-identical fixed caches finds
-that the candidate-set Transformer has a modest advantage over the pointwise
-scorer and wins all six paired comparisons on the overlap-clean checkpoint.
-Because this pattern differs from the earlier alignment checkpoint, the
-strongest supported conclusion is the value of direct residual learning to
-rank; a checkpoint-robust benefit from self-attention remains unestablished.
-Claims about controlled external-baseline comparisons, individual feature and loss
-contributions, and measured efficiency are outside the present evidence.
+We presented \method{} for supervised, non-generative second-stage reranking of
+MS/MS candidates. It improves the fixed seed-42 retriever in all
+three reranker initializations under both candidate protocols. The candidate-set
+Transformer has a modest overlap-clean advantage over the pointwise scorer, but
+not the same pattern under the earlier alignment checkpoint. None of five
+audited removal settings gives the full model uniform paired MRR support, while rank
+removal improves both reported metrics in all six fixed-alignment pairs. We keep
+the predefined full configuration as the reference: the strongest supported
+conclusion concerns the reranking framework, not any independent component
+benefit. Matched external baselines and measured efficiency remain outside the
+evidence.
 
 \bibliographystyle{splncs04}
 \bibliography{references}
