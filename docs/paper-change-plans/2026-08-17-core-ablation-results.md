@@ -1,6 +1,6 @@
 # 论文修改计划：核心组件消融结果入稿
 
-- 状态：`执行中`
+- 状态：`已执行`
 - 创建日期：2026-08-17
 - 最后更新：2026-08-17
 - 负责人：Codex（作者负责最终学术判断与文字确认）
@@ -68,18 +68,18 @@
 
 ### 3.1 涉及文件与章节
 
-- [ ] `analyze_core_ablations.py`：新增确定性的原始工件审计、同 seed 配对统计、
+- [x] `analyze_core_ablations.py`：新增确定性的原始工件审计、同 seed 配对统计、
   组件主张门槛和 manifest 生成入口。
-- [ ] `tests/test_core_ablation_analysis.py`：覆盖矩阵完整性、配对方向、语义门槛、
+- [x] `tests/test_core_ablation_analysis.py`：覆盖矩阵完整性、配对方向、语义门槛、
   非有限数值/协议漂移拒绝和确定性输出。
-- [ ] `analysis/transfer2026_core_ablations/`：保存 `summary_long.csv`、
+- [x] `analysis/transfer2026_core_ablations/`：保存 `summary_long.csv`、
   `paired_deltas.csv`、`ablation_summary.csv`、`report.md` 和
   `analysis_manifest.json`。
-- [ ] `paper/TRANSFER_2026_PLAN.md`：回填 30/30 消融完成记录、实验冻结状态和新的
+- [x] `paper/TRANSFER_2026_PLAN.md`：回填 30/30 消融完成记录、实验冻结状态和新的
   执行顺序；top-K、效率、排名迁移与 venue 未完成项保持真实状态。
-- [ ] `paper/main.tex`：更新 Contributions、Controlled Reranker Ablation、Discussion、
+- [x] `paper/main.tex`：更新 Contributions、Controlled Reranker Ablation、Discussion、
   Limitations 和 Conclusion；仅在组件结果确实要求收窄核心主张时同步修改 Abstract。
-- [ ] `paper/main_cn.tex`：与英文稿同步相同数字、方向、术语和证据边界。
+- [x] `paper/main_cn.tex`：与英文稿同步相同数字、方向、术语和证据边界。
 
 ### 3.2 明确不做的事项
 
@@ -157,13 +157,13 @@
   下一步顺序；仍缺失项目不误勾选。
 - [x] 步骤 5：提交分析与计划回填，记录分析 commit；真正修改论文前将本计划状态改为
   `执行中`。
-- [ ] 步骤 6：按 claim gate 重写英文稿相关表格、贡献、结果、讨论、限制与结论。
-- [ ] 步骤 7：同步中文稿件，自动反查所有表格数字、delta、符号和单位。
-- [ ] 步骤 8：核验本轮无新增引用且现有 BibTeX/交叉引用未被破坏。
-- [ ] 步骤 9：编译双语稿并检查页数、引用、交叉引用、LaTeX error 与版面警告。
-- [ ] 步骤 10：检查 `git diff`，确认无新实验、无无关改动、无证据越界。
-- [ ] 步骤 11：使用 Conventional Commit 提交论文实质修改。
-- [ ] 步骤 12：回填论文 commit 和最终结果，将状态设为 `已执行`，再以独立文档
+- [x] 步骤 6：按 claim gate 重写英文稿相关表格、贡献、结果、讨论、限制与结论。
+- [x] 步骤 7：同步中文稿件，自动反查所有表格数字、delta、符号和单位。
+- [x] 步骤 8：核验本轮无新增引用且现有 BibTeX/交叉引用未被破坏。
+- [x] 步骤 9：编译双语稿并检查页数、引用、交叉引用、LaTeX error 与版面警告。
+- [x] 步骤 10：检查 `git diff`，确认无新实验、无无关改动、无证据越界。
+- [x] 步骤 11：使用 Conventional Commit 提交论文实质修改。
+- [x] 步骤 12：回填论文 commit 和最终结果，将状态设为 `已执行`，再以独立文档
   commit 归档本计划。
 
 ## 8. 风险、证据边界与待确认事项
@@ -183,22 +183,22 @@
 
 ## 9. 验证方案
 
-- [ ] 原始工件审计：30/30 latest complete、每组 seeds 42/43/44、`errors=[]`、
+- [x] 原始工件审计：30/30 latest complete、每组 seeds 42/43/44、`errors=[]`、
   `params_sha256`/cache/split/exclusions 一致；test log 为 17,556 queries、MCES skipped。
-- [ ] 数字重算：使用 sample SD (`ddof=1`)；同-seed delta=`full-ablation`；CSV 与报告显示值
+- [x] 数字重算：使用 sample SD (`ddof=1`)；同-seed delta=`full-ablation`；CSV 与报告显示值
   可从 seed-level rows 反查。
-- [ ] 确定性与 provenance：连续两次生成产物字节一致；manifest 记录全部输入和输出的
+- [x] 确定性与 provenance：连续两次生成产物字节一致；manifest 记录全部输入和输出的
   repository-relative path、size 与 SHA-256。
-- [ ] 代码检查：`ruff check analyze_core_ablations.py tests/test_core_ablation_analysis.py`、
+- [x] 代码检查：`ruff check analyze_core_ablations.py tests/test_core_ablation_analysis.py`、
   `python -m py_compile analyze_core_ablations.py tests/test_core_ablation_analysis.py`、
   相关及完整单元测试通过。
-- [ ] 英文稿编译：在 `paper/` 中使用现有 `latexmk`/构建方式生成 `main.pdf`，检查
+- [x] 英文稿编译：在 `paper/` 中使用现有 `latexmk`/构建方式生成 `main.pdf`，检查
   LaTeX Error、undefined citation/reference、Overfull 和最终页数。
-- [ ] 中文稿编译：在 `paper/` 中使用 XeLaTeX 现有构建方式生成中文 PDF并检查同类错误。
-- [ ] 引用和 BibTeX 检查：确认 `paper/references.bib` 无改动，编译日志无引用错误。
-- [ ] 中英文内容一致性检查：自动提取消融表数字并人工核对术语、方向、限制和贡献表述。
-- [ ] 旧表述扫描：清除“feature/loss removal 未报告”及中文对应过时句，但不扩大其它章节。
-- [ ] Git 检查：`git diff --check`、完整 diff、工作区与提交范围检查。
+- [x] 中文稿编译：在 `paper/` 中使用 XeLaTeX 现有构建方式生成中文 PDF并检查同类错误。
+- [x] 引用和 BibTeX 检查：确认 `paper/references.bib` 无改动，编译日志无引用错误。
+- [x] 中英文内容一致性检查：自动提取消融表数字并人工核对术语、方向、限制和贡献表述。
+- [x] 旧表述扫描：清除“feature/loss removal 未报告”及中文对应过时句，但不扩大其它章节。
+- [x] Git 检查：`git diff --check`、完整 diff、工作区与提交范围检查。
 
 ## 10. 执行记录
 
@@ -225,12 +225,41 @@
 - 用户确认继续下一步；专项计划在任何论文正文改动前切换为 `执行中`。
 - 后续严格按步骤 6–12 执行，不扩大实验、引用或论文主张范围。
 
+### 2026-08-17：核心消融完成双语入稿与验收
+
+- 用一张 8 行横向表同步替换中英文受控 reranker 表：Base、Pointwise、完整候选集合
+  Transformer 与五项移除设置共同报告质量/分子式候选的 Recall@1 和 MRR；所有学习行均为
+  reranker seeds 42--44 的均值 $\pm$ 样本标准差。
+- 自动从 `ablation_summary.csv` 重建表内 full/removal 数字并逐格匹配双稿；再次从
+  `paired_deltas.csv` 验证严格 MRR 门槛为 0/5，且去除排名嵌入在六个候选协议与种子配对中
+  同时提高 Recall@1 和 MRR。
+- 将摘要、贡献、方法定位、实现细节、结果、讨论、局限与结论的最强主张统一收窄为：当前证据
+  支持监督、非生成式第二阶段重排序框架，但不建立 self-attention 或任一受审计设计的独立、
+  因果或跨 alignment 收益；不事后把无排名嵌入版本升级为新主模型。
+- 明确五项实现语义，特别记录 `no_residual` 仍保留基础分数 MLP 输入、`no_base_score` 是联合
+  移除、显式乘积/绝对差特征移除仍保留 self-attention，以及 listwise-only 令
+  $\lambda=0$。
+- 未新增或修改引用；`paper/references.bib` 无 diff。旧的“feature/loss removal 未报告”双语
+  表述已清除；top-$K$、候选顺序和实测效率仍如实保留为未完成项。
+- 英文以 `latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex` 编译为 16 页；中文以
+  `latexmk -xelatex -interaction=nonstopmode -halt-on-error main_cn.tex` 编译为 15 页。两份最终
+  日志均无 LaTeX error、undefined citation/reference、Overfull 或 Underfull。仅保留英文
+  `amsmath` 的 `\vec` 重定义警告与中文 Fandol 字体的 CJK script 警告。
+- 用户明确要求当前以完成既定待办和保证内容充实可靠为先，英文页数上限暂不作为阻塞条件，
+  待完稿后统一微调；本轮不为页数新增目标或删减证据边界。
+- 英文、中文审阅代理各一名及一名数字审阅代理完成只读终审，未发现阻塞性数字、语义、表结构或
+  双语一致性问题。最终 `git diff --check` 通过，生成的编译中间文件未纳入版本控制。
+- 论文实质修改 commit：
+  `bc0dbf6f6064760e51cb32000c7d9494197b9048`（`docs(paper): 纳入核心组件消融结果`）。
+
 ## 11. 最终结果
 
-- 完成日期：尚未完成
-- 最终状态：`执行中`
-- 验证结果：分析准备阶段已验证；论文修改、双语编译和最终验收尚未执行
+- 完成日期：2026-08-17
+- 最终状态：`已执行`
+- 验证结果：分析工件、双语数值反查、引用/交叉引用、双语编译、版面日志、完整 diff 与
+  提交范围均已核验；英文 16 页、中文 15 页，页数微调按用户决定延后
 - 分析 commit：`2701782a1e193d442e09a9fc49668fbd161416f5`
-- 论文修改 commit：尚未提交
+- 论文修改 commit：`bc0dbf6f6064760e51cb32000c7d9494197b9048`
 - 计划归档 commit：无需在本文件中自我引用
-- 相对原计划的偏差：无/尚未记录
+- 相对原计划的偏差：未新增实验、引用或模型选择；英文最终为 16 页，用户明确将页数上限
+  微调延后，因此不作为本轮完成阻塞项
