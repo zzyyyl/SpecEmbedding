@@ -182,7 +182,7 @@ def require_clean_worktree() -> None:
         )
 
 
-def require_runtime_at_source_commit() -> None:
+def require_source_commit() -> None:
     run_git("cat-file", "-e", f"{SOURCE_COMMIT}^{{commit}}")
     runtime_paths = [
         "params.yaml",
@@ -193,13 +193,33 @@ def require_runtime_at_source_commit() -> None:
         "run_rerank_multiseed.py",
         "train_rerank.py",
     ]
-    result = run_git("diff", "--quiet", SOURCE_COMMIT, "--", *runtime_paths, check=False)
-    if result.returncode not in (0, 1):
-        raise AuditError(result.stderr.strip() or "git diff failed")
-    if result.returncode == 1:
+    for runtime_path in runtime_paths:
+        run_git("cat-file", "-e", f"{SOURCE_COMMIT}:{runtime_path}")
+
+
+def git_blob_artifact(
+    artifact_id: str, commit: str, repository_path: str
+) -> dict[str, Any]:
+    path = Path(repository_path)
+    if path.is_absolute() or ".." in path.parts or path.as_posix() != repository_path:
+        raise AuditError(f"Invalid repository path for {artifact_id}: {repository_path!r}")
+    result = subprocess.run(
+        ["git", "show", f"{commit}:{repository_path}"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        check=True,
+    )
+    payload = result.stdout
+    if not payload:
         raise AuditError(
-            "Evaluation runtime differs from the canonical source commit " + SOURCE_COMMIT
+            f"Missing or empty Git blob for {artifact_id}: {commit}:{repository_path}"
         )
+    return {
+        "id": artifact_id,
+        "location": f"git:{commit}:{repository_path}",
+        "sha256": hashlib.sha256(payload).hexdigest(),
+        "size_bytes": len(payload),
+    }
 
 
 def require_file(path: Path, label: str) -> Path:
@@ -698,9 +718,9 @@ def serialize_internal_manifest(manifest: dict[str, Any]) -> str:
 
 
 def build_manifest() -> dict[str, Any]:
-    require_runtime_at_source_commit()
+    require_source_commit()
     artifacts: list[dict[str, Any]] = []
-    params_item = artifact("config.params", REPO_ROOT / "params.yaml")
+    params_item = git_blob_artifact("config.params", SOURCE_COMMIT, "params.yaml")
     require_equal(params_item["sha256"], PARAMS_SHA256, "params.yaml hash")
     artifacts.append(params_item)
 
@@ -717,6 +737,10 @@ def build_manifest() -> dict[str, Any]:
         "packaging_policy": (
             "Inventory only, not an anonymous bundle allowlist. Redact referenced status and log "
             "files before release because they may contain host, user, process, GPU, or timestamp data."
+        ),
+        "provenance_policy": (
+            "Experiment runtime and configuration remain bound to source_commit; "
+            "config.params is hashed from that Git tree rather than the current worktree."
         ),
         "experiment": {
             "dataset": "MassSpecGym",
