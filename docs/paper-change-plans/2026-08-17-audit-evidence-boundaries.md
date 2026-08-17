@@ -84,7 +84,9 @@
 - [ ] `paper/ADMA2026_TODO.md` / `docs/project_memory_zh.md`：同步多 alignment 完成状态、
   外部 reported 降级决策、当前页数和后续页数微调状态。
 - [ ] `docs/audit-report-2026-08-17.md`：记录本轮修复、验证和提交。
-- [ ] 本计划文件：按步骤更新状态、实际执行、偏差、验证和论文 commit。
+- [x] 本计划文件：按步骤更新状态、实际执行、偏差、验证和论文 commit。
+- [x] `paper/BUILDING.md` / `paper/build_release.sh` / `paper/release/`：固定跨 cwd 强制重建
+  流程，并留存当前双语 PDF、source commit、工具链、页数与 SHA-256。
 
 ### 3.2 明确不做的事项
 
@@ -275,15 +277,27 @@ context，不承担公平比较。
 - 上述修改仍属于本计划的“证据边界、局限与投稿记录”范围，不改变方法定义、评价协议、
   实验数值或研究结论，状态保持 `执行中`。
 
+### 2026-08-17：第二轮意见已落实
+
+- `run_rerank_pipeline.py` 已固定 Git/subprocess cwd、绝对子脚本和仓库根相对输入路径；新增
+  临时 cwd 下的完整 dry-run 回归测试。双语 limitation 已精确区分当前事后验收锁与历史训练
+  环境证据，实质修改 commit 为 `e597d89`。
+- 从 tracked source commit `e597d89f45eb2f56bc8ad6332c49016a62496ad7` 强制完整重建双语稿；
+  英文 17 页、中文 16 页，两份 PDF 无 fatal/LaTeX error、undefined citation/reference 或
+  Overfull/Underfull。PDF 与构建 manifest 留存在 `paper/release/`；manifest 固定工具链、页数、
+  字节数和 SHA-256，忽略的 `paper/build` 已同步为相同版本。
+- 当前完整测试为 `88 passed, 5 warnings`；Ruff、compileall、shell 语法、`git diff --check`
+  均通过。下一步提交并推送 release evidence 后，请原审计会话进行第三轮只读复审。
+
 执行时按日期记录状态转换、派生产物核验、双语修改、页数、测试、提交和复审反馈。
 
 ## 11. 最终结果
 
 - 完成日期：尚未完成
 - 最终状态：`执行中`
-- 验证结果：本地与显式锁环境均已通过；第二轮审计提出两项 P1，正在续修并等待再次复审
+- 验证结果：本地与显式锁环境均已通过；第二轮审计的两项 P1 已完成本地修复，等待第三轮复审
 - 论文修改 commit：`1c0dee2`
-- 工程复现 commit：`f5e6e78`
+- 工程复现 commit：`f5e6e78`、`e597d89`
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：同步完成同一审计中的路径可移植性和依赖锁修复；未扩大论文论点、
   未新增实验或引用。按用户要求增加“通知原审计会话并迭代至无阻断项”的验收步骤。

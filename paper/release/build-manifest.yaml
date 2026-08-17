@@ -1,0 +1,55 @@
+schema_version: 1
+artifact_kind: manuscript_release_build
+status: audit_evidence
+built_at: "2026-08-17T19:20:25+08:00"
+
+source:
+  git_commit: e597d89f45eb2f56bc8ad6332c49016a62496ad7
+  branch: codex/transfer-2026-0831
+  tracked_worktree_clean: true
+  command: bash paper/build_release.sh
+  instructions: paper/BUILDING.md
+
+environment:
+  operating_system: Ubuntu 20.04
+  kernel: Linux 5.15.0-139-generic x86_64
+  latexmk: "4.67"
+  pdftex: "1.40.20 (TeX Live 2019/Debian)"
+  xetex: "0.999991 (TeX Live 2019/Debian)"
+  bibtex: "0.99d (TeX Live 2019/Debian)"
+  english_engine: pdfLaTeX
+  chinese_engine: XeLaTeX
+
+verification:
+  fatal_errors: 0
+  latex_errors: 0
+  undefined_citations: 0
+  undefined_references: 0
+  overfull_boxes: 0
+  underfull_boxes: 0
+  known_nonblocking_warnings:
+    - English amsmath math-accent command redefinitions
+    - Chinese Fandol fontspec messages from the TeX Live ctex font set
+  pdf_string_private_path_hits: 0
+
+outputs:
+  english:
+    path: paper/release/specembedding-adma2026-en.pdf
+    role: English submission draft
+    pages: 17
+    bytes: 476068
+    sha256: 62d09761172b8b04e7facc5e8090f7cfc4e868d29f85e18726b9bae0260b5034
+    pdfinfo_author: empty
+  chinese:
+    path: paper/release/specembedding-adma2026-zh.pdf
+    role: Chinese internal discussion draft
+    pages: 16
+    bytes: 421756
+    sha256: f985499fbdcd06723aa6b0517874317c09145bd0b8d42b6bd0a79a2c1c6d3bcb
+    pdfinfo_author: absent
+
+scope_note: >-
+  These tracked PDFs and hashes preserve the audited build outputs from the
+  stated source commit. PDF byte-for-byte reproducibility is not claimed
+  because TeX embeds build timestamps. Page-limit compression remains a
+  separate final-submission task by user decision.

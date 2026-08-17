@@ -10,7 +10,9 @@
 - 官方征稿页面：https://adma2026.github.io/call_for_research_papers.html
 - 英文稿：`paper/main.tex`
 - 中文稿：`paper/main_cn.tex`
-- 编译目录：`paper/build/`
+- 工作编译目录：`paper/build/`（Git 忽略）
+- 可审计发布构建：`paper/release/`；执行 `bash paper/build_release.sh`，构建来源、工具链、
+  页数和 SHA-256 见 `paper/release/build-manifest.yaml`
 
 状态约定：
 
@@ -85,9 +87,10 @@
 ## 投稿合规
 
 - [x] 使用 Springer LNCS/LNAI 模板。
-- [ ] 当前源稿最近验证为英文 17 页、中文 16 页；`paper/build` 中 8 月 1 日旧 PDF 为
-  15/14 页。用户决定完稿后再统一微调页数，不能沿用 11/10 页的历史完成状态。
-- [x] 作者、单位和 PDF 作者元数据已隐藏。
+- [ ] source commit `e597d89` 已强制完整重建为英文 17 页、中文 16 页，并将当前 PDF、
+  页数和 SHA-256 留存在 `paper/release/`；`paper/build` 已同步为相同版本，不再保留 8 月 1 日
+  的 15/14 页旧稿。用户决定完稿后再统一微调页数，故最终页数合规仍未完成。
+- [x] 当前留存 PDF 的作者元数据为空或缺失；正文中的作者和单位已隐藏。
 - [x] 未包含致谢和基金信息。
 - [x] 已在 Introduction 中加入覆盖全部章节和实际辅助范围的 AI 使用披露。
 - [ ] 最终确认正文、参考文献和 limitation 总计不超过 15 页。

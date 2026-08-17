@@ -4,6 +4,10 @@
 审计基线：`df7dec6`（分支 `codex/transfer-2026-0831`）
 审计范围：源码、训练/评估脚本、测试、实验 artifact、英文稿 `paper/main.tex`、中文稿 `paper/main_cn.tex`、引用与投稿待办。
 
+修复跟踪状态：初次审计问题已经落实；第二轮独立审计无 P0，并提出的两项 P1 已在
+`e597d89` 及其后续发布构建记录中完成本地修复，当前等待第三轮独立只读复审。下文第 1--6 节
+保留初次审计时点的原始判定，第 7 节以后记录修复演进，避免把历史发现误读为当前状态。
+
 ## 1. 总体结论
 
 当前仓库已经具备较完整的两阶段 MassSpecGym 实验流水线，核心 reranker 多种子结果、核心组件消融结果和 overlap-clean 处理均有结构化 artifact 支撑。论文目前对证据边界的表述总体谨慎：外部 JESTR/GLMR 数字被标为 `reported`，正文明确不声称严格 SOTA，也承认 self-attention 的独立收益尚未被 checkpoint-robust 证据确认。
@@ -288,3 +292,28 @@
 修复后仍保留的研究限制：身份规则影响未量化；三个 alignment 只构成内部描述性证据；
 组件审计仍只覆盖 canonical alignment seed 42；JESTR/GLMR 未独立复现且不可直接比较。
 这些限制已在论文关键独立阅读位置自包含披露。当前状态可提交原审计会话进行再次审计。
+
+### 2026-08-17：第二轮独立审计续修
+
+状态：**两项 P1 已完成本地修复，等待第三轮独立复审**。
+
+- `run_rerank_pipeline.py` 现以脚本位置确定 repository root；Git 查询和所有 subprocess
+  固定在仓库根运行，三个子脚本使用绝对路径，用户输入的相对 data/candidate/output 路径
+  按仓库根解析。新增测试从临时 cwd 执行完整 `--dry-run --mode all`，同时核验默认 run name、
+  commit、子脚本路径和 subprocess cwd；工程与论文局限修订提交为 `e597d89`。
+- 双语 limitation 现明确区分：2026-08-17 事后验收环境已经按精确版本锁重建验证，但历史
+  训练没有逐包环境记录，故不声称 bitwise retraining equivalence。PyPI 锁仍仅固定版本、
+  不含 wheel hash，这一供应链边界继续在 runtime snapshot 中披露。
+- 使用 `paper/build_release.sh` 从干净的 tracked source commit
+  `e597d89f45eb2f56bc8ad6332c49016a62496ad7` 强制执行完整 BibTeX/LaTeX 构建。英文 PDF 为
+  17 页、476068 bytes、SHA-256 `62d09761172b8b04e7facc5e8090f7cfc4e868d29f85e18726b9bae0260b5034`；
+  中文 PDF 为 16 页、421756 bytes、SHA-256
+  `f985499fbdcd06723aa6b0517874317c09145bd0b8d42b6bd0a79a2c1c6d3bcb`。
+- 两份 PDF 与 `paper/release/build-manifest.yaml` 受 Git 跟踪；manifest 固定源码 commit、
+  Ubuntu/TeX 工具链、页数、字节数、哈希和检查结果。构建日志无 fatal/LaTeX error、undefined
+  citation/reference 或 Overfull/Underfull；英文作者元数据为空，中文作者字段缺失，字符串扫描
+  无私有路径命中。忽略的 `paper/build` 已同步，避免旧 15/14 页 PDF 被误认成当前稿。
+- 当前 canonical 环境完整测试为 `88 passed, 5 warnings`；Ruff、compileall、shell 语法和
+  `git diff --check` 均通过。本轮未新增训练、评价、引用、性能数字或研究结论。
+
+页数压缩仍按用户决定留到完稿后处理，17 页英文稿不被误记为已经满足最终页数限制。

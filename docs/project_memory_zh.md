@@ -87,7 +87,8 @@ docs(paper): 更新 ADMA2026 论文稿件
 - 用户要求提交时，如无特殊说明，提交后直接推送远端。
 - 当前主要开发分支为 `dev`。
 - 本环境没有安装 `gh`，但普通 `git push` 可用；无法自动创建 GitHub/GitLab PR。
-- LaTeX 编译产物统一放入 `paper/build/`，该目录已被 Git 忽略。
+- LaTeX 工作编译产物放入已被 Git 忽略的 `paper/build/`；审计或投稿里程碑使用
+  `paper/build_release.sh` 强制重建，并把 PDF 与构建清单留存在受跟踪的 `paper/release/`。
 
 ## 3. 基础模型
 
@@ -323,6 +324,9 @@ latexmk -pdf -xelatex \
 
 - `paper/build/main.pdf`
 - `paper/build/main_cn.pdf`
+- 可审计副本：`paper/release/specembedding-adma2026-en.pdf`、
+  `paper/release/specembedding-adma2026-zh.pdf`
+- 构建来源、工具链、页数和 SHA-256：`paper/release/build-manifest.yaml`
 
 ## 6. 已完成的主要实验
 
@@ -732,8 +736,10 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 中文稿：`paper/main_cn.tex`
 - 参考文献：`paper/references.bib`
 - 待办清单：`paper/ADMA2026_TODO.md`
-- 当前源稿最近验证：英文 17 页、中文 16 页（2026-08-17 审计修订后重新编译）。
-- `paper/build` 中 8 月 1 日旧 PDF：英文 15 页、中文 14 页，不能代表当前源稿。
+- 当前源稿最近验证：source commit `e597d89` 强制完整重建为英文 17 页、中文 16 页；
+  两份 PDF 和带源码 commit、工具链、页数、SHA-256 的构建清单已留存在 `paper/release/`。
+- 已忽略的 `paper/build/main.pdf` 与 `main_cn.pdf` 已同步为相同的 17/16 页版本，不再保留
+  8 月 1 日 15/14 页旧稿；发布证据以受跟踪的 `paper/release/` 为准。
 - 页数压缩：按用户决定延后到完稿后统一微调；最终投稿合规仍未完成。
 - 英文 PDF 作者元数据：空
 - 致谢和基金：未加入
