@@ -1,12 +1,13 @@
 # SpecEmbedding 项目记忆
 
-最后更新：2026-07-14
+最后更新：2026-08-17
 
-本次更新前代码状态：
+当前修订状态：
 
-- 分支：`dev`
-- 当前实验代码提交：`a2280d2 feat(rerank): 支持训练验证重叠敏感性评估`
-- 工作区：干净
+- 分支：`codex/transfer-2026-0831`
+- 暂定论文完成日期：2026-08-31
+- ADMA 2026 截止日期和 `dev`/`a2280d2` 状态只作为历史实验背景；当前转投进度以
+  `paper/TRANSFER_2026_PLAN.md`、专项计划和 Git 历史为准。
 
 本文档用于后续开发、实验和论文协作时快速恢复上下文。它是内部协作材料，不应直接放入 ADMA 双盲补充材料。若本文档与代码、`params.yaml` 或实验日志冲突，以代码和原始日志为准。
 
@@ -20,7 +21,8 @@
 4. 使用基础相似度从候选库中检索 top-$K$ 分子。
 5. 使用非生成式残差 reranker 重新排序 hard candidates，并受控比较 pointwise 与 set-aware 变体。
 
-当前论文目标是投稿 ADMA 2026，主题选择为 `Data mining for bioinformatics`。英文标题暂定为：
+当前目标是完成转投稿件，暂定完稿日期为 2026-08-31；ADMA 2026 及其主题
+`Data mining for bioinformatics` 是原始投稿背景。英文标题暂定为：
 
 > Non-Generative Learning to Rerank for MS/MS-Based Molecule Retrieval
 
@@ -29,7 +31,11 @@
 - 在已有跨模态检索器之上直接优化候选列表排序。
 - 结合 base score、base rank 和显式谱图--候选交互特征。
 - 使用 residual listwise reranking，在不生成分子的情况下修正基础排序。
-- pointwise 与 set-aware Transformer 都大幅优于 base；overlap-clean 流水线中 Transformer 呈现小幅一致优势，但该优势与历史 checkpoint 结论不一致，对 alignment/checkpoint 敏感。
+- pointwise 与候选集合 Transformer 在 alignment seeds 42/43/44 的 12/12 个
+  alignment--candidate--learned-model 聚合单元中均同时改善对应 base 的 Recall@1 和 MRR；
+  Transformer 相对 pointwise 在两类候选和两项指标上都只有 2/3 alignment 方向为正。
+- Recall/MRR 使用本地 exact-target-SMILES 单正例规则，不等价于参考二维 InChIKey/可能
+  多正例 evaluator；差异影响尚未量化。
 - 因此可被当前实验支持的核心是“监督残差学习排序有效”，而不是“候选间关系是主要增益来源”。
 
 ## 2. 协作与工程约定
@@ -328,10 +334,12 @@ latexmk -pdf -xelatex \
 - 验证谱图：19,429
 - 测试谱图：17,556
 - 唯一分子：32,010
-- 基础 checkpoint：`checkpoints_align/d4c1f70_massspecgym_nopretrain/best_model_stage2.pth`
+- canonical 基础 checkpoint：`checkpoints_align/a2280d2_massspecgym_nopretrain_valoverlapclean/best_model_stage2.pth`
 - alignment：无额外 SpecEmbedding 预训练
 - rerank top-$K$：40
-- alignment 随机种子：42（固定 checkpoint）
+- canonical/组件表 alignment 随机种子：42（固定 checkpoint）
+- 跨 alignment 分层分析：alignment seeds 42、43、44；每个 checkpoint 内先聚合
+  reranker seeds 42、43、44
 - reranker 随机种子：42、43、44
 - reranker hidden dim：512
 - rank embedding dim：32
@@ -353,7 +361,7 @@ MassSpecGym 候选文件来自其官方数据集发布：
 
 ### 6.2 本地结果
 
-Recall 指标以百分比表示。当前 overlap-clean 主结果表的 MRR 保留日志中 $[0,1]$ 原始量纲；后续历史表为了与旧稿一致将 MRR 乘以 100。MCES@1 是结构距离，保留原始量纲，越低越好。
+Recall 指标以百分比表示。当前 overlap-clean 主结果表的 MRR 保留日志中 $[0,1]$ 原始量纲；后续历史表为了与旧稿一致将 MRR 乘以 100。MCES@1 是结构距离，保留原始量纲，越低越好。Recall/MRR 采用 MassSpecGym 提供候选文件上的本地 exact-target-SMILES 单正例规则；该规则与参考二维 InChIKey/可能多正例 evaluator 不等价，影响尚未量化。
 
 2026-07-12 完成 commit `a2280d2` 的 train--val overlap-clean 全流水线。该流水线排除 validation 索引 7686/7687/7688/8464/8465/8466，重训 alignment、重建 mass/formula top-40 cache，并完成 2 种候选库 $×$ 2 种 reranker $×$ 3 个 seeds 的 12 组训练与评估。12/12 组均为 `complete`，`errors=[]`。当前主结果应采用下表的 overlap-clean 数字：
 
@@ -371,8 +379,32 @@ overlap-clean 受控结论：
 - Pointwise 相对 Clean Base 的 Recall@1 增益为 mass +19.9836、formula +10.8700 个百分点；Set Transformer 增益为 mass +21.1228、formula +11.4662 个百分点。监督残差 reranking 的核心收益保持。
 - Set Transformer 相对 Pointwise 的平均 Recall@1 差异为 mass +1.1392、formula +0.5962 个百分点，在 6/6 个成对 seed--candidate Recall@1 比较中获胜；MRR raw 平均差分别为 +0.0081/+0.0038。
 - 上述 Transformer 优势与历史 `d4c1f70` 固定 alignment 结果（mass -0.13、formula +0.21 个百分点，胜场 3/6）不一致。因此只能说 clean run 呈现小幅一致优势，但尚不能确认 candidate self-attention 具有稳健独立收益。
-- $±$ 只覆盖 reranker seeds 42/43/44；alignment 仍只有 seed 42，不代表端到端方差。
+- 本表的 $±$ 只覆盖 reranker seeds 42/43/44，并固定 canonical alignment seed 42；
+  跨 alignment 证据另见下方分层结果，不能把两种统计单位混用。
 - overlap-clean MCES@1 已使用同一 `a2280d2` 流水线补算完成：mass Clean Base/seed-42 Set Transformer 为 15.3681/7.7057，绝对降低 7.6624（49.86%）；formula 为 5.4389/3.0913，绝对降低 2.3476（43.16%）。四项均完成 17,556/17,556 条查询，batch 状态为 `complete`。
+
+#### 跨 alignment 分层结果（2026-08-17）
+
+alignment seeds 42/43/44 均已完成两种候选协议、两种监督 reranker 和 reranker seeds
+42/43/44，共 36/36 组。下表先在每个 alignment 内平均三个 reranker seeds；R@1/MRR
+均以百分比显示，不把九次 alignment--reranker 组合展平为九个 alignment 样本。
+
+| Alignment | Candidate | Base R@1 | Pointwise R@1 | Transformer R@1 | Base MRR | Pointwise MRR | Transformer MRR |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 42 | mass | 47.46 | 67.44 | 68.58 | 55.03 | 71.79 | 72.60 |
+| 42 | formula | 63.10 | 73.97 | 74.57 | 68.86 | 77.64 | 78.02 |
+| 43 | mass | 35.92 | 66.92 | 67.19 | 44.33 | 70.42 | 70.58 |
+| 43 | formula | 45.08 | 69.64 | 69.30 | 51.85 | 72.14 | 71.96 |
+| 44 | mass | 23.91 | 57.78 | 57.42 | 32.26 | 61.22 | 60.91 |
+| 44 | formula | 28.73 | 59.76 | 59.82 | 36.87 | 63.14 | 63.34 |
+
+- 三个 alignment、两种候选、两种学习模型构成的 12 个 alignment-level 聚合单元中，
+  Pointwise/Transformer 的三 reranker-seed 均值均同时改善对应 base 的 R@1 与 MRR（12/12）。
+- Transformer-minus-Pointwise 的 alignment-level 配对均值在 mass/formula 的 R@1 与 MRR
+  上都只有 2/3 alignment 为正，不支持 self-attention 的一致独立收益。
+- 三个 checkpoints 使用相同参数哈希，但来自两个 source commits；三个 alignment-level
+  estimates 仅是内部描述性敏感性证据，不构成置信区间、显著性或一般端到端稳定性证明。
+- 版本化证据：`analysis/transfer2026_alignment_multiseed/`。
 
 Train--val 模型选择审计：
 
@@ -562,15 +594,19 @@ Recall@1 的三种子均值仅变化 $-0.0045$ 至 $-0.0055$ 个百分点，主�
 不变。因此，“训练时保证监督列表有正例”本身不构成测试正标签泄露，且
 train--test 输入重叠不会实质改变当前结果。
 
-2026-07-12 也已完成 6 条 train--val 重叠输入的 overlap-clean 全流水线审计。clean 与历史 alignment 均选择 best/stop epoch 16/21，但 reranker 9/12 组的 best/stop epoch 对不同。这说明新旧完整流水线的模型选择并非逐项一致，同时 overlap-clean 流水线仍保持对 base 的显著增益。由于 alignment 同时重训，新旧差异只能报告为流水线级敏感性，不应单独归因于 validation 协议或作为 6 条查询的隔离因果估计。
+2026-07-12 也已完成 6 条 train--val 重叠输入的 overlap-clean 全流水线审计。clean 与历史 alignment 均选择 best/stop epoch 16/21，但 reranker 9/12 组的 best/stop epoch 对不同。这说明新旧完整流水线的模型选择并非逐项一致，同时 overlap-clean 流水线仍保持对 base 的数值大幅改善。由于 alignment 同时重训，新旧差异只能报告为流水线级敏感性，不应单独归因于 validation 协议或作为 6 条查询的隔离因果估计。
 
 ### 7.2 必须明确披露的限制
 
 - formula candidate 设置假设已知真实分子式，应称为 formula-conditioned retrieval，不能描述成完全开放的未知分子鉴定。
 - reranker 是 closed-library 方法，不能生成候选库之外的新分子。
-- reranker 已使用 3 个随机种子，但 alignment 仍只有 seed 42，当前误差不覆盖端到端方差。
-- overlap-clean 流水线中 candidate self-attention 有小幅一致优势，但与历史 checkpoint 的结论不一致；优势对 alignment/checkpoint 敏感，不能将整体增益归因于候选交互。
-- JESTR 和 GLMR 尚未在本代码库统一复现。
+- canonical 主表和组件消融固定 alignment seed 42，其 $±$ 只覆盖三个 reranker seeds；
+  另有 alignment seeds 42/43/44 分层分析，但仅形成三个内部描述性 estimates，不是一般
+  端到端方差、置信区间或显著性结果。
+- 跨 alignment 分析中 candidate self-attention 的 Recall@1/MRR 方向均只有 2/3
+  alignment 为正，不能将整体增益归因于候选交互。
+- JESTR 和 GLMR 尚未在本代码库统一复现；当前正式采用 reported-only、不可直接比较的
+  降级边界，不再作为本轮开放 P0。
 - train--test 剔除敏感性和 train--val overlap-clean 模型选择审计均已完成；对 train--val 结果的解释仍必须保留“alignment 重训使其不是隔离因果效应”的限制。
 
 ## 8. 与 JESTR 和 GLMR 的比较
@@ -627,17 +663,17 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 
 | Candidate | Method | Recall@1 | Recall@5 | Recall@20 | MRR | MCES@1 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| mass | JESTR | 17.62 | 40.36 | 64.76 | 29.12 | 15.82 |
-| mass | GLMR | 64.17 | 72.96 | 78.78 | 67.82 | 11.14 |
-| formula | JESTR | 11.77 | 33.26 | 61.01 | 22.83 | 11.73 |
-| formula | GLMR | 68.48 | 78.09 | 84.22 | 72.47 | 5.05 |
+| mass | JESTR（reported；未复现） | 17.62 | 40.36 | 64.76 | 29.12 | 15.82 |
+| mass | GLMR（reported；未复现） | 64.17 | 72.96 | 78.78 | 67.82 | 11.14 |
+| formula | JESTR（reported；未复现） | 11.77 | 33.26 | 61.01 | 22.83 | 11.73 |
+| formula | GLMR（reported；未复现） | 68.48 | 78.09 | 84.22 | 72.47 | 5.05 |
 
-当前本地 reranker 数字高于 GLMR 论文报告值，但不能直接据此声称严格超越，因为：
+这些外部数值只记录 GLMR 论文给出的点估计，不用于对本地与外部流水线作相对性能排序，因为：
 
 - 基础 retriever 不同。
 - 分子 canonicalization 和候选处理细节可能不同。
 - GLMR/JESTR 未在本地统一复现。
-- 当前多种子只覆盖 reranker，alignment 仍固定为 seed 42。
+- canonical 数字与跨 alignment 描述性汇总使用不同统计单位，且外部协议均未匹配。
 
 ### 8.4 最稳妥的论文定位
 
@@ -651,8 +687,8 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 
 - 直接、非生成式的监督残差 learning-to-rank。
 - 结合显式谱图--候选交互特征、base score 和 base rank 进行重排序。
-- 轻量级、可缓存、可插入现有双塔检索器。
-- overlap-clean 三种子受控实验中 Set Transformer 相对 Pointwise 有小幅一致优势，同时明确披露该优势与历史 checkpoint 的不一致性。
+- 使用离线候选 embedding cache，可作为现有双塔检索器后的独立第二阶段。
+- alignment seeds 42/43/44 中两个监督 reranker 在 12/12 个候选--模型聚合单元均改善对应 base；Transformer 相对 Pointwise 的 Recall@1/MRR 方向均仅 2/3 alignment 为正。
 
 不要主张：
 
@@ -696,8 +732,9 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 中文稿：`paper/main_cn.tex`
 - 参考文献：`paper/references.bib`
 - 待办清单：`paper/ADMA2026_TODO.md`
-- 英文编译：成功，11 页
-- 中文编译：成功，10 页
+- 当前源稿最近验证：英文 17 页、中文 16 页（2026-08-17 审计修订后重新编译）。
+- `paper/build` 中 8 月 1 日旧 PDF：英文 15 页、中文 14 页，不能代表当前源稿。
+- 页数压缩：按用户决定延后到完稿后统一微调；最终投稿合规仍未完成。
 - 英文 PDF 作者元数据：空
 - 致谢和基金：未加入
 - AI assistance disclosure：已移入 Introduction，并明确覆盖所有章节、代码编辑、实验编排和一致性审计；数值来自软件流水线，作者核验并承担全部责任。
@@ -705,14 +742,19 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - SpecEmbedding 书目信息：已按 ACS 正式页面补齐为 Analytical Chemistry 2025, 97(37), 20137--20146。
 - 正式方法架构图：已使用共享 TikZ 源 `paper/figures/method_overview.tex` 替换中英文稿文本占位图；图中包含三阶段流程、两种 reranker 变体、残差跳连和训练/测试协议。
 - overlap-clean mass/formula MCES@1：已完成（mass Base/seed-42 Set Transformer 15.3681/7.7057；formula 5.4389/3.0913；四项均为 17,556/17,556，batch 状态 `complete`）
-- 最终实验 artifact manifest：已生成 `paper/adma2026_artifact_manifest.json`，60 个 canonical artifacts 校验通过，SHA-256 为 `e00634b13d79ab1f4e7cbb38339f89302a98082e75f5daf54e3e0daef4702245`；仅作内部 inventory，匿名附件不得直接打包其引用的原始 status/log。
+- 最终实验 artifact manifest：已生成 `paper/adma2026_artifact_manifest.json`，60 个 canonical artifacts 校验通过；2026-08-17 加入评价身份协议和 source-commit `params.yaml` blob 后，SHA-256 为 `ad92596e1ca60e8edc6b7be594bde7cbe314f5d08a0421551ba88eaad8207875`；仅作内部 inventory，匿名附件不得直接打包其引用的原始 status/log。
 - overlap-clean alignment/cache/reranker 全流水线：12/12 组 pointwise/Transformer 实验已完成
+- alignment seeds 42/43/44 跨 alignment：36/36 组完成并形成分层分析；监督 reranking
+  相对 base 的 12/12 聚合单元均改善，Transformer--Pointwise 方向不一致。
+- canonical 核心组件消融：五项移除、两种候选、三个 reranker seeds 共 30/30 组完成；
+  没有组件通过严格独立收益门槛。
 - train--test 输入重叠敏感性：12/12 组完成；剔除 3 条重叠输入后主结论不变
 - train--val 输入重叠：overlap-clean 审计已完成；clean 与历史 alignment best/stop epoch 相同，reranker 9/12 组选择不同
-- 中心主张：已收窄为非生成式残差 learning-to-rank；clean run 中 self-attention 有小幅优势，但暂不将其作为已验证的稳健增益来源
+- 中心主张：已收窄为本地 exact-SMILES 协议下非生成式残差 learning-to-rank 的框架级
+  收益；不主张官方 evaluator 等价、稳健 self-attention 独立收益或 SOTA。
 
-当前论文仍不是最终可提交版本；未完成消融和外部基线复现已明确记录为当前证据范围
-之外，匿名补充包、CMT 作者/COI 及最终 PDF 检查仍待完成。
+当前论文仍不是最终可提交版本；核心消融和跨 alignment 分析已完成，外部基线采用
+reported-only 降级边界。页数微调、匿名补充包、作者/COI 与最终 PDF 合规检查仍待完成。
 
 ## 10. 论文文件与结构
 
@@ -740,8 +782,8 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 
 论文已经：
 
-- 直接比较 JESTR、GLMR 和本文排序机制。
-- 分开标注本地结果与外部 reported results。
+- 在机制层面对照 JESTR、GLMR 与本文排序方式，不作匹配性能比较。
+- 本地结果与外部 reported results 视觉拆表；外部明确未复现、不可直接比较。
 - 写明训练正例插入和测试无插入协议。
 - 写明 formula-conditioned setting 的限制。
 - 披露跨划分输入重叠，并报告 3 条 train--test 重叠的剔除敏感性结果。
@@ -757,8 +799,10 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 
 1. 使用显式 allowlist 准备可选匿名补充包，并扫描姓名、用户名、本地路径、Git 远端和公开项目链接；不要直接打包整个仓库或内部 artifact manifest。
 2. 完成最终英文 PDF、CMT 作者列表/COI、既有公开版本及双盲合规检查。
-3. 时间允许时再完成 feature/loss/top-$K$ 消融、效率测量或多 alignment seeds；其中多 alignment seeds 对判断 self-attention 稳定性价值最高。
-4. 尽可能在统一协议下复现 JESTR/GLMR；若时间不足，继续保留 `reported` 标记且不主张严格 SOTA。
+3. 已完成核心 feature/loss 消融与多 alignment seeds；当前只保留既有 top-$K$、效率和
+   排名迁移待办，不新增实验目标。
+4. JESTR/GLMR 维持 reported-only、未复现且不可直接比较的止损方案；除非用户以后明确
+   开启新的统一复现任务，否则不再列为当前待办。
 
 ## 12. 已知风险与容易混淆的地方
 
@@ -774,11 +818,14 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 
 ### 12.3 多种子作用域与 self-attention 证据
 
-- 每个流水线内，seeds 42/43/44 只重训 reranker，共享同一 seed-42 alignment checkpoint 和 cache。
-- 因此已报告的标准差是 reranker-level uncertainty，不是 end-to-end uncertainty。
-- overlap-clean 流水线中 Set Transformer 在 6/6 个成对比较中获胜，平均 Recall@1 高 1.1392/0.5962 个百分点；历史流水线中则仅获胜 3/6。
-- 因此 self-attention 的小幅优势对 alignment/checkpoint 敏感，不能将整体 reranking 增益归因于候选间交互。
-- 如需主张完整流水线稳定性，必须重训多个 alignment seeds 并为每个 checkpoint 重建 cache。
+- canonical 与组件表中，reranker seeds 42/43/44 共享 seed-42 alignment checkpoint 和
+  cache，因此其标准差只表示 reranker-level variation。
+- 跨 alignment 分层分析已经覆盖 alignment seeds 42/43/44，并在每个 checkpoint 内聚合
+  相同三个 reranker seeds；三个 alignment-level estimates 来自两个 source commits。
+- 两种学习式 reranker 相对 base 的 12/12 聚合单元均改善，但 Set Transformer 相对
+  Pointwise 在 mass/formula 的 Recall@1 与 MRR 上都只有 2/3 alignment 为正。
+- 因此现有证据是内部描述性敏感性结果，不是置信区间、显著性或一般完整流水线稳定性；
+  组件消融仍未跨 alignment 重复，不能将整体增益归因于候选间交互。
 
 ### 12.4 跨论文结果不能作为受控消融
 

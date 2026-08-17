@@ -1,6 +1,9 @@
-# ADMA 2026 投稿待办
+# ADMA 2026 投稿待办（历史基线；转投修订中）
 
-最后更新：2026-07-14
+最后更新：2026-08-17
+
+- 当前转投暂定完稿日期：2026-08-31
+- 下列 ADMA 截止日期仅作历史记录，不再是当前投稿日程。
 
 - 论文截止：2026-07-17 AoE
 - 补充材料：可选；若提交，截止为 2026-07-20 AoE（正文截止后 3 天）
@@ -19,15 +22,19 @@
 
 - [x] 计算历史 `d4c1f70` checkpoint 质量候选场景的 MCES@1（Base：16.4199；代表性 seed-42 Set Transformer：8.0209；越低越好）。
 - [x] 使用 `run_overlap_clean_mces.sh` 完成最终 overlap-clean `a2280d2` checkpoint 的 MCES@1 重算：mass Base/seed-42 Transformer 为 15.3681/7.7057，formula 为 5.4389/3.0913；四项均完成 17,556/17,556 条查询，batch 状态为 `complete`。
-- [ ] 在统一候选集、SMILES canonicalization 和评价代码下复现 JESTR。
-- [ ] 在相同协议下复现 GLMR。
+- [-] 在统一候选集、SMILES canonicalization 和评价代码下复现 JESTR；当前采用
+  reported-only 降级方案，不再作为本轮转投 P0，除非后续明确开启新复现任务。
+- [-] 在相同协议下复现 GLMR；同上，外部数字仅作未复现、不可直接比较的跨论文背景。
 - [x] 当前采用无法完成统一复现时的降级方案：全文保留 `reported results` 标记，不声称严格 SOTA。
+- [x] 全文、双语 README、canonical manifest 和版本化分析报告统一标注本地
+  exact-target-SMILES 单正例规则；与参考二维 InChIKey/可能多正例 evaluator 的差异
+  尚未量化，因此不声称官方 evaluator 等价。
 - [x] 在固定 alignment checkpoint 上为 pointwise/Transformer reranker 运行 seeds 42/43/44，报告均值和样本标准差。
 - [x] 确认验证集和测试集始终使用 `force_include_positive=false`；mass/formula cache meta、生成日志和 label 一致性检查均通过。
 - [x] 完成分子标签重复审计；identifier、原始/规范化 SMILES 和 InChIKey 两两交集均为 0，fold 标记无错配。
 - [x] 使用 `run_rerank_overlap_sensitivity.py` 对 3 个 train--test 完全相同谱图输入完成剔除敏感性评估；12/12 组完成，排除 test cache 索引 5908/5909/5910 后三种子平均 Recall@1 仅变化 $-0.0045$ 至 $-0.0055$ 个百分点，主结论不变；实验代码 commit 为 `b20a2e8`。
 - [x] 完成 6 个 train--val 完全相同输入的 overlap-clean 全流水线审计：排除 val 索引 7686/7687/7688/8464/8465/8466，alignment validation molecule keys 由 3386 降至 3384；best/stop epoch 仍为 16/21，reranker 12/12 完成、无错误，其中 9/12 组 best/stop epoch 对与历史流水线不同。实验代码 commit 为 `a2280d2`；该对比包含 alignment 重训，只能解释为流水线级敏感性，不是 6 条查询的隔离因果效应。
-- [x] 已运行 `python freeze_adma2026_artifacts.py` 并生成 `paper/adma2026_artifact_manifest.json`：60 个 canonical artifacts 全部通过校验，manifest SHA-256 为 `e00634b13d79ab1f4e7cbb38339f89302a98082e75f5daf54e3e0daef4702245`。该 manifest 仅作内部 inventory；其中引用的原始 status/log 可能含主机、用户、进程和 GPU 信息，不能直接按清单打包匿名附件。
+- [x] 已运行 `python freeze_adma2026_artifacts.py` 并生成 `paper/adma2026_artifact_manifest.json`：60 个 canonical artifacts 全部通过校验；2026-08-17 加入评价身份协议并将历史 `params.yaml` 绑定到 source-commit blob 后，manifest SHA-256 为 `ad92596e1ca60e8edc6b7be594bde7cbe314f5d08a0421551ba88eaad8207875`。该 manifest 仅作内部 inventory；其中引用的原始 status/log 可能含主机、用户、进程和 GPU 信息，不能直接按清单打包匿名附件。
 - [x] 将正文中的 `Required Ablations`、`we will` 等待办式内容替换为已完成的三种子 pointwise/Transformer 结果。
 - [x] 使用共享 TikZ 矢量源 `paper/figures/method_overview.tex` 制作正式方法架构图，并替换中英文稿的文本框占位图；图中区分跨模态对齐、top-40 检索/缓存和监督残差重排序，标明 pointwise/set-aware 两种变体、基础分数跳连以及训练/验证测试协议。
 - [x] 对照 SpecEmbedding 原文与 ACS 正式书目信息完成引用和增量审计：在引言、相关工作和方法处就地归因峰序列 Transformer backbone，准确区分其“重复谱图 SupCon + Tanimoto-MSE”与本文从零训练的跨模态目标；将本文贡献收窄为第二阶段非生成式残差 learning-to-rank；补齐 `97(37):20137--20146`。
@@ -36,17 +43,20 @@
 ## P1：核心消融实验
 
 - [x] 基础检索器 vs. pointwise MLP vs. Transformer listwise reranker（3 个 reranker seeds）。
-- [x] 比较候选间 self-attention：overlap-clean 流水线中 Transformer 平均 Recall@1 比 Pointwise 高 1.1392（mass）/0.5962（formula）个百分点，6/6 个成对 seed 获胜；但这与历史 checkpoint 的 3/6 胜场不一致，因此仅能报告小幅优势且对 alignment/checkpoint 敏感，不将整体增益归因于 self-attention。
-- [ ] 移除基础检索分数。
-- [ ] 移除 rank embedding。
-- [ ] 移除元素乘积特征。
-- [ ] 移除绝对差特征。
-- [ ] 仅 listwise CE vs. `CE + pairwise loss`。
+- [x] 比较候选间 self-attention：canonical alignment seed 42 内 Transformer 呈小幅优势；
+  但 alignment seeds 42/43/44 分层后，mass/formula 的 alignment-level Recall@1 与 MRR
+  差值都只有 2/3 为正，因此不将整体增益归因于 self-attention。
+- [x] 分别审计只移除 residual shortcut，以及联合移除基础分数输入与 residual 路径；后者不是单因素 feature 消融。
+- [x] 移除 rank embedding；六个同种子候选协议配对中 Recall@1/MRR 均提高，因此不把该设计写成已验证贡献。
+- [x] 联合移除元素乘积与绝对差特征；仍保留 self-attention，不解释为无候选交互。
+- [x] 仅 listwise CE vs. `CE + pairwise loss`。
 - [ ] 开启/关闭候选顺序随机打乱。
 - [ ] 比较 `K=20/40/100/256`。
 - [ ] 比较有无 SpecEmbedding 预训练。
 - [ ] 分析不同候选召回上界下 reranker 的实际增益。
-- [ ] 若要报告端到端不确定性，还需使用多个 alignment seeds 重训基础检索器并重建 cache。
+- [x] 已完成 alignment seeds 42/43/44 的基础检索器、cache 与每个 alignment 下
+  reranker seeds 42/43/44，共 36/36 组，并生成分层分析。三个 alignment-level estimates
+  只提供内部描述性敏感性证据，不构成置信区间、显著性或一般端到端稳定性证明。
 
 ## P1：效率与可解释性
 
@@ -61,25 +71,29 @@
 ## P1：论文完善
 
 - [x] 补充固定基础检索器上三个 reranker seeds 的均值和样本标准差。
-- [x] 在结果表中明确区分本地复现结果和论文报告结果。
-- [ ] 补充数据集、完整候选池规模和平均候选数量统计。
-- [ ] 统一使用 `Recall@K`、`MRR`、`MCES@1` 等术语。
+- [x] 将本地结果与外部 reported 结果拆为独立表；外部表明确 `not reproduced / not directly comparable`。
+- [x] 补充数据集、完整候选池规模和平均候选数量统计。
+- [x] 统一使用 `Recall@K`、`MRR`、`MCES@1` 等术语。
 - [ ] 压缩相关工作，避免 JESTR/GLMR 方法介绍喧宾夺主。
-- [x] 根据受控消融收窄核心论点：监督残差重排序稳定有效；overlap-clean 运行中 Transformer 有小幅一致优势，但优势对 alignment/checkpoint 敏感，暂不主张 self-attention 的稳健独立收益。
+- [x] 根据受控消融收窄核心论点：在三个审计 alignment 内，两种监督残差 reranker
+  均改善对应 base；Transformer 相对 Pointwise 的 Recall@1/MRR 方向都只有 2/3
+  alignment 为正，因此不主张 self-attention 的稳健独立收益。
 - [ ] 完成人工英文润色。
-- [ ] 检查中英文稿内容一致性。
+- [x] 检查中英文稿内容一致性（2026-08-17 逐表、逐证据边界复核）。
 - [ ] 核对全部参考文献的作者、年份、页码和 DOI。
 
 ## 投稿合规
 
 - [x] 使用 Springer LNCS/LNAI 模板。
-- [x] 英文稿当前为 11 页，低于 15 页限制。
+- [ ] 当前源稿最近验证为英文 17 页、中文 16 页；`paper/build` 中 8 月 1 日旧 PDF 为
+  15/14 页。用户决定完稿后再统一微调页数，不能沿用 11/10 页的历史完成状态。
 - [x] 作者、单位和 PDF 作者元数据已隐藏。
 - [x] 未包含致谢和基金信息。
 - [x] 已在 Introduction 中加入覆盖全部章节和实际辅助范围的 AI 使用披露。
 - [ ] 最终确认正文、参考文献和 limitation 总计不超过 15 页。
 - [ ] 检查 PDF、源文件和补充材料中是否含姓名、用户名、单位或本地路径。
-- [ ] 清理 `/data1/zyl`、Git 远端地址、公开仓库链接及 Git 历史信息。
+- [x] 清理当前受跟踪源码、配置和归档 notebook 中的私有机器绝对路径。
+- [ ] 最终匿名检查 Git 远端地址、公开仓库链接及 Git 历史信息。
 - [ ] 准备不含 `.git` 历史的匿名代码压缩包。
 - [ ] 确认补充材料不超过 20 MB；超过时改用匿名仓库。
 - [ ] 确认匿名仓库在补充材料截止后不再修改。
@@ -146,9 +160,10 @@ Train--val overlap-clean 审计排除 6 条 validation 查询（两个分子组�
 | 方法 | 数字来源 | 是否本地复现 | 使用限制 |
 | --- | --- | --- | --- |
 | SpecMolAlign | 本项目日志 | 是 | 可用于受控比较 |
-| SpecEmbedding-Rerank | 本项目日志 | 是 | alignment 固定为 seed 42；reranker 使用 seeds 42/43/44 |
-| JESTR | GLMR 论文 Table 1 | 否 | 必须标注 `reported` |
-| GLMR | GLMR 论文 Table 1 | 否 | 必须标注 `reported` |
+| SpecEmbedding-Rerank canonical/组件表 | 本项目日志 | 是 | alignment 固定为 seed 42；reranker 使用 seeds 42/43/44；组件只在此 alignment 审计 |
+| SpecEmbedding-Rerank 跨 alignment | 版本化分层分析 | 是 | alignment seeds 42/43/44；每个 alignment 内先聚合 reranker seeds 42/43/44；三个 estimates 仅描述性 |
+| JESTR | GLMR 论文 Table 1 | 否 | 必须标注 `reported; not reproduced; not directly comparable` |
+| GLMR | GLMR 论文 Table 1 | 否 | 必须标注 `reported; not reproduced; not directly comparable` |
 
 ## 建议时间线
 
@@ -157,9 +172,9 @@ Train--val overlap-clean 审计排除 6 条 validation 查询（两个分子组�
 - [x] 7 月 12 日：完成 train--val overlap-clean alignment/cache/reranker 全流水线及 12 组多种子评估。
 - [x] 7 月 13 日：执行 `run_overlap_clean_mces.sh`，补算 overlap-clean 代表性 checkpoint 的 mass/formula MCES@1。
 - [x] 7 月 14 日：执行 `python freeze_adma2026_artifacts.py`，生成不含本机绝对路径或 hostname 的内部实验 artifact manifest；60 个 artifacts 校验通过。其中仍记录 Git commit，且所引用的原始 status/log 需要脱敏，不得未审查就直接放入匿名补充材料。
-- [x] 7 月 14 日：完成共享中英文标签的 TikZ 正式方法图，替换两稿文本占位图；英文/中文稿编译后仍为 11/10 页。
+- [x] 7 月 14 日：完成共享中英文标签的 TikZ 正式方法图，替换两稿文本占位图；当时英文/中文稿编译为 11/10 页。
 - [x] 7 月 14 日：完成 SpecEmbedding 贡献边界、正式书目信息和 ADMA/Springer AI 披露审计，并同步修正中英文稿。
-- [x] 7 月 10 日至 12 日：确定保留 reported-results 降级方案，不声称严格 SOTA；JESTR/GLMR 统一复现仍作为独立待办。
+- [x] 7 月 10 日至 12 日：确定 reported-only 降级方案；2026-08-17 已正式执行为当前证据边界，JESTR/GLMR 统一复现不再作为本轮开放待办。
 - [ ] 7 月 13 日至 14 日：消融、效率和案例分析。
 - [ ] 7 月 15 日：更新其余图表并完成全文核对。
 - [ ] 7 月 16 日：执行最终双盲、页数、引用和可选补充材料检查。
