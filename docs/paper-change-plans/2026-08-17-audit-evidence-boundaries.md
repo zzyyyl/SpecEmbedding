@@ -22,7 +22,7 @@
 3. 将未独立复现的 JESTR/GLMR 外部数字与本地结果在视觉和叙述上分离，消除公平 benchmark
    或严格超越的暗示；
 4. 将代表性 seed-42、三 reranker-seed 均值和三 alignment-level 估计三种统计口径明确分开；
-5. 把投稿待办、项目记忆和审计报告统一到当前源稿英文 16 页、中文 15 页，并保留用户
+5. 把投稿待办、项目记忆和审计报告统一到当前源稿英文 17 页、中文 16 页，并保留用户
    “完稿后再微调页数”的决定。
 
 ## 2. 当前证据与问题定位
@@ -58,8 +58,8 @@
 
 ### 2.4 页数与统计口径记录过时
 
-- 8 月 1 日遗留 `paper/build` PDF 为英文 15 页、中文 14 页；8 月 17 日核心消融入稿后，
-  当前源稿最后验证为英文 16 页、中文 15 页。
+- 8 月 1 日遗留 `paper/build` PDF 为英文 15 页、中文 14 页；8 月 17 日审计修订后，
+  当前源稿最后验证为英文 17 页、中文 16 页。
 - `paper/ADMA2026_TODO.md` 和 `docs/project_memory_zh.md` 仍保留 11/10 页或多 alignment
   未完成记录；历史日期记录可以保留，但必须标明“当时”。
 - 主结果表是代表性 reranker seed 42；组件表是固定 alignment seed 42 下 reranker
@@ -150,7 +150,7 @@
   勾选；JESTR/GLMR 统一复现采用已确认的 reported-only fallback，不继续作为当前 P0。
 - `project_memory_zh.md` 在历史记录保留当时状态，同时新增当前状态，清除会误导下一步执行的
   “alignment 仍只有 seed 42”陈述。
-- 当前页数记录为“源稿最近编译 16/15；旧 build PDF 15/14；页数压缩延后”，最终投稿
+- 当前页数记录为“源稿最近编译 17/16；旧 build PDF 15/14；页数压缩延后”，最终投稿
   合规项继续未完成，不以旧 11/10 页作完成依据。
 
 ## 5. 引用文献与真实性核验
@@ -178,20 +178,22 @@ context，不承担公平比较。
 ## 7. 分步执行清单
 
 - [x] 步骤 1：提交本计划；开始任何论文正文修改前将状态改为 `执行中`。
-- [ ] 步骤 2：修改 canonical freeze 与两份分析脚本和测试，加入身份协议与统计单位字段；
+- [x] 步骤 2：修改 canonical freeze 与两份分析脚本和测试，加入身份协议与统计单位字段；
   重新生成 manifest/派生产物并验证数值、输入/输出哈希和字节级确定性。
-- [ ] 步骤 3：修改英文稿的全局协议标签、外部结果视觉分区、跨 alignment 结果、讨论、
+- [x] 步骤 3：修改英文稿的全局协议标签、外部结果视觉分区、跨 alignment 结果、讨论、
   局限和结论。
-- [ ] 步骤 4：逐项同步中文稿，核对表格数字、正负方向、术语和结论强度。
-- [ ] 步骤 5：更新双语 README、投稿 TODO、项目记忆与审计修复记录。
-- [ ] 步骤 6：确认无新增引用，检查 BibTeX、交叉引用和表格引用。
-- [ ] 步骤 7：运行分析脚本测试和完整 `python -m pytest -q`。
-- [ ] 步骤 8：编译英文/中文稿，记录当前页数、错误、undefined citation/reference、
+- [x] 步骤 4：逐项同步中文稿，核对表格数字、正负方向、术语和结论强度。
+- [x] 步骤 5：更新双语 README、投稿 TODO、项目记忆与审计修复记录。
+- [x] 步骤 6：确认无新增引用，检查 BibTeX、交叉引用和表格引用。
+- [x] 步骤 7：运行分析脚本测试和完整 `python -m pytest -q`。
+- [x] 步骤 8：编译英文/中文稿，记录当前页数、错误、undefined citation/reference、
   Overfull/Underfull 和已知 package warning。
-- [ ] 步骤 9：检查协议词扫描、双语一致性、`git diff --check` 和完整 diff，确保无新实验、
+- [x] 步骤 9：检查协议词扫描、双语一致性、`git diff --check` 和完整 diff，确保无新实验、
   无数值漂移、无无关文件。
-- [ ] 步骤 10：使用 Conventional Commit 提交论文及关联实质修改。
-- [ ] 步骤 11：回填论文 commit 和最终结果，将状态设为 `已执行`，再以独立文档 commit
+- [x] 步骤 10：使用 Conventional Commit 提交论文及关联实质修改。
+- [ ] 步骤 11：将论文、工程复现与审计记录推送后，通知原审计会话复审；若有阻断意见，
+  在同一计划内继续修复、验证和复审。
+- [ ] 步骤 12：复审无阻断项后回填最终结果，将状态设为 `已执行`，再以独立文档 commit
   归档本计划。
 
 ## 8. 风险、证据边界与待确认事项
@@ -210,18 +212,18 @@ context，不承担公平比较。
 
 ## 9. 验证方案
 
-- [ ] 派生产物：两次生成字节一致；manifest 的数值、路径、SHA-256 与输入工件匹配。
-- [ ] 数字核验：跨 alignment 表逐格反查 `alignment_level.csv` 或对应受控 CSV；
+- [x] 派生产物：两次生成字节一致；manifest 的数值、路径、SHA-256 与输入工件匹配。
+- [x] 数字核验：跨 alignment 表逐格反查 `alignment_level.csv` 或对应受控 CSV；
   Base/Pointwise/Transformer 和 delta 方向与报告一致。
-- [ ] 协议扫描：摘要、所有结果表 caption、结论、README、analysis report/manifest 均出现
+- [x] 协议扫描：摘要、所有结果表 caption、结论、README、analysis report/manifest 均出现
   本地 exact-SMILES 和非官方 evaluator 等价限定。
-- [ ] 外部基线：表内视觉分区明确，正文无直接 higher/lower 或 SOTA 解释。
-- [ ] 英文稿编译：`latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex`。
-- [ ] 中文稿编译：`latexmk -xelatex -interaction=nonstopmode -halt-on-error main_cn.tex`。
-- [ ] 引用检查：日志无 undefined citation/reference，`paper/references.bib` 无计划外 diff。
-- [ ] 双语一致性：表格数字自动比对，人工核对协议、统计单位、方向与限制性措辞。
-- [ ] 测试：`conda run -n specembedding python -m pytest -q` 全部通过。
-- [ ] Git：`git diff --check` 通过，提交只包含计划内文件。
+- [x] 外部基线：表内视觉分区明确，正文无直接 higher/lower 或 SOTA 解释。
+- [x] 英文稿编译：`latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex`。
+- [x] 中文稿编译：`latexmk -xelatex -interaction=nonstopmode -halt-on-error main_cn.tex`。
+- [x] 引用检查：日志无 undefined citation/reference，`paper/references.bib` 无计划外 diff。
+- [x] 双语一致性：表格数字自动比对，人工核对协议、统计单位、方向与限制性措辞。
+- [x] 测试：`conda run -n specembedding python -m pytest -q` 全部通过。
+- [x] Git：`git diff --check` 通过，提交只包含计划内文件。
 
 ## 10. 执行记录
 
@@ -231,13 +233,44 @@ context，不承担公平比较。
 - 按用户要求采用不新增实验的严格协议标注方案，并将已有 alignment seeds 42/43/44
   分层结果纳入论文；状态在正文修改前切换为 `执行中`。
 
+### 2026-08-17：协议工件与双语稿完成
+
+- canonical freeze、核心消融与跨 alignment 分析统一加入结构化身份协议；相关提交为
+  `ae8efe1`、`0e02992`、`48316f2`。canonical manifest 共 60 个工件，配置证据固定到历史
+  source commit 的 `params.yaml` blob；两次确定性生成哈希一致。
+- 英文和中文稿同步加入本地 exact-target-SMILES 单正例边界、跨 alignment 表与分层统计单位；
+  外部 JESTR/GLMR 拆为 reported-only 独立表，不作相对性能排序。
+- 数字逐格反查版本化 CSV：两个监督模型在 12/12 个 alignment--candidate--model 聚合单元
+  均改善对应 base 的 Recall@1/MRR；Transformer-minus-Pointwise 在两种候选和两个指标上
+  均仅 2/3 alignment 为正。三个 checkpoint 来自两个 source commits，故仅作描述性证据。
+- 中英文最终编译为 17/16 页；无 fatal error、undefined citation/reference 或
+  Overfull/Underfull。保留英文 `amsmath` 与中文 Fandol `fontspec` 已知 package warning。
+- 未修改 `paper/references.bib`，未新增引用、训练、评价或数值；页数压缩按用户决定延后。
+- canonical `specembedding` 环境完整测试为 `86 passed, 5 warnings`；其中新增路径可移植性
+  测试属于工程审计修复，不改变论文实验。
+
+### 2026-08-17：实质提交与工程复现闭环
+
+- 双语论文、投稿 TODO 与项目记忆以 commit `1c0dee2` 提交；该 commit 是本计划要求的
+  论文实质修改 commit。
+- 路径可移植性、无导入时目录创建、完整 CLI 路径透传、legacy notebook 输出目录、依赖
+  固定和 Linux x86-64 显式锁以 commit `f5e6e78` 提交。该工程修复来自同一审计，但没有
+  改变论文方法、实验数值或证据边界。
+- canonical 环境最终测试为 `86 passed, 5 warnings in 33.48s`；从显式 Conda/PyPI 锁
+  重建的全新环境为 `86 passed, 5 warnings in 26.92s`，Ruff 通过。
+- 双语 PDF 再确认 17/16 页；无 fatal error、undefined citation/reference 或
+  Overfull/Underfull。tracked 私有机器根扫描为零命中。
+- 下一步是推送并请求原审计会话独立复审；在复审结论返回前保持状态 `执行中`。
+
 执行时按日期记录状态转换、派生产物核验、双语修改、页数、测试、提交和复审反馈。
 
 ## 11. 最终结果
 
 - 完成日期：尚未完成
 - 最终状态：`执行中`
-- 验证结果：尚未验证
-- 论文修改 commit：尚未提交
+- 验证结果：本地与显式锁环境均已通过；等待独立复审
+- 论文修改 commit：`1c0dee2`
+- 工程复现 commit：`f5e6e78`
 - 计划归档 commit：无需在本文件中自我引用
-- 相对原计划的偏差：尚未记录
+- 相对原计划的偏差：同步完成同一审计中的路径可移植性和依赖锁修复；未扩大论文论点、
+  未新增实验或引用。按用户要求增加“通知原审计会话并迭代至无阻断项”的验收步骤。

@@ -76,7 +76,7 @@
 
 位置：`SpecEmbedding/const/gnps.py:4`、`SpecEmbedding/const/mona.py:4`、`SpecEmbedding/const/tsne_cluster.py:3-11`、`params.yaml`。
 
-现象：旧数据处理和可视化常量写死 `/data1/xp/...`，`params.yaml` 也包含 `/data1/zyl/...` 默认路径。README 的路径覆盖只覆盖部分新 CLI。
+现象：旧数据处理和可视化常量曾写死私有机器数据根，`params.yaml` 也曾包含另一台机器的默认路径。README 的路径覆盖只覆盖部分新 CLI。
 
 影响：在另一台机器上导入相关模块可能立即访问不存在的目录，且 `mkdir` 会在导入时执行；旧版 notebook 和部分数据处理流程无法按 README 独立运行。
 
@@ -201,3 +201,90 @@
 - warning 为 1 条 `torch_geometric.distributed` 弃用提示和 4 条 PyTorch nested-tensor 提示，没有测试失败。
 
 边界说明：默认 shell 使用未声明的 Python `3.13.9`，且未安装项目运行时依赖 PyTorch；其 `pytest --collect-only -q` 因缺少 `torch` 仍退出 2。加入 pytest 根路径配置后，原有 4 类仓库根模块导入错误已全部消失。项目的发布验收以 `environment.yml` 声明的 Python 3.12 `specembedding` 环境为准，不把不完整的系统 Python 解释为受支持环境。
+
+### 2026-08-17：P0-2 评价身份协议
+
+状态：**已按“严格限定本地协议”方案修复；未新增身份敏感性实验**。
+
+修改内容：
+
+- 新增单一结构化协议定义，固定本地 evaluator 为 exact target-SMILES 单正例，参考
+  MassSpecGym loader 为二维 InChIKey 等价且可能多正例，并固定
+  `official_evaluator_equivalent: false` 与“影响未量化”；
+- canonical freeze、核心消融与跨 alignment 报告/manifest 均写入该协议字段；历史配置读取
+  固定到 source commit 的 `params.yaml` blob，不再受当前可移植配置改写影响；
+- 双语摘要、关键表格 caption、讨论、局限、结论和 README 均明确使用“本地协议”口径，
+  不再留下官方 evaluator 等价或严格 SOTA 的解释空间；
+- 相关协议工件提交为 `ae8efe1`、`0e02992`、`48316f2`，论文证据边界提交为
+  `1c0dee2`。
+
+边界说明：按用户“不增加更多目标、主要完成待办”的决定，本轮没有新增二维 InChIKey/
+多正例评价运行。因此该修复关闭的是协议标注与结论边界问题，而不是量化两种身份规则的
+数值差异；此差异继续作为明确限制保留。
+
+### 2026-08-17：P1-1 路径可移植性与导入行为
+
+状态：**已修复并验证**，工程提交为 `f5e6e78`。
+
+修改内容：
+
+- `params.yaml`、源码、shell/batch 脚本和 11 份 legacy notebook 中的私有机器根已改为
+  repository-relative 配置或显式环境变量；tracked 文件私有根扫描为零命中；
+- 配置优先级固定为显式 `load_config(path)`、`SPECEMBEDDING_CONFIG`、仓库默认
+  `params.yaml`，已知相对路径相对于所选 YAML 目录解析；
+- `SpecEmbedding.const` 只解析路径，不在导入时创建目录；需要写出的 legacy notebook
+  单元在 `np.save` 前显式创建父目录；
+- 包导入仅为 Numba/Matplotlib 设置可覆盖的可写 cache 路径默认值，不创建目录，也不全局
+  禁用 Numba JIT；可执行入口只在进入 `main()` 后显式准备 cache 目录；
+- `run_pipeline.py` 使用仓库根定位 Git、子脚本和 subprocess 工作目录，data/cache/
+  tokenset/pretrained/candidate 参数均完整透传；`unique_seed_train.py` 的数据加载和训练置于
+  main guard 内，且每个 seed 的 mean/std 恢复在 seed 循环内写出；
+- 新增配置相对路径、任意 cwd、导入写入、运行时 cache、CLI 透传、notebook JSON/写前建目录、
+  私有路径扫描和 seed 写出作用域测试。
+
+### 2026-08-17：P1-2 至 P1-4 论文与投稿记录
+
+状态：**已修复并验证**，论文提交为 `1c0dee2`。
+
+- 当前源稿重新编译为英文 17 页、中文 16 页；8 月 1 日旧 build PDF 15/14 页仅作历史记录，
+  11/10 页旧状态已删除。按用户决定，页数压缩延后到完稿后，不把当前页数误记为最终合规；
+- 新增 alignment seeds 42/43/44 分层表。每个 alignment 内先聚合 reranker seeds 42--44，
+  不把九次运行展平：两个监督模型相对对应 base 在 12/12 个 alignment--candidate--model
+  聚合单元的 Recall@1/MRR 均改善；Transformer 相对 Pointwise 在两类候选和两个指标上
+  均只有 2/3 alignment 为正；
+- 摘要与结论区分 canonical alignment seed 42、固定 alignment 内 reranker 初始化统计和
+  三个 alignment 的描述性敏感性；不声称一般端到端稳定性、显著性或组件因果性；
+- JESTR/GLMR 移到独立 reported-only cross-paper context 表，显著标注未独立复现、不可
+  直接比较；删除直接 higher/lower 和方法归因叙述。
+
+### 2026-08-17：P2 环境锁与统计口径
+
+状态：**已完成最小可审计闭环**。
+
+- `environment.yml` 与 `requirements-dev.txt` 固定直接依赖版本；新增带每包 MD5 URL 的
+  Linux x86-64 Conda 显式锁、完整 PyPI 层版本锁和可重复执行的锁验证脚本；
+- `reproducibility/runtime-snapshot.yaml` 记录 source commit、Linux/驱动/GPU/CUDA/cuDNN、
+  直接包版本、锁文件 SHA-256 和实际验证结果，不含用户名、hostname、GPU UUID 或本机绝对
+  路径；
+- 从显式 Conda 锁创建全新环境并安装 PyPI 锁后，完整测试为
+  `86 passed, 5 warnings in 26.92s`，Ruff 全部通过；canonical `specembedding` 环境完整测试
+  为 `86 passed, 5 warnings in 33.48s`；
+- 代表性 seed 42、固定 alignment 的三 reranker-seed 均值和三个 alignment-level 描述性
+  估计已在表标题、caption、正文和项目状态文档中分开。
+
+环境边界：该快照是 2026-08-17 对当前源码的事后验收复现环境，不证明历史训练环境逐包
+相同，也不证明重新训练可 bitwise 重现。PyPI 锁固定版本但未记录 wheel hash；Conda 显式锁
+记录逐包 MD5。
+
+### 2026-08-17：最终本地验收摘要
+
+- `conda run -n specembedding python -m pytest -q`：`86 passed, 5 warnings`；
+- 显式锁全新环境：`86 passed, 5 warnings`；Ruff 通过；
+- `compileall`、shell 语法、`git diff --check`：通过；tracked 私有路径：零命中；
+- 英文/中文 LaTeX：17/16 页，无 fatal error、undefined citation/reference 或
+  Overfull/Underfull；仅保留已知 `amsmath` 与 Fandol `fontspec` warning；
+- 未新增引用、训练、评价、效率数字、显著性检验或外部 baseline 复现。
+
+修复后仍保留的研究限制：身份规则影响未量化；三个 alignment 只构成内部描述性证据；
+组件审计仍只覆盖 canonical alignment seed 42；JESTR/GLMR 未独立复现且不可直接比较。
+这些限制已在论文关键独立阅读位置自包含披露。当前状态可提交原审计会话进行再次审计。

@@ -1,0 +1,96 @@
+schema_version: 1
+captured_at: "2026-08-17"
+scope: post_hoc_validation_reproduction_environment
+historical_execution_environment_exact: false
+
+source:
+  commit: f5e6e78c2dbaddc67f19313685f2964cec9694cb
+  branch: codex/transfer-2026-0831
+  interpretation: >-
+    This snapshot validates that the audited source, tests, and document builds
+    work in a freshly reconstructed environment. It does not prove the exact
+    package state of historical training runs or bitwise retraining equivalence.
+
+platform:
+  os: Linux
+  architecture: x86_64
+  kernel: 5.15.0-139-generic
+  libc: glibc 2.31
+  conda: 25.7.0
+  python: 3.12.13
+  gpu:
+    count: 2
+    model: NVIDIA GeForce RTX 4090
+    memory_mib_each: 24564
+    compute_capability: "8.9"
+    driver: 535.183.01
+  cuda:
+    pytorch_build_runtime: "12.1"
+    cudnn: 9.1.0
+    validation_tests_required_gpu: false
+    sandboxed_test_process_cuda_visible: false
+
+packages:
+  pytorch: 2.5.1
+  torchvision: 0.20.1
+  torchaudio: 2.5.1
+  numpy: 2.2.6
+  pandas: 3.0.2
+  rdkit: 2026.3.1
+  torch-geometric: 2.7.0
+  matchms: 0.32.0
+  myopic-mces: 1.0.1
+  scipy: 1.15.3
+  scikit-learn: 1.8.0
+  pytest: 8.4.2
+  huggingface-hub: 1.11.0
+  matplotlib: 3.10.8
+  networkx: 3.4.2
+  numba: 0.61.2
+  pyyaml: 6.0.3
+  tqdm: 4.67.3
+  ruff: 0.15.13
+
+locks:
+  human_recipe:
+    path: environment.yml
+    sha256: 2c48083dbcc905cb53bcba3e84afa065b5758b5437528f4c9cb9aeb1adb716a7
+  development_requirements:
+    path: requirements-dev.txt
+    sha256: 953301450087b61cf387ec95d388c06127b2a55ee0f220c827d67a65cc5ce0b0
+  conda_linux_64:
+    path: reproducibility/conda-linux-64.lock
+    sha256: 8e969ebfb1949f2325f928b5095e4e1be4780d12680735686e3ae07df53e8897
+    package_integrity: per-URL MD5 fragments
+  pip_linux_64:
+    path: reproducibility/pip-linux-64.lock
+    sha256: 06b0516cfe5f908d9df4ace3f6a89311902cf093fa60fc0d3b3aeedabd9357c6
+    package_integrity: exact versions; wheel hashes are not recorded
+  validation_script:
+    path: reproducibility/validate_linux_lock.sh
+    sha256: 818e03cf90407882f22a5b21b54c6b65ab11ed7c86852af8e485074b5d855134
+
+validation:
+  canonical_environment:
+    command: conda run -n specembedding python -m pytest -q
+    result: 86 passed, 5 warnings in 33.48s
+  exact_lock_rebuild:
+    command: bash reproducibility/validate_linux_lock.sh <unused-environment-name>
+    conda_layer: created successfully from conda-linux-64.lock
+    pip_layer: installed successfully from pip-linux-64.lock
+    tests: 86 passed, 5 warnings in 26.92s
+    ruff: all checks passed
+  static_checks:
+    compileall: passed
+    bash_syntax: passed
+    git_diff_check: passed
+    tracked_private_path_scan: zero matches
+  documents:
+    english_pdf_pages: 17
+    chinese_pdf_pages: 16
+    fatal_latex_errors: 0
+    undefined_citations_or_references: 0
+    overfull_or_underfull_boxes: 0
+    known_warnings:
+      - amsmath math-accent redefinition warning in the English build
+      - Fandol fontspec warnings in the Chinese build
