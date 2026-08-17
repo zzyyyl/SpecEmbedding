@@ -6,7 +6,10 @@ SpecEmbedding is a deep learning model designed specifically for MS/MS spectral 
 
 The model was trained and evaluated on the GNPS, MoNA, and MTBLS1572 datasets, initially preprocessed by the MSBERT team. To further improve data quality, we removed entries with malformed or invalid SMILES strings. All cleaned data, along with the preprocessing scripts and 10-fold query/reference splits used for evaluation, are available on [figshare](https://doi.org/10.6084/m9.figshare.28876751.v2).
 
-To assess the model's robustness and generalizability on high-quality data, we additionally tested MassBank and MassSpecGym, two curated spectral libraries. SpecEmbedding achieved consistently strong performance on these datasets as well.
+To extend the evaluation to additional curated spectral data, we also tested
+MassBank and MassSpecGym. The corresponding results and protocols are reported
+in the linked artifacts; this broader coverage is not, by itself, a general
+out-of-domain robustness guarantee.
 
 To ensure a fair and reproducible evaluation, we strictly retained the original training set split used by MSBERT and only applied random splitting to the test sets. Final results are reported as the average and standard deviation across the 10 splits.
 
@@ -16,11 +19,12 @@ More details about Evaluation Metrics can be found in [SpecEmbedding-Comparison]
 
 ### 1. Environment
 
-OS: Linux Ubuntu 20.04
-
-Python: 3.12
-
-PyTorch: 2.6.0 with CUDA 12.4
+The post-hoc acceptance environment validated on 2026-08-17 used Ubuntu 20.04,
+Python 3.12.13, PyTorch 2.5.1 with CUDA runtime 12.1, and cuDNN 9.1. This is a
+reproduction/validation snapshot, not proof that every historical training run
+used an identical package set. `environment.yml` is the maintained environment
+recipe; the versioned paper manifests separately freeze data, candidates,
+checkpoints, parameters, and analysis artifacts.
 
 Create the canonical Conda environment from the repository root:
 
@@ -29,8 +33,9 @@ conda env create -f environment.yml
 conda activate specembedding
 ```
 
-If the environment already exists, synchronize it with the checked-in
-specification before running tests or experiments:
+For an existing development environment, synchronize it with the checked-in
+recipe before running tests or experiments. This updates a working environment;
+it is not an exact historical lock:
 
 ```bash
 conda env update -n specembedding -f environment.yml --prune
@@ -171,7 +176,50 @@ Users can refer to the following Jupyter notebooks for details on model training
 
 ### 4. Command-line workflows
 
-The default paths and hyperparameters are defined in `params.yaml`. The processed data root is expected to contain one subdirectory per dataset, for example `MassSpecGym`, `MassBank`, `GNPS`, `MoNA`, or `NPLIB1`. Each dataset directory is loaded through `src/data/base.py` and should contain split files such as `train.pkl`, `val.pkl`, and `test.pkl`.
+The default paths and hyperparameters are defined in `params.yaml`. Configuration
+selection follows: explicit `load_config(path)` argument, then the
+`SPECEMBEDDING_CONFIG` environment variable, then the repository `params.yaml`.
+Relative paths are resolved from the selected YAML file, so configuration does
+not depend on the shell's working directory. Command-line path arguments override
+the loaded configuration.
+
+By default, processed data is stored under `data/processed`. It contains one
+subdirectory per dataset, for example `MassSpecGym`, `MassBank`, `GNPS`, `MoNA`,
+or `NPLIB1`. Each directory should contain `train.pkl`, `val.pkl`, and `test.pkl`;
+MassSpecGym retrieval additionally uses `candidates_mass.pkl` and
+`candidates_formula.pkl`. Each split is loaded through `src/data/base.py`.
+
+Older spectrum-to-spectrum notebooks are archival recipes rather than the paper
+result workflow. Their private machine paths were replaced with repository-local
+`data/legacy` paths; run them from their notebook directory after placing the
+figshare/raw inputs there. Legacy Python constants can instead be relocated with
+`SPECEMBEDDING_LEGACY_DATA_ROOT`, `SPECEMBEDDING_MSBERT_ROOT`,
+and `SPECEMBEDDING_TSNE_CLUSTER_DIR`.
+
+#### 4.1 Paper-result workflow and protocol
+
+The transfer-paper results use the spectrum--molecule alignment and top-40
+reranking workflow, not the earlier spectrum-to-spectrum notebook evaluation.
+Recall and MRR use MassSpecGym-supplied candidate files with a local
+exact-target-SMILES single-positive rule. The reference loader defaults to
+two-dimensional InChIKey equivalence and may yield multiple positives; the
+effect of this difference is unquantified, so the local values are not
+official-evaluator-equivalent.
+
+The representative table uses alignment seed 42 and reranker seed 42. The
+fixed-alignment table holds alignment seed 42 constant and summarizes reranker
+seeds 42--44. The cross-alignment analysis first summarizes those reranker seeds
+within each of alignment seeds 42--44 and then treats the three alignment-level
+estimates descriptively; it does not flatten nine runs or provide confidence
+intervals. The versioned evidence is in
+`analysis/transfer2026_alignment_multiseed/` and
+`analysis/transfer2026_core_ablations/`. JESTR and GLMR values in the paper are
+externally reported, not independently reproduced, and not directly comparable
+to the local results.
+
+The following commands describe the repository's broader and legacy workflows;
+their outputs should not be substituted for the paper tables without matching
+the recorded candidate, identity, split, cache, and checkpoint protocol.
 
 Each split file is a pickle file containing `list[matchms.Spectrum]`. Each `Spectrum` must provide:
 

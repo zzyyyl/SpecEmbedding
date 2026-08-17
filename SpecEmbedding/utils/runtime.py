@@ -9,7 +9,6 @@ from SpecEmbedding.config import config
 def configure_runtime_cache():
     """Use writable cache directories in sandboxed or restricted environments."""
     os.environ.setdefault("NUMBA_CACHE_DIR", "/tmp/numba_cache")
-    os.environ.setdefault("NUMBA_DISABLE_JIT", "1")
     os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
     os.environ.setdefault("XDG_CACHE_HOME", "/tmp")
     os.makedirs(os.environ["NUMBA_CACHE_DIR"], exist_ok=True)

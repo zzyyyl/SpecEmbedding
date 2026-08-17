@@ -45,6 +45,12 @@ def add_base_argument(parser):
         help="Base directory containing processed dataset folders"
     )
     parser.add_argument(
+        "--cache_path",
+        type=str,
+        default=config.data.cache_path,
+        help="Directory containing reusable TokenSet caches",
+    )
+    parser.add_argument(
         "--save_dir",
         type=str,
         default=config.general.save_dir,
@@ -138,7 +144,11 @@ def main():
     set_seed(config.general.seed)
     device = resolve_device(args.device)
 
-    classified_data = get_classified_data(dataset_type=args.dataset_type, data_path=args.data_path)
+    classified_data = get_classified_data(
+        dataset_type=args.dataset_type,
+        data_path=args.data_path,
+        cache_path=args.cache_path,
+    )
     train_data = classified_data['train_data']
     train_keys = classified_data['train_keys']
     val_data = classified_data['val_data']

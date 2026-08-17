@@ -1,4 +1,5 @@
 import inspect
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -99,6 +100,10 @@ class TrainAlignCliSeedTest(unittest.TestCase):
                 "train_align.py",
                 "--save_dir",
                 temporary,
+                "--cache_path",
+                str(Path(temporary) / "cache"),
+                "--tokenset_cache",
+                str(Path(temporary) / "exact.pkl"),
                 "--seed",
                 "17",
             ]
@@ -108,7 +113,11 @@ class TrainAlignCliSeedTest(unittest.TestCase):
                 mock.patch.object(train_align, "startup_logging"),
                 mock.patch.object(train_align, "set_seed") as set_seed,
                 mock.patch.object(train_align, "resolve_device", return_value=torch.device("cpu")),
-                mock.patch.object(train_align, "get_classified_data", return_value=classified_data),
+                mock.patch.object(
+                    train_align,
+                    "get_classified_data",
+                    return_value=classified_data,
+                ) as get_classified,
                 mock.patch.object(train_align, "train_align", return_value=final_model) as train,
                 mock.patch.object(train_align.torch, "save"),
             ):
@@ -118,6 +127,9 @@ class TrainAlignCliSeedTest(unittest.TestCase):
         kwargs = train.call_args.kwargs
         self.assertEqual(kwargs["seed"], 17)
         self.assertEqual(kwargs["selection_metadata"]["seed"], 17)
+        classified_call = get_classified.call_args.kwargs
+        self.assertEqual(classified_call["cache_path"], str(Path(temporary) / "cache"))
+        self.assertEqual(classified_call["cache_file"], str(Path(temporary) / "exact.pkl"))
 
     def test_cli_rejects_negative_seed(self):
         with (
@@ -151,6 +163,10 @@ class RunPipelineSeedTest(unittest.TestCase):
             command[command.index("--save_dir") + 1],
             "checkpoints_align/abc123_massspecgym_nopretrain",
         )
+        self.assertEqual(
+            Path(command[1]),
+            run_pipeline.REPOSITORY_ROOT / "train_align.py",
+        )
 
     def test_nondefault_seed_gets_collision_safe_default_path(self):
         commands = self.run_pipeline_commands(
@@ -176,6 +192,64 @@ class RunPipelineSeedTest(unittest.TestCase):
             run_pipeline.main()
 
         self.assertEqual(raised.exception.code, 2)
+
+    def test_pipeline_forwards_portable_train_paths(self):
+        commands = self.run_pipeline_commands(
+            "--mode",
+            "train",
+            "--data_path",
+            "processed",
+            "--cache_path",
+            "cache",
+            "--tokenset_cache",
+            "cache/exact.pkl",
+            "--pretrained_spec",
+            "models/spec.ckpt",
+        )
+
+        command = commands[0]
+        for flag, expected in (
+            ("--data_path", "processed"),
+            ("--cache_path", "cache"),
+            ("--tokenset_cache", "cache/exact.pkl"),
+            ("--pretrained_spec", "models/spec.ckpt"),
+        ):
+            self.assertEqual(command[command.index(flag) + 1], expected)
+
+    def test_pipeline_forwards_portable_eval_paths(self):
+        commands = self.run_pipeline_commands(
+            "--mode",
+            "eval",
+            "--data_path",
+            "processed",
+            "--candidate_type",
+            "formula",
+            "--candidate_path",
+            "candidates/formula.pkl",
+        )
+
+        self.assertEqual(len(commands), 3)
+        for command in commands:
+            self.assertEqual(command[command.index("--data_path") + 1], "processed")
+            self.assertEqual(command[command.index("--candidate_type") + 1], "formula")
+            self.assertEqual(
+                command[command.index("--candidate_path") + 1],
+                "candidates/formula.pkl",
+            )
+
+    def test_subprocesses_run_from_repository_root(self):
+        completed = subprocess.CompletedProcess(["python"], returncode=0)
+        with mock.patch.object(
+            run_pipeline.subprocess,
+            "run",
+            return_value=completed,
+        ) as run:
+            run_pipeline.run_command(["python", "example.py"])
+
+        run.assert_called_once_with(
+            ["python", "example.py"],
+            cwd=run_pipeline.REPOSITORY_ROOT,
+        )
 
 
 if __name__ == "__main__":

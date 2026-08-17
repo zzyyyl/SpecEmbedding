@@ -27,3 +27,12 @@ tests/*
 data/*
 checkpoints*/*
 paper/build/
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.fdb_latexmk
+paper/*.fls
+paper/*.out
+paper/*.xdv
+paper/main.pdf
+paper/main_cn.pdf

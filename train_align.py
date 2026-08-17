@@ -245,6 +245,7 @@ def main():
     classified_data = get_classified_data(
         dataset_type=args.dataset_type,
         data_path=args.data_path,
+        cache_path=args.cache_path,
         cache_file=args.tokenset_cache,
     )
     exclusion_report = {

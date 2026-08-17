@@ -26,8 +26,6 @@ from SpecEmbedding.utils.rerank import (
 )
 from SpecEmbedding.utils.runtime import configure_runtime_cache, resolve_device, setup_logging, startup_logging
 
-configure_runtime_cache()
-
 
 @torch.no_grad()
 def evaluate(model, loader, device, top_k):
@@ -201,6 +199,7 @@ def parse_args():
 
 
 def main():
+    configure_runtime_cache()
     args = parse_args()
 
     if args.train_k <= 0:

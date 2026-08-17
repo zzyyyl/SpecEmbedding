@@ -1,22 +1,11 @@
-# ruff: noqa: E402
 import argparse
 import hashlib
 import logging
-import os
 from pathlib import Path
-
-os.environ.setdefault("NUMBA_CACHE_DIR", "/tmp/numba_cache")
-os.environ.setdefault("NUMBA_DISABLE_JIT", "1")
-os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
-os.environ.setdefault("XDG_CACHE_HOME", "/tmp")
 
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-
-from SpecEmbedding.utils.runtime import configure_runtime_cache
-
-configure_runtime_cache()
 
 from SpecEmbedding.config import config
 from SpecEmbedding.data.datasets_eval import MolSmilesDataset, SpecSequenceDataset, mol_collate_fn
@@ -24,7 +13,7 @@ from SpecEmbedding.data.tokenizer import Tokenizer
 from SpecEmbedding.type import TokenizerConfig
 from SpecEmbedding.utils.align import load_align_model, resolve_storage_dtype
 from SpecEmbedding.utils.providers import get_provider, load_candidates
-from SpecEmbedding.utils.runtime import resolve_device, setup_logging, startup_logging
+from SpecEmbedding.utils.runtime import configure_runtime_cache, resolve_device, setup_logging, startup_logging
 
 
 def sha256_file(path: str | Path) -> str:
@@ -331,6 +320,7 @@ def parse_args():
 
 
 def main():
+    configure_runtime_cache()
     args = parse_args()
 
     if args.pre_top_k <= 0:

@@ -16,7 +16,12 @@ from SpecEmbedding.utils.runtime import resolve_device, setup_logging, startup_l
 def main():
     parser = argparse.ArgumentParser(description="Evaluate SpecEmbedding model using MassSpecGym split logic.")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to model checkpoint. If using a pre-configured architecture via --loss_type, this parameter is ignored.")
-    parser.add_argument("--data_dir", type=str, required=True, help="Directory containing the replicated .npy files (e.g. /data1/xp/data/massSpecGymData)")
+    parser.add_argument(
+        "--data_dir",
+        type=str,
+        required=True,
+        help="Directory containing the replicated .npy files (for example, data/massSpecGymData)",
+    )
     parser.add_argument("--loss_type", type=str, default="custom", choices=["custom", "TanimotoLoss", "SupConLoss", "SupConWithTanimotoLoss"], help="Type of model to load. 'custom' means load from --checkpoint directly using the default architecture.")
     parser.add_argument("--device", type=str, default=config.general.device, help='Device to use, for example "cpu", "cuda", "cuda:0", or "cuda:1".')
 

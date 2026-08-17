@@ -5,22 +5,25 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.12
-  - pytorch
-  - torchvision
-  - torchaudio
+  - python=3.12.13
+  - pytorch=2.5.1
+  - torchvision=0.20.1
+  - torchaudio=2.5.1
   - pytorch-cuda=12.1
-  - numpy
-  - pandas
-  - rdkit
-  - tqdm
-  - matplotlib
-  - scipy
-  - scikit-learn
-  - pytest>=8,<9
-  - huggingface_hub
+  - numpy=2.2.6
+  - pandas=3.0.2
+  - rdkit=2026.03.1
+  - tqdm=4.67.3
+  - matplotlib=3.10.8
+  - scipy=1.15.3
+  - scikit-learn=1.8.0
+  - networkx=3.4.2
+  - numba=0.61.2
+  - pyyaml=6.0.3
+  - pytest=8.4.2
+  - huggingface_hub=1.11.0
   - pip
   - pip:
-    - torch-geometric
-    - matchms
-    - myopic_mces
+    - torch-geometric==2.7.0
+    - matchms==0.32.0
+    - myopic_mces==1.0.1

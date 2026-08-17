@@ -1,16 +1,16 @@
 general:
   seed: 42
   device: "cuda" # or "cpu", "cuda:0", "cuda:1"
-  save_dir: "./checkpoints"
+  save_dir: "checkpoints"
 
 data:
   dataset_type: "massspecgym" # or "local"
-  data_path: "/data1/zyl/SpecEmbedding/processed"
-  cache_path: "/data1/zyl/SpecEmbedding/train_cache"
-  raw_path: "/data1/zyl/SpecEmbedding/raw"
-  candidates_path: "/data1/zyl/SpecEmbedding/candidates"
-  cid_smiles_path: "/data1/zyl/SpecEmbedding/candidates/CID-SMILES"
-  pubchem_cache_path: "/data1/zyl/SpecEmbedding/pubchem_similarity_cache"
+  data_path: "data/processed"
+  cache_path: "data/train_cache"
+  raw_path: "data/raw"
+  candidates_path: "data/candidates"
+  cid_smiles_path: "data/candidates/CID-SMILES"
+  pubchem_cache_path: "data/pubchem_similarity_cache"
   tokenizer:
     max_len: 100
     show_progress_bar: true
@@ -91,7 +91,7 @@ rerank:
   train:
     train_cache: null
     val_cache: null
-    save_dir: "./checkpoints_rerank"
+    save_dir: "checkpoints_rerank"
     model_type: "transformer"
     train_k: 128
     batch_size: 16
@@ -129,7 +129,7 @@ rerank:
 
 paths:
   pretrained_models:
-    supcon_tanimoto_aug: "/data1/xp/data/model/transformer-SupConWithTanimotoLoss-Augmentation/model.ckpt"
-    supcon_tanimoto: "/data1/xp/code/specEmbedding/SpecEmbedding/model/transformer-SupConWithTanimotoLoss/model.ckpt"
-    supcon: "/data1/xp/code/specEmbedding/SpecEmbedding/model/transformer-SupConLoss/model.ckpt"
-    tanimoto: "/data1/xp/code/specEmbedding/SpecEmbedding/model/transformer-TanimotoLoss/model.ckpt"
+    supcon_tanimoto_aug: "checkpoints/legacy/transformer-SupConWithTanimotoLoss-Augmentation/model.ckpt"
+    supcon_tanimoto: "checkpoints/legacy/transformer-SupConWithTanimotoLoss/model.ckpt"
+    supcon: "checkpoints/legacy/transformer-SupConLoss/model.ckpt"
+    tanimoto: "checkpoints/legacy/transformer-TanimotoLoss/model.ckpt"

@@ -2,20 +2,26 @@ import argparse
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 from SpecEmbedding.config import config
+
+REPOSITORY_ROOT = Path(__file__).resolve().parent
 
 
 def get_commit_hash():
     try:
-        return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=REPOSITORY_ROOT,
+        ).decode("ascii").strip()
     except Exception:
         print("Warning: Could not get git commit hash. Using 'unknown'.")
         return "unknown"
 
 def run_command(command):
     print(f"Running: {' '.join(command)}")
-    result = subprocess.run(command)
+    result = subprocess.run(command, cwd=REPOSITORY_ROOT)
     if result.returncode != 0:
         print(f"Command failed with exit code {result.returncode}")
         sys.exit(result.returncode)
@@ -30,6 +36,12 @@ def main():
     parser.add_argument("--mode", choices=["train", "eval", "test", "all"], default="all", help="Execution mode: train, eval/test, or all (default: all)")
     parser.add_argument("--no-pretrain", action="store_true", help="Run without pre-trained model (equivalent to nostage1)")
     parser.add_argument("--save_dir", help="Explicit save directory (optional)")
+    parser.add_argument("--data_path", default=config.data.data_path, help="Processed dataset root")
+    parser.add_argument("--cache_path", default=config.data.cache_path, help="Reusable TokenSet cache root")
+    parser.add_argument("--tokenset_cache", help="Exact TokenSet cache file for alignment training")
+    parser.add_argument("--pretrained_spec", default="checkpoints/model.ckpt", help="Pretrained spectrum encoder checkpoint")
+    parser.add_argument("--candidate_type", choices=["mass", "formula"], default="mass")
+    parser.add_argument("--candidate_path", help="Custom evaluation candidates pickle")
     parser.add_argument("--device", help='Device to use, for example "cpu", "cuda", "cuda:0", or "cuda:1"')
     parser.add_argument("--mol_norm_type", choices=["layernorm", "rmsnorm"], help="Normalization used in the molecule GINE encoder.")
     parser.add_argument("--seed", type=int, default=config.general.seed, help="Random seed for alignment training")
@@ -55,15 +67,18 @@ def main():
 
         # 1. Train the alignment model
         train_cmd = [
-            "python", "train_align.py",
+            sys.executable, str(REPOSITORY_ROOT / "train_align.py"),
             "--dataset_type", args.dataset_type,
+            "--data_path", args.data_path,
+            "--cache_path", args.cache_path,
             "--save_dir", save_dir,
             "--seed", str(args.seed),
         ]
+        append_optional_arg(train_cmd, "--tokenset_cache", args.tokenset_cache)
         append_optional_arg(train_cmd, "--device", args.device)
         append_optional_arg(train_cmd, "--mol_norm_type", args.mol_norm_type)
         if not args.no_pretrain:
-            train_cmd.extend(["--pretrained_spec", "checkpoints/model.ckpt"])
+            append_optional_arg(train_cmd, "--pretrained_spec", args.pretrained_spec)
 
         run_command(train_cmd)
 
@@ -76,42 +91,54 @@ def main():
         if args.no_pretrain:
             # Evaluate only best_model_stage2.pth for no-pretrain mode
             eval_cmd = [
-                "python", "eval_align.py",
+                sys.executable, str(REPOSITORY_ROOT / "eval_align.py"),
                 "--dataset_type", args.dataset_type,
+                "--data_path", args.data_path,
                 "--checkpoint", os.path.join(save_dir, "best_model_stage2.pth"),
+                "--candidate_type", args.candidate_type,
                 "--no-mces"
             ]
+            append_optional_arg(eval_cmd, "--candidate_path", args.candidate_path)
             append_optional_arg(eval_cmd, "--device", args.device)
             append_optional_arg(eval_cmd, "--mol_norm_type", args.mol_norm_type)
             run_command(eval_cmd)
         else:
             # Standard evaluation sequence
             eval_stage1_cmd = [
-                "python", "eval_align.py",
+                sys.executable, str(REPOSITORY_ROOT / "eval_align.py"),
                 "--dataset_type", args.dataset_type,
+                "--data_path", args.data_path,
                 "--checkpoint", os.path.join(save_dir, "best_model_stage1.pth"),
+                "--candidate_type", args.candidate_type,
                 "--no-mces"
             ]
+            append_optional_arg(eval_stage1_cmd, "--candidate_path", args.candidate_path)
             append_optional_arg(eval_stage1_cmd, "--device", args.device)
             append_optional_arg(eval_stage1_cmd, "--mol_norm_type", args.mol_norm_type)
             run_command(eval_stage1_cmd)
 
             eval_stage2_cmd = [
-                "python", "eval_align.py",
+                sys.executable, str(REPOSITORY_ROOT / "eval_align.py"),
                 "--dataset_type", args.dataset_type,
+                "--data_path", args.data_path,
                 "--checkpoint", os.path.join(save_dir, "best_model_stage2.pth"),
+                "--candidate_type", args.candidate_type,
                 "--no-mces"
             ]
+            append_optional_arg(eval_stage2_cmd, "--candidate_path", args.candidate_path)
             append_optional_arg(eval_stage2_cmd, "--device", args.device)
             append_optional_arg(eval_stage2_cmd, "--mol_norm_type", args.mol_norm_type)
             run_command(eval_stage2_cmd)
 
             eval_final_cmd = [
-                "python", "eval_align.py",
+                sys.executable, str(REPOSITORY_ROOT / "eval_align.py"),
                 "--dataset_type", args.dataset_type,
+                "--data_path", args.data_path,
                 "--checkpoint", os.path.join(save_dir, "final_aligned_model.pth"),
+                "--candidate_type", args.candidate_type,
                 "--no-mces"
             ]
+            append_optional_arg(eval_final_cmd, "--candidate_path", args.candidate_path)
             append_optional_arg(eval_final_cmd, "--device", args.device)
             append_optional_arg(eval_final_cmd, "--mol_norm_type", args.mol_norm_type)
             run_command(eval_final_cmd)
