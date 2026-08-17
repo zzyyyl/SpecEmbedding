@@ -4,9 +4,11 @@
 审计基线：`df7dec6`（分支 `codex/transfer-2026-0831`）
 审计范围：源码、训练/评估脚本、测试、实验 artifact、英文稿 `paper/main.tex`、中文稿 `paper/main_cn.tex`、引用与投稿待办。
 
-修复跟踪状态：初次审计问题已经落实；第二轮独立审计无 P0，并提出的两项 P1 已在
-`e597d89` 及其后续发布构建记录中完成本地修复，当前等待第三轮独立只读复审。下文第 1--6 节
-保留初次审计时点的原始判定，第 7 节以后记录修复演进，避免把历史发现误读为当前状态。
+修复跟踪状态：**本轮审计范围内通过，无 P0/P1 阻断项**。第三轮独立审计基于远端
+`5a1fe38` 确认代码、复现、证据边界、匿名性和构建有效性通过；用户随后再次明确页数可以
+延后，英文 17 页只作为独立投稿整理事项，不作 P0/P1 或本轮审计阻断。待完稿并确认转投
+venue 规则后统一微调。下文第 1--6 节保留初次审计时点的原始判定，第 7 节以后记录修复
+演进，避免把历史发现误读为当前状态。
 
 ## 1. 总体结论
 
@@ -317,3 +319,32 @@
   `git diff --check` 均通过。本轮未新增训练、评价、引用、性能数字或研究结论。
 
 页数压缩仍按用户决定留到完稿后处理，17 页英文稿不被误记为已经满足最终页数限制。
+
+### 2026-08-17：第三轮独立审计结论与分级更正
+
+审计基线：远端分支 `codex/transfer-2026-0831`，HEAD `5a1fe38`。审计未保留任何工作区变更。
+
+第三轮初始判定为“有条件通过”，条件仅来自把英文 17 页列为投稿合规 P1；代码、复现、
+证据边界、匿名性和构建有效性当时均已通过。用户随后明确页数可以延后且不阻塞审计，原审计
+会话据此将该项降级为独立非阻断待办。**更正后的本轮判定为通过，无 P0/P1 阻断项**。
+第二轮提出的任意 cwd rerank 总管线和当前双语 PDF 可审计留存均已独立核验关闭。
+
+独立执行结果：
+
+- 从临时 cwd 执行完整 `run_rerank_pipeline.py --mode all --dry-run` 返回 0；绝对子脚本、
+  repository-root 输出与相对 data/candidate 路径均正确，专项测试 `2 passed`；
+- `conda run -n specembedding python -m pytest -q tests`：`88 passed, 5 warnings in 32.74s`；
+- Ruff、compileall、`bash -n`、`git diff --check`：通过；
+- `freeze_adma2026_artifacts.py --check`：60 个 canonical artifacts 验证通过并匹配 manifest；
+- tracked 双语 PDF 的页数、字节数、SHA-256、作者元数据与 build manifest 一致；文本扫描无
+  `/data1`、`/home/` 或 `git@` 私有路径；重建日志无 fatal/LaTeX error、undefined
+  citation/reference 或 Overfull/Underfull。
+
+独立非阻断投稿整理事项：英文稿为 17 页；若转投 venue 仍适用 15 页总限制，则最终投稿前
+需要压缩。目前不能称为“最终可投稿稿”。该事项已诚实保留为开放 TODO，并按用户明确决定
+在完稿后处理，不作 P0/P1，也不阻断本轮计划归档。
+
+继续保留但不构成本轮阻断的限制：PyPI 锁没有 wheel hashes；local exact-SMILES 与官方
+多正例协议差异未量化；cross-alignment 仅有三个描述性单位；组件未跨 alignment；
+Transformer 容量与候选交互混杂；JESTR/GLMR 未独立复现；无统一效率测量；top-40 闭集
+coverage 限制仍在。

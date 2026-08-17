@@ -1,6 +1,6 @@
 # 论文修改计划：审计证据边界与投稿记录修订
 
-- 状态：`执行中`
+- 状态：`已执行`
 - 创建日期：2026-08-17
 - 最后更新：2026-08-17
 - 负责人：Codex（作者负责最终学术判断与投稿决策）
@@ -70,20 +70,20 @@
 
 ### 3.1 涉及文件与章节
 
-- [ ] `paper/main.tex`：摘要、协议说明、主要结果表、跨 alignment 结果、受控消融表、
+- [x] `paper/main.tex`：摘要、协议说明、主要结果表、跨 alignment 结果、受控消融表、
   Discussion、Limitations、Conclusion。
-- [ ] `paper/main_cn.tex`：逐项同步相同数字、术语、表结构与证据强度。
-- [ ] `analyze_alignment_multiseed.py` 及相应测试/派生产物：为报告和 manifest 加入固定的
+- [x] `paper/main_cn.tex`：逐项同步相同数字、术语、表结构与证据强度。
+- [x] `analyze_alignment_multiseed.py` 及相应测试/派生产物：为报告和 manifest 加入固定的
   identity-protocol 声明，重新生成确定性工件。
-- [ ] `analyze_core_ablations.py` 及相应测试/派生产物：加入相同声明，并明确统计对象为
+- [x] `analyze_core_ablations.py` 及相应测试/派生产物：加入相同声明，并明确统计对象为
   canonical alignment seed 42 下的 reranker seeds 42--44。
-- [ ] `freeze_adma2026_artifacts.py` / `paper/adma2026_artifact_manifest.json`：在 canonical
+- [x] `freeze_adma2026_artifacts.py` / `paper/adma2026_artifact_manifest.json`：在 canonical
   工件清单中加入相同的结构化评价身份协议，避免最上游结果 manifest 缺少协议标签。
-- [ ] `README.md` / `docs/README_zh.md`：在论文主结果复现入口附近加入本地身份规则、
+- [x] `README.md` / `docs/README_zh.md`：在论文主结果复现入口附近加入本地身份规则、
   非官方 evaluator 等价和 fixed/cross-alignment 统计口径说明。
-- [ ] `paper/ADMA2026_TODO.md` / `docs/project_memory_zh.md`：同步多 alignment 完成状态、
+- [x] `paper/ADMA2026_TODO.md` / `docs/project_memory_zh.md`：同步多 alignment 完成状态、
   外部 reported 降级决策、当前页数和后续页数微调状态。
-- [ ] `docs/audit-report-2026-08-17.md`：记录本轮修复、验证和提交。
+- [x] `docs/audit-report-2026-08-17.md`：记录本轮修复、验证和提交。
 - [x] 本计划文件：按步骤更新状态、实际执行、偏差、验证和论文 commit。
 - [x] `paper/BUILDING.md` / `paper/build_release.sh` / `paper/release/`：固定跨 cwd 强制重建
   流程，并留存当前双语 PDF、source commit、工具链、页数与 SHA-256。
@@ -193,9 +193,9 @@ context，不承担公平比较。
 - [x] 步骤 9：检查协议词扫描、双语一致性、`git diff --check` 和完整 diff，确保无新实验、
   无数值漂移、无无关文件。
 - [x] 步骤 10：使用 Conventional Commit 提交论文及关联实质修改。
-- [ ] 步骤 11：将论文、工程复现与审计记录推送后，通知原审计会话复审；若有阻断意见，
+- [x] 步骤 11：将论文、工程复现与审计记录推送后，通知原审计会话复审；若有阻断意见，
   在同一计划内继续修复、验证和复审。
-- [ ] 步骤 12：复审无阻断项后回填最终结果，将状态设为 `已执行`，再以独立文档 commit
+- [x] 步骤 12：复审无阻断项后回填最终结果，将状态设为 `已执行`，再以独立文档 commit
   归档本计划。
 
 ## 8. 风险、证据边界与待确认事项
@@ -289,15 +289,37 @@ context，不承担公平比较。
 - 当前完整测试为 `88 passed, 5 warnings`；Ruff、compileall、shell 语法、`git diff --check`
   均通过。下一步提交并推送 release evidence 后，请原审计会话进行第三轮只读复审。
 
+### 2026-08-17：第三轮独立复审完成
+
+- release evidence 以 commit `5a1fe38` 推送后，原审计会话对该远端 HEAD 完成第三轮独立
+  复审，且未保留审计产生的工作区变更。代码、复现、证据边界、匿名性和构建有效性通过；
+  用户明确页数可以延后且不阻塞审计后，审计会话将页数从 P1 降级为独立非阻断待办，故
+  本轮最终判定为通过，无 P0/P1 阻断项。
+- 审计方从临时 cwd 实测 `run_rerank_pipeline.py --mode all --dry-run` 返回 0，确认绝对子脚本、
+  仓库根输出、相对 data/candidate 路径和 train/val/test 参数均正确；路径专项测试 2/2 通过。
+- 独立复核两份 tracked PDF 的页数、字节数、SHA-256、作者元数据和私有路径扫描均与 manifest
+  一致；重跑发布构建后 PDF 哈希保持一致，日志无 fatal/LaTeX error、undefined
+  citation/reference 或 Overfull/Underfull。
+- 独立复跑为 `88 passed, 5 warnings in 32.74s`；Ruff、compileall、shell 语法、
+  `git diff --check` 通过；60 个 canonical artifacts 与 manifest 匹配。身份协议、统计单位、
+  external baseline 和效率结论边界均通过抽查。
+- 独立非阻断投稿整理事项是英文审计稿 17 页；若转投 venue 仍适用历史 ADMA 的 15 页限制，
+  则最终投稿前需要压缩。该事实已在 TODO、release manifest 和项目记忆中明确标为未完成；
+  按用户决定，本计划不强行压页，待完稿并确认适用规则后统一微调，不作 P0/P1，也不被误记
+  为最终投稿已经合规。
+
 执行时按日期记录状态转换、派生产物核验、双语修改、页数、测试、提交和复审反馈。
 
 ## 11. 最终结果
 
-- 完成日期：尚未完成
-- 最终状态：`执行中`
-- 验证结果：本地与显式锁环境均已通过；第二轮审计的两项 P1 已完成本地修复，等待第三轮复审
+- 完成日期：2026-08-17
+- 最终状态：`已执行`
+- 验证结果：第三轮独立复审及用户范围确认后，本轮无 P0/P1 阻断项；完整测试 88 项通过，
+  canonical artifacts 60 项匹配，双语 release evidence 自洽。英文 17 页的最终投稿合规任务
+  按用户决定延期到完稿并确认转投规则后处理。
 - 论文修改 commit：`1c0dee2`
 - 工程复现 commit：`f5e6e78`、`e597d89`
+- 发布证据 commit：`5a1fe38`
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：同步完成同一审计中的路径可移植性和依赖锁修复；未扩大论文论点、
   未新增实验或引用。按用户要求增加“通知原审计会话并迭代至无阻断项”的验收步骤。
