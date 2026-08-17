@@ -698,8 +698,8 @@ pointwise 的 5.26 倍（多 6,304,768 个，约 $+426\%$），因而候选交�
 本文未量化 exact-SMILES 身份规则相对参考二维 InChIKey 规则的影响，因此 Recall/MRR 是
 明确的本地协议结果，并不等价于官方 evaluator。精确记录重叠审计也不能
 排除近重复样本或相关数据来源。模型选择排除审计出的 6 条 train--validation 记录重叠，并
-保留全部测试查询。artifact manifest 固定源码和工件校验和，但环境配置没有完全锁定
-PyTorch、RDKit、PyG 和 \texttt{myopic-MCES} 的确切版本。2026 年 MassSpecGym 审计预印本
+保留全部测试查询。当前事后验收环境已锁定版本，并已从显式 Conda/PyPI 锁重建；但历史训练
+运行没有保留逐包环境证明，因此本文不声称训练可按位重现。2026 年 MassSpecGym 审计预印本
 还报告了数据泄漏、shortcut learning、实现错误和指标不一致风险，并发布 v1.5
 \cite{liu2026massspecgymwild}；本文分数与冻结工件和本地协议绑定，不能据此证明与 v1.5 等价。
 

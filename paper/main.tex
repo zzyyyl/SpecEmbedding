@@ -852,9 +852,10 @@ impact of exact-SMILES rather than reference two-dimensional InChIKey identity
 is unquantified, so Recall/MRR are explicitly local-protocol results rather than
 official-evaluator-equivalent values. The exact-record audit cannot exclude near duplicates or
 correlated provenance. Model selection excludes the six audited
-training--validation overlaps; all test queries remain. The manifest pins source
-and artifact checksums, but not exact PyTorch, RDKit, PyG, and
-\texttt{myopic-MCES} versions. A 2026 audit preprint reports further MassSpecGym
+training--validation overlaps; all test queries remain. The post-hoc validation
+environment is now version-locked and was rebuilt from explicit Conda/PyPI
+locks, but historical training runs did not preserve a per-package environment
+record; therefore we do not claim bitwise retraining equivalence. A 2026 audit preprint reports further MassSpecGym
 leakage, shortcut, implementation, and metric risks and releases v1.5
 \cite{liu2026massspecgymwild}; our scores are artifact- and protocol-specific,
 not proven v1.5-equivalent.

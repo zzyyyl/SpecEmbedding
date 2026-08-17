@@ -3,10 +3,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+REPOSITORY_ROOT = Path(__file__).resolve().parent
+
 
 def get_commit_hash():
     try:
-        return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode("ascii").strip()
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=REPOSITORY_ROOT,
+        ).decode("ascii").strip()
     except Exception:
         print("Warning: Could not get git commit hash. Using 'unknown'.")
         return "unknown"
@@ -16,7 +21,7 @@ def run_command(command, dry_run: bool = False):
     print(f"Running: {' '.join(command)}")
     if dry_run:
         return
-    result = subprocess.run(command)
+    result = subprocess.run(command, cwd=REPOSITORY_ROOT)
     if result.returncode != 0:
         print(f"Command failed with exit code {result.returncode}")
         sys.exit(result.returncode)
@@ -30,6 +35,13 @@ def append_optional_arg(command, flag, value):
 def ensure_file(path: str | Path, description: str):
     if not Path(path).exists():
         raise FileNotFoundError(f"{description} not found: {path}")
+
+
+def resolve_repository_path(path: str | Path) -> Path:
+    path = Path(path).expanduser()
+    if not path.is_absolute():
+        path = REPOSITORY_ROOT / path
+    return path.resolve()
 
 
 def candidate_label(args):
@@ -64,7 +76,7 @@ def append_path_suffix(path: Path, suffix: str):
 
 def default_align_save_dir(args):
     suffix = "_nopretrain" if args.no_pretrain else ""
-    return Path("checkpoints_align") / f"{get_commit_hash()}_{args.dataset_type}{suffix}"
+    return REPOSITORY_ROOT / "checkpoints_align" / f"{get_commit_hash()}_{args.dataset_type}{suffix}"
 
 
 def append_output_suffixes(name_or_path, suffixes):
@@ -78,14 +90,30 @@ def append_output_suffixes(name_or_path, suffixes):
 
 
 def resolve_paths(args):
-    align_save_dir = Path(args.align_save_dir) if args.align_save_dir else default_align_save_dir(args)
-    checkpoint = Path(args.checkpoint) if args.checkpoint else align_save_dir / args.align_checkpoint_name
+    align_save_dir = (
+        resolve_repository_path(args.align_save_dir)
+        if args.align_save_dir
+        else default_align_save_dir(args)
+    )
+    checkpoint = (
+        resolve_repository_path(args.checkpoint)
+        if args.checkpoint
+        else align_save_dir / args.align_checkpoint_name
+    )
 
     label = candidate_label(args)
     output_suffixes = [topk_suffix(args.pre_top_k), limit_suffix(args.limit)]
     run_name = append_output_suffixes(args.run_name or f"{align_save_dir.name}_{label}", output_suffixes)
-    cache_dir = append_output_suffixes(Path(args.cache_dir), output_suffixes) if args.cache_dir else Path("rerank_cache") / run_name
-    save_dir = append_output_suffixes(Path(args.save_dir), output_suffixes) if args.save_dir else Path("checkpoints_rerank") / run_name
+    cache_dir = (
+        append_output_suffixes(resolve_repository_path(args.cache_dir), output_suffixes)
+        if args.cache_dir
+        else REPOSITORY_ROOT / "rerank_cache" / run_name
+    )
+    save_dir = (
+        append_output_suffixes(resolve_repository_path(args.save_dir), output_suffixes)
+        if args.save_dir
+        else REPOSITORY_ROOT / "checkpoints_rerank" / run_name
+    )
 
     caches = {
         split: cache_dir / f"{args.dataset_type}_{label}_{split}.pt"
@@ -97,7 +125,7 @@ def resolve_paths(args):
 def build_prepare_command(args, checkpoint, split, save_path):
     command = [
         sys.executable,
-        "prepare_rerank_cache.py",
+        str(REPOSITORY_ROOT / "prepare_rerank_cache.py"),
         "--checkpoint",
         str(checkpoint),
         "--dataset_type",
@@ -127,7 +155,7 @@ def build_prepare_command(args, checkpoint, split, save_path):
 def build_train_command(args, save_dir, caches):
     command = [
         sys.executable,
-        "train_rerank.py",
+        str(REPOSITORY_ROOT / "train_rerank.py"),
         "--train_cache",
         str(caches["train"]),
         "--val_cache",
@@ -143,7 +171,7 @@ def build_train_command(args, save_dir, caches):
 def build_eval_command(args, save_dir, caches):
     command = [
         sys.executable,
-        "eval_rerank.py",
+        str(REPOSITORY_ROOT / "eval_rerank.py"),
         "--cache",
         str(caches["test"]),
         "--checkpoint",
@@ -202,6 +230,11 @@ def main():
         parser.error("--pre_top_k/--topk must be greater than 0")
     if args.limit is not None and args.limit < 0:
         parser.error("--limit must be greater than or equal to 0")
+
+    for attribute in ("candidate_path", "data_path"):
+        value = getattr(args, attribute)
+        if value is not None:
+            setattr(args, attribute, str(resolve_repository_path(value)))
 
     do_prepare = args.mode in ["prepare", "all"]
     do_train = args.mode in ["train", "all"]
