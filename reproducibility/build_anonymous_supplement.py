@@ -98,6 +98,7 @@ TEXT_SUFFIXES = {
     ".cfg",
     ".ini",
     ".json",
+    ".lock",
     ".md",
     ".py",
     ".sh",
@@ -134,6 +135,10 @@ STATIC_CONTENT_PATTERNS = (
             r"(?i)https?://[^\s)>\]]*(?:github\.com|gitlab\.com|git\.ustc\.edu\.cn|"
             r"figshare\.com|huggingface\.co|hf\.co)[^\s)>\]]*"
         ),
+    ),
+    (
+        "public Figshare DOI",
+        re.compile(r"(?i)https?://doi\.org/10\.6084/m9\.figshare[^\s)>\]]*"),
     ),
     (
         "ORCID identifier",
@@ -181,20 +186,28 @@ def sha256_file(path: Path) -> str:
 
 
 def _safe_relative(value: str, *, label: str) -> PurePosixPath:
+    raw_parts = value.split("/")
     if (
         "\\" in value
         or any(ord(character) < 32 for character in value)
-        or any(":" in part for part in value.split("/"))
+        or any(":" in part for part in raw_parts)
+        or any(part in {"", ".", ".."} for part in raw_parts)
     ):
         raise AnonymousArchiveError(f"Unsafe {label}: {value!r}")
     path = PurePosixPath(value)
-    if path.is_absolute() or not path.parts or any(part in {"", ".", ".."} for part in path.parts):
+    if path.is_absolute() or not path.parts:
         raise AnonymousArchiveError(f"Unsafe {label}: {value!r}")
     return path
 
 
 def _validate_archive_destination(path: PurePosixPath) -> None:
-    if "\\" in path.as_posix() or any(":" in part for part in path.parts):
+    if (
+        path.is_absolute()
+        or not path.parts
+        or any(part in {"", ".", ".."} for part in path.parts)
+        or "\\" in path.as_posix()
+        or any(":" in part for part in path.parts)
+    ):
         raise AnonymousArchiveError(f"Unsafe archive destination: {path}")
     lowered = tuple(part.lower() for part in path.parts)
     top_level = lowered[0]
@@ -207,8 +220,11 @@ def _validate_archive_destination(path: PurePosixPath) -> None:
     filename = lowered[-1]
     if filename in FORBIDDEN_FILENAMES or "artifact_manifest" in filename:
         raise AnonymousArchiveError(f"Forbidden archive inventory file: {path}")
-    if path.suffix.lower() in FORBIDDEN_SUFFIXES:
+    suffix = path.suffix.lower()
+    if suffix in FORBIDDEN_SUFFIXES:
         raise AnonymousArchiveError(f"Forbidden archive file type: {path}")
+    if suffix not in TEXT_SUFFIXES:
+        raise AnonymousArchiveError(f"Unsupported archive file type: {path}")
 
 
 def load_allowlist(repository_root: Path, allowlist_path: Path) -> list[AllowedFile]:
@@ -439,7 +455,12 @@ def verify_archive(
                 record = expected[name]
                 if len(data) != record["bytes"] or sha256_bytes(data) != record["sha256"]:
                     raise AnonymousArchiveError(f"Archive member hash mismatch: {name}")
-            relative = PurePosixPath(name).relative_to(ARCHIVE_ROOT)
+            relative = _safe_relative(
+                name.removeprefix(root_prefix),
+                label="archive member",
+            )
+            if (ARCHIVE_ROOT / relative).as_posix() != name:
+                raise AnonymousArchiveError(f"Non-canonical archive member path: {name}")
             if name != manifest_name:
                 _validate_archive_destination(relative)
             scan_items.append(

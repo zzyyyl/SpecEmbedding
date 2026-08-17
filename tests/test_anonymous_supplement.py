@@ -1,5 +1,7 @@
+import json
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 from reproducibility.build_anonymous_supplement import (
@@ -7,6 +9,7 @@ from reproducibility.build_anonymous_supplement import (
     build_archive,
     load_allowlist,
     scan_entries,
+    sha256_bytes,
     sha256_file,
     verify_archive,
 )
@@ -120,6 +123,66 @@ class AnonymousSupplementTest(unittest.TestCase):
 
             with self.assertRaisesRegex(AnonymousArchiveError, "Unsafe archive destination"):
                 load_allowlist(root, allowlist)
+
+    def test_unknown_binary_type_is_rejected_instead_of_skipping_scan(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "unsafe.dat").write_bytes(b"\xff/private/home/path")
+            allowlist = root / "allowlist.txt"
+            allowlist.write_text("unsafe.dat\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(AnonymousArchiveError, "Unsupported archive file type"):
+                load_allowlist(root, allowlist)
+
+    def test_figshare_doi_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "unsafe.txt").write_text(
+                "https://doi.org/10.6084/m9.figshare.12345678",
+                encoding="utf-8",
+            )
+            allowlist = root / "allowlist.txt"
+            allowlist.write_text("unsafe.txt\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(AnonymousArchiveError, "identity scan failed"):
+                build_archive(
+                    repository_root=root,
+                    allowlist_path=allowlist,
+                    output_path=root / "unsafe.zip",
+                    deny_tokens=[],
+                )
+
+    def test_verify_rejects_parent_traversal_member(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            archive_path = Path(temporary) / "unsafe.zip"
+            payload = b"safe\n"
+            relative = "../escape.txt"
+            member = f"specembedding-supplement/{relative}"
+            manifest_member = "specembedding-supplement/ANONYMOUS_MANIFEST.json"
+            manifest = json.dumps(
+                {
+                    "schema_version": 1,
+                    "files": [
+                        {
+                            "path": relative,
+                            "bytes": len(payload),
+                            "sha256": sha256_bytes(payload),
+                            "mode": "0644",
+                        }
+                    ],
+                },
+                sort_keys=True,
+            ).encode()
+            with zipfile.ZipFile(archive_path, mode="w") as archive:
+                for name, data in sorted(
+                    ((member, payload), (manifest_member, manifest))
+                ):
+                    info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+                    info.create_system = 3
+                    archive.writestr(info, data)
+
+            with self.assertRaisesRegex(AnonymousArchiveError, "Unsafe archive member"):
+                verify_archive(archive_path, deny_tokens=[])
 
 
 if __name__ == "__main__":
