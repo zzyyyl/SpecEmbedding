@@ -21,6 +21,7 @@ test*.py
 *.csv
 
 temp/*
+dist/
 tests/*
 !tests/
 !tests/test_*.py

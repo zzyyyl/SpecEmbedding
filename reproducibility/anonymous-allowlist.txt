@@ -1,0 +1,48 @@
+# Explicit source allowlist for the anonymous code supplement.
+# Syntax: repository source path, optionally followed by " -> archive path".
+
+reproducibility/anonymous-supplement-README.md -> README.md
+reproducibility/anonymous-allowlist.txt -> SOURCE_ALLOWLIST.txt
+environment.yml
+requirements-dev.txt
+pyproject.toml
+params.yaml
+
+reproducibility/conda-linux-64.lock
+reproducibility/pip-linux-64.lock
+reproducibility/validate_linux_lock.sh
+reproducibility/run_anonymous_smoke.py
+
+prepare_rerank_cache.py
+train_rerank.py
+eval_rerank.py
+run_rerank_pipeline.py
+
+SpecEmbedding/__init__.py
+SpecEmbedding/config.py
+SpecEmbedding/type.py
+SpecEmbedding/models.py
+SpecEmbedding/models_align.py
+SpecEmbedding/models_rerank.py
+SpecEmbedding/data/const.py
+SpecEmbedding/data/datasets_eval.py
+SpecEmbedding/data/datasets_rerank.py
+SpecEmbedding/data/graph_utils.py
+SpecEmbedding/data/tokenizer.py
+SpecEmbedding/trainer/trainer.py
+SpecEmbedding/utils/align.py
+SpecEmbedding/utils/mces.py
+SpecEmbedding/utils/providers.py
+SpecEmbedding/utils/rerank.py
+SpecEmbedding/utils/runtime.py
+
+src/data/__init__.py
+src/data/base.py
+src/data/GNPS.py
+src/data/MassBank.py
+src/data/MassSpecGym.py
+src/data/MoNA.py
+src/data/NPLIB1.py
+
+tests/test_rerank_core.py
+tests/test_rerank_pipeline_paths.py
