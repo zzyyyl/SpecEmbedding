@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import hashlib
+import io
 import json
 import os
 import re
@@ -495,8 +496,10 @@ def verify_archive(
             raise AnonymousArchiveError("Archive members do not match ANONYMOUS_MANIFEST.json")
 
         scan_items = []
+        canonical_members: list[tuple[str, bytes, int]] = []
         for name in names:
             data = archive.read(name)
+            member_mode = 0o644
             if name != manifest_name:
                 record = expected[name]
                 if len(data) != record["bytes"] or sha256_bytes(data) != record["sha256"]:
@@ -509,14 +512,25 @@ def verify_archive(
                 raise AnonymousArchiveError(f"Non-canonical archive member path: {name}")
             if name != manifest_name:
                 _validate_archive_destination(relative)
+                member_mode = _manifest_mode(record, member_name=name)
                 _validate_zip_member_mode(
                     info_by_name[name],
-                    expected_mode=_manifest_mode(record, member_name=name),
+                    expected_mode=member_mode,
                 )
             scan_items.append(
                 AllowedFile(relative, relative, archive_path, data, 0o644)
             )
+            canonical_members.append((name, data, member_mode))
         scan_entries(scan_items, deny_tokens)
+
+        canonical_buffer = io.BytesIO()
+        with zipfile.ZipFile(canonical_buffer, mode="w") as canonical_archive:
+            for name, data, mode in canonical_members:
+                _write_zip_member(canonical_archive, name, data, mode)
+        if archive_path.read_bytes() != canonical_buffer.getvalue():
+            raise AnonymousArchiveError(
+                "Archive byte envelope or member metadata is non-canonical"
+            )
 
     return {
         "archive": str(archive_path),

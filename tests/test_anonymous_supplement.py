@@ -261,6 +261,32 @@ class AnonymousSupplementTest(unittest.TestCase):
             with self.assertRaisesRegex(AnonymousArchiveError, "mode mismatch"):
                 verify_archive(rewritten, deny_tokens=[])
 
+    def test_verify_rejects_hidden_prefix_or_trailer_bytes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "safe.txt").write_text("safe\n", encoding="utf-8")
+            allowlist = root / "allowlist.txt"
+            allowlist.write_text("safe.txt\n", encoding="utf-8")
+            archive_path = root / "valid.zip"
+            build_archive(
+                repository_root=root,
+                allowlist_path=allowlist,
+                output_path=archive_path,
+                deny_tokens=[],
+            )
+            valid_bytes = archive_path.read_bytes()
+            mutations = {
+                "prefix": b"#!/bin/sh\n# /home/example/project\n" + valid_bytes,
+                "trailer": valid_bytes + b"\nprivate=/home/example/project\n",
+            }
+
+            for label, mutated_bytes in mutations.items():
+                with self.subTest(label=label):
+                    mutated = root / f"{label}.zip"
+                    mutated.write_bytes(mutated_bytes)
+                    with self.assertRaisesRegex(AnonymousArchiveError, "non-canonical"):
+                        verify_archive(mutated, deny_tokens=[])
+
 
 if __name__ == "__main__":
     unittest.main()
