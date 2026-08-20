@@ -1,6 +1,6 @@
 # SpecEmbedding 项目记忆
 
-最后更新：2026-08-17
+最后更新：2026-08-20
 
 当前修订状态：
 
@@ -757,13 +757,21 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
   相对 base 的 12/12 聚合单元均改善，Transformer--Pointwise 方向不一致。
 - canonical 核心组件消融：五项移除、两种候选、三个 reranker seeds 共 30/30 组完成；
   没有组件通过严格独立收益门槛。
+- 匿名补充代码包：已从 source commit `c565d29` 以 40 文件显式 allowlist 构建；包体
+  63,991 bytes，SHA-256 为
+  `0e6b775a15ca0d54a58d6072ce1fbce0deb0951c0a357958a7d99e3f5c8baf52`。身份扫描
+  零命中，独立解包后 7 项测试、Ruff、compileall 与合成
+  `prepare -> train -> eval` CPU cold smoke 通过；证据见
+  `reproducibility/anonymous-supplement-validation.yaml`。该 smoke 不复现论文指标，
+  本轮也未再次从 lock 新建 Conda 环境。
 - train--test 输入重叠敏感性：12/12 组完成；剔除 3 条重叠输入后主结论不变
 - train--val 输入重叠：overlap-clean 审计已完成；clean 与历史 alignment best/stop epoch 相同，reranker 9/12 组选择不同
 - 中心主张：已收窄为本地 exact-SMILES 协议下非生成式残差 learning-to-rank 的框架级
   收益；不主张官方 evaluator 等价、稳健 self-attention 独立收益或 SOTA。
 
 当前论文仍不是最终可提交版本；核心消融和跨 alignment 分析已完成，外部基线采用
-reported-only 降级边界。页数微调、匿名补充包、作者/COI 与最终 PDF 合规检查仍待完成。
+reported-only 降级边界，匿名补充代码包已完成阶段验收。参考文献核验、人工英文润色、
+页数微调、作者/COI 与最终 PDF/源码/归档联合合规检查仍待完成。
 
 ## 10. 论文文件与结构
 
@@ -806,11 +814,15 @@ reported-only 降级边界。页数微调、匿名补充包、作者/COI 与最�
 
 完整清单以 `paper/ADMA2026_TODO.md` 为准。当前优先事项：
 
-1. 使用显式 allowlist 准备可选匿名补充包，并扫描姓名、用户名、本地路径、Git 远端和公开项目链接；不要直接打包整个仓库或内部 artifact manifest。
-2. 完成最终英文 PDF、CMT 作者列表/COI、既有公开版本及双盲合规检查。
-3. 已完成核心 feature/loss 消融与多 alignment seeds；当前只保留既有 top-$K$、效率和
+1. 核对现有参考文献的一手来源和元数据，压缩相关工作并完成人工英文润色；不扩展论文
+   主张或新增文献目标。
+2. 完成最终英文 PDF、作者列表/COI、既有公开版本及双盲合规检查；页数按用户决定留到
+   完稿后统一微调。
+3. 匿名补充代码包已完成阶段验收；提交前只需对最终生成副本与 PDF/源码做一次联合身份
+   复扫，不再扩大包内功能。
+4. 已完成核心 feature/loss 消融与多 alignment seeds；当前只保留既有 top-$K$、效率和
    排名迁移待办，不新增实验目标。
-4. JESTR/GLMR 维持 reported-only、未复现且不可直接比较的止损方案；除非用户以后明确
+5. JESTR/GLMR 维持 reported-only、未复现且不可直接比较的止损方案；除非用户以后明确
    开启新的统一复现任务，否则不再列为当前待办。
 
 ## 12. 已知风险与容易混淆的地方
@@ -859,6 +871,12 @@ reported-only 降级边界。页数微调、匿名补充包、作者/COI 与最�
 - checkpoint、日志或配置中的本地目录。
 
 匿名补充材料应使用无 `.git` 历史的独立归档，并执行身份字符串扫描。
+
+2026-08-20 已落实为 `reproducibility/anonymous-allowlist.txt` 和确定性 ZIP builder；
+归档默认生成到 Git 忽略的 `dist/`，不把提交 artifact 反向纳入源码历史。当前包已通过
+用户名、hostname、Git remote/author、绝对路径、邮箱/ORCID、GPU UUID、公开托管链接和
+敏感文件类型扫描。提交前仍需从固定 source commit 重建最终副本，并与最终 PDF/源码一起
+复扫；当前验证使用既有事后验收环境，不等于又完成了一次从 lock 的全新安装。
 
 ### 12.7 AI 披露
 

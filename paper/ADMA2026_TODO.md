@@ -1,6 +1,6 @@
 # ADMA 2026 投稿待办（历史基线；转投修订中）
 
-最后更新：2026-08-17
+最后更新：2026-08-20
 
 - 当前转投暂定完稿日期：2026-08-31
 - 下列 ADMA 截止日期仅作历史记录，不再是当前投稿日程。
@@ -13,6 +13,9 @@
 - 工作编译目录：`paper/build/`（Git 忽略）
 - 可审计发布构建：`paper/release/`；执行 `bash paper/build_release.sh`，构建来源、工具链、
   页数和 SHA-256 见 `paper/release/build-manifest.yaml`
+- 可选匿名代码包：执行 `python reproducibility/build_anonymous_supplement.py` 生成
+  `dist/specembedding-anonymous-supplement.zip`；固定源码、哈希、独立解包测试和边界见
+  `reproducibility/anonymous-supplement-validation.yaml`
 
 状态约定：
 
@@ -94,12 +97,18 @@
 - [x] 未包含致谢和基金信息。
 - [x] 已在 Introduction 中加入覆盖全部章节和实际辅助范围的 AI 使用披露。
 - [ ] 最终确认正文、参考文献和 limitation 总计不超过 15 页。
-- [ ] 检查 PDF、源文件和补充材料中是否含姓名、用户名、单位或本地路径。
+- [ ] 检查 PDF、源文件和补充材料中是否含姓名、用户名、单位或本地路径；当前匿名代码包
+  已完成零命中扫描，但最终 PDF/源码/归档仍需在提交前合并复查。
 - [x] 清理当前受跟踪源码、配置和归档 notebook 中的私有机器绝对路径。
-- [ ] 最终匿名检查 Git 远端地址、公开仓库链接及 Git 历史信息。
-- [ ] 准备不含 `.git` 历史的匿名代码压缩包。
-- [ ] 确认补充材料不超过 20 MB；超过时改用匿名仓库。
-- [ ] 确认匿名仓库在补充材料截止后不再修改。
+- [ ] 最终匿名检查 Git 远端地址、公开仓库链接及 Git 历史信息；当前 allowlist 代码包
+  已通过上述扫描且不含 `.git`，最终提交副本仍需复扫。
+- [x] 准备不含 `.git` 历史的匿名代码压缩包：source commit `c565d29`，40 个 allowlisted
+  源文件，63,991 bytes，SHA-256
+  `0e6b775a15ca0d54a58d6072ce1fbce0deb0951c0a357958a7d99e3f5c8baf52`；从包外 cwd
+  独立执行 7 项测试和合成 `prepare -> train -> eval` CPU smoke 均通过。
+- [x] 当前匿名压缩包不超过历史 20 MB 限制（63,991 bytes）；目标 venue 确定后仍需
+  按其实际规则复核文件格式和上限。
+- [-] 当前采用匿名单文件压缩包，不建立匿名仓库；若目标 venue 改要求仓库，再重新开放冻结检查。
 - [ ] 在 CMT 中确认最终作者列表。
 - [ ] 在 CMT 中完整申报利益冲突。
 - [ ] 确认稿件未同时投稿其他 archival venue。
@@ -178,6 +187,9 @@ Train--val overlap-clean 审计排除 6 条 validation 查询（两个分子组�
 - [x] 7 月 14 日：完成共享中英文标签的 TikZ 正式方法图，替换两稿文本占位图；当时英文/中文稿编译为 11/10 页。
 - [x] 7 月 14 日：完成 SpecEmbedding 贡献边界、正式书目信息和 ADMA/Springer AI 披露审计，并同步修正中英文稿。
 - [x] 7 月 10 日至 12 日：确定 reported-only 降级方案；2026-08-17 已正式执行为当前证据边界，JESTR/GLMR 统一复现不再作为本轮开放待办。
+- [x] 2026-08-20：完成显式 allowlist 匿名代码包、身份扫描、确定性重建及独立解包
+  `prepare -> train -> eval` CPU cold smoke；验证记录见
+  `reproducibility/anonymous-supplement-validation.yaml`。
 - [ ] 7 月 13 日至 14 日：消融、效率和案例分析。
 - [ ] 7 月 15 日：更新其余图表并完成全文核对。
 - [ ] 7 月 16 日：执行最终双盲、页数、引用和可选补充材料检查。

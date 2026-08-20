@@ -1,0 +1,101 @@
+schema_version: 1
+status: audit_evidence
+validated_on: 2026-08-20
+
+source:
+  commit: c565d29e8b4bfd9e44c5863ebbd94aee08a85389
+  branch: codex/transfer-2026-0831
+  build_origin: clean local clone of the source commit
+  worktree_clean_before_build: true
+
+archive:
+  generated_path: dist/specembedding-anonymous-supplement.zip
+  tracked_in_git: false
+  archive_root: specembedding-supplement
+  allowlisted_source_files: 40
+  zip_members_including_generated_manifest: 41
+  bytes: 63991
+  sha256: 0e6b775a15ca0d54a58d6072ce1fbce0deb0951c0a357958a7d99e3f5c8baf52
+  historical_adma_limit_bytes: 20971520
+  under_historical_20_mib_limit: true
+  deterministic_rebuild_sha256_match: true
+  build_command: python reproducibility/build_anonymous_supplement.py
+  integrity_contract:
+    canonical_safe_paths_only: true
+    unix_regular_files_only: true
+    member_modes_bound_to_manifest: true
+    allowed_modes: ["0644", "0755"]
+    compression: deflated
+    fixed_member_timestamps: true
+    zip_comments_or_extra_metadata_present: false
+    canonical_byte_round_trip_match: true
+    hidden_prefix_or_trailer_bytes_rejected: true
+
+anonymity:
+  explicit_allowlist_only: true
+  git_history_included: false
+  checkpoints_data_caches_logs_included: false
+  paper_docs_analysis_internal_artifact_manifest_included: false
+  static_and_dynamic_identity_scan: passed_zero_findings
+  independent_adversarial_review_p0_p1: none
+  dynamic_sources_checked:
+    - current username
+    - current hostname
+    - Git origin URL
+    - configured Git author name and email
+    - recent Git author and committer identities
+  static_classes_checked:
+    - POSIX and Windows user paths
+    - numbered private data roots
+    - email and ORCID identifiers
+    - GPU UUIDs
+    - SSH remotes, public project-hosting links, and Figshare DOI links
+    - private-key and credential-like tokens
+
+independent_unpack_validation:
+  fresh_external_directory: true
+  command_cwd_outside_package: true
+  environment: existing post-hoc specembedding Conda validation environment
+  cold_install_from_locks_performed_this_round: false
+  pytest:
+    result: passed
+    tests: 7
+    warnings: 4
+    seconds: 1.56
+  ruff: passed
+  compileall: passed
+  shell_syntax: passed
+  synthetic_cpu_smoke:
+    result: passed
+    stages:
+      - prepare_rerank_cache
+      - train_rerank
+      - eval_rerank
+    prepared_queries:
+      train: 6
+      val: 4
+      test: 4
+    reranker: tiny Transformer, one epoch
+    mces: skipped
+    reported_scientific_metrics_reproduced: false
+
+repository_validation:
+  pytest:
+    result: passed
+    tests: 106
+    warnings: 9
+    seconds: 32.01
+  ruff: passed
+  compileall: passed
+  canonical_artifacts:
+    result: passed
+    validated: 60
+    manifest_matches: true
+
+scope_boundaries:
+  - The archive is a generated submission artifact and is intentionally not tracked in Git.
+  - The cold smoke uses synthetic spectra, synthetic candidates, and a random alignment checkpoint.
+  - The smoke validates executable integration only and does not reproduce paper metrics.
+  - This round reused the audited post-hoc Conda environment; it did not create a new environment from the lock files.
+  - Generic hostile-ZIP schema and unusual-text hardening remains P2; the actual 40-file allowlist has no control bytes or NFC/casefold collisions.
+  - Final PDF, source, archive, author, conflict-of-interest, and target-venue checks still require one combined pre-submission pass.

@@ -1,6 +1,6 @@
 # SpecEmbedding 转投稿件完成计划
 
-- 最后更新：2026-08-17
+- 最后更新：2026-08-20
 - 计划完成日期：2026-08-31
 - 转投开发分支：`codex/transfer-2026-0831`
 
@@ -364,6 +364,16 @@ JESTR/GLMR 统一复现必须满足：
 - 包体积满足目标 venue 限制。
 - 冻结工作树再次通过 60/60 canonical artifact 校验。
 
+2026-08-20 已完成匿名代码包阶段验收：source commit `c565d29` 通过显式 40 文件
+allowlist 构建；两次重建得到相同 SHA-256
+`0e6b775a15ca0d54a58d6072ce1fbce0deb0951c0a357958a7d99e3f5c8baf52`，包体
+63,991 bytes。包内不含 Git 历史、论文/内部清单、数据、checkpoint、cache 或日志；
+静态与运行时身份扫描零命中。从全新外部目录解包后，7 项包内测试、Ruff、compileall、
+shell 语法和合成 `prepare -> train -> eval` CPU cold smoke 全部通过；60/60 canonical
+artifact 复核保持通过。该 smoke 只证明执行集成，不复现论文指标；本轮复用了现有事后
+验收 Conda 环境，没有再次从 lock 文件新建环境。完整证据见
+`reproducibility/anonymous-supplement-validation.yaml`。
+
 ## 7. 时间表与冻结点
 
 | 日期 | 工作 | 里程碑 |
@@ -425,9 +435,10 @@ JESTR/GLMR 统一复现必须满足：
 ### 合规与工件
 
 - [ ] 环境可从零重建。
-- [ ] lint、compile、unit tests、cold smoke 全部通过。
-- [ ] 匿名包由 allowlist 构建并独立解包复演。
-- [ ] PDF/source/archive 身份信息扫描零命中。
+- [x] lint、compile、unit tests、cold smoke 全部通过。
+- [x] 匿名包由 allowlist 构建并独立解包复演。
+- [ ] PDF/source/archive 身份信息扫描零命中；archive 阶段已通过，最终 PDF/source
+  仍需与提交副本合并复查。
 - [ ] 作者、COI、基金、既有公开版本和 AI 披露由作者最终确认。
 - [ ] 最终代码、论文和工件 checksum 已冻结。
 
