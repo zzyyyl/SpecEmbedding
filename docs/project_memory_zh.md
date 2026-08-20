@@ -738,11 +738,11 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 待办清单：`paper/ADMA2026_TODO.md`
 - 上一版受跟踪 release evidence 对应 source commit `e597d89`，英文 17 页、中文 16 页；
   这是历史审计快照，不再代表当前初稿。
-- 2026-08-21 从专家预审修订 source commit `a7f3112` 强制完整重建当前初稿：英文 18 页、
-  524,387 bytes、SHA-256
-  `74e39879e2e833c2af703d5c48fd0bd90fc738f602fd43131032c9700d3cb514`；中文 16 页、
-  429,971 bytes、SHA-256
-  `fa0bb66d0215b66cc50daaf7d9a33b31f08b46ebccd99bd9f0a987a329a16006`。两份 PDF、工具链、
+- 2026-08-21 从专家预审修订 source commit `22c6b65` 强制完整重建当前初稿：英文 18 页、
+  527,837 bytes、SHA-256
+  `a4307475767d59dfe345bffa71614a1f832e39f83fa86d0d4f348e32530f154b`；中文 16 页、
+  434,876 bytes、SHA-256
+  `4e66d65c6f48fb03594f5f14722568a2532bd719b81e65e01b1df313311c2114`。两份 PDF、工具链、
   页数和哈希清单已留存在 `paper/release/`。
 - 第三轮独立审计基于远端 `5a1fe38` 复跑 88 项测试、临时 cwd 总管线、Ruff、artifact check
   和双语发布证据；结合用户明确“页数可以延后且不阻塞审计”的范围决定，本轮最终无 P0/P1
