@@ -50,7 +50,7 @@
 我们构建 \method{}：第一阶段对齐峰序列谱图编码器和分子图编码器；第二阶段在 listwise
 监督下，综合谱图与候选嵌入、显式交互特征、基础分数和原始排名进行残差重排序。
 我们在 overlap-clean alignment-seed-42 第一阶段 checkpoint 和 cache 上，使用三个
-reranker 随机种子比较不含学习式跨候选交互的 pointwise 打分器与候选集合 Transformer，
+reranker training seeds 比较不含学习式跨候选交互的 pointwise 打分器与候选集合 Transformer，
 并对 alignment seeds 42--44 另行完成分层分析。在包含 17,556 条测试查询的
 MassSpecGym 上，固定 alignment 结果中两者的
 Recall@1（三种子均值 $\pm$ 样本标准差）在质量约束场景分别为
@@ -170,7 +170,7 @@ MassSpecGym 方法并列定位。本文贡献并非 reranking 或 self-attention
     方法 & 最终排序信号 & 候选间交互 & 生成分子 & 优化阶段 \\
     \midrule
     JESTR & 谱图--候选余弦相似度 & 推理时无 & 否
-      & InfoNCE 加分子式候选正则 \\
+      & InfoNCE；可选的后期候选正则 \\
     GLMR & 生成分子--候选余弦相似度 & 检索候选作为生成器条件 & 是
       & dual-path InfoNCE 加自回归生成 \\
     本文 & pair 特征和检索先验预测的残差分数
@@ -274,8 +274,9 @@ $b_i=\zs^\top\mathbf{z}_{m_i}$ 作为基础分数。
 
 \subsection{候选构造与训练协议}
 
-基础检索器对每条查询对应的 MassSpecGym 所提供候选池打分，并保留 top-$K$，当前实验
-取 $K=40$。监督训练要求候选列表中存在正例。如果真实训练分子未进入基础 top-40，则
+MassSpecGym 提供按目标分子键控的候选列表；每条 query 复用其目标分子对应的列表。基础
+检索器对该列表打分并保留 top-$K$，当前实验取 $K=40$。$K=40$ 是预先固定的设计与计算
+预算选择，本文不比较其它截断深度，结论仅适用于该截断深度。如果真实训练分子未进入基础 top-40，则
 用它替换最后一个候选，同时在 cache 中保留其在所提供完整候选池中的基础排名；
 该目标排名等于基础分数严格高于它的候选数加一，与目标同分的候选不计为排名更高。
 排名嵌入接收
@@ -284,15 +285,17 @@ $\bar r_i=\min\{\max(r_i,0),512\}$，其中索引 0 专用于 padding。训练 r
 伪特征的额外保护。
 
 待打分候选池是标签目标与文件候选按 exact SMILES 去重后的并集。静态审计显示，目标已经
-存在于全部 32,010 个冻结候选池中，因此该并集没有扩大候选池。与此不同，仅训练集执行
+存在于全部 32,010 个唯一目标键控冻结列表中，因此该并集没有扩大候选列表。与此不同，仅训练集执行
 检索后的强制替换：它将未进入基础 top-40 的 exact target 放入截断列表。验证和测试不执行
 该替换。未进入基础 top-40 的
 真实目标因此保持缺失，并降低召回上界和全部端到端指标。任何被分配到测试划分的记录、
 测试目标或标签都不用于任一阶段的参数优化或 checkpoint 选择。当执行强制替换时，被插入
-正例的缓存排名必然大于 40，而其余 39 个训练候选的排名至多为 40。因此，排名嵌入暴露了
-仅训练期存在、与标签相关的 rank shortcut，并造成训练--评价列表分布偏移。这不是测试泄漏：
-验证和测试从不执行该替换。下文无排名嵌入审计应解释为对该 shortcut 风险的披露，而不是
-排名具有独立正收益的证据。
+在冻结训练 cache 中，绝大多数强制正例的完整池排名大于 40（质量：12,038/12,071；分子式：
+18,561/18,605）。当排名大于 40 时，它会单向识别被强制的正例，暴露仅训练期存在、与标签
+相关的 rank shortcut，并造成训练--评价列表分布偏移。严格高分排名与 top-$K$ 同分消歧留下
+例外（质量 33 个，最小排名 28；分子式 44 个，最小排名 15），因此这不是绝对规则。这不是
+测试泄漏：验证和测试从不执行该替换。下文无排名嵌入审计应解释为对 shortcut 风险的披露，
+而不是排名具有独立正收益的证据。
 
 \subsection{残差重排序器变体}
 
@@ -460,20 +463,24 @@ alignment 内聚合。因此跨 alignment 的统计单位是三个 alignment che
 匿名补充包提供源码检查、锁定的环境文件、自动化测试和一个小型 CPU 合成 smoke test，
 但不包含 MassSpecGym 谱图、候选池、训练后的 alignment 或 reranker checkpoint、reranker
 cache、日志及私有分析工件；因此 smoke test 不能复现论文科学指标。质量和分子式两种候选池
-分别训练 reranker。冻结候选工件及其 provenance 由 release manifest 标识；分析记录中的
-源提交为 \texttt{a2280d2}（完整模型）和 \texttt{8bd2ca4}（消融），配置哈希前缀为
-\texttt{b6260dad043f}（完整哈希保存在分析 manifest）。公开的特征包括
-原子、键和图规模特征；alignment 投影为 512 维、$\tau=0.07$；AdamW weight decay 为
+分别训练 reranker。冻结候选工件及其 provenance 记录在内部实验/分析 manifest 中（不随匿名
+投稿包提供）；论文 release manifest 仅覆盖提交 PDF。分析记录中的源提交为
+\texttt{a2280d2}（完整模型）、\texttt{8bd2ca4}（消融）和 \texttt{28bdce2}（alignment
+seeds 43--44），配置哈希前缀为 \texttt{b6260dad043f}（完整哈希保存在该内部 manifest）。
+公开的图特征包括原子符号、度、总氢数、芳香性、环大小分箱、形式电荷；键类型、共轭性、
+环内标志；以及 $\log(1+n_\mathrm{atoms})$、$\log(1+n_\mathrm{bonds})$ 图规模特征。
+alignment 投影为 512 维、$\tau=0.07$；AdamW weight decay 为
 $10^{-4}$、gradient clipping 为 1；谱图 cache 使用 FP32、分子 cache 使用 FP16。真实数据
 入口为 \texttt{run\_rerank\_pipeline.py}，但运行仍需获得上述未随匿名包提供的数据和工件。
 
 \subsection{对比方法与指标}
 
 受控基线包括与 reranker 使用同一对齐 checkpoint 的基础检索器，以及保留全部输入和损失、
-仅移除候选间自注意力但不匹配参数量的 pointwise reranker。另表列出 GLMR 论文表 1
-报告的 JESTR 和 GLMR 结果 \cite{zhang2026glmr}。这些外部数字不是受控比较：我们未在
+仅移除候选间自注意力但不匹配参数量的 pointwise reranker。JESTR 和 GLMR 仅作为 GLMR
+论文中的 reported-only 机制背景 \cite{zhang2026glmr}；本文不展示其外部数值。这些外部
+结果不是受控比较：我们未在
 当前代码库中独立复现 JESTR 和 GLMR，其基础检索器、候选处理、身份/canonicalization
-规则与 MCES 实现也未和本文的 exact-target-SMILES 单正例协议匹配。
+规则与 MCES 实现也未和本文的 exact-target-SMILES 单正例协议匹配；本文不展示这些外部数值。
 
 评价指标为全部测试查询上的 Recall@1、Recall@5、Recall@20 和 MRR。对每条测试查询，
 包括真实目标未进入检索 top-40 的查询，记 $\hat m_n^{(1)}$ 为排序第一的候选。本文报告
@@ -547,7 +554,7 @@ seed-42 Transformer checkpoint 计算；这些单 checkpoint 数值不包含随�
 \noindent JESTR 和 GLMR 保留为 reported-only、未复现且不可直接比较的机制背景；本文不再
 复现其数值表，也不据此推断相对排名。
 
-在代表性 seed-42 实验中，候选集合 Transformer 在质量约束 Recall@1 上带来 21.28 个百分点提升，
+在单一 project-default seed 审计中，候选集合 Transformer 在质量约束 Recall@1 上带来 21.28 个百分点提升，
 在分子式约束场景带来 11.65 个百分点提升；MRR 分别提升 17.84 和 9.36 个百分点。
 Recall@20 的提升较小，因为此时主要瓶颈已经变为基础 top-40 召回上界。相对对应的固定
 overlap-clean 基础模型，表~\ref{tab:mces_audit_cn} 的单 checkpoint seed-42 Transformer 将质量候选 MCES@1 从 15.3681
@@ -702,7 +709,7 @@ Transformer--Pointwise 方向进一步说明大部分增益不应归因于候选
 
 \section{局限性与负责任评估}
 
-三个 reranker 随机种子的均值 $\pm$ 样本标准差和 paired-win 次数只是描述性统计，不是
+三个 reranker training seeds 的均值 $\pm$ 样本标准差和 paired-win 次数只是描述性统计，不是
 置信区间或显著性检验。canonical 表和全部组件移除固定 alignment seed 42。独立的跨
 alignment 分析仅覆盖三个内部 checkpoints，它们具有相同的记录超参数但来自两个代码修订，
 并先在每个 alignment 内聚合 reranker seeds；因此只构成描述性敏感性证据，不是
@@ -748,8 +755,8 @@ Recall 和 MRR 使用 MassSpecGym 提供候选文件上的本地 exact-target-SM
 checkpoint 上相对 pointwise 呈现小幅优势，但对每种候选设置和指标都只有 2/3 个 alignment
 方向为正。完整模型相对五个移除变体中的任一个都未取得上述六个 MRR
 配对全胜（六个配对为 2 种候选池 $\times$ 3 个 reranker training seeds）；去除排名嵌入反而在每个配对中同时提高 Recall@1 和 MRR。最稳健的结论是
-第二阶段重排序框架的价值，而不是 self-attention 或任一受审计设计的独立收益。另表展示的
-JESTR/GLMR 未复现且不可直接比较；匹配外部基线和实测效率仍超出当前证据范围。
+第二阶段重排序框架的价值，而不是 self-attention 或任一受审计设计的独立收益。JESTR/GLMR
+仅作为 reported-only、未复现、不可直接比较的机制背景；匹配外部基线和实测效率仍超出当前证据范围。
 
 \bibliographystyle{plain}
 \bibliography{references}

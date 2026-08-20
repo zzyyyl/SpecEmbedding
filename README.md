@@ -213,9 +213,9 @@ within each of alignment seeds 42--44 and then treats the three alignment-level
 estimates descriptively; it does not flatten nine runs or provide confidence
 intervals. The versioned evidence is in
 `analysis/transfer2026_alignment_multiseed/` and
-`analysis/transfer2026_core_ablations/`. JESTR and GLMR values in the paper are
-externally reported, not independently reproduced, and not directly comparable
-to the local results.
+`analysis/transfer2026_core_ablations/`. JESTR and GLMR are retained only as
+reported-only, not independently reproduced, not directly comparable mechanism
+background; the paper does not display their external numeric values.
 
 The following commands describe the repository's broader and legacy workflows;
 their outputs should not be substituted for the paper tables without matching

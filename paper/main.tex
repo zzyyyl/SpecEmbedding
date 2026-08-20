@@ -79,7 +79,8 @@ corresponding base in all 12
 alignment--candidate--learned-model aggregate cells for both Recall@1 and MRR,
 whereas the Transformer--pointwise direction varies by alignment. A
 fixed-alignment audit finds that the full model does not achieve six-of-six MRR
-wins against any of five removal variants; the no-rank-embedding variant improves both
+wins (2 candidate pools $\times$ 3 reranker training seeds) against any of five
+removal variants; the no-rank-embedding variant improves both
 metrics in every pool-by-reranker-seed pair. Thus, the evidence supports
 supervised non-generative second-stage reranking; robust self-attention and
 independent component benefits remain unestablished. Neither variant generates
@@ -141,7 +142,8 @@ Our contributions are:
   advantage is not directionally uniform across these checkpoints, so the
   analysis does not establish a robust self-attention benefit. Moreover, within
   the overlap-clean alignment-seed-42 audit, the full model does not achieve
-  six-of-six pool-by-reranker-seed MRR wins against any removal variant.
+  six-of-six (2 candidate pools $\times$ 3 reranker training seeds) MRR wins
+  against any removal variant.
 \end{itemize}
 
 \paragraph{AI-assistance disclosure.}
@@ -151,7 +153,7 @@ and consistency audits. Reported observations and numerical results came from
 the stated software pipeline, not model generation. The authors reviewed all
 AI-assisted text and code, verified the technical claims, citations, saved
 artifacts, and reported results, and assume full responsibility for the
-manuscript.
+manuscript's accuracy, completeness, and originality.
 
 \section{Related Work}
 
@@ -219,7 +221,7 @@ evaluated design choices rather than assumed sources of gain.
     Model & Ranking signal & Candidate interaction & Generates & Training stages \\
     \midrule
     JESTR & Spectrum--candidate cosine & None at inference & No
-      & InfoNCE plus formula-candidate regularizer \\
+      & InfoNCE; optional late-stage candidate regularization \\
     GLMR & Generated--candidate cosine & Retrieved candidates condition the generator & Yes
       & Dual-path InfoNCE plus generation \\
     Ours & Residual score from pair features and retrieval priors
@@ -340,8 +342,11 @@ $b_i=\zs^\top\mathbf{z}_{m_i}$ is the base score.
 
 \subsection{Candidate Construction and Training Protocol}
 
-MassSpecGym supplies one candidate pool per query. The base retriever scores the
-pool and keeps its top $K=40$ molecules. If a training target is absent from the
+MassSpecGym supplies target-molecule-keyed candidate lists; each query reuses the
+list keyed by its target molecule. The base retriever scores that list and keeps
+its top $K=40$ molecules. $K=40$ is a fixed design and compute-budget choice;
+we do not compare other truncation depths, so conclusions are conditional on
+this cutoff. If a training target is absent from the
 retrieved top-40, it replaces the last molecule while its full-pool base rank is cached.
 That rank is one plus the number of strictly higher-scoring candidates; ties
 with the target do not count as higher. The rank embedding receives
@@ -351,18 +356,21 @@ and rank together to guard against cache-order artifacts.
 
 Scored pools are exact-SMILES-deduplicated unions of the labeled target and
 supplied candidates. A static audit found the target already present in all
-32,010 frozen pools, so no pool was enlarged. Post-retrieval positive forcing is
+32,010 unique target-keyed frozen lists, so no list was enlarged. Post-retrieval positive forcing is
 training-only; validation and test perform no top-40 replacement. A target absent
 from the retrieved top-40 remains absent and lowers the upper bound and all
 end-to-end metrics. No
 test record, target, or label is used for optimization or checkpoint selection.
-When forcing is applied, the inserted positive has a cached rank greater than
-40, while the other 39 training candidates have ranks at most 40. Thus the rank
-embedding exposes a training-only label-correlated rank shortcut and creates a
-train--evaluation list-distribution shift. This is not test leakage: validation
-and test never perform the replacement. The no-rank-embedding audit below is
-therefore interpreted as a disclosure of this shortcut risk, not as evidence that
-rank has an independent positive effect.
+In the frozen training caches, most forced positives have full-pool rank greater
+than 40 (mass: 12,038/12,071; formula: 18,561/18,605). When rank exceeds 40 it
+unidirectionally identifies a forced positive, exposing a training-only
+label-correlated rank shortcut and train--evaluation list-distribution shift.
+Strict-higher ranking and top-$K$ tie breaking leave exceptions (mass 33, with
+minimum rank 28; formula 44, with minimum rank 15), so this is not an absolute
+rule. This is not test leakage: validation and test never perform the
+replacement. The no-rank-embedding audit below is therefore interpreted as a
+disclosure of shortcut risk, not as evidence that rank has an independent
+positive effect.
 
 \subsection{Residual Reranker Variants}
 
@@ -573,11 +581,16 @@ MassSpecGym spectra, candidate pools, trained alignment or reranker checkpoints,
 reranker caches, logs, or private analysis artifacts; the smoke test therefore
 does not reproduce the scientific metrics. The two reported pools use separate
 mass and formula reranker trainings. The frozen candidate artifacts and their
-provenance are identified by the release manifest; the analysis records source
-commits \texttt{a2280d2} (full model), \texttt{8bd2ca4} (ablations), and
-configuration hash prefix \texttt{b6260dad043f} (the full hash is retained in
-the analysis manifest).
-The disclosed features include atom, bond, and graph-size descriptors; the
+provenance are recorded in the internal experiment/analysis manifest (not
+included in the anonymous submission); the paper release manifest covers only
+the submitted PDFs. The analysis records source commits \texttt{a2280d2} (full
+model), \texttt{8bd2ca4} (ablations), and \texttt{28bdce2} (alignment seeds
+43--44), plus configuration hash prefix \texttt{b6260dad043f} (the full hash is
+retained in that internal manifest).
+The disclosed graph features are atom symbol, degree, total hydrogen count,
+aromaticity, ring-size bin, formal charge; bond type, conjugation, and ring
+membership; and $\log(1+n_\mathrm{atoms})$, $\log(1+n_\mathrm{bonds})$ graph-size
+features. The
 alignment projection is 512-dimensional with temperature $\tau=0.07$; AdamW
 uses weight decay $10^{-4}$ and gradient clipping 1.0; spectrum caches are
 FP32 and molecule caches FP16. The real-data entry point is
@@ -588,8 +601,8 @@ FP32 and molecule caches FP16. The real-data entry point is
 The controlled baselines are the same aligned retriever without the second-stage
 ranker and a pointwise reranker that removes candidate self-attention while
 retaining all other inputs and objectives, but not the same parameter count. We
-separately show JESTR and GLMR values from Table 1 of the GLMR paper
-\cite{zhang2026glmr}. These external numbers are not a controlled comparison:
+retain JESTR and GLMR as reported-only mechanism background from the GLMR paper
+\cite{zhang2026glmr}; no external numeric values are shown. They are not a controlled comparison:
 JESTR and GLMR were not independently reproduced in our codebase, and their
 retrievers, candidate handling, identity/canonicalization rules, and MCES
 implementations are not matched to our local exact-target-SMILES
@@ -674,13 +687,14 @@ single-checkpoint values do not include seed-level uncertainty.
   \end{tabular}
 \end{table}
 
-In the representative seed-42 run, the candidate-set Transformer adds 21.28 percentage
+In a single project-default-seed audit, the candidate-set Transformer adds 21.28 percentage
 points in mass-conditioned Recall@1 and 11.65 points in formula-conditioned
 Recall@1. The corresponding MRR gains are 17.84 and 9.36 points. Improvements
 at Recall@20 are smaller because the first-stage top-40 upper bound is already
 the dominant constraint. Relative to the corresponding fixed overlap-clean base, the same
-single-checkpoint seed-42 Transformer in Table~\ref{tab:mces_audit} reduces MCES@1 from 15.3681 to 7.7057 for mass candidates
-($49.86\%$) and from 5.4389 to 3.0913 for formula candidates ($43.16\%$).
+single-checkpoint seed-42 Transformer in Table~\ref{tab:mces_audit} reduces
+mass MCES@1 from 15.3681 to 7.7057 ($49.86\%$), and formula MCES@1 from
+5.4389 to 3.0913 ($43.16\%$).
 These are single-checkpoint audits, not seed-aggregated estimates.
 
 JESTR and GLMR remain reported-only, not reproduced, and not directly
@@ -930,8 +944,8 @@ The full model does not achieve six-of-six MRR wins against any of five removal
 variants within the canonical alignment, while rank-embedding removal improves both
 reported metrics in every pool-by-reranker-seed pair. The strongest supported
 conclusion therefore concerns the reranking framework, not an independent
-component benefit. The separately displayed JESTR/GLMR values were not
-reproduced and are not directly comparable; matched external baselines and
+component benefit. JESTR and GLMR are reported-only, not reproduced, and not
+directly comparable mechanism background; matched external baselines and
 measured efficiency remain outside the evidence.
 
 \bibliographystyle{splncs04}
