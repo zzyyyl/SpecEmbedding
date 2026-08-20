@@ -17,7 +17,7 @@ the auditable PDFs to:
 It also synchronizes the ignored `paper/build/main*.pdf` files so that the
 legacy local build directory does not retain stale PDFs.
 
-The verified 2026-08-17 toolchain uses TeX Live 2019/Debian, `latexmk` 4.67,
+The verified 2026-08-20 toolchain uses TeX Live 2019/Debian, `latexmk` 4.67,
 pdfLaTeX for English, XeLaTeX for Chinese, BibTeX 0.99d, and the TeX Live Fandol
 fonts supplied with `ctex`. The known non-blocking messages are the English
 `amsmath` math-accent redefinition warning and Chinese Fandol `fontspec`
