@@ -1,6 +1,6 @@
 # 论文修改计划：初稿引用核验、相关工作压缩与双语语言收口
 
-- 状态：`执行中`
+- 状态：`已执行`
 - 创建日期：2026-08-20
 - 最后更新：2026-08-20
 - 负责人：Codex
@@ -86,7 +86,7 @@
 - [x] `paper/references.bib`：仅补齐已核验元数据，不新增或删除文献。
 - [x] `paper/ADMA2026_TODO.md`：勾选相关工作压缩、英文润色、全部引用核验；保留实验、页数和投稿账户事项原状态或明确非本轮范围。
 - [x] `docs/project_memory_zh.md`：记录初稿写作收口结果和剩余投稿整理事项。
-- [ ] 本计划：记录执行、验证、论文 commit 与偏差。
+- [x] 本计划：记录执行、验证、论文 commit 与偏差。
 
 ### 3.2 明确不做的事项
 
@@ -199,8 +199,8 @@
 - [x] 步骤 9：完整编译双语稿，记录页数及 warning；页数超出未来 venue 上限不阻断本轮。
 - [x] 步骤 10：运行 ChkTeX/LaCheck、`git diff --check` 并人工审阅完整 diff。
 - [x] 步骤 11：使用 Conventional Commit 提交论文、BibTeX、TODO 与记忆文档的实质修改。
-- [ ] 步骤 12：回填论文 commit、验证结果与实际偏差，将状态改为 `已执行`，再以独立文档 commit 归档计划。
-- [ ] 步骤 13：推送当前分支，并进行一次只读收口审计，判断完整初稿是否成立。
+- [x] 步骤 12：回填论文 commit、验证结果与实际偏差，将状态改为 `已执行`，再以独立文档 commit 归档计划。
+- [x] 步骤 13：推送当前分支，并进行一次只读收口审计，判断完整初稿是否成立。
 
 ## 8. 风险、证据边界与待确认事项
 
@@ -216,12 +216,12 @@
 
 - [x] 英文稿编译：在 `paper/` 执行 `latexmk -gg -pdf -interaction=nonstopmode -halt-on-error main.tex`。
 - [x] 中文稿编译：在 `paper/` 执行 `latexmk -gg -xelatex -interaction=nonstopmode -halt-on-error main_cn.tex`。
-- [ ] 发布构建：执行 `bash paper/build_release.sh`，检查当前双语 PDF、页数、SHA-256 和构建日志；按需要更新受跟踪 manifest。
+- [x] 发布构建：执行 `bash paper/build_release.sh`，检查当前双语 PDF、页数、SHA-256 和构建日志；按需要更新受跟踪 manifest。
 - [x] 引用/BibTeX：比较两稿 `\\cite{}` 键集合与 `references.bib` 条目集合，要求均为同一 25 键；日志不得有 undefined citation/reference。
 - [x] 证据边界：搜索 `exact-SMILES`、`exact-target-SMILES`、`official`、`SOTA`、`significant`、`robust`、`latency`、`efficiency`、`all six`、`earlier checkpoint`，逐处人工核验。
 - [x] 中英文一致性：逐项核对摘要、贡献、Related Work 结构、canonical 定义、pool-by-seed 计数、pre-clean 敏感性、Limitations 与 Conclusion。
 - [x] 静态语言检查：在 `paper/` 运行 ChkTeX 与 LaCheck；区分模板/宏噪声和可修复警告。
-- [ ] 匿名性：对最终 PDF 文本和本轮修改文件扫描用户名、本地绝对路径、远端地址与作者元数据；最终提交联合复扫仍另行保留。
+- [x] 匿名性：对当前初稿 PDF 文本和本轮修改文件扫描用户名、本地绝对路径、远端地址与作者元数据；当前零命中，最终提交联合复扫仍另行保留。
 - [x] 变更范围：`git diff --check`、`git status -sb`、完整 `git diff`，确认未混入代码、数据、checkpoint 或用户改动。
 
 ## 10. 执行记录
@@ -232,12 +232,39 @@
 - 2026-08-20：只读终审发现共享方法图仍使用 `Official candidates`/`set-aware`，以及历史 TODO 会把过期 ADMA 动作和可选实验误读为当前目标；在不新增实验或改变主张的前提下同步修正。这是对原计划的小幅术语/归档扩展，不改变目标和证据边界。
 - 2026-08-20：双语强制完整工作构建通过，英文 17 页、中文 15 页；日志中致命错误、未定义引用/交叉引用及 Overfull/Underfull 均为零。ChkTeX 排除非断行引用等既知风格建议后无输出；LaCheck 仅有模板和公式宏噪声。
 - 2026-08-20：论文、共享方法图、BibTeX、历史 TODO 与项目记忆的实质修改以 commit `076c5c5`（`docs(paper): 完成初稿引用与语言收口`）提交；计划文件未混入该 commit。
+- 2026-08-20：计划执行进展以 `033ac22` 单独提交；该干净 source commit 随后通过
+  `paper/build_release.sh` 严格构建。当前 release 英文为 17 页、479,007 bytes、SHA-256
+  `68eaebb36afa5c9fe000b7b948b72080df390f81b1bc1901ff5ca92bfad7dd44`；中文为 15 页、
+  421,262 bytes、SHA-256
+  `75870b7dde764559f9ba6626b82ecabbe0500a016200a7fd2212051158ffe197`。构建日志严格检查为零，
+  PDF 作者元数据为空或缺失，源码与 PDF 私有身份字符串扫描零命中；release evidence 以
+  `a6063f3` 提交。
+- 2026-08-20：`freeze_adma2026_artifacts.py --check` 在干净基线上验证 60 个 canonical
+  artifacts 并与 manifest 匹配；本轮没有重跑训练或评价实验。
+- 2026-08-20：按用户既定要求通知审计任务
+  `01a00c04-6b74-7fc2-b99f-e1878294339e`。其对远端 `a6063f3` 的独立只读审计确认论文、
+  引用闭包、证据边界、构建和匿名性无 P0/P1，仅提出旧审计文档仍将历史 17/16 快照写得
+  像当前 release 的 P2。修复后以 `8478bfb` 推送；同一任务再次复核，确认旧 17/16 与当前
+  17/15 已按日期、source commit、字节数和哈希分开，无 P0/P1/P2，并明确允许本计划归档为
+  `已执行`。
 
 ## 11. 最终结果
 
-- 完成日期：尚未完成
-- 最终状态：`未执行`
-- 验证结果：尚未验证
+- 完成日期：2026-08-20
+- 最终状态：`已执行`
+- 验证结果：完整初稿成立。双语严格 release build 通过，英文 17 页、中文 15 页；致命
+  LaTeX 错误、未定义引用/交叉引用及 Overfull/Underfull 均为零。两稿与 BibTeX 使用相同
+  25 个引用键，无缺失、未使用或重复条目；全部 25 条文献已按一手来源核验。当前 PDF 与
+  manifest 的页数、字节数、SHA-256 一致，作者元数据为空或缺失，私有身份扫描零命中。
+  60 个 canonical artifacts 匹配。指定审计任务最终判定无 P0/P1/P2。
 - 论文修改 commit：`076c5c5 docs(paper): 完成初稿引用与语言收口`
+- 发布证据 commit：`a6063f3 docs(paper): 更新初稿双语发布证据`
+- 归档一致性修复 commit：`8478bfb docs(audit): 同步当前双语发布快照`
 - 计划归档 commit：无需在本文件中自我引用
-- 相对原计划的偏差：尚未记录
+- 相对原计划的偏差：Related Work 实际净压缩约 80 个英文词，少于计划的 100--150 词，
+  原因是保留全部 25 个引用及必要机制边界；未以删减证据换取篇幅。只读终审触发两项小幅
+  范围扩展：同步共享方法图中的 supplied-candidate/candidate-set 术语，并把历史 ADMA
+  实验、效率与提交动作明确降级为非当前目标；后续又修正旧审计归档中的 17/16 历史快照
+  标注。这些调整均未改变方法、评价协议、结果数字或研究结论。
+- 非阻断后续事项：确认转投 venue 及格式、作者/单位/COI、定稿后的联合匿名复扫，并按
+  venue 规则处理英文 17 页；本轮不新增实验或外部基线复现目标。
