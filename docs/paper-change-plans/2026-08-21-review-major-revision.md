@@ -139,14 +139,14 @@
 
 ## 7. 分步执行清单
 
-- [ ] 步骤 1：提交本计划并保持稿件未修改。
-- [ ] 步骤 2：将计划状态改为 `执行中`，记录起始 commit。
-- [ ] 步骤 3：从现有 CSV/manifest 静态核对均值、SD、U40 和 P/Z/N，形成修改用数字清单。
-- [ ] 步骤 4：修改英文训练 shortcut、seed rationale、统计层级和 availability；重组主表/MCES/P-Z-N 表并删除外部数值表。
-- [ ] 步骤 5：逐项同步中文稿、README、分析报告和匿名补充说明。
-- [ ] 步骤 6：运行 citation/number/boundary/anonymous diff 审计，确认无新实验数字或主张越界。
-- [ ] 步骤 7：完整编译双语稿，运行严格 release build，检查 PDF/manifest/哈希与页数。
-- [ ] 步骤 8：用 Conventional Commit 提交论文及配套说明实质修改。
+- [x] 步骤 1：提交本计划并保持稿件未修改（计划提交 `b794b0e`）。
+- [x] 步骤 2：将计划状态改为 `执行中`，记录起始 commit（状态提交 `6106a9f`）。
+- [x] 步骤 3：从现有 CSV/manifest 静态核对均值、SD、U40 和 P/Z/N，形成修改用数字清单。
+- [x] 步骤 4：修改英文训练 shortcut、seed rationale、统计层级和 availability；重组主表/MCES/P-Z-N 表并删除外部数值表。
+- [x] 步骤 5：逐项同步中文稿、README、分析报告和匿名补充说明（匿名包原有边界已足够准确，仅同步 README/正文）。
+- [x] 步骤 6：运行 citation/number/boundary/anonymous diff 审计，确认无新实验数字或主张越界。
+- [x] 步骤 7：完整编译双语稿，运行严格 release build，检查 PDF/manifest/哈希与页数。
+- [x] 步骤 8：用 Conventional Commit 提交论文及配套说明实质修改（`a7f3112`；发布证据 `22d460c`）。
 - [ ] 步骤 9：推送并通知评审专家对话再次只读复审；若有同范围意见继续收口，否则归档本计划。
 - [ ] 步骤 10：回填验证、评审反馈、commit 和偏差，将状态改为 `已执行`，以独立文档 commit 归档计划。
 
@@ -161,23 +161,21 @@
 
 ## 9. 验证方案
 
-- [ ] 英文稿：`latexmk -gg -pdf -interaction=nonstopmode -halt-on-error main.tex`。
-- [ ] 中文稿：`latexmk -gg -xelatex -interaction=nonstopmode -halt-on-error main_cn.tex`。
-- [ ] 严格发布：`bash paper/build_release.sh`；检查 fatal/undefined/Overfull/Underfull、页数、作者元数据、私有路径与 manifest 哈希。
-- [ ] 引用/BibTeX：双稿 citation keys 与 `references.bib` 均为同一 25 条，无 undefined citation/reference。
-- [ ] 数字闭包：主表三种子均值/SD、U40、MCES 单次值、P/Z/N 与现有 CSV/报告逐项一致；结果数字无意外修改。
-- [ ] 边界审计：搜索 train-only/rank shortcut/distribution shift/test leakage、local exact-target-SMILES、official evaluator、n=3、12/12、2/3、reported-only、not reproduced、not directly comparable、availability。
-- [ ] 双语一致性：摘要、方法、主结果、MCES、组件、局限、结论和 availability 逐项对照。
-- [ ] 匿名性：PDF/源码/补充包扫描身份字符串和元数据；不把内部 manifest/log/data 纳入投稿包。
-- [ ] `git diff --check`、ChkTeX/LaCheck、artifact check、完整 diff 与工作区状态。
+- [x] 英文稿、中文稿均由 `bash paper/build_release.sh` 完整重建。
+- [x] 严格发布检查通过：无 fatal、undefined citation/reference、overfull/underfull；英文 18 页、中文 16 页；PDF 作者元数据保持匿名；私有路径扫描无命中，manifest 哈希匹配。
+- [x] `conda run -n specembedding python -m pytest -q tests`：106 passed, 9 warnings；`conda run -n specembedding python -m ruff check .`：All checks passed；`freeze_adma2026_artifacts.py --check`：60 canonical artifacts，manifest matches；`git diff --check` 通过。
+- [x] 引用/BibTeX、数字闭包、协议边界和双语一致性完成静态核对；未新增实验、外部引用或科学结论。
+- [x] 匿名性核对：release PDF 无作者/私有路径；匿名补充包仍明确不含真实数据、候选池、checkpoint、cache、日志和分析工件。
 
 ## 10. 执行记录
 
-2026-08-21：收到评审专家对远端 `01204ac` 的 Major Revision 预审意见；尚未修改论文，先创建本计划。
+2026-08-21：收到评审专家对远端 `01204ac` 的 Major Revision 预审意见；创建计划并提交 `b794b0e`，随后以 `6106a9f` 切换为执行中。
+2026-08-21：完成英文/中文正文、README、消融报告和发布 PDF 修订；论文实质提交为 `a7f3112`，发布证据提交为 `22d460c`。主表改为三种 reranker training seeds 均值±样本 SD，新增单 checkpoint MCES、U40、P/Z/N 和 availability 边界，删除外部数值表；未新增实验。
+2026-08-21：等待评审专家会话 `01a01f8c-fe25-7390-8811-fedfac865d3c` 对 `22d460c` 进行独立复核。
 
 ## 11. 最终结果
 
-- 完成日期：尚未完成
+- 完成日期：待专家复核后回填；当前计划内代码、论文、构建和证据修订已完成，步骤 9 为待复核。
 - 最终状态：`未执行`
 - 验证结果：尚未验证
 - 论文修改 commit：尚未提交
