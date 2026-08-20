@@ -1,4 +1,5 @@
 import json
+import stat
 import tempfile
 import unittest
 import zipfile
@@ -179,10 +180,86 @@ class AnonymousSupplementTest(unittest.TestCase):
                 ):
                     info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
                     info.create_system = 3
+                    info.compress_type = zipfile.ZIP_DEFLATED
+                    info.external_attr = (stat.S_IFREG | 0o644) << 16
                     archive.writestr(info, data)
 
             with self.assertRaisesRegex(AnonymousArchiveError, "Unsafe archive member"):
                 verify_archive(archive_path, deny_tokens=[])
+
+    def test_verify_rejects_symlink_member(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            archive_path = Path(temporary) / "unsafe.zip"
+            payload = b"../../outside"
+            member = "specembedding-supplement/link.txt"
+            manifest_member = "specembedding-supplement/ANONYMOUS_MANIFEST.json"
+            manifest = json.dumps(
+                {
+                    "schema_version": 1,
+                    "files": [
+                        {
+                            "path": "link.txt",
+                            "bytes": len(payload),
+                            "sha256": sha256_bytes(payload),
+                            "mode": "0644",
+                        }
+                    ],
+                },
+                sort_keys=True,
+            ).encode()
+            with zipfile.ZipFile(archive_path, mode="w") as archive:
+                manifest_info = zipfile.ZipInfo(
+                    manifest_member,
+                    date_time=(1980, 1, 1, 0, 0, 0),
+                )
+                manifest_info.create_system = 3
+                manifest_info.compress_type = zipfile.ZIP_DEFLATED
+                manifest_info.external_attr = (stat.S_IFREG | 0o644) << 16
+                archive.writestr(manifest_info, manifest)
+
+                link_info = zipfile.ZipInfo(
+                    member,
+                    date_time=(1980, 1, 1, 0, 0, 0),
+                )
+                link_info.create_system = 3
+                link_info.compress_type = zipfile.ZIP_DEFLATED
+                link_info.external_attr = (stat.S_IFLNK | 0o777) << 16
+                archive.writestr(link_info, payload)
+
+            with self.assertRaisesRegex(AnonymousArchiveError, "not a regular file"):
+                verify_archive(archive_path, deny_tokens=[])
+
+    def test_verify_rejects_mode_mismatch(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "script.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+            allowlist = root / "allowlist.txt"
+            allowlist.write_text("script.sh\n", encoding="utf-8")
+            archive_path = root / "mode.zip"
+            build_archive(
+                repository_root=root,
+                allowlist_path=allowlist,
+                output_path=archive_path,
+                deny_tokens=[],
+            )
+
+            rewritten = root / "rewritten.zip"
+            with zipfile.ZipFile(archive_path, mode="r") as source, zipfile.ZipFile(
+                rewritten,
+                mode="w",
+            ) as destination:
+                for info in source.infolist():
+                    data = source.read(info.filename)
+                    copied = zipfile.ZipInfo(info.filename, date_time=info.date_time)
+                    copied.create_system = info.create_system
+                    copied.compress_type = info.compress_type
+                    copied.external_attr = info.external_attr
+                    if info.filename.endswith("script.sh"):
+                        copied.external_attr = (stat.S_IFREG | 0o755) << 16
+                    destination.writestr(copied, data)
+
+            with self.assertRaisesRegex(AnonymousArchiveError, "mode mismatch"):
+                verify_archive(rewritten, deny_tokens=[])
 
 
 if __name__ == "__main__":

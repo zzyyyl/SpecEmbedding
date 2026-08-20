@@ -10,6 +10,7 @@ import json
 import os
 import re
 import socket
+import stat
 import subprocess
 import zipfile
 from dataclasses import dataclass
@@ -391,6 +392,46 @@ def _write_zip_member(archive: zipfile.ZipFile, name: str, data: bytes, mode: in
     archive.writestr(info, data, compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
 
 
+def _validate_zip_member_mode(
+    info: zipfile.ZipInfo,
+    *,
+    expected_mode: int,
+) -> None:
+    if info.create_system != 3:
+        raise AnonymousArchiveError(
+            f"Archive member does not use Unix metadata: {info.filename}"
+        )
+    unix_mode = (info.external_attr >> 16) & 0xFFFF
+    if not stat.S_ISREG(unix_mode):
+        raise AnonymousArchiveError(
+            f"Archive member is not a regular file: {info.filename}"
+        )
+    actual_mode = stat.S_IMODE(unix_mode)
+    if actual_mode != expected_mode:
+        raise AnonymousArchiveError(
+            f"Archive member mode mismatch: {info.filename} "
+            f"(expected {expected_mode:04o}, got {actual_mode:04o})"
+        )
+    if info.compress_type != zipfile.ZIP_DEFLATED:
+        raise AnonymousArchiveError(
+            f"Archive member has unexpected compression: {info.filename}"
+        )
+
+
+def _manifest_mode(record: dict, *, member_name: str) -> int:
+    mode_text = record.get("mode")
+    if not isinstance(mode_text, str) or re.fullmatch(r"0[0-7]{3}", mode_text) is None:
+        raise AnonymousArchiveError(
+            f"Archive manifest has an invalid mode for {member_name}"
+        )
+    mode = int(mode_text, 8)
+    if mode not in {0o644, 0o755}:
+        raise AnonymousArchiveError(
+            f"Archive manifest has a forbidden mode for {member_name}: {mode_text}"
+        )
+    return mode
+
+
 def build_archive(
     *,
     repository_root: Path,
@@ -439,6 +480,11 @@ def verify_archive(
         manifest_name = (ARCHIVE_ROOT / ARCHIVE_MANIFEST).as_posix()
         if manifest_name not in names:
             raise AnonymousArchiveError("Archive manifest is missing")
+        info_by_name = {info.filename: info for info in infos}
+        _validate_zip_member_mode(
+            info_by_name[manifest_name],
+            expected_mode=0o644,
+        )
         manifest = json.loads(archive.read(manifest_name))
         expected = {
             (ARCHIVE_ROOT / item["path"]).as_posix(): item
@@ -463,6 +509,10 @@ def verify_archive(
                 raise AnonymousArchiveError(f"Non-canonical archive member path: {name}")
             if name != manifest_name:
                 _validate_archive_destination(relative)
+                _validate_zip_member_mode(
+                    info_by_name[name],
+                    expected_mode=_manifest_mode(record, member_name=name),
+                )
             scan_items.append(
                 AllowedFile(relative, relative, archive_path, data, 0o644)
             )
