@@ -37,7 +37,10 @@ Top-1 differences are percentage points; MRR uses the raw [0, 1] scale.
 | formula | listwise_only | 74.5671 ± 0.2819 | 74.2386 ± 0.2456 | 0.3285 ± 0.3434 (3/0/0) | 0.780167 ± 0.002554 | 0.777100 ± 0.002464 | 0.003067 ± 0.004102 (2/0/1) |
 
 `P/Z/N` counts positive/zero/negative full-minus-ablation deltas across
-reranker seeds 42/43/44.
+reranker seeds 42/43/44. The paper-level six-pair claim uses two candidate
+pools $\times$ three reranker training seeds; these are paired reranker
+comparisons within the fixed alignment-42 checkpoint, not independent alignment
+replications.
 
 ## Component claim gate
 

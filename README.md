@@ -206,9 +206,9 @@ two-dimensional InChIKey equivalence and may yield multiple positives; the
 effect of this difference is unquantified, so the local values are not
 official-evaluator-equivalent.
 
-The representative table uses alignment seed 42 and reranker seed 42. The
-fixed-alignment table holds alignment seed 42 constant and summarizes reranker
-seeds 42--44. The cross-alignment analysis first summarizes those reranker seeds
+The main table uses project-default alignment seed 42 for the base and summarizes
+reranker training seeds 42--44. The fixed-alignment table holds alignment seed 42
+constant and summarizes those same training seeds. The cross-alignment analysis first summarizes those reranker seeds
 within each of alignment seeds 42--44 and then treats the three alignment-level
 estimates descriptively; it does not flatten nine runs or provide confidence
 intervals. The versioned evidence is in
@@ -219,7 +219,10 @@ to the local results.
 
 The following commands describe the repository's broader and legacy workflows;
 their outputs should not be substituted for the paper tables without matching
-the recorded candidate, identity, split, cache, and checkpoint protocol.
+the recorded candidate, identity, split, cache, and checkpoint protocol. The
+anonymous supplement is a source-inspection and synthetic smoke package only;
+it does not include the real spectra, candidate pools, checkpoints, caches, or
+analysis logs needed to reproduce the reported metrics.
 
 Each split file is a pickle file containing `list[matchms.Spectrum]`. Each `Spectrum` must provide:
 

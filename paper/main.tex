@@ -64,7 +64,7 @@ second-stage residual ranker combines spectrum and candidate embeddings,
 explicit interaction features, the base score, and the base rank under listwise
 supervision. Using the overlap-clean alignment-seed-42 checkpoint and caches, we
 compare a pointwise scorer without learned cross-candidate interaction with a
-candidate-set Transformer across three reranker initializations; a separate
+candidate-set Transformer across three reranker training seeds; a separate
 analysis repeats the design for alignment seeds 42--44. On the 17,556-query
 MassSpecGym test split, the fixed-alignment mean $\pm$ sample-SD Recall@1
 values are
@@ -79,7 +79,7 @@ corresponding base in all 12
 alignment--candidate--learned-model aggregate cells for both Recall@1 and MRR,
 whereas the Transformer--pointwise direction varies by alignment. A
 fixed-alignment audit finds that the full model does not achieve six-of-six MRR
-wins against any of five removal variants; the rank-free variant improves both
+wins against any of five removal variants; the no-rank-embedding variant improves both
 metrics in every pool-by-reranker-seed pair. Thus, the evidence supports
 supervised non-generative second-stage reranking; robust self-attention and
 independent component benefits remain unestablished. Neither variant generates
@@ -129,7 +129,7 @@ framework with pointwise and candidate-set Transformer variants.
 Our contributions are:
 
 \begin{itemize}
-  \item We formulate and evaluate direct, non-generative second-stage
+  \item We instantiate and systematically audit direct, non-generative second-stage
   learning-to-rank for MS/MS-to-molecule retrieval, avoiding both cosine-only
   final ranking and autoregressive molecular decoding.
   \item We compare pointwise and self-attentive rankers with matched features,
@@ -356,6 +356,13 @@ training-only; validation and test perform no top-40 replacement. A target absen
 from the retrieved top-40 remains absent and lowers the upper bound and all
 end-to-end metrics. No
 test record, target, or label is used for optimization or checkpoint selection.
+When forcing is applied, the inserted positive has a cached rank greater than
+40, while the other 39 training candidates have ranks at most 40. Thus the rank
+embedding exposes a training-only label-correlated rank shortcut and creates a
+train--evaluation list-distribution shift. This is not test leakage: validation
+and test never perform the replacement. The no-rank-embedding audit below is
+therefore interpreted as a disclosure of this shortcut risk, not as evidence that
+rank has an independent positive effect.
 
 \subsection{Residual Reranker Variants}
 
@@ -502,6 +509,12 @@ two-dimensional InChIKey equivalence and may label multiple positives. Our
 Recall and MRR therefore use a local exact-target-SMILES single-positive
 protocol on the supplied candidate files; the effect of the identity-rule
 difference is unquantified.
+The multiple-positive labels used during alignment are likewise cached raw
+exact-SMILES labels, not two-dimensional molecular-identity labels. The graph
+features do not explicitly encode atom chirality or bond stereochemistry, so a
+stereo variant can be treated as a negative locally even when a two-dimensional
+identity rule would merge it; this model-level consequence has not been
+quantified.
 
 \subsection{Implementation Details}
 
@@ -518,8 +531,10 @@ enabled with probability 0.5. The former removes a floor-rounded 20\% of
 fragment peaks below normalized intensity 0.3 and jitters intensities by
 $\pm15\%$; the latter applies 10\% node and 10\% directed edge-entry dropout.
 Validation disables augmentation but retains replicate-spectrum sampling under
-the fixed random stream. We designate the overlap-clean alignment-seed-42 run
-and its caches as the canonical configuration. This run applies the validation
+the fixed random stream. We designate the overlap-clean project-default seed-42
+run and its caches as the canonical configuration. Seed 42 is fixed by the
+project default configuration and was frozen before the 43/44 sensitivity runs;
+we do not claim that it was selected by test performance. This run applies the validation
 exclusion above, selects epoch 16, and stops at epoch 21.
 
 The reranker has hidden width 512, a 32-dimensional rank embedding, and dropout
@@ -529,8 +544,10 @@ learning rate $10^{-4}$, batch size 16, at most 30 epochs, and early stopping
 on validation MRR with patience 5. The pairwise weight and margin are
 $\lambda=0.2$ and $\gamma=0.1$. For the canonical controlled analysis, the
 alignment-seed-42 checkpoint and its overlap-clean caches are fixed while each
-reranker variant is trained with seeds 42, 43, and 44. These sample standard
-deviations measure reranker variation conditional on that first stage. A
+reranker variant is trained with seeds 42, 43, and 44. These are three reranker
+training seeds; each also controls initialization, data-loader order, candidate
+shuffling, and dropout. Their sample standard deviations measure reranker
+variation conditional on that first stage. A
 separate cross-alignment sensitivity analysis applies the same reranker seeds
 to alignment seeds 42, 43, and 44 and first aggregates reranker seeds within
 each alignment. Its cross-alignment unit is therefore the alignment checkpoint
@@ -547,6 +564,24 @@ Before training-only positive forcing, top-40 base recall is 93.78\% for mass
 and 90.42\% for formula on the training split. Training lists are then completed
 to 100\% labeled coverage as described above. No target is forced into the test
 top-40 lists, whose corresponding upper bounds are 83.88\% and 89.26\%.
+
+\subsection{Code, Data, and Artifact Availability}
+
+The anonymous supplement provides source inspection, locked environment files,
+automated tests, and a tiny synthetic CPU smoke test. It does not provide the
+MassSpecGym spectra, candidate pools, trained alignment or reranker checkpoints,
+reranker caches, logs, or private analysis artifacts; the smoke test therefore
+does not reproduce the scientific metrics. The two reported pools use separate
+mass and formula reranker trainings. The frozen candidate artifacts and their
+provenance are identified by the release manifest; the analysis records source
+commits \texttt{a2280d2} (full model), \texttt{8bd2ca4} (ablations), and
+configuration hash prefix \texttt{b6260dad043f} (the full hash is retained in
+the analysis manifest).
+The disclosed features include atom, bond, and graph-size descriptors; the
+alignment projection is 512-dimensional with temperature $\tau=0.07$; AdamW
+uses weight decay $10^{-4}$ and gradient clipping 1.0; spectrum caches are
+FP32 and molecule caches FP16. The real-data entry point is
+\texttt{run\_rerank\_pipeline.py}, subject to access to the excluded data and artifacts.
 
 \subsection{Baselines and Metrics}
 
@@ -578,62 +613,63 @@ distant pairs it may return the threshold or a computed lower bound rather than
 the unconstrained exact MCES distance. Thus, the reported quantity is
 thresholded myopic MCES, and lower is better. Exact SMILES-string matches are
 assigned zero. The canonical runs selected \texttt{PULP\_CBC\_CMD}, and no MCES
-worker failures were logged. Recall and MRR uncertainty is computed over three
+worker failures were logged. Recall and MRR seed dispersion is computed over three
 reranker seeds with a fixed base checkpoint in the canonical audit. The
 cross-alignment summary first averages reranker seeds within each checkpoint
 and then uses the three alignment-level paired estimates; neither sample
 standard deviation is a confidence interval. MCES@1 is computed for the
-overlap-clean base and representative seed-42 Transformer checkpoints; these
+overlap-clean base and project-default seed-42 Transformer checkpoints; these
 single-checkpoint values do not include seed-level uncertainty.
 
 \subsection{Main Results}
 
 \begin{table}[t]
   \centering
-  \caption{Representative local MassSpecGym results. The base uses alignment
-  seed 42, and the learned row uses reranker seed 42. Recall and MRR are
+  \caption{Project-default local MassSpecGym results. The base uses alignment
+  seed 42, and learned rows report mean $\pm$ sample SD over reranker training
+  seeds 42--44. Recall and MRR are
   percentages under our exact-target-SMILES single-positive protocol on supplied
-  candidate files; they are not official-evaluator-equivalent. MCES@1 is the
-  local thresholded myopic-MCES output (lower is better).}
+  candidate files; they are not official-evaluator-equivalent. MCES is reported
+  separately as a single-checkpoint audit.}
   \label{tab:main_results}
-  \scriptsize
-  \setlength{\tabcolsep}{3pt}
-  \begin{tabular}{@{}l>{\raggedright\arraybackslash}p{4.2cm}rrrrr@{}}
+  \tiny
+  \setlength{\tabcolsep}{1pt}
+  \begin{tabular}{@{}l>{\raggedright\arraybackslash}p{4.2cm}rrrr@{}}
     \toprule
-    Pool & Method & R@1 & R@5 & R@20 & MRR & MCES@1 \\
+    Pool & Method & R@1 & R@5 & R@20 & MRR \\
     \midrule
-    \multirow{2}{*}{Mass}
-      & \base{} (alignment seed 42) & 47.46 & 63.51 & 77.76 & 55.03 & 15.37 \\
-      & Candidate-set Transformer (rerank seed 42)
-      & 68.74 & 77.77 & 82.18 & 72.87 & 7.71 \\
+    \multirow{3}{*}{Mass}
+      & \base{} (alignment seed 42) & 47.46 & 63.51 & 77.76 & 55.03 \\
+      & Pointwise reranker (training seeds 42--44)
+      & $67.44\pm0.74$ & $77.02\pm0.59$ & $82.26\pm0.16$ & $71.79\pm0.66$ \\
+      & Candidate-set Transformer (training seeds 42--44)
+      & $68.58\pm0.20$ & $77.36\pm0.36$ & $82.20\pm0.07$ & $72.60\pm0.25$ \\
     \midrule
-    \multirow{2}{*}{Formula}
-      & \base{} (alignment seed 42) & 63.10 & 75.79 & 84.93 & 68.86 & 5.44 \\
-      & Candidate-set Transformer (rerank seed 42)
-      & 74.75 & 82.25 & 86.89 & 78.22 & 3.09 \\
+    \multirow{3}{*}{Formula}
+      & \base{} (alignment seed 42) & 63.10 & 75.79 & 84.93 & 68.86 \\
+      & Pointwise reranker (training seeds 42--44)
+      & $73.97\pm0.59$ & $81.94\pm0.27$ & $86.78\pm0.27$ & $77.64\pm0.49$ \\
+      & Candidate-set Transformer (training seeds 42--44)
+      & $74.57\pm0.28$ & $81.97\pm0.26$ & $86.77\pm0.14$ & $78.02\pm0.26$ \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \begin{table}[t]
   \centering
-  \caption{External cross-paper context reported by Zhang et
-  al.\ \cite{zhang2026glmr}. These values were not independently reproduced and
-  are not directly comparable to Table~\ref{tab:main_results}; retrievers,
-  candidate and identity processing, and MCES implementations may differ.}
-  \label{tab:external_context}
-  \small
-  \begin{tabular}{llrrrrr}
+  \caption{Single-checkpoint thresholded myopic-MCES@1 audit on the
+  project-default alignment-seed-42 checkpoint and reranker training seed 42;
+  lower is better. The solver was \texttt{PULP\_CBC\_CMD}; zero failed pairs
+  were logged. No seed-level mean or standard deviation is implied.}
+  \label{tab:mces_audit}
+  \scriptsize
+  \setlength{\tabcolsep}{2pt}
+  \begin{tabular}{@{}lrr@{}}
     \toprule
-    Pool & Method & R@1 & R@5 & R@20 & MRR & MCES@1 \\
+    Pool & Base & Candidate-set Transformer \\
     \midrule
-    \multirow{2}{*}{Mass}
-      & JESTR (reported; not reproduced) & 17.62 & 40.36 & 64.76 & 29.12 & 15.82 \\
-      & GLMR (reported; not reproduced) & 64.17 & 72.96 & 78.78 & 67.82 & 11.14 \\
-    \midrule
-    \multirow{2}{*}{Formula}
-      & JESTR (reported; not reproduced) & 11.77 & 33.26 & 61.01 & 22.83 & 11.73 \\
-      & GLMR (reported; not reproduced) & 68.48 & 78.09 & 84.22 & 72.47 & 5.05 \\
+    Mass & 15.3681 & 7.7057 \\
+    Formula & 5.4389 & 3.0913 \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -643,15 +679,13 @@ points in mass-conditioned Recall@1 and 11.65 points in formula-conditioned
 Recall@1. The corresponding MRR gains are 17.84 and 9.36 points. Improvements
 at Recall@20 are smaller because the first-stage top-40 upper bound is already
 the dominant constraint. Relative to the corresponding fixed overlap-clean base, the same
-seed-42 Transformer reduces MCES@1 from 15.3681 to 7.7057 for mass candidates
+single-checkpoint seed-42 Transformer in Table~\ref{tab:mces_audit} reduces MCES@1 from 15.3681 to 7.7057 for mass candidates
 ($49.86\%$) and from 5.4389 to 3.0913 for formula candidates ($43.16\%$).
+These are single-checkpoint audits, not seed-aggregated estimates.
 
-Table~\ref{tab:external_context} records the values reported in the
-GLMR paper without ranking those external pipelines against ours. A matched
-comparison would require rerunning the baselines with the same retriever,
-candidate lists, identity rule, and metric implementation. The displayed
-external ordering therefore supports no relative-performance ranking or method
-attribution.
+JESTR and GLMR remain reported-only, not reproduced, and not directly
+comparable background methods. We retain their mechanism descriptions but do
+not reproduce their numeric table or infer a relative ranking.
 
 \subsection{Cross-Alignment and Controlled Component Evidence}
 
@@ -665,19 +699,19 @@ attribution.
   not confidence intervals, significance tests, or general end-to-end
   random-seed stability. Recall@1 and MRR are percentages.}
   \label{tab:cross_alignment}
-  \scriptsize
-  \setlength{\tabcolsep}{3pt}
-  \begin{tabular}{@{}clrrrrrr@{}}
+  \tiny
+  \setlength{\tabcolsep}{1pt}
+  \begin{tabular}{@{}clrrrrrrr@{}}
     \toprule
-    Alignment & Pool & Base R@1 & Point. R@1 & Trans. R@1
+    Alignment & Pool & U40 & Base R@1 & Point. R@1 & Trans. R@1
       & Base MRR & Point. MRR & Trans. MRR \\
     \midrule
-    42 & Mass    & 47.46 & 67.44 & 68.58 & 55.03 & 71.79 & 72.60 \\
-    42 & Formula & 63.10 & 73.97 & 74.57 & 68.86 & 77.64 & 78.02 \\
-    43 & Mass    & 35.92 & 66.92 & 67.19 & 44.33 & 70.42 & 70.58 \\
-    43 & Formula & 45.08 & 69.64 & 69.30 & 51.85 & 72.14 & 71.96 \\
-    44 & Mass    & 23.91 & 57.78 & 57.42 & 32.26 & 61.22 & 60.91 \\
-    44 & Formula & 28.73 & 59.76 & 59.82 & 36.87 & 63.14 & 63.34 \\
+    42 & Mass    & 83.88 & 47.46 & 67.44 & 68.58 & 55.03 & 71.79 & 72.60 \\
+    42 & Formula & 89.26 & 63.10 & 73.97 & 74.57 & 68.86 & 77.64 & 78.02 \\
+    43 & Mass    & 80.98 & 35.92 & 66.92 & 67.19 & 44.33 & 70.42 & 70.58 \\
+    43 & Formula & 81.65 & 45.08 & 69.64 & 69.30 & 51.85 & 72.14 & 71.96 \\
+    44 & Mass    & 72.20 & 23.91 & 57.78 & 57.42 & 32.26 & 61.22 & 60.91 \\
+    44 & Formula & 75.60 & 28.73 & 59.76 & 59.82 & 36.87 & 63.14 & 63.34 \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -730,7 +764,9 @@ attribution.
 Table~\ref{tab:cross_alignment} preserves the alignment hierarchy: reranker
 seeds are first averaged within each first-stage checkpoint. Both learned
 rankers improve the alignment-matched base in Recall@1 and MRR in all 12
-alignment--candidate--learned-model aggregate cells. In contrast, the
+alignment--candidate--learned-model aggregate cells (three alignments $\times$
+two candidate pools $\times$ two learned models; each cell improves both
+Recall@1 and MRR). These are aggregate cells, not independent reranker runs. In contrast, the
 Transformer--pointwise difference is positive for only two of three alignments
 for each candidate setting and metric. Across the three alignment-level paired
 estimates, the mean $\pm$ sample-SD differences are $0.35\pm0.75$ Recall@1
@@ -746,7 +782,8 @@ On the canonical alignment-seed-42 checkpoint in
 Table~\ref{tab:reranker_ablation}, the candidate-set Transformer exceeds the
 pointwise model by $1.14/0.60$ Recall@1 points and $0.81/0.38$ MRR points for
 mass/formula candidates, respectively. For each of the six
-pool-by-reranker-seed pairs, both Recall@1 and MRR favor the Transformer within
+pool-by-reranker-seed pairs (two candidate pools $\times$ three reranker
+training seeds), both Recall@1 and MRR favor the Transformer within
 this checkpoint. Because it also has
 6.30M more trainable parameters, even this within-checkpoint comparison does not
 isolate candidate interaction from increased capacity; the cross-alignment
@@ -762,6 +799,13 @@ pairwise loss have candidate-dependent directions. The full model's mean MRR
 lead over the joint base-score-pathway removal is only 0.32/0.08 points, with
 mixed seed signs. These are descriptive comparisons, not significance tests;
 the predefined full configuration remains the reporting reference.
+
+For auditability, the six-of-six MRR win counts (positive/tied/negative,
+abbreviated P/Z/N) over the two candidate pools $\times$ three reranker
+training seeds are: no residual shortcut $2/0/4$, no base-score pathway
+$3/0/3$, no rank embedding $0/0/6$, no interaction features $2/0/4$, and
+listwise-only training $3/0/3$. These are six paired reranker comparisons per
+removal, not independent alignment replications.
 
 On the pre-overlap-clean fixed checkpoint, a sensitivity check excluded the
 three affected test queries, leaving 17,553. Across both candidate settings and
@@ -827,7 +871,7 @@ sensitivity evidence rather than a confidence interval or general stability
 claim. The component audit therefore establishes neither cross-alignment
 component stability nor causal effects. The joint base-score-pathway removal
 changes both its MLP input and shortcut; product/absolute-difference removal
-retains self-attention; and the rank-free variant was neither tested across
+retains self-attention; and the no-rank-embedding variant was neither tested across
 alignments nor selected post hoc. The candidate-set model also has 5.26 times
 the pointwise model's trainable
 parameters (6,304,768 more; $+426\%$), confounding interaction
