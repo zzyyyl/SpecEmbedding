@@ -1,6 +1,6 @@
 # 论文修改计划：专家预审后的证据披露与结果口径修订
 
-- 状态：`执行中`
+- 状态：`已执行`
 - 创建日期：2026-08-21
 - 最后更新：2026-08-21
 - 负责人：Codex
@@ -29,7 +29,7 @@
 
 - `prepare_rerank_cache.py:169--184` 在训练 target 不在 base top-40 时，将 target 替换末位并保留完整池 `true_rank`；验证/测试的 `force_include_positive=false` 不执行该替换。
 - canonical 训练 split 的 top-40 base recall 为 mass 93.78%、formula 90.42%，因此约 6.22%/9.58% 的训练查询受训练期插入影响；这些数值已在正文实现细节中出现，不需重算。
-- 被插入 target 的 full-pool rank 大于 40，而同列表的原 top-40 候选 rank 为 1--39，rank embedding 可携带确定性 label-correlated shortcut。该现象是训练/评价分布偏移，不是测试标签泄漏。
+- 冻结训练 cache 中绝大多数被插入 target 的 full-pool rank 大于 40（mass 12,038/12,071；formula 18,561/18,605）；mass 33、formula 44 个 tie-breaking 例外。仅当 rank>40 时，它才单向识别强制正例并形成 label-correlated shortcut；该现象是训练/评价分布偏移，不是测试标签泄漏。
 - 现有 no-rank-embedding 消融在 2 个候选池×3 个 reranker training seeds 的 6 个配对中同时改善 Recall@1/MRR；不重训，只把现有风险如实升级披露并停止 rank prior 正收益主张。
 
 ### 2.2 canonical seed 与统计层级
@@ -93,7 +93,7 @@
 
 ### 4.2 Candidate construction / Implementation / Limitations
 
-- 在正例替换段落明确：被强制插入的训练 target 保留 full-pool rank >40，而其余 top-40 rank 为 1--39，形成 training-only label-correlated rank shortcut；6.22%/9.58% 是训练期覆盖缺失比例；验证/测试不插入，因此这是 train--evaluation shift、不是 test leakage。
+- 在正例替换段落明确：冻结训练 cache 中绝大多数强制 target 的 full-pool rank >40（mass 12,038/12,071；formula 18,561/18,605），并记录 mass 33、formula 44 个 tie-breaking 例外；rank>40 时形成单向、training-only label-correlated rank shortcut；6.22%/9.58% 是训练期覆盖缺失比例；验证/测试不插入，因此这是 train--evaluation shift、不是 test leakage。
 - 将 canonical 定义改为：`params.yaml` project-default seed 42 的 single default-seed audit；不声明按测试指标选择、不声明预注册；alignment 43/44 是历史 sensitivity checkpoints。
 - 增加 U40 到 cross-alignment 表；caption 说明三个 alignment-level estimates 来自两个 source revisions。
 - 将模型身份/精度列入 availability 段，明确 GINE atom/bond/graph-size features、alignment projection 512/tau 0.07、reranker weight decay 1e-4、clip 1.0、spectrum FP32/molecule FP16 cache。
@@ -148,8 +148,8 @@
 - [x] 步骤 7：完整编译双语稿，运行严格 release build，检查 PDF/manifest/哈希与页数。
 - [x] 步骤 8：用 Conventional Commit 提交论文及配套说明实质修改（`a7f3112`；发布证据 `22d460c`）。
 - [x] 第二轮复核追加修订：修正 tie-breaking 例外、内部 manifest 指向与 alignment-43/44 provenance，清理外部数值残留，补齐候选列表/图特征/K=40/双语披露措辞（实质提交 `22c6b65`；发布证据 `8c65257`）。
-- [ ] 步骤 9：推送并通知评审专家对话再次只读复审；若有同范围意见继续收口，否则归档本计划。
-- [ ] 步骤 10：回填验证、评审反馈、commit 和偏差，将状态改为 `已执行`，以独立文档 commit 归档计划。
+- [x] 步骤 9：推送并通知评审专家对话再次只读复审；第三轮结论为无新增 P0/P1，小修后通过。
+- [x] 步骤 10：回填验证、评审反馈、commit 和偏差，将状态改为 `已执行`，以独立文档 commit 归档计划。
 
 ## 8. 风险、证据边界与待确认事项
 
@@ -173,11 +173,13 @@
 2026-08-21：收到评审专家对远端 `01204ac` 的 Major Revision 预审意见；创建计划并提交 `b794b0e`，随后以 `6106a9f` 切换为执行中。
 2026-08-21：完成英文/中文正文、README、消融报告和发布 PDF 修订；论文实质提交为 `a7f3112`，发布证据提交为 `22d460c`。主表改为三种 reranker training seeds 均值±样本 SD，新增单 checkpoint MCES、U40、P/Z/N 和 availability 边界，删除外部数值表；未新增实验。
 2026-08-21：评审专家第二轮复核指出 3 组 P1 和若干 P2；未要求新增实验。已按同一计划修订并提交 `22c6b65`，发布证据提交 `8c65257`，测试 106 passed、Ruff 通过、60 artifacts manifest matches，英文 18 页/中文 16 页严格构建通过。
-2026-08-21：等待评审专家会话 `01a01f8c-fe25-7390-8811-fedfac865d3c` 对 `8c65257` 进行第三轮独立复核。
+2026-08-21：第三轮独立复核确认第二轮三组 P1 全部关闭、无新增 P0/P1，仅指出中文 forcing 残句和计划旧绝对表述两项 P2；已修订并重建。
+2026-08-21：最终论文小修提交 `97fcad8`，发布清单/归档提交待本计划文档提交后回填；专家结论为“小修后通过”。
 
 ## 11. 最终结果
 
-- 完成日期：待专家复核后回填；当前计划内代码、论文、构建和证据修订已完成，步骤 9 为待复核。
+- 完成日期：2026-08-21。计划内代码、论文、构建、证据修订和专家复核均完成；无新增实验目标。
+- 最终状态：`已执行`。当前 release 英文 18 页、中文 16 页；页数仍按用户决定作为非阻断投稿整理事项。
 - 最终状态：`未执行`
 - 验证结果：尚未验证
 - 论文修改 commit：尚未提交
