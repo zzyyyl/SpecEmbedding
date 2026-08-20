@@ -19,7 +19,7 @@
 2. 使用 GINE 编码候选分子图。
 3. 通过跨模态对比学习对齐谱图和分子。
 4. 使用基础相似度从候选库中检索 top-$K$ 分子。
-5. 使用非生成式残差 reranker 重新排序 hard candidates，并受控比较 pointwise 与 set-aware 变体。
+5. 使用非生成式残差 reranker 重新排序 hard candidates，并受控比较 pointwise 与候选集合 Transformer 变体。
 
 当前目标是完成转投稿件，暂定完稿日期为 2026-08-31；ADMA 2026 及其主题
 `Data mining for bioinformatics` 是原始投稿背景。英文标题暂定为：
@@ -85,7 +85,7 @@ docs(paper): 更新 ADMA2026 论文稿件
 ```
 
 - 用户要求提交时，如无特殊说明，提交后直接推送远端。
-- 当前主要开发分支为 `dev`。
+- 当前主要开发分支为 `codex/transfer-2026-0831`。
 - 本环境没有安装 `gh`，但普通 `git push` 可用；无法自动创建 GitHub/GitLab PR。
 - LaTeX 工作编译产物放入已被 Git 忽略的 `paper/build/`；审计或投稿里程碑使用
   `paper/build_release.sh` 强制重建，并把 PDF 与构建清单留存在受跟踪的 `paper/release/`。
@@ -685,7 +685,7 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 | --- | --- | --- | --- | --- |
 | JESTR | spectrum--candidate cosine | 无 | 否 | 否 |
 | GLMR | generated--candidate cosine | 生成器 cross-attention | 是 | 否 |
-| SpecEmbedding-Rerank | explicit pair/retrieval features 的 residual learned score | set-aware 变体可选 self-attention | 否 | 是 |
+| SpecEmbedding-Rerank | explicit pair/retrieval features 的 residual learned score | 候选集合 Transformer 变体可选 self-attention | 否 | 是 |
 
 可以主张：
 
@@ -702,7 +702,7 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 仅凭当前外部数字已经严格达到 SOTA。
 - 在没有 latency 实验时声称一定比 GLMR 更快。
 
-## 9. ADMA 2026 投稿状态
+## 9. 转投稿件状态（ADMA 2026 历史背景）
 
 官方征稿页面：
 
@@ -736,19 +736,23 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 中文稿：`paper/main_cn.tex`
 - 参考文献：`paper/references.bib`
 - 待办清单：`paper/ADMA2026_TODO.md`
-- 当前源稿最近验证：source commit `e597d89` 强制完整重建为英文 17 页、中文 16 页；
-  两份 PDF 和带源码 commit、工具链、页数、SHA-256 的构建清单已留存在 `paper/release/`。
+- 上一版受跟踪 release evidence 对应 source commit `e597d89`，英文 17 页、中文 16 页；
+  这是历史审计快照，不代表本次初稿收口后的当前源稿。
+- 2026-08-20 本次初稿收口后的工作构建为英文 17 页、中文 15 页；最终 release PDF、
+  source commit、工具链、页数和 SHA-256 清单尚待实质稿件提交后重新生成。
 - 第三轮独立审计基于远端 `5a1fe38` 复跑 88 项测试、临时 cwd 总管线、Ruff、artifact check
   和双语发布证据；结合用户明确“页数可以延后且不阻塞审计”的范围决定，本轮最终无 P0/P1
   阻断项。英文 17 页仅作为独立非阻断投稿整理事项，待确认转投 venue 页数规则后处理。
-- 已忽略的 `paper/build/main.pdf` 与 `main_cn.pdf` 已同步为相同的 17/16 页版本，不再保留
-  8 月 1 日 15/14 页旧稿；发布证据以受跟踪的 `paper/release/` 为准。
+- 已忽略的 `paper/build/main.pdf` 与 `main_cn.pdf` 将由 release build 同步；发布证据以
+  受跟踪的 `paper/release/` 为准。
 - 页数压缩：按用户决定延后到完稿后统一微调；最终投稿合规仍未完成。
 - 英文 PDF 作者元数据：空
 - 致谢和基金：未加入
 - AI assistance disclosure：已移入 Introduction，并明确覆盖所有章节、代码编辑、实验编排和一致性审计；数值来自软件流水线，作者核验并承担全部责任。
 - SpecEmbedding 增量审计：已完成；正文在引言、相关工作和方法中就地归因继承的峰序列 Transformer，区分原工作的重复谱图 SupCon + Tanimoto-MSE 与本文从零训练的跨模态目标，并将本文贡献限定为第二阶段非生成式残差 learning-to-rank。
 - SpecEmbedding 书目信息：已按 ACS 正式页面补齐为 Analytical Chemistry 2025, 97(37), 20137--20146。
+- 初稿内容收口：全部 25 条参考文献已逐项核对一手来源；Related Work 在保留全部引用的
+  前提下净压缩约 80 个英文词；英文语言、证据边界及中英文一致性复核均已完成。
 - 正式方法架构图：已使用共享 TikZ 源 `paper/figures/method_overview.tex` 替换中英文稿文本占位图；图中包含三阶段流程、两种 reranker 变体、残差跳连和训练/测试协议。
 - overlap-clean mass/formula MCES@1：已完成（mass Base/seed-42 Set Transformer 15.3681/7.7057；formula 5.4389/3.0913；四项均为 17,556/17,556，batch 状态 `complete`）
 - 最终实验 artifact manifest：已生成 `paper/adma2026_artifact_manifest.json`，60 个 canonical artifacts 校验通过；2026-08-17 加入评价身份协议和 source-commit `params.yaml` blob 后，SHA-256 为 `ad92596e1ca60e8edc6b7be594bde7cbe314f5d08a0421551ba88eaad8207875`；仅作内部 inventory，匿名附件不得直接打包其引用的原始 status/log。
@@ -766,12 +770,12 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
   本轮也未再次从 lock 新建 Conda 环境。
 - train--test 输入重叠敏感性：12/12 组完成；剔除 3 条重叠输入后主结论不变
 - train--val 输入重叠：overlap-clean 审计已完成；clean 与历史 alignment best/stop epoch 相同，reranker 9/12 组选择不同
-- 中心主张：已收窄为本地 exact-SMILES 协议下非生成式残差 learning-to-rank 的框架级
+- 中心主张：已收窄为本地 exact-target-SMILES 协议下非生成式残差 learning-to-rank 的框架级
   收益；不主张官方 evaluator 等价、稳健 self-attention 独立收益或 SOTA。
 
-当前论文仍不是最终可提交版本；核心消融和跨 alignment 分析已完成，外部基线采用
-reported-only 降级边界，匿名补充代码包已完成阶段验收。参考文献核验、人工英文润色、
-页数微调、作者/COI 与最终 PDF/源码/归档联合合规检查仍待完成。
+当前双语内容初稿已经完成，但尚不是最终投稿版本。后续仅处理转投 venue 确认与格式适配、
+作者列表和 COI、最终 release 构建及 PDF/源码/补充归档联合匿名检查；页数调整暂不阻断。
+本阶段不新增实验、外部基线复现或论文主张。
 
 ## 10. 论文文件与结构
 
@@ -814,16 +818,12 @@ reported-only 降级边界，匿名补充代码包已完成阶段验收。参考
 
 完整清单以 `paper/ADMA2026_TODO.md` 为准。当前优先事项：
 
-1. 核对现有参考文献的一手来源和元数据，压缩相关工作并完成人工英文润色；不扩展论文
-   主张或新增文献目标。
-2. 完成最终英文 PDF、作者列表/COI、既有公开版本及双盲合规检查；页数按用户决定留到
-   完稿后统一微调。
-3. 匿名补充代码包已完成阶段验收；提交前只需对最终生成副本与 PDF/源码做一次联合身份
-   复扫，不再扩大包内功能。
-4. 已完成核心 feature/loss 消融与多 alignment seeds；当前只保留既有 top-$K$、效率和
-   排名迁移待办，不新增实验目标。
-5. JESTR/GLMR 维持 reported-only、未复现且不可直接比较的止损方案；除非用户以后明确
-   开启新的统一复现任务，否则不再列为当前待办。
+1. 确认转投 venue，并据其模板、页数和披露规则完成格式适配；页数当前非阻断。
+2. 确认最终作者列表、单位、COI 及 venue 要求的声明。
+3. 在实质稿件 commit 后重新生成受跟踪双语 release evidence，并联合复扫 PDF、源码和
+   匿名补充归档。
+4. 不新增实验目标；top-$K$、效率、排名迁移及 JESTR/GLMR 独立复现均不属于当前待办，
+   除非用户以后另行开启任务。
 
 ## 12. 已知风险与容易混淆的地方
 

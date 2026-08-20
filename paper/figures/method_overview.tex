@@ -82,7 +82,7 @@
       fill=blue!5, inner sep=0.5pt]
       {$\mathcal L_{\mathrm{align}}$} (zm.north);
 
-    % Stage 2: score the official candidate library and retain a reusable list.
+    % Stage 2: score the supplied candidate library and retain a reusable list.
     \node[moBox, text width=1.48cm] (base) at (5.02,4.30)
       {\molabel{Cosine base score}{余弦基础分数}\\$b_i=\mathbf z_s^\top\mathbf z_{m,i}$};
     \node[moBox, text width=1.12cm] (topk) at (6.60,4.30)
@@ -92,8 +92,8 @@
     \node[moFrozen, text width=2.05cm] (frozen) at (10.55,4.30)
       {\molabel{Encoders frozen;\\embeddings reused}{编码器冻结；\\嵌入重复使用}};
     \node[moSmall, text width=2.30cm] (protocol) at (10.55,3.38)
-      {\molabel{Official mass/formula\\candidates}
-      {官方质量/分子式\\候选}};
+      {\molabel{MassSpecGym-supplied\\mass/formula candidates}
+      {MassSpecGym 提供的\\质量/分子式候选}};
 
     \draw[moArrow] (zs.east) -| ([yshift=1.4mm]base.west);
     \draw[moArrow] (zm.east) -| ([yshift=-1.4mm]base.west);
@@ -102,7 +102,7 @@
     \draw[densely dotted, line width=0.55pt, draw=blue!55!black]
       (cache.east) -- (frozen.west);
 
-    % Stage 3: matched pointwise/set-aware variants and a shared residual path.
+    % Stage 3: matched pointwise/candidate-set variants and a shared residual path.
     \node[moBox, text width=3.12cm, minimum height=0.78cm] (features) at (1.72,1.55)
       {\molabel{Pair features}{候选配对特征}\\[-1pt]
        $\mathbf x_i=[\mathbf z_s,\mathbf z_{m,i},\mathbf z_s\!\odot\!\mathbf z_{m,i},$\\[-2pt]
@@ -111,8 +111,9 @@
       {\molabel{Shared}{共享}\\MLP\\$\mathbf h_i$};
     \node[moChoice, text width=1.70cm] (pointwise) at (5.62,1.86)
       {\textbf{Pointwise}\\\molabel{no list context}{无列表上下文}};
-    \node[moChoice, text width=1.70cm] (setaware) at (5.62,1.16)
-      {\textbf{Set-aware}\\\molabel{self-attention}{集合自注意力}};
+    \node[moChoice, text width=1.90cm] (setaware) at (5.62,1.16)
+      {\molabel{\textbf{Candidate-set}\\\textbf{Transformer}}
+      {\textbf{候选集合}\\\textbf{Transformer}}\\\molabel{self-attention}{自注意力}};
     \node[moBox, text width=0.90cm] (head) at (7.20,1.55)
       {\molabel{Score head}{打分头}\\$\Delta_i$};
     \node[moBox, text width=1.42cm] (residual) at (8.82,1.55)

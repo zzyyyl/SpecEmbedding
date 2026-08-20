@@ -41,11 +41,11 @@
 - [x] 完成 6 个 train--val 完全相同输入的 overlap-clean 全流水线审计：排除 val 索引 7686/7687/7688/8464/8465/8466，alignment validation molecule keys 由 3386 降至 3384；best/stop epoch 仍为 16/21，reranker 12/12 完成、无错误，其中 9/12 组 best/stop epoch 对与历史流水线不同。实验代码 commit 为 `a2280d2`；该对比包含 alignment 重训，只能解释为流水线级敏感性，不是 6 条查询的隔离因果效应。
 - [x] 已运行 `python freeze_adma2026_artifacts.py` 并生成 `paper/adma2026_artifact_manifest.json`：60 个 canonical artifacts 全部通过校验；2026-08-17 加入评价身份协议并将历史 `params.yaml` 绑定到 source-commit blob 后，manifest SHA-256 为 `ad92596e1ca60e8edc6b7be594bde7cbe314f5d08a0421551ba88eaad8207875`。该 manifest 仅作内部 inventory；其中引用的原始 status/log 可能含主机、用户、进程和 GPU 信息，不能直接按清单打包匿名附件。
 - [x] 将正文中的 `Required Ablations`、`we will` 等待办式内容替换为已完成的三种子 pointwise/Transformer 结果。
-- [x] 使用共享 TikZ 矢量源 `paper/figures/method_overview.tex` 制作正式方法架构图，并替换中英文稿的文本框占位图；图中区分跨模态对齐、top-40 检索/缓存和监督残差重排序，标明 pointwise/set-aware 两种变体、基础分数跳连以及训练/验证测试协议。
+- [x] 使用共享 TikZ 矢量源 `paper/figures/method_overview.tex` 制作正式方法架构图，并替换中英文稿的文本框占位图；图中区分跨模态对齐、top-40 检索/缓存和监督残差重排序，标明 pointwise/候选集合 Transformer 两种变体、基础分数跳连以及训练/验证测试协议。
 - [x] 对照 SpecEmbedding 原文与 ACS 正式书目信息完成引用和增量审计：在引言、相关工作和方法处就地归因峰序列 Transformer backbone，准确区分其“重复谱图 SupCon + Tanimoto-MSE”与本文从零训练的跨模态目标；将本文贡献收窄为第二阶段非生成式残差 learning-to-rank；补齐 `97(37):20137--20146`。
 - [x] 对照 ADMA CFP 与 Springer Nature AI policy 修正 AI 使用披露：声明移入 Introduction，覆盖全部章节，以及代码编辑、实验编排和一致性审计；明确数值来自软件流水线、作者核验全部 AI 辅助内容并承担责任。
 
-## P1：核心消融实验
+## 历史 P1：核心消融实验与非当前可选分析
 
 - [x] 基础检索器 vs. pointwise MLP vs. Transformer listwise reranker（3 个 reranker seeds）。
 - [x] 比较候选间 self-attention：canonical alignment seed 42 内 Transformer 呈小幅优势；
@@ -55,23 +55,23 @@
 - [x] 移除 rank embedding；六个同种子候选协议配对中 Recall@1/MRR 均提高，因此不把该设计写成已验证贡献。
 - [x] 联合移除元素乘积与绝对差特征；仍保留 self-attention，不解释为无候选交互。
 - [x] 仅 listwise CE vs. `CE + pairwise loss`。
-- [ ] 开启/关闭候选顺序随机打乱。
-- [ ] 比较 `K=20/40/100/256`。
-- [ ] 比较有无 SpecEmbedding 预训练。
-- [ ] 分析不同候选召回上界下 reranker 的实际增益。
+- [-] 开启/关闭候选顺序随机打乱；当前初稿不新增实验，仅保留为未来可选分析。
+- [-] 比较 `K=20/40/100/256`；当前初稿不新增实验，仅保留为未来可选分析。
+- [-] 比较有无 SpecEmbedding 预训练；当前初稿不新增实验，仅保留为未来可选分析。
+- [-] 分析不同候选召回上界下 reranker 的实际增益；当前初稿不新增实验，仅保留为未来可选分析。
 - [x] 已完成 alignment seeds 42/43/44 的基础检索器、cache 与每个 alignment 下
   reranker seeds 42/43/44，共 36/36 组，并生成分层分析。三个 alignment-level estimates
   只提供内部描述性敏感性证据，不构成置信区间、显著性或一般端到端稳定性证明。
 
-## P1：效率与可解释性
+## 历史 P1：效率与可解释性（非当前目标）
 
-- [ ] 统计基础模型、reranker 和完整模型参数量。
-- [ ] 测量 cache 构造时间和磁盘占用。
-- [ ] 测量单查询及完整测试集 rerank latency。
-- [ ] 测量端到端 latency、峰值显存和吞吐量。
-- [ ] 与 GLMR 的生成式推理成本进行同硬件比较。
-- [ ] 选择成功和失败案例，分析 reranker 调整排名的原因。
-- [ ] 统计真实分子从不同原始排名提升到 Top-1/5 的分布。
+- [-] 统计基础模型、reranker 和完整模型参数量；当前已有 reranker 参数量边界，完整效率画像不属于本轮待办。
+- [-] 测量 cache 构造时间和磁盘占用；未测量并已在正文限制中披露。
+- [-] 测量单查询及完整测试集 rerank latency；未测量并已在正文限制中披露。
+- [-] 测量端到端 latency、峰值显存和吞吐量；未测量并已在正文限制中披露。
+- [-] 与 GLMR 的生成式推理成本进行同硬件比较；不作未测量的效率主张。
+- [-] 选择成功和失败案例，分析 reranker 调整排名的原因；不新增案例分析目标。
+- [-] 统计真实分子从不同原始排名提升到 Top-1/5 的分布；不新增排名迁移目标。
 
 ## P1：论文完善
 
@@ -79,13 +79,19 @@
 - [x] 将本地结果与外部 reported 结果拆为独立表；外部表明确 `not reproduced / not directly comparable`。
 - [x] 补充数据集、完整候选池规模和平均候选数量统计。
 - [x] 统一使用 `Recall@K`、`MRR`、`MCES@1` 等术语。
-- [ ] 压缩相关工作，避免 JESTR/GLMR 方法介绍喧宾夺主。
+- [x] 2026-08-20 压缩并重组相关工作：保留 25 个既有引用及候选重排、联合嵌入、
+  模拟/生成和 learning-to-rank 的证据链，合并重复的 Method Positioning 小节；英文
+  Related Work 净减少约 80 词，未新增文献或扩大主张。
 - [x] 根据受控消融收窄核心论点：在三个审计 alignment 内，两种监督残差 reranker
   均改善对应 base；Transformer 相对 Pointwise 的 Recall@1/MRR 方向都只有 2/3
   alignment 为正，因此不主张 self-attention 的稳健独立收益。
-- [ ] 完成人工英文润色。
-- [x] 检查中英文稿内容一致性（2026-08-17 逐表、逐证据边界复核）。
-- [ ] 核对全部参考文献的作者、年份、页码和 DOI。
+- [x] 2026-08-20 完成全文英文语言与证据边界润色；修正 canonical 定义、协议名、
+  pool-by-reranker-seed 配对计数、pre-clean 指代和组件方向表述。
+- [x] 检查中英文稿内容一致性（2026-08-17 逐表、逐证据边界复核；2026-08-20 在
+  相关工作压缩和语言收口后再次同步复核）。
+- [x] 2026-08-20 对全部 25 条参考文献逐项核对一手来源、作者、题名、年份、卷期页码、
+  DOI/稳定链接和发表状态；补齐 7 条不完整元数据，MassSpecGym in the Wild 继续明确为
+  arXiv preprint。
 
 ## 投稿合规
 
@@ -109,11 +115,11 @@
 - [x] 当前匿名压缩包不超过历史 20 MB 限制（63,991 bytes）；目标 venue 确定后仍需
   按其实际规则复核文件格式和上限。
 - [-] 当前采用匿名单文件压缩包，不建立匿名仓库；若目标 venue 改要求仓库，再重新开放冻结检查。
-- [ ] 在 CMT 中确认最终作者列表。
-- [ ] 在 CMT 中完整申报利益冲突。
+- [ ] 目标 venue 确定后，在其投稿系统中确认最终作者列表。
+- [ ] 目标 venue 确定后，按其规则完整申报利益冲突。
 - [ ] 确认稿件未同时投稿其他 archival venue。
-- [ ] 由作者确认是否存在与本稿相关的既有公开 preprint、paper announcement 或 workshop 版本；若存在，按官方 CFP 至少提前 24 小时联系 Program Chair 并完成披露。
-- [ ] 评审期间不新上传 arXiv 或个人主页。
+- [ ] 由作者确认是否存在与本稿相关的既有公开 preprint、paper announcement 或 workshop 版本；目标 venue 确定后按其披露规则处理。
+- [ ] 目标 venue 确定后，遵守其评审期间公开预印本和宣传政策。
 
 ## 实验结果记录
 
@@ -190,11 +196,11 @@ Train--val overlap-clean 审计排除 6 条 validation 查询（两个分子组�
 - [x] 2026-08-20：完成显式 allowlist 匿名代码包、身份扫描、确定性重建及独立解包
   `prepare -> train -> eval` CPU cold smoke；验证记录见
   `reproducibility/anonymous-supplement-validation.yaml`。
-- [ ] 7 月 13 日至 14 日：消融、效率和案例分析。
-- [ ] 7 月 15 日：更新其余图表并完成全文核对。
-- [ ] 7 月 16 日：执行最终双盲、页数、引用和可选补充材料检查。
-- [ ] 7 月 17 日 AoE：提交论文。
-- [ ] 7 月 20 日 AoE 前：若选择提交补充材料，上传匿名单文件或冻结匿名仓库。
+- [-] 7 月 13 日至 14 日：消融、效率和案例分析；历史日程已结束，未完成部分不转为当前实验目标。
+- [-] 7 月 15 日：更新其余图表并完成全文核对；历史日程已结束，当前以转投计划为准。
+- [-] 7 月 16 日：执行最终双盲、页数、引用和可选补充材料检查；历史日程已结束，待目标 venue 确定后按其规则执行。
+- [-] 7 月 17 日 AoE：提交论文；ADMA 历史截止已结束，不再执行。
+- [-] 7 月 20 日 AoE 前：若选择提交补充材料，上传匿名单文件或冻结匿名仓库；ADMA 历史截止已结束，不再执行。
 
 ## 临时记录
 
