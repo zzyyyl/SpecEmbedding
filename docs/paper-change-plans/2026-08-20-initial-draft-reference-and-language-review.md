@@ -1,6 +1,6 @@
 # 论文修改计划：初稿引用核验、相关工作压缩与双语语言收口
 
-- 状态：`未执行`
+- 状态：`执行中`
 - 创建日期：2026-08-20
 - 最后更新：2026-08-20
 - 负责人：Codex
@@ -77,14 +77,15 @@
 
 ### 3.1 涉及文件与章节
 
-- [ ] `paper/main.tex` 顶部注释：改成历史 ADMA 检查来源和当前转投整理边界。
-- [ ] `paper/main.tex` Abstract/Introduction：定义 canonical，澄清组件配对与余弦排序表述，压缩重复语言。
-- [ ] `paper/main.tex` Related Work：压缩三类方法描述，合并 Positioning 小节但保留机制表和全部必要引用。
-- [ ] `paper/main.tex` Method/Experiments/Limitations/Conclusion：统一协议名、canonical 名称、pool-by-seed 配对计数和 pre-clean 指代；修复小型排版告警。
-- [ ] `paper/main_cn.tex`：同步所有会影响主张、协议、实验层级或相关工作结构的修改，并修复 alignment/`canonical runs` 误译。
-- [ ] `paper/references.bib`：仅补齐已核验元数据，不新增或删除文献。
-- [ ] `paper/ADMA2026_TODO.md`：勾选相关工作压缩、英文润色、全部引用核验；保留实验、页数和投稿账户事项原状态或明确非本轮范围。
-- [ ] `docs/project_memory_zh.md`：记录初稿写作收口结果和剩余投稿整理事项。
+- [x] `paper/main.tex` 顶部注释：改成历史 ADMA 检查来源和当前转投整理边界。
+- [x] `paper/main.tex` Abstract/Introduction：定义 canonical，澄清组件配对与余弦排序表述，压缩重复语言。
+- [x] `paper/main.tex` Related Work：压缩三类方法描述，合并 Positioning 小节但保留机制表和全部必要引用。
+- [x] `paper/main.tex` Method/Experiments/Limitations/Conclusion：统一协议名、canonical 名称、pool-by-seed 配对计数和 pre-clean 指代；修复小型排版告警。
+- [x] `paper/main_cn.tex`：同步所有会影响主张、协议、实验层级或相关工作结构的修改，并修复 alignment/`canonical runs` 误译。
+- [x] `paper/figures/method_overview.tex`：只做协议和模型术语同步；将 `Official candidates` 改为 supplied candidates，并用 candidate-set Transformer 替代旧 `set-aware` 标签。
+- [x] `paper/references.bib`：仅补齐已核验元数据，不新增或删除文献。
+- [x] `paper/ADMA2026_TODO.md`：勾选相关工作压缩、英文润色、全部引用核验；保留实验、页数和投稿账户事项原状态或明确非本轮范围。
+- [x] `docs/project_memory_zh.md`：记录初稿写作收口结果和剩余投稿整理事项。
 - [ ] 本计划：记录执行、验证、论文 commit 与偏差。
 
 ### 3.2 明确不做的事项
@@ -187,17 +188,17 @@
 
 ## 7. 分步执行清单
 
-- [ ] 步骤 1：提交本计划，确认论文文件尚未修改。
-- [ ] 步骤 2：将状态改为 `执行中`，记录开始执行的计划 commit。
-- [ ] 步骤 3：补齐 `references.bib` 的已核验元数据，检查 25 键唯一且引用集合不变。
-- [ ] 步骤 4：修改英文顶部注释、摘要和引言，修正 canonical、余弦排序、协议名与组件配对表述。
-- [ ] 步骤 5：压缩英文 Related Work 并合并 Positioning 小节，保留全部必要引用和机制表。
-- [ ] 步骤 6：修改英文 Method/Experiments/Discussion/Limitations/Conclusion 的术语、指代与语言问题。
-- [ ] 步骤 7：逐项同步中文稿并修复 alignment 与 canonical runs 误译。
-- [ ] 步骤 8：执行引用集合、BibTeX 字段、协议词、数字和中英文边界检查。
-- [ ] 步骤 9：完整编译双语稿，记录页数及 warning；页数超出未来 venue 上限不阻断本轮。
-- [ ] 步骤 10：运行 ChkTeX/LaCheck、`git diff --check` 并人工审阅完整 diff。
-- [ ] 步骤 11：使用 Conventional Commit 提交论文、BibTeX、TODO 与记忆文档的实质修改。
+- [x] 步骤 1：提交本计划，确认论文文件尚未修改。
+- [x] 步骤 2：将状态改为 `执行中`，记录开始执行的计划 commit。
+- [x] 步骤 3：补齐 `references.bib` 的已核验元数据，检查 25 键唯一且引用集合不变。
+- [x] 步骤 4：修改英文顶部注释、摘要和引言，修正 canonical、余弦排序、协议名与组件配对表述。
+- [x] 步骤 5：压缩英文 Related Work 并合并 Positioning 小节，保留全部必要引用和机制表。
+- [x] 步骤 6：修改英文 Method/Experiments/Discussion/Limitations/Conclusion 的术语、指代与语言问题。
+- [x] 步骤 7：逐项同步中文稿并修复 alignment 与 canonical runs 误译。
+- [x] 步骤 8：执行引用集合、BibTeX 字段、协议词、数字和中英文边界检查。
+- [x] 步骤 9：完整编译双语稿，记录页数及 warning；页数超出未来 venue 上限不阻断本轮。
+- [x] 步骤 10：运行 ChkTeX/LaCheck、`git diff --check` 并人工审阅完整 diff。
+- [x] 步骤 11：使用 Conventional Commit 提交论文、BibTeX、TODO 与记忆文档的实质修改。
 - [ ] 步骤 12：回填论文 commit、验证结果与实际偏差，将状态改为 `已执行`，再以独立文档 commit 归档计划。
 - [ ] 步骤 13：推送当前分支，并进行一次只读收口审计，判断完整初稿是否成立。
 
@@ -213,25 +214,30 @@
 
 ## 9. 验证方案
 
-- [ ] 英文稿编译：在 `paper/` 执行 `latexmk -gg -pdf -interaction=nonstopmode -halt-on-error main.tex`。
-- [ ] 中文稿编译：在 `paper/` 执行 `latexmk -gg -xelatex -interaction=nonstopmode -halt-on-error main_cn.tex`。
+- [x] 英文稿编译：在 `paper/` 执行 `latexmk -gg -pdf -interaction=nonstopmode -halt-on-error main.tex`。
+- [x] 中文稿编译：在 `paper/` 执行 `latexmk -gg -xelatex -interaction=nonstopmode -halt-on-error main_cn.tex`。
 - [ ] 发布构建：执行 `bash paper/build_release.sh`，检查当前双语 PDF、页数、SHA-256 和构建日志；按需要更新受跟踪 manifest。
-- [ ] 引用/BibTeX：比较两稿 `\\cite{}` 键集合与 `references.bib` 条目集合，要求均为同一 25 键；日志不得有 undefined citation/reference。
-- [ ] 证据边界：搜索 `exact-SMILES`、`exact-target-SMILES`、`official`、`SOTA`、`significant`、`robust`、`latency`、`efficiency`、`all six`、`earlier checkpoint`，逐处人工核验。
-- [ ] 中英文一致性：逐项核对摘要、贡献、Related Work 结构、canonical 定义、pool-by-seed 计数、pre-clean 敏感性、Limitations 与 Conclusion。
-- [ ] 静态语言检查：在 `paper/` 运行 ChkTeX 与 LaCheck；区分模板/宏噪声和可修复警告。
+- [x] 引用/BibTeX：比较两稿 `\\cite{}` 键集合与 `references.bib` 条目集合，要求均为同一 25 键；日志不得有 undefined citation/reference。
+- [x] 证据边界：搜索 `exact-SMILES`、`exact-target-SMILES`、`official`、`SOTA`、`significant`、`robust`、`latency`、`efficiency`、`all six`、`earlier checkpoint`，逐处人工核验。
+- [x] 中英文一致性：逐项核对摘要、贡献、Related Work 结构、canonical 定义、pool-by-seed 计数、pre-clean 敏感性、Limitations 与 Conclusion。
+- [x] 静态语言检查：在 `paper/` 运行 ChkTeX 与 LaCheck；区分模板/宏噪声和可修复警告。
 - [ ] 匿名性：对最终 PDF 文本和本轮修改文件扫描用户名、本地绝对路径、远端地址与作者元数据；最终提交联合复扫仍另行保留。
-- [ ] 变更范围：`git diff --check`、`git status -sb`、完整 `git diff`，确认未混入代码、数据、checkpoint 或用户改动。
+- [x] 变更范围：`git diff --check`、`git status -sb`、完整 `git diff`，确认未混入代码、数据、checkpoint 或用户改动。
 
 ## 10. 执行记录
 
-尚未执行。计划基于 2026-08-20 的双语全文只读审读、25 条一手文献核验、ChkTeX/LaCheck 与引用集合检查形成；论文文件在创建计划前未修改。
+- 2026-08-20：计划基于双语全文只读审读、25 条一手文献核验、ChkTeX/LaCheck 与引用集合检查形成；论文文件在创建计划前未修改。
+- 2026-08-20：计划以 commit `7d46bb6` 单独提交后，将状态改为 `执行中`，开始按步骤执行。
+- 2026-08-20：补齐 7 条 BibTeX 元数据，压缩 Related Work 约 80 个英文词，完成英文全文和双语证据边界收口；两稿与 BibTeX 均保持同一 25 个引用键。
+- 2026-08-20：只读终审发现共享方法图仍使用 `Official candidates`/`set-aware`，以及历史 TODO 会把过期 ADMA 动作和可选实验误读为当前目标；在不新增实验或改变主张的前提下同步修正。这是对原计划的小幅术语/归档扩展，不改变目标和证据边界。
+- 2026-08-20：双语强制完整工作构建通过，英文 17 页、中文 15 页；日志中致命错误、未定义引用/交叉引用及 Overfull/Underfull 均为零。ChkTeX 排除非断行引用等既知风格建议后无输出；LaCheck 仅有模板和公式宏噪声。
+- 2026-08-20：论文、共享方法图、BibTeX、历史 TODO 与项目记忆的实质修改以 commit `076c5c5`（`docs(paper): 完成初稿引用与语言收口`）提交；计划文件未混入该 commit。
 
 ## 11. 最终结果
 
 - 完成日期：尚未完成
 - 最终状态：`未执行`
 - 验证结果：尚未验证
-- 论文修改 commit：尚未提交
+- 论文修改 commit：`076c5c5 docs(paper): 完成初稿引用与语言收口`
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：尚未记录
