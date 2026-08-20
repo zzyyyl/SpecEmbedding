@@ -2,12 +2,19 @@
 
 - 状态：`已执行`
 - 创建日期：2026-08-17
-- 最后更新：2026-08-17
+- 最后更新：2026-08-20
 - 负责人：Codex（作者负责最终学术判断与投稿决策）
 - 关联论文：`paper/main.tex` / `paper/main_cn.tex`
 - 关联审计：`docs/audit-report-2026-08-17.md`
 - 计划约束：不新增训练或评价实验，不改写已有实验数值，不新增引用；只使用已冻结的
-  exact-SMILES 结果、alignment seeds 42/43/44 分层分析和现有一手来源核验记录
+  exact-target-SMILES 结果、alignment seeds 42/43/44 分层分析和现有一手来源核验记录
+- 归档口径补记：本计划正文中的英文 17 页/中文 16 页均指 2026-08-17 的历史 release
+  快照。2026-08-20 初稿收口后的当前 release 由干净 source commit `033ac22` 构建并以
+  commit `a6063f3` 归档：英文 17 页、479,007 bytes、SHA-256
+  `68eaebb36afa5c9fe000b7b948b72080df390f81b1bc1901ff5ca92bfad7dd44`；中文 15 页、
+  421,262 bytes、SHA-256
+  `75870b7dde764559f9ba6626b82ecabbe0500a016200a7fd2212051158ffe197`。两组数字是不同日期的
+  可审计快照，不互相覆盖；页数继续按用户决定作为非阻断投稿整理事项。
 
 ## 1. 修改目标与动机
 
@@ -22,7 +29,7 @@
 3. 将未独立复现的 JESTR/GLMR 外部数字与本地结果在视觉和叙述上分离，消除公平 benchmark
    或严格超越的暗示；
 4. 将代表性 seed-42、三 reranker-seed 均值和三 alignment-level 估计三种统计口径明确分开；
-5. 把投稿待办、项目记忆和审计报告统一到当前源稿英文 17 页、中文 16 页，并保留用户
+5. 把投稿待办、项目记忆和审计报告统一到本计划执行时源稿英文 17 页、中文 16 页，并保留用户
    “完稿后再微调页数”的决定。
 
 ## 2. 当前证据与问题定位
@@ -59,7 +66,8 @@
 ### 2.4 页数与统计口径记录过时
 
 - 8 月 1 日遗留 `paper/build` PDF 为英文 15 页、中文 14 页；8 月 17 日审计修订后，
-  当前源稿最后验证为英文 17 页、中文 16 页。
+  当时源稿最后验证为英文 17 页、中文 16 页。当前 2026-08-20 release 已在本计划顶部
+  另行补记为英文 17 页、中文 15 页。
 - `paper/ADMA2026_TODO.md` 和 `docs/project_memory_zh.md` 仍保留 11/10 页或多 alignment
   未完成记录；历史日期记录可以保留，但必须标明“当时”。
 - 主结果表是代表性 reranker seed 42；组件表是固定 alignment seed 42 下 reranker
@@ -90,7 +98,7 @@
 
 ### 3.2 明确不做的事项
 
-- 不新增或重跑 exact-SMILES 与二维 InChIKey/多正例敏感性评价；因此不声称官方 evaluator
+- 不新增或重跑 exact-target-SMILES 与二维 InChIKey/多正例敏感性评价；因此不声称官方 evaluator
   等价，身份差异继续标为未量化。
 - 不重训 alignment、reranker，不重建 cache，不重新计算 Recall、MRR 或 MCES。
 - 不复现 JESTR/GLMR，不作 SOTA、显著性、因果性或同协议优越性声明。
@@ -111,7 +119,7 @@
 > yield multiple positives; the unquantified difference means these are not
 > official-evaluator-equivalent results.
 
-中文同步为等强度陈述。表 caption 可压缩，但必须同时保留 `local`、`exact-SMILES`、
+中文同步为等强度陈述。表 caption 可压缩，但必须同时保留 `local`、`exact-target-SMILES`、
 `single-positive`、`not official-evaluator-equivalent` 四层含义。分析 manifest 用结构化字段
 记录正例规则、参考规则、影响是否量化以及官方等价状态，报告由脚本生成，禁止只手工改产物。
 
@@ -140,7 +148,7 @@
 ### 4.4 讨论、局限与结论
 
 - 将“固定 alignment 下 reranker 初始化稳定性”与“已有三个 alignment 的分层敏感性”分开。
-- 最强支持结论限定为：在本地 exact-SMILES、MassSpecGym supplied-candidate、top-40 协议
+- 最强支持结论限定为：在本地 exact-target-SMILES、MassSpecGym supplied-candidate、top-40 协议
   下，监督残差重排序在三个内部 alignment 的已完成结果中一致改善 base；Pointwise 已取得
   大部分增益，候选 self-attention 的额外收益随 alignment 改变。
 - 保留组件审计只覆盖 canonical alignment seed 42、无组件独立因果收益的边界。
@@ -152,7 +160,7 @@
   勾选；JESTR/GLMR 统一复现采用已确认的 reported-only fallback，不继续作为当前 P0。
 - `project_memory_zh.md` 在历史记录保留当时状态，同时新增当前状态，清除会误导下一步执行的
   “alignment 仍只有 seed 42”陈述。
-- 当前页数记录为“源稿最近编译 17/16；旧 build PDF 15/14；页数压缩延后”，最终投稿
+- 本计划执行时的页数记录为“源稿最近编译 17/16；旧 build PDF 15/14；页数压缩延后”，最终投稿
   合规项继续未完成，不以旧 11/10 页作完成依据。
 
 ## 5. 引用文献与真实性核验
@@ -205,7 +213,7 @@ context，不承担公平比较。
 - 每个 alignment 内的三个 reranker seeds 先聚合为 alignment-level estimate；不得展平
   九次运行夸大样本量。
 - 跨 alignment 结果支持内部描述性复现，不支持置信区间、显著性、一般泛化或组件因果性。
-- exact-SMILES 与二维 InChIKey 的影响没有量化；任何官方 evaluator 等价主张都会触发
+- exact-target-SMILES 与二维 InChIKey 的影响没有量化；任何官方 evaluator 等价主张都会触发
   `已偏离待确认` 并要求新增评价计划。
 - 外部 baseline 未统一复现；任何 higher/lower、SOTA 或机制优越性主张都会触发暂停。
 - 若重新生成派生产物导致已有数值、输入哈希或 claim gate 改变，立即设为
@@ -218,7 +226,7 @@ context，不承担公平比较。
 - [x] 数字核验：跨 alignment 表逐格反查 `alignment_level.csv` 或对应受控 CSV；
   Base/Pointwise/Transformer 和 delta 方向与报告一致。
 - [x] 协议扫描：摘要、所有结果表 caption、结论、README、analysis report/manifest 均出现
-  本地 exact-SMILES 和非官方 evaluator 等价限定。
+  本地 exact-target-SMILES 和非官方 evaluator 等价限定。
 - [x] 外部基线：表内视觉分区明确，正文无直接 higher/lower 或 SOTA 解释。
 - [x] 英文稿编译：`latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex`。
 - [x] 中文稿编译：`latexmk -xelatex -interaction=nonstopmode -halt-on-error main_cn.tex`。
@@ -245,7 +253,7 @@ context，不承担公平比较。
 - 数字逐格反查版本化 CSV：两个监督模型在 12/12 个 alignment--candidate--model 聚合单元
   均改善对应 base 的 Recall@1/MRR；Transformer-minus-Pointwise 在两种候选和两个指标上
   均仅 2/3 alignment 为正。三个 checkpoint 来自两个 source commits，故仅作描述性证据。
-- 中英文最终编译为 17/16 页；无 fatal error、undefined citation/reference 或
+- 2026-08-17 当时中英文最终编译为 17/16 页；无 fatal error、undefined citation/reference 或
   Overfull/Underfull。保留英文 `amsmath` 与中文 Fandol `fontspec` 已知 package warning。
 - 未修改 `paper/references.bib`，未新增引用、训练、评价或数值；页数压缩按用户决定延后。
 - canonical `specembedding` 环境完整测试为 `86 passed, 5 warnings`；其中新增路径可移植性
@@ -260,14 +268,14 @@ context，不承担公平比较。
   改变论文方法、实验数值或证据边界。
 - canonical 环境最终测试为 `86 passed, 5 warnings in 33.48s`；从显式 Conda/PyPI 锁
   重建的全新环境为 `86 passed, 5 warnings in 26.92s`，Ruff 通过。
-- 双语 PDF 再确认 17/16 页；无 fatal error、undefined citation/reference 或
+- 2026-08-17 当时双语 PDF 再确认 17/16 页；无 fatal error、undefined citation/reference 或
   Overfull/Underfull。tracked 私有机器根扫描为零命中。
 - 下一步是推送并请求原审计会话独立复审；在复审结论返回前保持状态 `执行中`。
 
 ### 2026-08-17：第二轮独立审计反馈与续修决定
 
 - 原审计会话以远端 `7b824c4` 为只读基线复核，判定“有条件通过”：无 P0；提出两项 P1：
-  `run_rerank_pipeline.py` 仍依赖调用 cwd，以及当前 17/16 页双语 PDF 缺少可审计留存。
+  `run_rerank_pipeline.py` 仍依赖调用 cwd，以及当时 17/16 页双语 PDF 缺少可审计留存。
 - 同轮 P2 指出：论文仍写“确切依赖版本未锁定”，与新增的事后验收锁表面矛盾；应改为
   “当前验收环境已锁定，但历史训练环境没有逐包证明，不能声称 bitwise retraining”。
 - 续修不新增实验、引用、性能数字或结论：为 rerank 总管线固定 repository cwd/绝对子脚本
@@ -283,7 +291,7 @@ context，不承担公平比较。
   临时 cwd 下的完整 dry-run 回归测试。双语 limitation 已精确区分当前事后验收锁与历史训练
   环境证据，实质修改 commit 为 `e597d89`。
 - 从 tracked source commit `e597d89f45eb2f56bc8ad6332c49016a62496ad7` 强制完整重建双语稿；
-  英文 17 页、中文 16 页，两份 PDF 无 fatal/LaTeX error、undefined citation/reference 或
+  该 2026-08-17 历史快照为英文 17 页、中文 16 页，两份 PDF 无 fatal/LaTeX error、undefined citation/reference 或
   Overfull/Underfull。PDF 与构建 manifest 留存在 `paper/release/`；manifest 固定工具链、页数、
   字节数和 SHA-256，忽略的 `paper/build` 已同步为相同版本。
 - 当前完整测试为 `88 passed, 5 warnings`；Ruff、compileall、shell 语法、`git diff --check`
@@ -308,6 +316,15 @@ context，不承担公平比较。
   按用户决定，本计划不强行压页，待完稿并确认适用规则后统一微调，不作 P0/P1，也不被误记
   为最终投稿已经合规。
 
+### 2026-08-20：当前初稿 release 快照补记
+
+- 初稿引用、语言和双语证据边界收口后，从干净 source commit `033ac22` 运行严格 release
+  build；对应归档 commit 为 `a6063f3`。英文仍为 17 页，中文由历史快照的 16 页变为 15 页。
+- 当前受跟踪 PDF 的字节数和 SHA-256 已记录在本计划顶部，并与
+  `paper/release/build-manifest.yaml` 一致；作者元数据为空或缺失，私有路径扫描零命中。
+- 此更新只区分历史与当前构建快照，不改变 2026-08-17 审计结论、论文科学主张或用户关于
+  页数非阻断的决定。
+
 执行时按日期记录状态转换、派生产物核验、双语修改、页数、测试、提交和复审反馈。
 
 ## 11. 最终结果
@@ -315,8 +332,9 @@ context，不承担公平比较。
 - 完成日期：2026-08-17
 - 最终状态：`已执行`
 - 验证结果：第三轮独立复审及用户范围确认后，本轮无 P0/P1 阻断项；完整测试 88 项通过，
-  canonical artifacts 60 项匹配，双语 release evidence 自洽。英文 17 页的最终投稿合规任务
-  按用户决定延期到完稿并确认转投规则后处理。
+  canonical artifacts 60 项匹配，2026-08-17 的 17/16 历史 release evidence 与
+  2026-08-20 的 17/15 当前初稿 release evidence 均已按日期明确且各自自洽。英文 17 页的
+  最终投稿合规任务按用户决定延期到完稿并确认转投规则后处理。
 - 论文修改 commit：`1c0dee2`
 - 工程复现 commit：`f5e6e78`、`e597d89`
 - 发布证据 commit：`5a1fe38`
