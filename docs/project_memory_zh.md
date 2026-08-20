@@ -738,16 +738,16 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 待办清单：`paper/ADMA2026_TODO.md`
 - 上一版受跟踪 release evidence 对应 source commit `e597d89`，英文 17 页、中文 16 页；
   这是历史审计快照，不再代表当前初稿。
-- 2026-08-20 从干净 source commit `033ac22`（论文实质 commit `076c5c5`）强制完整重建
-  当前初稿：英文 17 页、479,007 bytes、SHA-256
-  `68eaebb36afa5c9fe000b7b948b72080df390f81b1bc1901ff5ca92bfad7dd44`；中文 15 页、
-  421,262 bytes、SHA-256
-  `75870b7dde764559f9ba6626b82ecabbe0500a016200a7fd2212051158ffe197`。两份 PDF、工具链、
+- 2026-08-21 从专家预审修订 source commit `a7f3112` 强制完整重建当前初稿：英文 18 页、
+  524,387 bytes、SHA-256
+  `74e39879e2e833c2af703d5c48fd0bd90fc738f602fd43131032c9700d3cb514`；中文 16 页、
+  429,971 bytes、SHA-256
+  `fa0bb66d0215b66cc50daaf7d9a33b31f08b46ebccd99bd9f0a987a329a16006`。两份 PDF、工具链、
   页数和哈希清单已留存在 `paper/release/`。
 - 第三轮独立审计基于远端 `5a1fe38` 复跑 88 项测试、临时 cwd 总管线、Ruff、artifact check
   和双语发布证据；结合用户明确“页数可以延后且不阻塞审计”的范围决定，本轮最终无 P0/P1
   阻断项。英文 17 页仅作为独立非阻断投稿整理事项，待确认转投 venue 页数规则后处理。
-- 已忽略的 `paper/build/main.pdf` 与 `main_cn.pdf` 已由 release build 同步为 17/15 页；
+- 已忽略的 `paper/build/main.pdf` 与 `main_cn.pdf` 已由 release build 同步为 18/16 页；
   发布证据以受跟踪的 `paper/release/` 为准。
 - 页数压缩：按用户决定延后到完稿后统一微调；最终投稿合规仍未完成。
 - 英文 PDF 作者元数据：空
