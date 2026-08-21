@@ -821,6 +821,15 @@ $3/0/3$, no rank embedding $0/0/6$, no interaction features $2/0/4$, and
 listwise-only training $3/0/3$. These are six paired reranker comparisons per
 removal, not independent alignment replications.
 
+These rows provide only a partial information-source audit. The ranker can
+combine nonlinear calibration of the base score with compatibility corrections
+from the frozen spectrum and molecule embeddings, but the present design does
+not identify how much of the gain comes from either source. In particular, we
+did not train isolated ``embeddings-only'', ``base-score-only'', or
+``embeddings-plus-score'' rankers. Those controlled feature-source ablations,
+as well as capacity-matched pointwise and query-level paired uncertainty
+analyses, remain pending rather than being inferred from the removal rows.
+
 On the pre-overlap-clean fixed checkpoint, a sensitivity check excluded the
 three affected test queries, leaving 17,553. Across both candidate settings and
 rerankers, mean Recall@1 decreased by 0.0045--0.0055 points (maximum seed-level

@@ -1,0 +1,15 @@
+{
+  "scope": "reference-identity audit on tracked top-40 caches; not official evaluator",
+  "source_commit": "to be filled after paper revision commit",
+  "command": "PYTHONPATH=. conda run -n specembedding python analysis/transfer2026_scholargpt_review/official_identity_eval.py --output analysis/transfer2026_scholargpt_review/official_identity_eval.json --device cuda:0 --batch-size 64",
+  "files": {
+    "official_identity_eval.py": "sha256:2b0d91538ac19bd734cbf1c2e4e6c663652692b85ab49a9d5839c4bf6d487ef7",
+    "official_identity_eval.json": "sha256:4655b858cea607a6288e5fd19fae6af76c7a8eb4421d837aae7524bbfe28865b"
+  },
+  "identity": "RDKit 2D InChIKey first block; multiple matching candidates treated as positive",
+  "limitations": [
+    "uses saved top-40 caches rather than full candidate pools",
+    "does not invoke the MassSpecGym official loader",
+    "single canonical reranker checkpoint (seed 42), not the three-seed main table"
+  ]
+}

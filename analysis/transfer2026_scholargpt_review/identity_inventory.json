@@ -1,0 +1,24 @@
+{
+  "formula": {
+    "cache": "/home/zyl/MYPROS/SpecEmbedding/rerank_cache/a2280d2_massspecgym_nopretrain_valoverlapclean_formula_topk40/massspecgym_formula_test.pt",
+    "extra_positive_candidates": 0,
+    "local_exact_smiles_base_r1": 0.6310093415356574,
+    "multiple_positive_queries": 0,
+    "note": "Base-only identity inventory from saved top-40 cache; not a full official evaluator rerun.",
+    "queries": 17556,
+    "reference_2d_inchikey_base_r1": 0.6310093415356574,
+    "reference_2d_inchikey_base_upper_bound": 0.892572339940761,
+    "reference_positive_queries": 15670
+  },
+  "mass": {
+    "cache": "/home/zyl/MYPROS/SpecEmbedding/rerank_cache/a2280d2_massspecgym_nopretrain_valoverlapclean_mass_topk40/massspecgym_mass_test.pt",
+    "extra_positive_candidates": 0,
+    "local_exact_smiles_base_r1": 0.47459557985873774,
+    "multiple_positive_queries": 0,
+    "note": "Base-only identity inventory from saved top-40 cache; not a full official evaluator rerun.",
+    "queries": 17556,
+    "reference_2d_inchikey_base_r1": 0.47459557985873774,
+    "reference_2d_inchikey_base_upper_bound": 0.8388015493278651,
+    "reference_positive_queries": 14726
+  }
+}
