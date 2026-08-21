@@ -36,7 +36,6 @@ def summarize(path: Path) -> dict:
         target_smiles = query["true_smiles"]
         target_key = key(target_smiles)
         indices = query["candidate_indices"].tolist()
-        base_ranks = query["base_ranks"].tolist()
         local_index = None
         reference_indices = []
         for pos, index in enumerate(indices):

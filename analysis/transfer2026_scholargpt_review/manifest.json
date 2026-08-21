@@ -3,8 +3,9 @@
   "source_commit": "0a6ba1155a46c991fe4e2cb158dfedb4d30c2c4b",
   "command": "PYTHONPATH=. conda run -n specembedding python analysis/transfer2026_scholargpt_review/official_identity_eval.py --output analysis/transfer2026_scholargpt_review/official_identity_eval.json --device cuda:0 --batch-size 64",
   "files": {
-    "official_identity_eval.py": "sha256:2b0d91538ac19bd734cbf1c2e4e6c663652692b85ab49a9d5839c4bf6d487ef7",
-    "official_identity_eval.json": "sha256:4655b858cea607a6288e5fd19fae6af76c7a8eb4421d837aae7524bbfe28865b"
+    "official_identity_eval.py": "sha256:d65e44ab69b0d825040228ee168e5fa43eebe74eb3c6329731929d9a52ccf002",
+    "official_identity_eval.json": "sha256:4655b858cea607a6288e5fd19fae6af76c7a8eb4421d837aae7524bbfe28865b",
+    "identity_inventory.py": "sha256:633cb1b2a84e238dcfb27dd006580fa454dbc34cc67ec24ed5d875bb8dd64f47"
   },
   "identity": "RDKit 2D InChIKey first block; multiple matching candidates treated as positive",
   "limitations": [
