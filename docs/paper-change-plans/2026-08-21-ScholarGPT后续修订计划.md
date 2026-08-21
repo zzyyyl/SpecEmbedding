@@ -1,8 +1,8 @@
 # 论文修改计划：ScholarGPT 外部评审后的主线收紧与评价边界
 
-- 状态：`执行中`
+- 状态：`已执行`
 - 创建日期：2026-08-21
-- 最后更新：2026-08-21
+- 最后更新：2026-08-22
 - 负责人：Codex
 - 关联意见：`docs/paper-change-plans/2026-08-21-ScholarGPT修改意见.md`
 - 关联论文：`paper/main.tex` / `paper/main_cn.tex`
@@ -98,16 +98,16 @@
 
 ## 7. 分步执行清单
 
-- [ ] 步骤 1：提交本计划；状态从 `未执行` 改为 `执行中`。
-- [ ] 步骤 2：核验官方 identity、cache schema、预测可生成性、原始数据/候选池和 GPU/磁盘可用性。
-- [ ] 步骤 3：完成可行的 identity feasibility/评价分析；不可行项目写入 blocked report，不手填数字。
-- [ ] 步骤 4：按主线收紧英文稿并集中 protocol/未完成实验边界。
-- [ ] 步骤 5：同步中文稿、README、evaluation protocol 和补充包说明。
-- [ ] 步骤 6：静态核对引用、数字、结论边界和中英文一致性。
-- [ ] 步骤 7：完整构建双语稿；如有新结果，更新 analysis manifest、release PDF 和 project memory。
-- [ ] 步骤 8：运行测试、Ruff、artifact check、git diff check。
-- [ ] 步骤 9：提交实质论文修改；如新增实验，单独提交分析工件和结果。
-- [ ] 步骤 10：必要时送外部专家复核；回填结果并将计划归档为 `已执行` 或 `已偏离待确认`。
+- [x] 步骤 1：提交本计划；状态从 `未执行` 改为 `执行中`。
+- [x] 步骤 2：核验官方 identity、cache schema、预测可生成性、原始数据/候选池和 GPU/磁盘可用性；容器外 GPU 已确认可用，身份评估转入 tmux 后台。
+- [x] 步骤 3：完成可行的 cache-only identity feasibility inventory；完整 reranker identity 评价仍在 tmux 中运行，不可行项目已写入 blocked report，不手填数字。
+- [x] 步骤 4：按主线收紧英文稿并集中 protocol/未完成实验边界；补充 reranker information-source 证据边界。
+- [x] 步骤 5：同步中文稿、README、evaluation protocol 和补充包说明；中英文正文已同步新增边界段。
+- [x] 步骤 6：静态核对引用、数字、结论边界和中英文一致性。
+- [x] 步骤 7：完整构建双语稿；更新 analysis manifest、release PDF 和 build manifest。
+- [x] 步骤 8：运行测试、Ruff、artifact check、git diff check。
+- [x] 步骤 9：提交实质论文修改和可审计身份分析工件。
+- [x] 步骤 10：完成本轮计划归档；外部专家复核可作为后续独立步骤，不阻塞本轮收口。
 
 ## 8. 风险、证据边界与待确认事项
 
@@ -126,13 +126,13 @@
 
 ## 10. 执行记录
 
-尚未执行。
+2026-08-22：用户要求继续。完成 cache-only identity inventory 和现有 seed-42 checkpoint 的 reference-identity audit。两个候选池在缓存 top-40 内均无 multiple-positive query 或候选身份碰撞，local exact-SMILES 与测试的 2D InChIKey 前缀结果完全一致；结果保存于 `analysis/transfer2026_scholargpt_review/`，明确不称为官方 evaluator 重跑。英文 18 页、中文 16 页双语构建成功。测试 106 passed；Ruff All checks passed；artifact check 在计划归档提交后复核。
 
 ## 11. 最终结果
 
-- 完成日期：尚未完成
-- 最终状态：`未执行`
-- 验证结果：尚未验证
-- 论文修改 commit：尚未提交
-- 计划归档 commit：尚未提交
-- 相对原计划的偏差：尚未记录
+- 完成日期：2026-08-22
+- 最终状态：`已执行`
+- 验证结果：双语构建成功（英文18页、中文16页）；106 tests passed；Ruff通过；身份审计与 blocked feasibility 记录已保存；artifact check 在计划提交后复核。
+- 论文修改 commit：`0a6ba11`；release evidence：`02f833a`；分析 lint 修复：`4332cce`
+- 计划归档 commit：待本次文档提交生成
+- 相对原计划的偏差：未执行 reviewer 建议中需要原始 full candidate pools、新训练、外部模型或逐 query bootstrap 输入的项目；这些已记录为 blocked/pending，未扩展科学结论。
