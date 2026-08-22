@@ -1,6 +1,6 @@
 # 论文修改计划：ScholarGPT 方法重构与实验复核
 
-- 状态：`已执行`
+- 状态：`执行中`
 - 创建日期：2026-08-23
 - 最后更新：2026-08-23
 - 负责人：Codex
@@ -160,3 +160,13 @@
 用户继续要求按完整评审附件核验。此前第二阶段已完成无 forcing、relative/pointwise 对照和机制审计，但仍把官方候选来源核对与困难候选分层列为范围外。本次使用本地 Hugging Face 缓存中的 MassSpecGym 1.3.1 `MassSpecGym.tsv` 与 retrieval candidate JSON，核对候选集合和官方列表顺序，并在保存嵌入上重算排序；结果作为官方候选顺序交叉核验记录，不夸大为完整 loader 端到端评价、重新训练或外部方法复现。
 
 本次继续执行还从已保存的逐 query 预测和候选 SMILES 计算了可复核的候选池大小、基础排序名次、top 候选 Morgan 相似度、基础分数间隔和谱峰数分层。外部 JESTR/GLMR、第二个 retriever、candidate-aware alignment 重训、跨数据集验证和端到端吞吐仍不在本地证据范围内。
+
+## 14. 严格最低验收补充（2026-08-23）
+
+逐条复核完整 ScholarGPT 意见后，确认前一阶段虽已完成无 rank、无 forcing、full-pool coarse-to-fine、谱图依赖损失、容量匹配 pointwise、机制消融和 seed-42 困难分层，但主表仍是 local exact-target-SMILES 协议，官方顺序核验只覆盖 seed 42，且没有把固定硬件前向审计拆分为完整候选池粗排/关系精排/吞吐证据。为避免把局部核验写成正式 evaluator，本阶段补做：
+
+1. 依据 MassSpecGym 1.3.1 loader 的二维 InChIKey 标签和 retrieval JSON 顺序，对 relative/pointwise 三个 reranker seeds 及 Base 统一重算 R@1/R@5/R@20/R@40/MRR，并记录 tie-breaking 与多正例计数；
+2. 从已保存的 seed-42 预测和模型前向审计中补出 full-pool coarse、top-40 relative branch、pointwise 和 Transformer 的参数/延迟/显存/吞吐分项；
+3. 重新组织正文主表与实验问题，使 official-protocol 结果与 local-protocol 敏感性结果分开；若外部强 baseline、candidate-aware alignment 或同一代码版本的 alignment 重训仍无可审计输入，则保留为明确未完成项，不用本地模型替代。
+
+本阶段不新增外部论文引用，不把缺少统一 checkpoint 的 JESTR/GLMR 写成复现结果，也不把三 reranker seeds 误称为 alignment 重复。页数仍不设 15 页硬上限，优先保证主结果清楚和证据闭合。
