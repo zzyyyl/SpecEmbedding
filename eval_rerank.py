@@ -93,6 +93,12 @@ def parse_args():
     )
     parser.add_argument("--save_dir", type=str, default=config.rerank.eval.save_dir)
     parser.add_argument(
+        "--max-candidates",
+        type=int,
+        default=None,
+        help="Optionally truncate an existing full-pool cache without inserting positives.",
+    )
+    parser.add_argument(
         "--device",
         type=str,
         default=config.general.device,
@@ -137,6 +143,8 @@ def main():
         raise ValueError("rerank.eval.batch_size must be greater than 0")
     if args.num_workers < 0:
         raise ValueError("rerank.eval.num_workers must be greater than or equal to 0")
+    if args.max_candidates is not None and args.max_candidates <= 0:
+        raise ValueError("--max-candidates must be greater than 0")
 
     checkpoint_path = Path(args.checkpoint)
     save_dir = Path(args.save_dir) if args.save_dir else checkpoint_path.parent
@@ -147,7 +155,12 @@ def main():
     startup_logging(args, "Evaluate SpecEmbedding reranker")
     device = resolve_device(args.device)
 
-    dataset = RerankCacheDataset(args.cache, return_smiles=True, require_label=False)
+    dataset = RerankCacheDataset(
+        args.cache,
+        max_candidates=args.max_candidates,
+        return_smiles=True,
+        require_label=False,
+    )
     excluded_count = exclude_query_indices(
         dataset,
         args.exclude_query_indices,
@@ -172,6 +185,8 @@ def main():
 
     logging.info("=" * 50)
     logging.info("Total queries: %s", results["total"])
+    if args.max_candidates is not None:
+        logging.info("Evaluation candidate truncation: K=%s (no positive forcing)", args.max_candidates)
     logging.info("Pre-retrieval upper bound: %.4f%%", results["upper_bound"] * 100)
     log_ranking_summary("BASE", results["base"], top_k)
     log_ranking_summary("RERANK", results["rerank"], top_k)

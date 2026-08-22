@@ -21,6 +21,7 @@ from SpecEmbedding.utils.rerank import (
     listwise_cross_entropy,
     rank_from_scores,
     reranker_model_config,
+    spectrum_dependency_loss,
     summarize_ranking_metrics,
     update_ranking_metrics,
 )
@@ -89,7 +90,7 @@ def parse_args():
     parser.add_argument(
         "--model_type",
         type=str,
-        choices=["transformer", "pointwise"],
+        choices=["transformer", "pointwise", "relative"],
         default=config.rerank.train.model_type,
         help="Reranker variant. Other hyperparameters are read from rerank.train in params.yaml.",
     )
@@ -147,6 +148,51 @@ def parse_args():
         help="Weight of the pairwise ranking loss; use 0 for listwise CE only.",
     )
     parser.add_argument(
+        "--lambda-spec",
+        type=float,
+        default=float(getattr(config.rerank.train, "lambda_spec", 0.0)),
+        help="Weight of the mismatched-spectrum dependency loss.",
+    )
+    parser.add_argument(
+        "--spec-margin",
+        type=float,
+        default=float(getattr(config.rerank.train, "spec_margin", 0.1)),
+        help="Margin for the mismatched-spectrum dependency loss.",
+    )
+    parser.add_argument(
+        "--relation-dim",
+        type=int,
+        default=int(getattr(config.rerank.train, "relation_dim", 64)),
+        help="Hidden dimension of the relative candidate branch.",
+    )
+    parser.add_argument(
+        "--pair-chunk-size",
+        type=int,
+        default=int(getattr(config.rerank.train, "pair_chunk_size", 32)),
+        help="Number of query candidates processed per relation chunk.",
+    )
+    parser.add_argument(
+        "--relative-module",
+        dest="use_relative_module",
+        action=argparse.BooleanOptionalAction,
+        default=bool(getattr(config.rerank.train, "use_relative_module", True)),
+        help="Enable the explicit relative candidate branch for model_type=relative.",
+    )
+    parser.add_argument(
+        "--spectrum-conditioning",
+        dest="use_spectrum_conditioning",
+        action=argparse.BooleanOptionalAction,
+        default=bool(getattr(config.rerank.train, "use_spectrum_conditioning", True)),
+        help="Condition relative relations on the spectrum embedding.",
+    )
+    parser.add_argument(
+        "--molecular-relation",
+        dest="use_molecular_relation",
+        action=argparse.BooleanOptionalAction,
+        default=bool(getattr(config.rerank.train, "use_molecular_relation", True)),
+        help="Use candidate embedding differences in the relative branch.",
+    )
+    parser.add_argument(
         "--train-k",
         type=int,
         default=int(config.rerank.train.train_k),
@@ -182,6 +228,12 @@ def parse_args():
     args.metric_for_best = config.rerank.train.metric_for_best
     args.num_workers = int(config.rerank.train.num_workers)
     args.top_k = [int(k) for k in config.rerank.train.top_k]
+
+    if args.model_type == "relative":
+        # Rank is intentionally unavailable to the formal model.  Keep the
+        # legacy CLI flag for old checkpoints, but make the new model safe by
+        # construction even when the global legacy default is true.
+        args.use_rank_embedding = False
 
     if not args.train_cache:
         parser.error("--train_cache is required unless rerank.train.train_cache is set in params.yaml")
@@ -226,6 +278,14 @@ def main():
         raise ValueError("rerank.train.n_layers must be greater than or equal to 0")
     if args.lambda_pair < 0:
         raise ValueError("--lambda-pair must be greater than or equal to 0")
+    if args.lambda_spec < 0:
+        raise ValueError("--lambda-spec must be greater than or equal to 0")
+    if args.spec_margin < 0:
+        raise ValueError("--spec-margin must be greater than or equal to 0")
+    if args.relation_dim <= 0:
+        raise ValueError("--relation-dim must be greater than 0")
+    if args.pair_chunk_size <= 0:
+        raise ValueError("--pair-chunk-size must be greater than 0")
 
     save_dir = Path(args.save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -304,6 +364,20 @@ def main():
             )
             if loss is None:
                 continue
+            if args.lambda_spec > 0:
+                spec_loss = spectrum_dependency_loss(
+                    model=model,
+                    spec_emb=spec_emb,
+                    candidate_embs=candidate_embs,
+                    base_scores=base_scores,
+                    base_ranks=base_ranks,
+                    candidate_mask=candidate_mask,
+                    labels=labels,
+                    margin=args.spec_margin,
+                    scores=scores,
+                )
+                if spec_loss is not None:
+                    loss = loss + args.lambda_spec * spec_loss
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=args.grad_clip)
             optimizer.step()

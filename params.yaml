@@ -92,9 +92,9 @@ rerank:
     train_cache: null
     val_cache: null
     save_dir: "checkpoints_rerank"
-    model_type: "transformer"
-    train_k: 128
-    batch_size: 16
+    model_type: "relative"
+    train_k: 256
+    batch_size: 8
     epochs: 30
     lr: 0.0001
     weight_decay: 0.0001
@@ -108,11 +108,18 @@ rerank:
     alpha_init: 1.0
     use_base_score_feature: true
     use_residual_score: true
-    use_rank_embedding: true
+    use_rank_embedding: false
     use_product_feature: true
     use_abs_diff_feature: true
     shuffle_candidates: true
     lambda_pair: 0.2
+    lambda_spec: 0.1
+    spec_margin: 0.1
+    relation_dim: 32
+    pair_chunk_size: 16
+    use_relative_module: true
+    use_spectrum_conditioning: true
+    use_molecular_relation: true
     margin: 0.1
     grad_clip: 1.0
     metric_for_best: "mrr"

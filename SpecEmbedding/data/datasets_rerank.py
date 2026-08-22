@@ -39,6 +39,7 @@ class RerankCacheDataset(Dataset):
         shuffle_candidates: bool = False,
         require_label: bool = False,
         return_smiles: bool = False,
+        force_label_into_max_candidates: bool = False,
     ):
         self.cache_path = Path(cache_path)
         self.cache = load_rerank_cache(self.cache_path)
@@ -50,10 +51,20 @@ class RerankCacheDataset(Dataset):
         self.max_candidates = max_candidates
         self.shuffle_candidates = shuffle_candidates
         self.return_smiles = return_smiles
+        self.force_label_into_max_candidates = force_label_into_max_candidates
 
         self.indices = list(range(len(self.queries)))
         if require_label:
-            self.indices = [idx for idx in self.indices if self.queries[idx].get("label") is not None]
+            self.indices = [
+                idx
+                for idx in self.indices
+                if self.queries[idx].get("label") is not None
+                and (
+                    self.max_candidates is None
+                    or int(self.queries[idx]["label"]) < self.max_candidates
+                    or self.force_label_into_max_candidates
+                )
+            ]
 
         if not self.indices:
             raise ValueError(f"No valid rerank samples found in {self.cache_path}")
@@ -80,6 +91,9 @@ class RerankCacheDataset(Dataset):
                 if label < self.max_candidates:
                     selected = torch.arange(self.max_candidates)
                     new_label = label
+                elif not self.force_label_into_max_candidates:
+                    selected = torch.arange(self.max_candidates)
+                    new_label = None
                 else:
                     keep = list(range(self.max_candidates - 1)) + [label]
                     selected = torch.tensor(keep, dtype=torch.long)

@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class CandidateReranker(nn.Module):
@@ -123,3 +124,206 @@ class PointwiseReranker(CandidateReranker):
     def __init__(self, *args, **kwargs):
         kwargs["n_layers"] = 0
         super().__init__(*args, **kwargs)
+
+
+class RelativeCandidateReranker(nn.Module):
+    """Spectrum-conditioned relative candidate reranker.
+
+    The model keeps an absolute, pointwise compatibility branch and adds a
+    permutation-equivariant relation branch.  For every ordered candidate
+    pair, the relation score is constructed as ``g(r_ij) - g(r_ji)``; this
+    makes the pair preference antisymmetric by construction while allowing
+    the query spectrum to condition both the preference and its aggregation
+    weight.  ``base_ranks`` is accepted by the public forward signature for
+    cache compatibility but is intentionally ignored.
+    """
+
+    def __init__(
+        self,
+        embedding_dim: int,
+        hidden_dim: int,
+        rank_emb_dim: int = 1,
+        max_rank: int = 1,
+        n_layers: int = 0,
+        n_heads: int = 1,
+        dropout: float = 0.1,
+        alpha_init: float = 1.0,
+        use_base_score_feature: bool = True,
+        use_residual_score: bool = True,
+        use_rank_embedding: bool = False,
+        use_product_feature: bool = True,
+        use_abs_diff_feature: bool = True,
+        relation_dim: int | None = None,
+        pair_chunk_size: int = 32,
+        use_relative_module: bool = True,
+        use_spectrum_conditioning: bool = True,
+        use_molecular_relation: bool = True,
+    ):
+        super().__init__()
+        del rank_emb_dim, max_rank, n_layers, n_heads, use_rank_embedding
+        if embedding_dim <= 0 or hidden_dim <= 0:
+            raise ValueError("embedding_dim and hidden_dim must be greater than 0")
+        if pair_chunk_size <= 0:
+            raise ValueError("pair_chunk_size must be greater than 0")
+
+        self.embedding_dim = embedding_dim
+        self.hidden_dim = hidden_dim
+        self.use_base_score_feature = use_base_score_feature
+        self.use_residual_score = use_residual_score
+        self.use_product_feature = use_product_feature
+        self.use_abs_diff_feature = use_abs_diff_feature
+        self.use_relative_module = use_relative_module
+        self.use_spectrum_conditioning = use_spectrum_conditioning
+        self.use_molecular_relation = use_molecular_relation
+        self.pair_chunk_size = pair_chunk_size
+        self.relation_dim = relation_dim or max(32, min(128, hidden_dim // 2))
+
+        absolute_dim = embedding_dim * 2
+        if use_product_feature:
+            absolute_dim += embedding_dim
+        if use_abs_diff_feature:
+            absolute_dim += embedding_dim
+        if use_base_score_feature:
+            absolute_dim += 1
+        self.absolute_mlp = nn.Sequential(
+            nn.Linear(absolute_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.GELU(),
+        )
+        self.absolute_score = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, max(hidden_dim // 2, 1)),
+            nn.GELU(),
+            nn.Linear(max(hidden_dim // 2, 1), 1),
+        )
+
+        self.spec_relation = nn.Linear(embedding_dim, self.relation_dim)
+        self.mol_relation = nn.Linear(embedding_dim, self.relation_dim)
+        relation_input_dim = self.relation_dim * 3 + 2
+        if not use_spectrum_conditioning:
+            relation_input_dim -= self.relation_dim
+        if not use_molecular_relation:
+            relation_input_dim -= self.relation_dim
+        self.preference_mlp = nn.Sequential(
+            nn.Linear(relation_input_dim, self.relation_dim),
+            nn.LayerNorm(self.relation_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(self.relation_dim, self.relation_dim),
+            nn.GELU(),
+            nn.Linear(self.relation_dim, 1),
+        )
+        weight_input_dim = self.relation_dim * 2 + 1
+        if not use_spectrum_conditioning:
+            weight_input_dim -= self.relation_dim
+        if not use_molecular_relation:
+            weight_input_dim -= self.relation_dim
+        self.weight_mlp = nn.Sequential(
+            nn.Linear(weight_input_dim, self.relation_dim),
+            nn.GELU(),
+            nn.Linear(self.relation_dim, 1),
+        )
+        self.alpha = nn.Parameter(torch.tensor(float(alpha_init), dtype=torch.float32))
+        self.beta = nn.Parameter(torch.tensor(1.0, dtype=torch.float32))
+
+    def _absolute_features(self, spec_emb, candidate_embs, base_scores):
+        spec_expand = spec_emb.unsqueeze(1).expand_as(candidate_embs)
+        features = [spec_expand, candidate_embs]
+        if self.use_product_feature:
+            features.append(spec_expand * candidate_embs)
+        if self.use_abs_diff_feature:
+            features.append(torch.abs(spec_expand - candidate_embs))
+        if self.use_base_score_feature:
+            features.append(base_scores.unsqueeze(-1))
+        return torch.cat(features, dim=-1)
+
+    def _relation_features(self, spec_rel, mol_i, mol_j, base_i, base_j):
+        delta = mol_i - mol_j
+        abs_delta = torch.abs(delta)
+        cosine = F.cosine_similarity(mol_i, mol_j, dim=-1).unsqueeze(-1)
+        parts = []
+        if self.use_spectrum_conditioning:
+            parts.append(spec_rel)
+        if self.use_molecular_relation:
+            parts.extend([delta, abs_delta])
+        base_delta = base_i - base_j
+        if base_delta.ndim == cosine.ndim - 1:
+            base_delta = base_delta.unsqueeze(-1)
+        parts.extend([base_delta, cosine])
+        return torch.cat(parts, dim=-1)
+
+    def _relative_scores(self, spec_emb, candidate_embs, base_scores, candidate_mask):
+        batch_size, num_candidates, _ = candidate_embs.shape
+        spec_rel = self.spec_relation(spec_emb)
+        mol_rel = self.mol_relation(candidate_embs)
+        relative = torch.zeros(
+            (batch_size, num_candidates),
+            dtype=candidate_embs.dtype,
+            device=candidate_embs.device,
+        )
+        for start in range(0, num_candidates, self.pair_chunk_size):
+            stop = min(start + self.pair_chunk_size, num_candidates)
+            mol_i = mol_rel[:, start:stop].unsqueeze(2)
+            mol_j = mol_rel.unsqueeze(1)
+            base_i = base_scores[:, start:stop].unsqueeze(2)
+            base_j = base_scores.unsqueeze(1)
+            spec_pair = spec_rel[:, None, None, :].expand(-1, stop - start, num_candidates, -1)
+            pair_features = self._relation_features(spec_pair, mol_i, mol_j, base_i, base_j)
+            reverse_features = self._relation_features(spec_pair, mol_j, mol_i, base_j, base_i)
+            preference = self.preference_mlp(pair_features).squeeze(-1)
+            reverse_preference = self.preference_mlp(reverse_features).squeeze(-1)
+            pair_preference = preference - reverse_preference
+
+            weight_parts = []
+            if self.use_spectrum_conditioning:
+                weight_parts.append(spec_pair)
+            if self.use_molecular_relation:
+                weight_parts.append(mol_i - mol_j)
+            weight_parts.append(
+                F.cosine_similarity(mol_i, mol_j, dim=-1).unsqueeze(-1)
+            )
+            weight_logits = self.weight_mlp(torch.cat(weight_parts, dim=-1)).squeeze(-1)
+            valid = candidate_mask[:, start:stop].unsqueeze(-1) & candidate_mask.unsqueeze(1)
+            eye = torch.zeros(
+                (stop - start, num_candidates),
+                dtype=torch.bool,
+                device=candidate_embs.device,
+            )
+            local = torch.arange(stop - start, device=candidate_embs.device)
+            global_indices = torch.arange(start, stop, device=candidate_embs.device)
+            eye[local, global_indices] = True
+            valid = valid & ~eye.unsqueeze(0)
+            weights = F.softplus(weight_logits) * valid.to(weight_logits.dtype)
+            weights = weights / weights.sum(dim=-1, keepdim=True).clamp_min(1e-6)
+            contribution = (weights * pair_preference * valid.to(pair_preference.dtype)).sum(dim=-1)
+            relative[:, start:stop] = contribution
+        return relative
+
+    def forward(
+        self,
+        spec_emb,
+        candidate_embs,
+        base_scores,
+        base_ranks=None,
+        candidate_mask=None,
+    ):
+        del base_ranks
+        if candidate_mask is None:
+            candidate_mask = torch.ones(
+                candidate_embs.shape[:2], dtype=torch.bool, device=candidate_embs.device
+            )
+        absolute = self.absolute_score(self.absolute_mlp(
+            self._absolute_features(spec_emb, candidate_embs, base_scores)
+        )).squeeze(-1)
+        if self.use_relative_module:
+            relative = self._relative_scores(spec_emb, candidate_embs, base_scores, candidate_mask)
+            scores = absolute + self.beta * relative
+        else:
+            scores = absolute
+        if self.use_residual_score:
+            scores = scores + self.alpha * base_scores
+        return scores.masked_fill(~candidate_mask, torch.finfo(scores.dtype).min)

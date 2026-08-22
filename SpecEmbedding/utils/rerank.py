@@ -6,7 +6,11 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 
-from SpecEmbedding.models_rerank import CandidateReranker, PointwiseReranker
+from SpecEmbedding.models_rerank import (
+    CandidateReranker,
+    PointwiseReranker,
+    RelativeCandidateReranker,
+)
 
 
 def _config_value(source, key: str):
@@ -37,11 +41,13 @@ def build_reranker(model_config, embedding_dim: int | None = None):
         model_cls = PointwiseReranker
     elif model_type == "transformer":
         model_cls = CandidateReranker
+    elif model_type == "relative":
+        model_cls = RelativeCandidateReranker
     else:
         raise ValueError(f"Unsupported reranker model_type: {model_type}")
 
     legacy_base_score = bool(_config_value_default(model_config, "use_base_score", True))
-    return model_cls(
+    common_kwargs = dict(
         embedding_dim=int(embedding_dim),
         hidden_dim=int(_config_value(model_config, "hidden_dim")),
         rank_emb_dim=int(_config_value(model_config, "rank_emb_dim")),
@@ -60,6 +66,19 @@ def build_reranker(model_config, embedding_dim: int | None = None):
         use_product_feature=bool(_config_value_default(model_config, "use_product_feature", True)),
         use_abs_diff_feature=bool(_config_value_default(model_config, "use_abs_diff_feature", True)),
     )
+    if model_type == "relative":
+        common_kwargs.update(
+            relation_dim=int(_config_value_default(model_config, "relation_dim", 64)),
+            pair_chunk_size=int(_config_value_default(model_config, "pair_chunk_size", 32)),
+            use_relative_module=bool(_config_value_default(model_config, "use_relative_module", True)),
+            use_spectrum_conditioning=bool(
+                _config_value_default(model_config, "use_spectrum_conditioning", True)
+            ),
+            use_molecular_relation=bool(
+                _config_value_default(model_config, "use_molecular_relation", True)
+            ),
+        )
+    return model_cls(**common_kwargs)
 
 
 def reranker_model_config(args, embedding_dim: int) -> dict:
@@ -78,6 +97,11 @@ def reranker_model_config(args, embedding_dim: int) -> dict:
         "use_rank_embedding": args.use_rank_embedding,
         "use_product_feature": args.use_product_feature,
         "use_abs_diff_feature": args.use_abs_diff_feature,
+        "relation_dim": getattr(args, "relation_dim", 64),
+        "pair_chunk_size": getattr(args, "pair_chunk_size", 32),
+        "use_relative_module": getattr(args, "use_relative_module", True),
+        "use_spectrum_conditioning": getattr(args, "use_spectrum_conditioning", True),
+        "use_molecular_relation": getattr(args, "use_molecular_relation", True),
     }
 
 
@@ -136,6 +160,51 @@ def compute_rerank_loss(scores, labels, candidate_mask, lambda_pair: float, marg
     if pair_loss is None:
         return ce_loss
     return ce_loss + lambda_pair * pair_loss
+
+
+def spectrum_dependency_loss(
+    model,
+    spec_emb,
+    candidate_embs,
+    base_scores,
+    base_ranks,
+    candidate_mask,
+    labels,
+    margin: float,
+    scores=None,
+):
+    """Penalize a positive candidate scoring well under a mismatched spectrum.
+
+    A cyclic batch permutation provides a deterministic in-batch negative
+    without adding labels or changing the candidate pool.  The loss is only
+    defined for batches containing at least two labeled queries.
+    """
+
+    labeled = labels >= 0
+    if labeled.sum() < 2:
+        return None
+    indices = torch.arange(spec_emb.size(0), device=spec_emb.device)
+    wrong_spec = spec_emb[torch.roll(indices, shifts=1)]
+    wrong_scores = model(
+        wrong_spec,
+        candidate_embs,
+        base_scores,
+        base_ranks,
+        candidate_mask,
+    )
+    rows = torch.arange(labels.size(0), device=labels.device)
+    if scores is None:
+        scores = model(
+            spec_emb,
+            candidate_embs,
+            base_scores,
+            base_ranks,
+            candidate_mask,
+        )
+    positive_scores = scores[rows, labels.clamp_min(0)]
+    mismatched_scores = wrong_scores[rows, labels.clamp_min(0)]
+    loss = F.softplus(mismatched_scores - positive_scores + margin)
+    return loss[labeled].mean()
 
 
 def rank_from_scores(scores, label: int, candidate_mask) -> int:

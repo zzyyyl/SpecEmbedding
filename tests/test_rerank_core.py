@@ -9,8 +9,8 @@ from SpecEmbedding.data.datasets_rerank import (
     exclude_query_indices,
     rerank_collate_fn,
 )
-from SpecEmbedding.models_rerank import CandidateReranker
-from SpecEmbedding.utils.rerank import load_reranker
+from SpecEmbedding.models_rerank import CandidateReranker, RelativeCandidateReranker
+from SpecEmbedding.utils.rerank import load_reranker, spectrum_dependency_loss
 
 
 class RerankerCoreTest(unittest.TestCase):
@@ -163,6 +163,85 @@ class RerankerCoreTest(unittest.TestCase):
             self.assertEqual(batch["labels"].tolist(), [0, -1])
             self.assertEqual(exclude_query_indices(dataset, [1]), 1)
             self.assertEqual(len(dataset), 1)
+
+    def test_dataset_truncation_does_not_force_positive_by_default(self):
+        payload = {
+            "spec_embs": torch.eye(2),
+            "mol_embs": torch.eye(3),
+            "mol_smiles": ["CC", "CCC", "CO"],
+            "queries": [
+                {
+                    "spec_index": 0,
+                    "true_smiles": "CO",
+                    "candidate_indices": torch.tensor([0, 1, 2]),
+                    "base_scores": torch.tensor([0.9, 0.8, 0.1]),
+                    "base_ranks": torch.tensor([1, 2, 3]),
+                    "label": 2,
+                    "positive_in_base_topk": True,
+                }
+            ],
+            "meta": {"split": "train"},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            cache = Path(temporary) / "cache.pt"
+            torch.save(payload, cache)
+            dataset = RerankCacheDataset(cache, max_candidates=2, require_label=False)
+            sample = dataset[0]
+            self.assertEqual(sample["label"], -1)
+            self.assertEqual(sample["candidate_indices"].tolist(), [0, 1])
+
+    def test_relative_reranker_is_permutation_equivariant_and_antisymmetric(self):
+        model = RelativeCandidateReranker(
+            embedding_dim=4,
+            hidden_dim=8,
+            relation_dim=4,
+            pair_chunk_size=2,
+            dropout=0.0,
+        ).eval()
+        original = model(**self.inputs)
+        permutation = torch.tensor([2, 0, 1])
+        permuted_inputs = dict(self.inputs)
+        for key in ("candidate_embs", "base_scores", "base_ranks", "candidate_mask"):
+            permuted_inputs[key] = self.inputs[key][:, permutation]
+        permuted = model(**permuted_inputs)
+        torch.testing.assert_close(permuted, original[:, permutation], atol=1e-6, rtol=1e-6)
+
+        spec_rel = model.spec_relation(self.inputs["spec_emb"][:1])
+        mol_rel = model.mol_relation(self.inputs["candidate_embs"][:1])
+        mol_i = mol_rel[:, :1].unsqueeze(2)
+        mol_j = mol_rel[:, 1:2].unsqueeze(1)
+        base_i = self.inputs["base_scores"][:1, :1].unsqueeze(2)
+        base_j = self.inputs["base_scores"][:1, 1:2].unsqueeze(1)
+        spec_pair = spec_rel[:, None, None, :]
+        forward = model.preference_mlp(
+            model._relation_features(spec_pair, mol_i, mol_j, base_i, base_j)
+        )
+        reverse = model.preference_mlp(
+            model._relation_features(spec_pair, mol_j, mol_i, base_j, base_i)
+        )
+        torch.testing.assert_close(forward - reverse, -(reverse - forward))
+
+    def test_relative_model_uses_spectrum_dependency_loss(self):
+        model = RelativeCandidateReranker(
+            embedding_dim=4,
+            hidden_dim=8,
+            relation_dim=4,
+            pair_chunk_size=2,
+            dropout=0.0,
+        )
+        labels = torch.tensor([0, 1])
+        loss = spectrum_dependency_loss(
+            model,
+            self.inputs["spec_emb"],
+            self.inputs["candidate_embs"],
+            self.inputs["base_scores"],
+            self.inputs["base_ranks"],
+            self.inputs["candidate_mask"],
+            labels,
+            margin=0.1,
+        )
+        self.assertIsNotNone(loss)
+        self.assertTrue(torch.isfinite(loss))
 
 
 if __name__ == "__main__":
