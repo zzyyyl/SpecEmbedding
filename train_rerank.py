@@ -81,6 +81,10 @@ def parse_args():
         help="Validation cache path. Falls back to rerank.train.val_cache.",
     )
     parser.add_argument("--save_dir", type=str, default=config.rerank.train.save_dir)
+    parser.add_argument("--batch-size", type=int, default=None)
+    parser.add_argument("--epochs", type=int, default=None)
+    parser.add_argument("--patience", type=int, default=None)
+    parser.add_argument("--max-train-queries", type=int, default=None)
     parser.add_argument(
         "--device",
         type=str,
@@ -217,11 +221,13 @@ def parse_args():
         parser.error("--exclude-val-query-indices must contain non-negative integers")
     args.exclude_val_query_indices = sorted(set(args.exclude_val_query_indices))
 
-    args.batch_size = int(config.rerank.train.batch_size)
-    args.epochs = int(config.rerank.train.epochs)
+    args.batch_size = int(
+        config.rerank.train.batch_size if args.batch_size is None else args.batch_size
+    )
+    args.epochs = int(config.rerank.train.epochs if args.epochs is None else args.epochs)
     args.lr = float(config.rerank.train.lr)
     args.weight_decay = float(config.rerank.train.weight_decay)
-    args.patience = int(config.rerank.train.patience)
+    args.patience = int(config.rerank.train.patience if args.patience is None else args.patience)
     args.hidden_dim = int(config.rerank.train.hidden_dim)
     args.rank_emb_dim = int(config.rerank.train.rank_emb_dim)
     args.max_rank = int(config.rerank.train.max_rank)
@@ -292,6 +298,8 @@ def main():
         raise ValueError("--relation-dim must be greater than 0")
     if args.pair_chunk_size <= 0:
         raise ValueError("--pair-chunk-size must be greater than 0")
+    if args.max_train_queries is not None and args.max_train_queries <= 0:
+        raise ValueError("--max-train-queries must be greater than 0")
     if args.relation_top_k <= 0:
         raise ValueError("--relation-top-k must be greater than 0")
 
@@ -308,6 +316,10 @@ def main():
         shuffle_candidates=args.shuffle_candidates,
         require_label=True,
     )
+    if args.max_train_queries is not None:
+        train_dataset.indices = train_dataset.indices[: args.max_train_queries]
+        if not train_dataset.indices:
+            raise ValueError("--max-train-queries removed every labeled training query")
     val_dataset = RerankCacheDataset(
         args.val_cache,
         max_candidates=None,
