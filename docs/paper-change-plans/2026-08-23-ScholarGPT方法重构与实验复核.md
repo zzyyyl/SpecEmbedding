@@ -1,12 +1,12 @@
 # 论文修改计划：ScholarGPT 方法重构与实验复核
 
-- 状态：`已执行`
+- 状态：`执行中`
 - 创建日期：2026-08-23
 - 最后更新：2026-08-23
 - 负责人：Codex
 - 关联意见：`docs/paper-change-plans/2026-08-21-ScholarGPT修改意见.md`、外部评审附件 `pasted-text-1.txt`
 - 关联论文：`paper/main.tex` / `paper/main_cn.tex`
-- 计划约束：优先完成评审明确要求的无捷径训练和候选相对判别核心；只把实际运行产生的结果写入论文，缺失原始数据/外部代码的项目保留为阻塞项，不伪造结论。
+- 计划约束：优先完成评审明确要求的无捷径训练和候选相对判别核心；本次继续执行将使用当前可访问的 MassSpecGym 1.3.1 官方数据快照补做正式身份评价和困难候选分层，只把实际运行产生的结果写入论文。缺失外部代码、统一 checkpoint 或额外数据的项目仍保留为未完成边界，不伪造结论。
 
 ## 1. 修改目标与动机
 
@@ -43,7 +43,7 @@
 ### 3.2 明确不做的事项
 
 - 不把现有 forced top-40 结果改名为无 forcing 新方法结果。
-- 没有完整原始 candidate pool、外部模型或逐 query 预测时，不声称官方 evaluator、外部 baseline、bootstrap CI 或 full-pool 结果。
+- 没有完整原始 candidate pool、外部模型或逐 query 预测时，不声称外部 baseline、bootstrap CI 或 full-pool 结果；本轮若能从本地缓存的官方 MassSpecGym 1.3.1 数据快照逐 query 重建身份标签，则单独记录其正式 evaluator 规则与覆盖范围。
 - 不把新模型的单次运行或同 alignment 多次运行写成一般稳定性；种子、alignment checkpoint 和训练配置逐项记录。
 - 不要求本轮无依据地新增文献；现有 25 条引用继续核验闭包。
 
@@ -100,13 +100,14 @@
 - [x] 步骤 8：完成双语构建、引用/匿名性/工件检查和测试。
 - [x] 步骤 9：使用中文 Conventional Commit 提交论文/代码实质修改（`25b38a0`、排版收口 `acaa5ab`）。
 - [x] 步骤 10：更新发布证据，回填本计划实际结果并用独立中文文档 commit 归档。
+- [ ] 步骤 11：在当前可访问的官方 MassSpecGym 1.3.1 数据快照上重建正式 InChIKey 标签评价，并补充结构相似度、基础分数间隔、候选池大小和谱峰数分层；同步论文和证据清单。
 
 ## 8. 风险、证据边界与待确认事项
 
 - 新模型可能无法稳定优于 pointwise；这是评审验收条件，不能用叙事修补。
 - 全池缓存和相对 pair 计算可能受显存/磁盘限制；先用小限额 smoke test，再提交后台长任务。
 - 现有缓存路径包含历史机器绝对路径元数据；结果记录应使用仓库相对路径和哈希，不把私有路径写入论文或 release PDF。
-- 若实现需要改变官方 evaluator、数据身份规则或引入新外部模型，计划应暂停为 `已偏离待确认`，先向用户报告。
+- 若实现需要改变官方 evaluator、数据身份规则或引入新外部模型，计划应暂停为 `已偏离待确认`，先向用户报告；本次只复用已缓存的官方数据和官方 2D InChIKey 规则，不引入外部模型。
 
 ## 9. 验证方案
 
@@ -133,10 +134,10 @@
 
 ## 11. 当前结果与待归档
 
-- 当前状态：`已执行`；论文正文、双语构建、发布 manifest、测试和静态核验均已完成。页数只作当前快照，不假定具体 venue 上限。
+- 当前状态：`执行中`；上一阶段论文正文、双语构建、发布 manifest、测试和静态核验已完成；本次继续补做官方数据快照标签评价和困难候选分层，页数只作当前快照，不假定具体 venue 上限。
 - 主要结论：relative/pointwise 均改善 base；pointwise 在主 R@1/MRR 汇总略高，relative 独立普遍收益未建立。
 - 证据边界：三 reranker seeds 不是 alignment 重复；identity 结果为 cache-level；JESTR/GLMR 仍 reported-only；前向 latency/显存不是端到端效率主张。
-- 外部 baseline、候选感知 alignment 重训和完整 official loader rerun 不纳入本轮范围，不写成已完成结果。
+- 外部 baseline、候选感知 alignment 重训和跨数据集验证仍不纳入本次范围，不写成已完成结果；官方数据快照上的身份标签重建与缓存排名核对单独执行。
 
 ## 12. 最终核验步骤
 
@@ -144,6 +145,12 @@
 2. 完成英文/中文 LaTeX/BibTeX 构建，检查 undefined citation/reference、Overfull/Underfull、PDF 匿名性和页数记录；已完成，页数不作为阻断。
 3. 更新 `paper/release/build-manifest.yaml` 与受跟踪双语 PDF，核对 bytes/SHA-256、源 commit `acaa5ab` 和构建日志；已完成。
 4. `git diff --check`、Ruff、compileall 已通过；canonical artifact check 将在归档 commit 后复核，私有 raw predictions/cache 未纳入 Git 或匿名包。
-5. 论文实质 commit `25b38a0`、排版收口 `acaa5ab`、发布清单 `f6725a7` 已提交；本计划以独立中文文档 commit 归档。已尝试向评审线程 `01a01f8c-fe25-7390-8811-fedfac865d3c` 请求只读复核，但该线程当前不在本会话可用 agent 列表，未能通过协作工具投递；本计划不将其误记为已完成审计。
+5. 论文实质 commit `25b38a0`、排版收口 `acaa5ab`、发布清单 `f6725a7` 已提交；本次继续执行完成后再更新计划状态并单独归档。此前尝试向评审线程 `01a01f8c-fe25-7390-8811-fedfac865d3c` 请求只读复核，但该线程当前不在本会话可用 agent 列表，未能通过协作工具投递；本计划不将其误记为已完成审计。
 
-第二阶段明确不做：未经统一数据与 checkpoint 的外部方法“复现”声称；把历史 alignment revision 混写为同配置随机重复；把 cache-only 身份核对写成完整 official evaluator；以及为达到正向结果而事后选择 seed、K 或模型变体。
+第二阶段明确不做：未经统一数据与 checkpoint 的外部方法“复现”声称；把历史 alignment revision 混写为同配置随机重复；以及为达到正向结果而事后选择 seed、K 或模型变体。正式身份评价仅在第 13 节规定的官方数据快照核对完成后使用相应限定语。
+
+## 13. 继续执行记录（2026-08-23）
+
+用户继续要求按完整评审附件核验。此前第二阶段已完成无 forcing、relative/pointwise 对照和机制审计，但仍把正式 loader 评价与困难候选分层列为范围外。本次恢复执行后，允许使用本地 Hugging Face 缓存中的 MassSpecGym 1.3.1 `MassSpecGym.tsv` 与 retrieval candidate JSON，逐 query 核对官方 2D InChIKey 标签；若结果与缓存顺序和候选列表一致，则以“官方数据/规则重建的正式身份评价”记录，不夸大为重新训练或外部方法复现。
+
+本次继续执行还将从已保存的逐 query 预测和候选 SMILES 计算可复核的候选池大小、基础排序名次、top 候选 Morgan 相似度、基础分数间隔和谱峰数分层。外部 JESTR/GLMR、第二个 retriever、candidate-aware alignment 重训、跨数据集验证和端到端吞吐仍不在本地证据范围内。
