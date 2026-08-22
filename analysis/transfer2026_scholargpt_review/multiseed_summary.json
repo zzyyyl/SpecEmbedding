@@ -1,0 +1,338 @@
+{
+  "files": [
+    {
+      "pool": "mass",
+      "model": "relative",
+      "seed": 42,
+      "path": "analysis/transfer2026_scholargpt_review/pilot_predictions/mass_relative_seed42.json"
+    },
+    {
+      "pool": "mass",
+      "model": "relative",
+      "seed": 43,
+      "path": "analysis/transfer2026_scholargpt_review/pilot_predictions/mass_relative_seed43.json"
+    },
+    {
+      "pool": "mass",
+      "model": "relative",
+      "seed": 44,
+      "path": "analysis/transfer2026_scholargpt_review/pilot_predictions/mass_relative_seed44.json"
+    },
+    {
+      "pool": "mass",
+      "model": "pointwise",
+      "seed": 42,
+      "path": "analysis/transfer2026_scholargpt_review/pilot_predictions/mass_pointwise_seed42.json"
+    },
+    {
+      "pool": "mass",
+      "model": "pointwise",
+      "seed": 43,
+      "path": "analysis/transfer2026_scholargpt_review/pilot_predictions/mass_pointwise_seed43.json"
+    },
+    {
+      "pool": "mass",
+      "model": "pointwise",
+      "seed": 44,
+      "path": "analysis/transfer2026_scholargpt_review/pilot_predictions/mass_pointwise_seed44.json"
+    },
+    {
+      "pool": "formula",
+      "model": "relative",
+      "seed": 42,
+      "path": "analysis/transfer2026_scholargpt_review/pilot_predictions/formula_relative_seed42.json"
+    },
+    {
+      "pool": "formula",
+      "model": "relative",
+      "seed": 43,
+      "path": "analysis/transfer2026_scholargpt_review/pilot_predictions/formula_relative_seed43.json"
+    },
+    {
+      "pool": "formula",
+      "model": "relative",
+      "seed": 44,
+      "path": "analysis/transfer2026_scholargpt_review/pilot_predictions/formula_relative_seed44.json"
+    },
+    {
+      "pool": "formula",
+      "model": "pointwise",
+      "seed": 42,
+      "path": "analysis/transfer2026_scholargpt_review/pilot_predictions/formula_pointwise_seed42.json"
+    },
+    {
+      "pool": "formula",
+      "model": "pointwise",
+      "seed": 43,
+      "path": "analysis/transfer2026_scholargpt_review/pilot_predictions/formula_pointwise_seed43.json"
+    },
+    {
+      "pool": "formula",
+      "model": "pointwise",
+      "seed": 44,
+      "path": "analysis/transfer2026_scholargpt_review/pilot_predictions/formula_pointwise_seed44.json"
+    }
+  ],
+  "groups": {
+    "formula/pointwise": {
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "metrics": {
+        "recall_at_1": {
+          "rerank_mean": 0.6664578111946533,
+          "rerank_sample_sd": 0.012953659875839294,
+          "base_mean": 0.5848712690817954,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_5": {
+          "rerank_mean": 0.767562846510215,
+          "rerank_sample_sd": 0.00871261107674461,
+          "base_mean": 0.7149692412850307,
+          "base_sample_sd": 1.3597399555105182e-16,
+          "n_seeds": 3
+        },
+        "recall_at_20": {
+          "rerank_mean": 0.8532505506189717,
+          "rerank_sample_sd": 0.004187410057501915,
+          "base_mean": 0.8180678970152654,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_40": {
+          "rerank_mean": 0.8943191311612365,
+          "rerank_sample_sd": 0.0029362798545186294,
+          "base_mean": 0.8730348598769652,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_80": {
+          "rerank_mean": 0.9285144679881522,
+          "rerank_sample_sd": 0.0005609966849963378,
+          "base_mean": 0.9188881294144452,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_100": {
+          "rerank_mean": 0.9383306751727805,
+          "rerank_sample_sd": 0.0006650823987292907,
+          "base_mean": 0.929254955570745,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_256": {
+          "rerank_mean": 1.0,
+          "rerank_sample_sd": 0.0,
+          "base_mean": 1.0,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "mrr": {
+          "rerank_mean": 0.7166209249177067,
+          "rerank_sample_sd": 0.010443631183239526,
+          "base_mean": 0.6479330605448312,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        }
+      }
+    },
+    "formula/relative": {
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "metrics": {
+        "recall_at_1": {
+          "rerank_mean": 0.6632490316700843,
+          "rerank_sample_sd": 0.004618024620348426,
+          "base_mean": 0.5848712690817954,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_5": {
+          "rerank_mean": 0.7629490392648287,
+          "rerank_sample_sd": 0.002325173522404705,
+          "base_mean": 0.7149692412850307,
+          "base_sample_sd": 1.3597399555105182e-16,
+          "n_seeds": 3
+        },
+        "recall_at_20": {
+          "rerank_mean": 0.8508202323991797,
+          "rerank_sample_sd": 0.0007114374570970897,
+          "base_mean": 0.8180678970152654,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_40": {
+          "rerank_mean": 0.8931419457735247,
+          "rerank_sample_sd": 0.0006001169829604154,
+          "base_mean": 0.8730348598769652,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_80": {
+          "rerank_mean": 0.9290650869598238,
+          "rerank_sample_sd": 0.002501946747175426,
+          "base_mean": 0.9188881294144452,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_100": {
+          "rerank_mean": 0.9382357408673198,
+          "rerank_sample_sd": 0.0014703482111755998,
+          "base_mean": 0.929254955570745,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_256": {
+          "rerank_mean": 1.0,
+          "rerank_sample_sd": 0.0,
+          "base_mean": 1.0,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "mrr": {
+          "rerank_mean": 0.7128849023316897,
+          "rerank_sample_sd": 0.003342497064127565,
+          "base_mean": 0.6479330605448312,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        }
+      }
+    },
+    "mass/pointwise": {
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "metrics": {
+        "recall_at_1": {
+          "rerank_mean": 0.5137275005696058,
+          "rerank_sample_sd": 0.005398649441097173,
+          "base_mean": 0.43779904306220097,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_5": {
+          "rerank_mean": 0.6734449760765551,
+          "rerank_sample_sd": 0.003934405659450736,
+          "base_mean": 0.6109592162223741,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_20": {
+          "rerank_mean": 0.8071124781651098,
+          "rerank_sample_sd": 0.0055252744473593554,
+          "base_mean": 0.7554682159945317,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_40": {
+          "rerank_mean": 0.8602567023619656,
+          "rerank_sample_sd": 0.006103648327062741,
+          "base_mean": 0.8215424925951241,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_80": {
+          "rerank_mean": 0.9337548416495786,
+          "rerank_sample_sd": 0.004187280918088183,
+          "base_mean": 0.9036226930963774,
+          "base_sample_sd": 1.3597399555105182e-16,
+          "n_seeds": 3
+        },
+        "recall_at_100": {
+          "rerank_mean": 0.9548682311840206,
+          "rerank_sample_sd": 0.003097070759630819,
+          "base_mean": 0.9253816359079517,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_256": {
+          "rerank_mean": 1.0,
+          "rerank_sample_sd": 0.0,
+          "base_mean": 1.0,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "mrr": {
+          "rerank_mean": 0.5902870081898167,
+          "rerank_sample_sd": 0.004412895134847454,
+          "base_mean": 0.521860003901349,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        }
+      }
+    },
+    "mass/relative": {
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "metrics": {
+        "recall_at_1": {
+          "rerank_mean": 0.5097592466013517,
+          "rerank_sample_sd": 0.00867398285730642,
+          "base_mean": 0.43779904306220097,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_5": {
+          "rerank_mean": 0.6706349206349206,
+          "rerank_sample_sd": 0.006672497353026766,
+          "base_mean": 0.6109592162223741,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_20": {
+          "rerank_mean": 0.8049100022784232,
+          "rerank_sample_sd": 0.005490421137434912,
+          "base_mean": 0.7554682159945317,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_40": {
+          "rerank_mean": 0.8612630059998482,
+          "rerank_sample_sd": 0.006952303063128917,
+          "base_mean": 0.8215424925951241,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_80": {
+          "rerank_mean": 0.9345333029543555,
+          "rerank_sample_sd": 0.0058562386871970845,
+          "base_mean": 0.9036226930963774,
+          "base_sample_sd": 1.3597399555105182e-16,
+          "n_seeds": 3
+        },
+        "recall_at_100": {
+          "rerank_mean": 0.9549251917672971,
+          "rerank_sample_sd": 0.0052491374376533685,
+          "base_mean": 0.9253816359079517,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "recall_at_256": {
+          "rerank_mean": 1.0,
+          "rerank_sample_sd": 0.0,
+          "base_mean": 1.0,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        },
+        "mrr": {
+          "rerank_mean": 0.5871197622455812,
+          "rerank_sample_sd": 0.00764051215298645,
+          "base_mean": 0.521860003901349,
+          "base_sample_sd": 0.0,
+          "n_seeds": 3
+        }
+      }
+    }
+  }
+}

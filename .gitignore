@@ -37,3 +37,8 @@ paper/*.out
 paper/*.xdv
 paper/main.pdf
 paper/main_cn.pdf
+
+# Internal second-stage per-query predictions are large and tied to local
+# excluded caches; tracked summaries and manifests record their provenance.
+analysis/transfer2026_scholargpt_review/pilot_predictions/
+analysis/transfer2026_scholargpt_review/ablation_predictions/

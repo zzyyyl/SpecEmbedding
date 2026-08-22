@@ -205,19 +205,21 @@ coarse top-40. A capacity-matched pointwise control and the earlier rank-aware
 Transformer audit are kept separate. Recall and MRR use MassSpecGym-supplied
 candidate files with a local exact-target-SMILES single-positive rule. The
 reference loader defaults to two-dimensional InChIKey equivalence and may yield
-multiple positives; the effect of this difference is unquantified, so local
-values are not official-evaluator-equivalent.
+multiple positives. A MassSpecGym 1.3.1 transform audit of the saved 17,556-query
+mass/formula test caches found no multiple-positive query or candidate identity
+collision, and the seed-42 relative metrics were unchanged; this remains a
+cache-level audit rather than a full official-loader rerun.
 
-The initial no-forcing pilot uses pre-overlap-clean alignment checkpoint
-`d4c1f70`, reranker seed 42, 5,000 training queries, and three epochs. It is a
-descriptive pilot, not a multi-seed main result: relative improves its base but
-is slightly below the capacity-matched pointwise control in both pools. Full
-metrics, fingerprints, commands, and boundaries are recorded in
-`analysis/transfer2026_scholargpt_method/pilot-results.md`. The earlier
-overlap-clean seed-42/43/44 tables remain historical evidence in their original
-analysis directories. JESTR and GLMR are reported-only, not independently
-reproduced, and not directly comparable mechanism background; no external
-numeric values are displayed.
+The no-forcing pilot uses pre-overlap-clean alignment checkpoint `d4c1f70`,
+5,000 training queries, three epochs, and reranker seeds 42--44. Both relative
+and capacity-matched pointwise improve the base in both pools; pointwise is
+slightly higher at the main R@1/MRR summaries, so no independent relative-module
+gain is claimed. Query-level predictions, K=20/40/80 evaluation-only sensitivity,
+bootstrap summaries, mechanism controls, and RTX 4090 forward audits are
+recorded in `analysis/transfer2026_scholargpt_review/second_stage_report.md` and
+`second_stage_manifest.json`. JESTR and GLMR remain reported-only, not
+independently reproduced, and not directly comparable mechanism background; no
+external numeric values are displayed.
 
 The new method entry points are `prepare_rerank_cache.py` with
 `--topk 256 --no-force_include_positive`, `train_rerank.py --model_type

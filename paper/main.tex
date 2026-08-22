@@ -10,8 +10,8 @@
 % Before transfer submission:
 % 1. Keep unmatched cross-paper values explicitly marked as reported,
 %    unreproduced, and not directly comparable.
-% 2. Keep unmeasured top-K and efficiency questions as limitations and make no
-%    corresponding empirical claim.
+% 2. Keep external baselines, alignment-retraining scope, and deployment-level
+%    efficiency questions as limitations; forward-only audits are not advantages.
 % 3. Once the venue is fixed, apply its page, format, disclosure, and anonymity
 %    rules and scrub the final PDF and supplement metadata.
 
@@ -566,8 +566,12 @@ and \href{https://github.com/pluskal-lab/MassSpecGym/blob/4f501b3207c9f466bc745a
 accessed August 1, 2026.} the reference loader instead defaults to
 two-dimensional InChIKey equivalence and may label multiple positives. Our
 Recall and MRR therefore use a local exact-target-SMILES single-positive
-protocol on the supplied candidate files; the effect of the identity-rule
-difference is unquantified.
+protocol on the supplied candidate files. We also applied the MassSpecGym
+1.3.1 2D-InChIKey transform to the saved 17,556-query test caches: neither
+pool contained a multiple-positive query or an identity collision, and the
+seed-42 relative metrics were unchanged under the two rules. This is a
+cache-level identity audit, not a full rerun through the official loader, so
+we retain the local-protocol label.
 The multiple-positive labels used during alignment are likewise cached raw
 exact-SMILES labels, not two-dimensional molecular-identity labels. The graph
 features do not explicitly encode atom chirality or bond stereochemistry, so a
@@ -626,8 +630,9 @@ automated tests, and a tiny synthetic CPU smoke test. It does not provide the
 MassSpecGym spectra, candidate pools, trained alignment or reranker checkpoints,
 reranker caches, logs, or private analysis artifacts; the smoke test therefore
 does not reproduce the scientific metrics. The two pilot pools use separate mass
-and formula reranker trainings. The pilot source commit is \texttt{d28106b}; its
-parameter hash is recorded in the internal pilot manifest alongside cache and
+and formula reranker trainings. The pilot training implementation is recorded
+at \texttt{488a04a} and the query-level evaluation utility at \texttt{8ce2655};
+parameter hashes are recorded in the internal pilot manifest alongside cache and
 checkpoint fingerprints. The frozen candidate artifacts and their
 provenance are recorded in the internal pilot manifest (not included in the
 anonymous submission); the release manifest covers only manuscript PDFs. The
@@ -656,25 +661,23 @@ implementations are not matched to our local exact-target-SMILES
 single-positive protocol.
 
 We report Recall@1, Recall@5, Recall@20, and mean reciprocal rank (MRR) over all
-test queries. The new pilot does not recompute MCES; the earlier thresholded
-myopic-MCES audit is retained only as an internal historical artifact and is not
-combined with the pilot results. For the historical audit, Recall/MRR seed
-dispersion was computed over three reranker seeds, while cross-alignment
-summaries first averaged seeds within each checkpoint. These descriptive
-summaries are not confidence intervals, and the historical MCES values were
-single-checkpoint measurements without seed-level uncertainty.
+test queries. The new pilot uses three reranker training seeds (42--44) on the
+same pre-overlap-clean alignment checkpoint and 5,000 training queries; means
+and sample SDs are seed dispersion, not independent alignment replicates. The
+query-level seed-42 paired bootstrap uses the saved per-query predictions and
+2,000 deterministic resamples. The new pilot does not recompute MCES; the
+earlier thresholded myopic-MCES audit remains a separate single-checkpoint
+artifact.
 
 \subsection{Main Results}
 
 \begin{table}[t]
   \centering
-  \caption{Initial no-forcing full-pool pilot on the local MassSpecGym protocol.
-  The base and both learned rows use the same pre-overlap-clean \texttt{d4c1f70}
-  alignment-seed-42 cache, one
-  reranker training seed (42), 5,000 training queries, and three epochs; the
-  learned rows are not seed aggregates. Recall and MRR are percentages under
-  exact-target-SMILES single-positive evaluation and are not official-evaluator-
-  equivalent.}
+  \caption{No-forcing full-pool pilot on the local MassSpecGym protocol. Base
+  values use the same pre-overlap-clean \texttt{d4c1f70} cache; learned rows
+  are means $\pm$ sample SD over reranker training seeds 42--44, each trained
+  on 5,000 queries for three epochs. Recall and MRR are percentages under
+  exact-target-SMILES single-positive evaluation.}
   \label{tab:main_results}
   \tiny
   \setlength{\tabcolsep}{1pt}
@@ -683,30 +686,44 @@ single-checkpoint measurements without seed-level uncertainty.
     Pool & Method & R@1 & R@5 & R@20 & MRR \\
     \midrule
     \multirow{3}{*}{Mass}
-      & \base{} (full pool, seed 42) & 43.78 & 61.10 & 68.43 & 52.19 \\
+      & \base{} (full pool, seed 42) & 43.78 & 61.10 & 75.55 & 52.19 \\
       & Capacity-matched pointwise
-      & 51.63 & 67.79 & 74.39 & 59.35 \\
+      & 51.37$\pm$0.54 & 67.34$\pm$0.39 & 80.71$\pm$0.55 & 59.03$\pm$0.44 \\
       & Relative candidate model
-      & 50.08 & 66.42 & 73.51 & 57.95 \\
+      & 50.98$\pm$0.87 & 67.06$\pm$0.67 & 80.49$\pm$0.55 & 58.71$\pm$0.76 \\
     \midrule
     \multirow{3}{*}{Formula}
-      & \base{} (full pool, seed 42) & 58.49 & 71.49 & 76.86 & 64.79 \\
+      & \base{} (full pool, seed 42) & 58.49 & 71.50 & 81.81 & 64.79 \\
       & Capacity-matched pointwise
-      & 68.05 & 77.72 & 82.17 & 72.82 \\
+      & 66.65$\pm$1.30 & 76.76$\pm$0.87 & 85.33$\pm$0.42 & 71.66$\pm$1.04 \\
       & Relative candidate model
-      & 66.80 & 76.47 & 81.36 & 71.61 \\
+      & 66.32$\pm$0.46 & 76.29$\pm$0.23 & 85.08$\pm$0.07 & 71.29$\pm$0.33 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-The pilot improves over its full-pool base in both pools, but the relative
-candidate module is below the capacity-matched pointwise control by 1.55 mass
-Recall@1 points (1.35 formula points) and 0.016 mass MRR (0.012 formula MRR).
-This is a single-seed, limited-query result rather than evidence of a robust
-independent relation benefit. The mass relative model gives 50.52\% Recall@1
-and 0.5784 MRR after evaluation-time top-40 truncation, compared with 50.08\%
-and 0.5795 on the full pool. New pilot runs did not compute MCES; the historical
-single-checkpoint MCES audit is retained only in the following secondary section.
+Both learned models improve on their full-pool base in both pools. Pointwise is
+slightly higher than relative at R@1 and MRR in the three-seed aggregate
+(mass: 51.37 vs. 50.98 and 0.5903 vs. 0.5871; formula: 66.65 vs. 66.32 and
+0.7166 vs. 0.7129). Evaluation-only K sensitivity on the same 256-candidate
+cache gives mass relative/pointwise R@1-at-K of 80.49/80.71 at $K=20$,
+86.13/86.03 at $K=40$, and 93.45/93.38 at $K=80$; these are not K-specific
+training runs. The seed-42 paired bootstrap gives a relative-minus-base R@1
+difference of 6.30 percentage points (95\% CI 5.69--6.93) and MRR difference
+0.0576 (0.0530--0.0625) for mass. New pilot runs did not compute MCES; the
+historical single-checkpoint MCES audit remains separate.
+
+\paragraph{Information-source and mechanism audit.}
+On the same seed-42 pilot, a base-score-only control reaches 43.78\%/0.5219
+(mass) and 58.49\%/0.6479 (formula) for R@1/MRR, i.e., no improvement over
+the base. An embedding-only absolute scorer reaches 50.07\%/0.5808 and
+66.13\%/0.7110, while adding the base-score pathway without the relative
+module gives 50.07\%/0.5798 and 66.28\%/0.7141. The full relative model gives
+50.08\%/0.5795 and 66.80\%/0.7161. Candidate-only controls (45.00\%/0.5245
+and 52.73\%/0.5960) are weaker than spectrum-conditioned variants. Removing
+molecular relations, spectrum conditioning, or antisymmetric pairing changes
+the two pools in different directions; these single-seed controls therefore
+support an information-source finding, not a causal component ranking.
 
 JESTR and GLMR remain reported-only, not reproduced, and not directly
 comparable background methods. We retain their mechanism descriptions but do
@@ -724,13 +741,14 @@ the relative module introduced here.
 
 The new full-pool pilot separates candidate coverage from list ordering. Its
 full-pool upper bound is 100\% by construction of the saved cache, whereas
-evaluation-time top-40 truncation gives a mass upper bound of 82.15\%. Within
-the full pool, the relative model improves the base from 43.78\% to 50.08\%
-Recall@1 and from 0.5219 to 0.5795 MRR; the capacity-matched pointwise control
-is higher at 51.63\% and 0.5935. Formula-conditioned retrieval shows the same
-ordering: relative 66.80\%/0.7161, pointwise 68.05\%/0.7282, and base
-58.49\%/0.6479 for Recall@1/MRR. These are one-seed, 5,000-query pilot
-measurements, not stability estimates.
+evaluation-time top-40 truncation gives a mass upper bound of 82.15\%. Across
+three reranker seeds, relative and pointwise both improve the base; pointwise
+is slightly stronger at R@1/MRR, while relative is not uniformly better at any
+cutoff. The saved seed-42 predictions also give fixed RTX 4090 forward-only
+measurements of 0.083 ms/query and 302 MB peak allocation for mass relative,
+versus 0.030 ms/query and 244 MB for pointwise (formula: 0.076/0.029 ms and
+302/244 MB). These measurements are implementation audits, not an efficiency
+claim.
 
 The mass spectrum-shuffle audit reduces the relative model to 45.05\% Recall@1
 and 0.5358 MRR, still above its base but well below the correctly paired
@@ -741,8 +759,9 @@ therefore do not attribute the pointwise-to-relative gap to a causal benefit of
 candidate relations. The historical Transformer results below are retained only
 as an audit of the previous design and are not merged with this pilot.
 
-No new MCES, official-evaluator, multi-seed, or fixed-hardware efficiency result
-is claimed here; those items remain explicit evidence boundaries.
+The identity result is limited to the saved candidate caches: it does not
+establish equivalence for an unreconstructed official loader or an external
+candidate pool. JESTR/GLMR remain reported-only and were not reproduced.
 
 \iffalse
 \section{Historical discussion text}
@@ -786,13 +805,13 @@ most of the gain should not be attributed to candidate self-attention.
 
 \section{Limitations and Responsible Evaluation}
 
-The primary new evidence is a seed-42 pilot trained on 5,000 of 194,119
-available training queries for three epochs. It is therefore insufficient for
-seed aggregation, alignment sensitivity, confidence intervals, or a claim that
-the relative branch is generally better than pointwise scoring. The pilot also
-uses the local exact-target-SMILES single-positive protocol; the reference
-two-dimensional InChIKey/multiple-positive evaluator was not run, so official
-comparability and the effect of stereochemistry remain open.
+The primary new evidence uses 5,000 of 194,119 training queries for three
+epochs and three reranker training seeds on one alignment checkpoint. This is
+not alignment-level or end-to-end seed stability. The query-level bootstrap is
+descriptive and does not replace independent retraining. The 2D-InChIKey audit
+found no identity collisions in these saved test caches, but it was not a full
+official-loader rerun; external baselines and candidate-aware alignment
+retraining remain outside scope.
 
 The no-forcing cache retains only candidates supplied by the MassSpecGym files.
 The reranker cannot recover a target absent from an evaluation cutoff, and it
@@ -803,10 +822,10 @@ an in-batch dependency audit, not a causal or invariance guarantee.
 
 The anonymous supplement contains code inspection, locked environments, tests,
 and a synthetic smoke test, but not the real data, candidate files, caches,
-checkpoints, logs, or pilot result artifacts. The official evaluator, matched
-external baselines, candidate-aware alignment retraining, difficulty
-stratification, and fixed-hardware latency/memory measurements remain blocked
-by unavailable inputs or uncompleted runs. We make no claims for them.
+checkpoints, logs, or pilot result artifacts. Matched external baselines and
+candidate-aware alignment retraining remain outside scope. The reported
+latency/memory numbers are fixed-hardware forward audits, not end-to-end
+throughput or deployment guarantees.
 
 The spectrum tower does not receive adduct, instrument, or collision-energy
 metadata, and formula conditioning presumes a known formula. Transfer to other
@@ -876,15 +895,16 @@ generation-validity failures.
 
 We introduced \method{}, a rank-free, no-forcing second-stage reranker that
 combines full-pool coarse scoring with spectrum-conditioned relative candidate
-preferences. In a seed-42 pilot under the local exact-target-SMILES protocol,
-both the relative model and its capacity-matched pointwise control improved the
-full-pool base in mass- and formula-conditioned retrieval. The pointwise control
-was slightly stronger in this pilot, and the spectrum-shuffle audit retained a
+preferences. Across three reranker training seeds under the local
+exact-target-SMILES protocol, both the relative model and its capacity-matched
+pointwise control improved the full-pool base in mass- and formula-conditioned
+retrieval. Pointwise was slightly stronger at the main R@1/MRR summaries, and
+the spectrum-shuffle audit retained a
 substantial candidate/base-score contribution. The evidence therefore supports
 the engineering framework and its explicit evidence boundaries, but does not
 establish an independent or generally robust benefit of the relative module.
-Official evaluator equivalence, external baselines, alignment retraining, and
-efficiency remain open rather than claimed.
+The 2D-InChIKey cache audit found no identity collisions, but official-loader
+equivalence and external-baseline comparison remain unclaimed.
 
 \bibliographystyle{splncs04}
 \bibliography{references}

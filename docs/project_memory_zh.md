@@ -1,6 +1,6 @@
 # SpecEmbedding 项目记忆
 
-最后更新：2026-08-20
+最后更新：2026-08-23
 
 当前修订状态：
 
@@ -936,7 +936,7 @@ checkpoint，也不沿用原谱图--谱图目标；第一阶段改为从零训�
 - 第 11 节最高优先级待办。
 - 第 12 节风险。
 
-## 15. 2026-08-23 ScholarGPT 方法重构 pilot
+## 15. 2026-08-23 ScholarGPT 方法重构 pilot（初始快照）
 
 外部评审要求将旧的 rank-aware、训练期 positive-forcing Transformer 设计与新方法分开。
 当前代码已加入无 rank、无 forcing 的 full-pool coarse-to-fine relative reranker：完整供给池
@@ -954,6 +954,24 @@ checkpoint，也不沿用原谱图--谱图目标；第一阶段改为从零训�
 
 relative 超过匹配 base，但在此有限 pilot 中略低于 pointwise；mass spectrum-shuffle 后为
 45.05 / 0.5358，formula 为 63.79 / 0.6860。因此不得声称候选关系的独立、因果或一般稳健
-收益。该 pilot 不更新历史 overlap-clean canonical artifact manifest；官方 evaluator、外部
-baseline、multi-seed aggregate、difficulty 分层和效率测量仍未完成。页数不作为当前阻断，正文
+收益。以上是第二阶段复核前的初始快照；该 pilot 不更新历史 overlap-clean canonical artifact manifest；页数不作为当前阻断，正文
 优先保持精炼和证据可靠。
+
+## 16. 2026-08-23 ScholarGPT 第二阶段复核
+
+按外部评审意见补做了同一 `d4c1f70` alignment checkpoint 下的 relative/容量匹配 pointwise
+三 seed（42--44）pilot：每个候选池使用 5,000 条训练 query、3 epochs、无 rank、无 forcing，
+在 17,556 条测试 query 上保存逐 query prediction。三 seed 聚合为：mass relative R@1/MRR
+50.98±0.87/0.5871，pointwise 51.37±0.54/0.5903；formula relative 66.32±0.46/0.7129，
+pointwise 66.65±1.30/0.7166。两种模型均超过 base，但 relative 没有建立相对 pointwise 的
+独立普遍优势。
+
+同一 256-candidate cache 完成 evaluation-only K=20/40/80 敏感性、seed-42 paired bootstrap、
+score-only/embedding-only/embedding+base/candidate-only/no-spectrum/no-molecular/no-antisymmetric
+机制对照，以及 RTX 4090 前向 latency/显存审计。base-score-only 没有带来提升，embedding
+分支贡献主要 pilot 增益；机制移除在两个候选池方向不一致，不作因果组件排序。
+
+对新 relative full-pool test cache 应用 MassSpecGym 1.3.1 二维 InChIKey 变换后，两个候选池
+均无 multiple-positive query 或 candidate identity collision，seed-42 local/reference 指标
+一致；该结果是 cache-level identity audit，不是完整官方 loader 重跑。JESTR/GLMR 仍为
+reported-only、未复现、不可直接比较。详见 `analysis/transfer2026_scholargpt_review/`。

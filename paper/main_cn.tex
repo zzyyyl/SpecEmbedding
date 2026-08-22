@@ -7,7 +7,7 @@
 %
 % 转投稿前：
 % 1. 未匹配复现的跨论文数字始终标为 reported、未复现且不可直接比较。
-% 2. 未测量的 top-K 和效率问题保留为限制，不据此作实验主张。
+% 2. 外部基线、alignment 重训和部署级效率仍保留为限制；前向审计不写成优势。
 % 3. venue 确定后再按其规则完成页数、格式、披露与匿名性检查，并清理最终
 %    PDF 和补充材料元数据。
 
@@ -445,7 +445,9 @@ commit \texttt{4f501b3} 中，\footnote{MassSpecGym
 与 \href{https://github.com/pluskal-lab/MassSpecGym/blob/4f501b3207c9f466bc745a0353f61dbfaf150d32/massspecgym/data/transforms.py}{label transform}，
 访问日期：2026-08-01。}参考 loader 默认使用二维 InChIKey 等价规则，可能标出多个正例。
 因此，本文 Recall 和 MRR 使用所提供候选文件上的本地 exact-target-SMILES 单正例协议；
-身份规则差异的影响尚未量化。
+我们还对保存的 17,556 条测试 query 应用了 MassSpecGym 1.3.1 的二维 InChIKey 变换：质量
+和分子式候选池都没有多正例 query 或身份碰撞，seed-42 relative 指标在两种规则下不变。这是
+缓存层面的身份审计，不是通过官方 loader 的完整重跑，因此仍保留 local-protocol 标记。
 alignment 中的多个正例标签同样来自 cache 中的 raw exact-SMILES 标签，而不是二维分子身份
 标签。图特征没有显式编码原子手性或键立体化学，因此某个立体异构候选在本地协议中可能被
 标为负例，而二维身份规则可能将其合并；这一模型层面的后果尚未量化。
@@ -486,8 +488,9 @@ $\delta=0.1$。容量匹配的 pointwise 对照使用相同绝对分支和优化
 匿名补充包提供源码检查、锁定的环境文件、自动化测试和一个小型 CPU 合成 smoke test，
 但不包含 MassSpecGym 谱图、候选池、训练后的 alignment 或 reranker checkpoint、reranker
 cache、日志及私有分析工件；因此 smoke test 不能复现论文科学指标。质量和分子式两种候选池
-分别训练 reranker。pilot 的源提交为 \texttt{d28106b}，参数哈希、cache 和 checkpoint 指纹
-记录在内部 pilot manifest 中；该 manifest 不随匿名投稿包提供，release manifest 仅覆盖论文
+分别训练 reranker。pilot 的训练实现提交为 \texttt{488a04a}，逐 query 评估工具提交为
+\texttt{8ce2655}；参数哈希、cache 和 checkpoint 指纹记录在内部 pilot manifest 中；该
+manifest 不随匿名投稿包提供，release manifest 仅覆盖论文
 PDF。早期含 rank Transformer 审计仍由其历史工件记录追踪，不与本 pilot provenance 混合。
 公开的图特征包括原子符号、度、总氢数、芳香性、环大小分箱、形式电荷；键类型、共轭性、
 环内标志；以及 $\log(1+n_\mathrm{atoms})$、$\log(1+n_\mathrm{bonds})$ 图规模特征。
@@ -505,20 +508,20 @@ $10^{-4}$、gradient clipping 为 1；谱图 cache 使用 FP32、分子 cache �
 当前代码库中独立复现 JESTR 和 GLMR，其基础检索器、候选处理、身份/canonicalization
 规则与 MCES 实现也未和本文的 exact-target-SMILES 单正例协议匹配；本文不展示这些外部数值。
 
-评价指标为全部测试查询上的 Recall@1、Recall@5、Recall@20 和 MRR。新的 pilot 不重新计算
-MCES；早期经过阈值处理的 myopic-MCES 审计仅作为内部历史工件保留，不与本 pilot 合并。历史
-审计中的 Recall/MRR 种子离散度来自三个 reranker training seeds；跨 alignment 汇总先在每个
-checkpoint 内平均 seeds。这些描述性汇总不是置信区间，历史 MCES 也只是单 checkpoint 测量，
-不含种子层面的不确定性。
+评价指标为全部测试查询上的 Recall@1、Recall@5、Recall@20 和 MRR。新的 pilot 使用同一
+pre-overlap-clean alignment checkpoint、5,000 条训练 query 和三个 reranker training seeds
+（42--44）；均值和样本标准差表示 seed 离散度，不是独立 alignment 重复。seed-42 的逐 query
+paired bootstrap 使用保存的预测和 2,000 次确定性重采样。新的 pilot 不重新计算 MCES；早期经过
+阈值处理的 myopic-MCES 审计仍作为独立的单 checkpoint 工件保留。
 
 \subsection{主要结果}
 
 \begin{table}[t]
   \centering
-  \caption{本地 MassSpecGym 无 forcing 完整候选池初始 pilot。Base 和两行学习式结果使用同一
-  pre-overlap-clean \texttt{d4c1f70} alignment-seed-42 cache、单个 reranker training seed（42）、5,000 条训练 query 和三个 epoch；
-  学习式结果不是多 seed 聚合。Recall 和 MRR 以百分比报告，采用本地 exact-target-SMILES
-  单正例协议，并不等价于官方 evaluator。}
+  \caption{本地 MassSpecGym 无 forcing 完整候选池 pilot。Base 使用同一
+  pre-overlap-clean \texttt{d4c1f70} cache；学习式结果为 reranker training seeds 42--44 的均值
+  $\pm$ 样本标准差，每次使用 5,000 条 query 训练三个 epoch。Recall 和 MRR 采用本地
+  exact-target-SMILES 单正例协议。}
   \label{tab:main_results_cn}
   \scriptsize
   \setlength{\tabcolsep}{2pt}
@@ -527,27 +530,38 @@ checkpoint 内平均 seeds。这些描述性汇总不是置信区间，历史 MC
     候选池 & 方法 & R@1 & R@5 & R@20 & MRR \\
     \midrule
     \multirow{3}{*}{质量}
-      & \base{}（完整池，seed 42） & 43.78 & 61.10 & 68.43 & 52.19 \\
+      & \base{}（完整池，seed 42） & 43.78 & 61.10 & 75.55 & 52.19 \\
       & 容量匹配 pointwise
-      & 51.63 & 67.79 & 74.39 & 59.35 \\
+      & 51.37$\pm$0.54 & 67.34$\pm$0.39 & 80.71$\pm$0.55 & 59.03$\pm$0.44 \\
       & 相对候选模型
-      & 50.08 & 66.42 & 73.51 & 57.95 \\
+      & 50.98$\pm$0.87 & 67.06$\pm$0.67 & 80.49$\pm$0.55 & 58.71$\pm$0.76 \\
     \midrule
     \multirow{3}{*}{分子式}
-      & \base{}（完整池，seed 42） & 58.49 & 71.49 & 76.86 & 64.79 \\
+      & \base{}（完整池，seed 42） & 58.49 & 71.50 & 81.81 & 64.79 \\
       & 容量匹配 pointwise
-      & 68.05 & 77.72 & 82.17 & 72.82 \\
+      & 66.65$\pm$1.30 & 76.76$\pm$0.87 & 85.33$\pm$0.42 & 71.66$\pm$1.04 \\
       & 相对候选模型
-      & 66.80 & 76.47 & 81.36 & 71.61 \\
+      & 66.32$\pm$0.46 & 76.29$\pm$0.23 & 85.08$\pm$0.07 & 71.29$\pm$0.33 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\noindent 本 pilot 在两个候选池上都超过完整池 Base，但相对候选模块低于容量匹配 pointwise：
-质量 R@1 低 1.55 个百分点、MRR 低 0.016；分子式 R@1 低 1.25 个百分点、MRR 低 0.012。
-因此这只是单 seed、有限训练 query 的结果，不能证明候选关系具有稳健独立收益。质量相对模型
-在评价时截断到 top-40 后为 50.52\% R@1、0.5784 MRR，而完整池为 50.08\%、0.5795。
-本 pilot 未计算 MCES；历史单 checkpoint MCES 审计仅保留在下方次级章节。
+\noindent 两种学习式模型在两个候选池都超过完整池 Base。三个 seed 聚合中，pointwise 在 R@1
+和 MRR 略高于 relative（质量：51.37 对 50.98、0.5903 对 0.5871；分子式：66.65 对 66.32、
+0.7166 对 0.7129）。同一 256 候选 cache 的评价时 K 敏感性显示，质量场景 relative/pointwise
+在 $K=20$ 为 80.49/80.71、$K=40$ 为 86.13/86.03、$K=80$ 为 93.45/93.38；这些不是
+按 K 重新训练的结果。seed-42 paired bootstrap 中，质量 relative 相对 Base 的 R@1 差为
+6.30 个百分点（95\% CI：5.69--6.93），MRR 差为 0.0576（0.0530--0.0625）。新的 pilot
+未计算 MCES；历史单 checkpoint MCES 审计仍单独保留。
+
+\paragraph{信息来源与机制审计。}
+在同一 seed-42 pilot 中，仅使用 base score 的对照在质量/分子式场景的 R@1/MRR 为
+43.78\%/0.5219 和 58.49\%/0.6479，与 Base 相同；仅使用 embedding 的绝对打分器为
+50.07\%/0.5808 和 66.13\%/0.7110；加入 base-score 但不使用相对分支为 50.07\%/0.5798
+和 66.28\%/0.7141。完整 relative 模型为 50.08\%/0.5795 和 66.80\%/0.7161。仅使用
+候选分子信息的对照为 45.00\%/0.5245 和 52.73\%/0.5960，弱于含谱图条件的变体。移除
+分子关系、谱图条件或反对称 pair 后两个候选池方向不一致；这些单 seed 对照支持的是信息
+来源分析，而不是组件因果排序。
 
 JESTR 和 GLMR 保留为 reported-only、未复现且不可直接比较的机制背景；本文不再复现其数值表，
 也不据此推断相对排名。
@@ -560,19 +574,19 @@ JESTR 和 GLMR 保留为 reported-only、未复现且不可直接比较的机制
 \section{讨论}
 
 新的完整池 pilot 将候选覆盖与列表内排序分开。保存的完整池上界按构造为 100\%，而评价时
-截断到 top-40 后质量候选上界为 82.15\%。在完整池内，相对模型把质量场景 Base 从
-43.78\%/0.5219 提升到 50.08\%/0.5795（Recall@1/MRR），容量匹配 pointwise 更高，为
-51.63\%/0.5935。分子式场景呈现相同顺序：相对模型 66.80\%/0.7161、pointwise
-68.05\%/0.7282、Base 58.49\%/0.6479。这些是单 seed、5,000 条训练 query 的 pilot，
-不是稳定性估计。
+截断到 top-40 后质量候选上界为 82.15\%。三个 reranker seeds 中两种模型都超过 Base；
+pointwise 在主要 R@1/MRR 汇总略强，relative 在不同 cutoff 并非始终更好。保存的 seed-42
+预测还给出 RTX 4090 仅前向测量：质量 relative 为 0.083 ms/query、峰值分配 302 MB，
+pointwise 为 0.030 ms/query、244 MB（分子式分别为 0.076/0.029 ms 和 302/244 MB）。
+这些是实现审计，不构成效率优越性结论。
 
 质量候选的 spectrum-shuffle 审计使相对模型降为 45.05\% Recall@1 和 0.5358 MRR，仍高于
 Base，但明显低于正确配对的相对结果。这说明模型并非完全不依赖谱图；然而打乱谱图后仍保留的
 性能也表明候选与基础分数路径贡献显著。因此，不能将 pointwise 到 relative 的差异归因于
 候选关系的因果收益。下方历史 Transformer 结果仅作为旧设计审计保留，不与本 pilot 合并。
 
-本文不在此宣称新的 MCES、官方 evaluator、多 seed 稳定性或固定硬件效率结果；这些仍是明确
-的证据边界。
+身份结果仅覆盖保存的候选 cache，不能证明未重建官方 loader 或外部候选池的等价性；JESTR/GLMR
+仍为 reported-only，未独立复现。
 
 \iffalse
 \section{历史讨论文本}
@@ -608,10 +622,10 @@ Transformer--Pointwise 方向进一步说明大部分增益不应归因于候选
 
 \section{局限性与负责任评估}
 
-新的主要证据是使用 194,119 条可用训练 query 中的 5,000 条、训练三个 epoch 的 seed-42
-pilot。因此它不足以支持 seed 聚合、alignment 敏感性、置信区间，或 relative 普遍优于
-pointwise 的结论。pilot 还使用本地 exact-target-SMILES 单正例协议；本文没有运行参考的
-二维 InChIKey/多正例 evaluator，身份规则和立体化学影响仍未量化。
+新的主要证据使用 194,119 条可用训练 query 中的 5,000 条、训练三个 epoch，以及同一
+alignment checkpoint 的三个 reranker training seeds。这不是 alignment 层级或端到端 seed
+稳定性；逐 query bootstrap 也不替代独立重训。二维 InChIKey 审计在保存的测试 cache 中未发现
+身份碰撞，但不是官方 loader 的完整重跑；外部基线和候选感知 alignment 重训仍不在范围内。
 
 无 forcing cache 只保留 MassSpecGym 文件提供的候选。目标若不在评价截断深度内，reranker
 无法恢复；闭集模型也不能提出候选池之外的结构。候选关系只在 coarse top-40 上计算，因此
@@ -619,9 +633,8 @@ pointwise 的结论。pilot 还使用本地 exact-target-SMILES 单正例协议�
 不变性保证。
 
 匿名补充包包含源码检查、锁定环境、测试和合成 smoke test，但不含真实数据、候选文件、cache、
-checkpoint、日志或 pilot 结果工件。官方 evaluator、匹配的外部基线、候选感知 alignment
-重训、难度分层以及固定硬件 latency/显存测量仍因输入不可用或尚未完成而阻塞；本文不对这些
-项目作主张。
+checkpoint、日志或 pilot 结果工件。匹配的外部基线和候选感知 alignment 重训仍不在范围内。
+报告的 latency/显存是固定硬件前向审计，不是端到端吞吐或部署保证。
 
 谱图塔不接收加合物、仪器或碰撞能量元数据，分子式条件也假设公式已知。向其它采集条件、
 候选构造、身份规则、基准或更大候选列表迁移尚未测试。历史 forced-positive Transformer
@@ -672,11 +685,11 @@ exchangeability 且目标属于候选池等假设下生成具有边际覆盖率�
 \section{结论}
 
 本文提出 \method{}：一种无 rank、无 forcing 的第二阶段排序器，将完整候选池 coarse 打分
-与谱图条件的相对候选偏好结合。在本地 exact-target-SMILES 协议的 seed-42 pilot 中，relative
-模型及容量匹配 pointwise 对照均改善质量和分子式场景的完整池 Base；pointwise 在该 pilot
-略强，spectrum-shuffle 审计也显示候选/base-score 路径贡献显著。因此，当前证据支持该工程
-框架及其明确的证据边界，但尚未建立 relative 模块独立且普遍稳健的收益。官方 evaluator
-等价性、外部基线、alignment 重训和效率测量仍是未完成事项，本文不作相关主张。
+与谱图条件的相对候选偏好结合。在本地 exact-target-SMILES 协议的三个 reranker training
+seeds 中，relative 和容量匹配 pointwise 都改善质量和分子式场景的完整池 Base；pointwise
+在主要 R@1/MRR 汇总略强，spectrum-shuffle 审计也显示候选/base-score 路径贡献显著。因此，
+当前证据支持该工程框架及其明确的证据边界，但尚未建立 relative 模块独立且普遍稳健的收益。
+二维 InChIKey cache 审计未发现身份碰撞，但官方 loader 等价性和外部基线比较仍不作主张。
 
 \bibliographystyle{plain}
 \bibliography{references}

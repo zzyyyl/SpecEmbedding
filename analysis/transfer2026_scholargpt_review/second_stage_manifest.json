@@ -1,0 +1,29 @@
+{
+  "scope": "second-stage no-forcing pilot and mechanism audit",
+  "training_source_commit": "488a04a",
+  "evaluation_source_commit": "8ce2655",
+  "alignment_checkpoint": "d4c1f70",
+  "seeds": [42, 43, 44],
+  "train_queries": 5000,
+  "epochs": 3,
+  "candidate_cache": "full supplied cache, at most 256 candidates; no positive forcing",
+  "identity_protocol": "local exact-target-SMILES plus MassSpecGym 1.3.1 2D InChIKey cache audit",
+  "tracked_files": {
+    "multiseed_summary.json": "sha256:f1aedab762263907e54ada99ae37e6da1b7f23d0c8617dbb4fe0003fc685e4e3",
+    "second_stage_report.md": "sha256:5cceb3bf3e20034c42cce6cf358bb5886d091cb328c5b9de01783c5574fd2750",
+    "relative_identity_eval.json": "sha256:a74f6aa4ead3a1a3c25e8e385183c1a925d5ce4e2c5c019ee96619d2c71f134b",
+    "summarize_pilot.py": "sha256:6a785fcff0c4bb7e3c31623d0d8ca2bc95713b97f0f1560dcb1053a4d1271a61"
+  },
+  "local_untracked_artifacts": {
+    "pilot_predictions": "analysis/transfer2026_scholargpt_review/pilot_predictions/",
+    "ablation_predictions": "analysis/transfer2026_scholargpt_review/ablation_predictions/",
+    "note": "Excluded from the anonymous supplement and git because they depend on private caches; summaries above are the tracked evidence."
+  },
+  "boundaries": [
+    "three reranker seeds are not independent alignment replicates",
+    "K sensitivity is evaluation-only truncation, not K-specific retraining",
+    "2D identity result is a cache-level audit, not a full official-loader rerun",
+    "JESTR/GLMR remain reported-only and not directly comparable",
+    "forward latency/memory is not an end-to-end efficiency claim"
+  ]
+}
