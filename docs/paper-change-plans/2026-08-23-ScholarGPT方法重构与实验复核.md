@@ -1,6 +1,6 @@
 # 论文修改计划：ScholarGPT 方法重构与实验复核
 
-- 状态：`执行中`
+- 状态：`已执行`
 - 创建日期：2026-08-23
 - 最后更新：2026-08-23
 - 负责人：Codex
@@ -98,9 +98,10 @@
 - [x] 步骤 6：完成主指标、coverage、谱图打乱审计和工件指纹记录；未把未完成的效率/难度分析写成结果。
 - [x] 步骤 7：按真实结果重写英文稿，同步中文稿、README 和项目记忆，并删除正文旧版大审计表。
 - [x] 步骤 8：完成双语构建、引用/匿名性/工件检查和测试。
-- [x] 步骤 9：使用中文 Conventional Commit 提交论文/代码实质修改（`25b38a0`、排版收口 `acaa5ab`）。
-- [x] 步骤 10：更新发布证据，回填本计划实际结果并用独立中文文档 commit 归档。
+- [x] 步骤 9：使用中文 Conventional Commit 提交本轮论文实质修改（`42ab734`、`620bf2b`）。
+- [x] 步骤 10：更新发布证据（`574d2e1`），回填本计划实际结果并用独立中文文档 commit 归档。
 - [x] 步骤 11：在当前可访问的官方 MassSpecGym 1.3.1 数据快照上完成候选来源/顺序核对、保存嵌入上的官方顺序交叉评价，并补充结构相似度、基础分数间隔、候选池大小和谱峰数分层；已同步论文和证据清单。该核验不等同于完整 official loader 端到端重跑。
+- [x] 步骤 12：按严格最低验收补充完成二维身份等价的三 seed 官方候选顺序评价、效率拆解和主表重组；外部 baseline、candidate-aware alignment 与 fresh loader 重编码仍按边界保留。
 
 ## 8. 风险、证据边界与待确认事项
 
@@ -116,7 +117,7 @@
 - [x] `python freeze_adma2026_artifacts.py --check`：60 canonical artifacts validated，manifest matches；这是旧 canonical 工件的历史校验，不覆盖新 pilot。
 - [x] `python -m compileall`：通过；`git diff --check`：通过。
 - [x] `bash paper/build_release.sh`（detached `tmux`）：英文 16 页、中文 14 页；最终日志无 LaTeX error、undefined citation/reference、Overfull/Underfull；仅保留已知 amsmath/Fandol 非阻断警告。页数仅作记录，不假定 venue 上限。
-- [x] PDF 匿名性与哈希核对：Author 为空/缺失，私有路径扫描无命中；发布稿与 manifest 已同步。英文 16 页、478401 bytes、SHA-256 `622ef3b4c2001c42c2d745cbb9024011fbef2643480c9a4f06dca46f1ba1f2ae`；中文 14 页、411513 bytes、SHA-256 `5d752429652e090e24acd78f2d71fa2dcc696763ea2b9055514ebb7c449d29df`。
+- [x] PDF 匿名性与哈希核对：Author 为空/缺失，私有路径扫描无命中；发布稿与 manifest 已同步。英文 16 页、479372 bytes、SHA-256 `c066ed41b657a2aaa3957295c6ed064e7bd31aa83fe2319846cb9b6db86a5dcc`；中文 14 页、416682 bytes、SHA-256 `f1e1fe30d8481184f1007a25c669cb2f2d3843650d7646f4ec0046a5d2de3376`。
 
 ## 10. 执行记录
 
@@ -136,22 +137,26 @@
 
 2026-08-23：从已保存的 seed-42 query predictions 完成候选数量、Base 名次、top-1 Morgan 相似度、Base 分数间隔和谱峰数分层；结果写入 `difficulty_analysis.json`。困难 query 上 relative 增益更明显，但容易 query 上有下降；仅作 local exact-SMILES 协议下描述性证据。
 
-2026-08-23：完成双语稿和证据的最终核验。`pytest -q tests` 为 110 passed、9 warnings；Ruff、compileall、`git diff --check` 均通过。论文/分析实质提交为 `be7dd891307b33f2ee198fe63fffa9c082673de2`，双语 release evidence 提交为 `151250f`；build manifest 已回填 source commit、页数、字节数和 SHA-256。官方顺序结果、候选来源比较和困难分层的哈希已回填 `second_stage_manifest.json`。
+2026-08-23：完成三 seed 官方兼容评价。`official_protocol_eval.json` 使用官方 retrieval JSON 顺序、稳定降序并列规则和保存的 alignment embeddings；同一 full-pool `relative_identity_eval.json` 审计证明两个候选池均为 17,556/17,556 正例 query、0 多正例、0 碰撞，因此 exact-target 标签与二维身份标签等价。mass relative/pointwise 的 R@1/MRR 为 50.98±0.87/0.5871、51.37±0.54/0.5903；formula 为 66.32±0.46/0.7129、66.65±1.30/0.7166。该评价没有 fresh loader 重编码或 alignment 重训。
+
+2026-08-23：完成效率拆解。RTX 4090、batch 64、2,048 queries、排除数据加载时，mass relative coarse/relation/full 为 0.261/0.111/0.372 ms/query（2,685 q/s，302 MB），pointwise 为 0.030 ms/query（33,450 q/s，244 MB）；formula relative 为 0.026/0.050/0.076 ms/query（13,235 q/s，302 MB），pointwise 为 0.026 ms/query（38,492 q/s，244 MB）。这些是 implementation audit，不是端到端效率主张。
+
+2026-08-23：论文英文/中文正文、README、项目记忆和证据 manifest 已同步；论文实质提交为 `42ab734`、表注排版修正为 `620bf2b`，双语 release evidence 为 `574d2e1`。最终 `pytest -q tests` 为 110 passed、9 warnings；Ruff、compileall、`git diff --check` 均通过。
 
 ## 11. 当前结果与待归档
 
-- 当前状态：`已执行`；论文正文、官方候选顺序交叉核验、困难候选分层、双语构建、发布 manifest、测试和静态核验均已完成。当前英文 16 页、中文 14 页仅作构建快照，不假定具体 venue 上限；用户已明确后续按目标 venue 再做精炼排版。
+- 当前状态：`已执行`；论文正文、官方兼容三 seed 候选顺序评价、二维身份审计、困难候选分层、效率拆解、双语构建、发布 manifest、测试和静态核验均已完成。当前英文 16 页、中文 14 页仅作构建快照，不假定具体 venue 上限；用户已明确后续按目标 venue 再做精炼排版。
 - 主要结论：relative/pointwise 均改善 base；pointwise 在主 R@1/MRR 汇总略高，relative 独立普遍收益未建立。
-- 证据边界：三 reranker seeds 不是 alignment 重复；身份结果仍为 cache-level；官方顺序核验使用保存嵌入、未重跑完整 loader 或重训 alignment；JESTR/GLMR 仍 reported-only；前向 latency/显存不是端到端效率主张。
+- 证据边界：三 reranker seeds 不是 alignment 重复；二维身份等价由同一 full-pool cache 审计建立，但官方兼容表仍使用保存嵌入、未重跑完整 loader 或重训 alignment；JESTR/GLMR 仍 reported-only；前向 latency/显存不是端到端效率主张。
 - 外部 baseline、候选感知 alignment 重训、跨数据集验证和完整 official loader 端到端重跑仍不纳入本次范围，不写成已完成结果；本次只完成官方候选 JSON 顺序与保存嵌入的交叉核验。
 
 ## 12. 最终核验步骤
 
 1. 对新增 Python/分析脚本运行 Ruff、compileall 和相关单元测试；完整 `pytest -q tests` 为 110 passed, 9 warnings（最终复核需重跑）。
 2. 完成英文/中文 LaTeX/BibTeX 构建，检查 undefined citation/reference、Overfull/Underfull、PDF 匿名性和页数记录；已完成，页数不作为阻断。
-3. 更新 `paper/release/build-manifest.yaml` 与受跟踪双语 PDF，核对 bytes/SHA-256、源 commit `be7dd891` 和构建日志；已完成。
+3. 更新 `paper/release/build-manifest.yaml` 与受跟踪双语 PDF，核对 bytes/SHA-256、源 commit `620bf2b` 和构建日志；已完成。
 4. `git diff --check`、Ruff、compileall 和 110 项测试已通过；canonical artifact check 仍按其历史 scope 单独复核，私有 raw predictions/cache 未纳入 Git 或匿名包。
-5. 论文实质 commit `be7dd891`、发布清单与 PDF commit `151250f` 已提交；本计划随后用独立中文文档 commit 归档。此前尝试向评审线程 `01a01f8c-fe25-7390-8811-fedfac865d3c` 请求只读复核，但该线程当前不在本会话可用 agent 列表，未能通过协作工具投递；本计划不将其误记为已完成外部审计。
+5. 论文实质 commits `42ab734`、`620bf2b`、发布清单与 PDF commit `574d2e1` 已提交；本计划随后用独立中文文档 commit 归档。外部评审意见已按实际可审计输入落实；没有把 JESTR/GLMR、外部强 baseline 或 fresh loader 端到端评价误记为已完成。
 
 第二阶段明确不做：未经统一数据与 checkpoint 的外部方法“复现”声称；把历史 alignment revision 混写为同配置随机重复；以及为达到正向结果而事后选择 seed、K 或模型变体。正式身份评价仅在第 13 节规定的官方数据快照核对完成后使用相应限定语。
 
@@ -170,3 +175,10 @@
 3. 重新组织正文主表与实验问题，使 official-protocol 结果与 local-protocol 敏感性结果分开；若外部强 baseline、candidate-aware alignment 或同一代码版本的 alignment 重训仍无可审计输入，则保留为明确未完成项，不用本地模型替代。
 
 本阶段不新增外部论文引用，不把缺少统一 checkpoint 的 JESTR/GLMR 写成复现结果，也不把三 reranker seeds 误称为 alignment 重复。页数仍不设 15 页硬上限，优先保证主结果清楚和证据闭合。
+
+### 14.1 实际结果与偏差
+
+- 官方兼容主表已完成，但严格意义上是“官方 retrieval JSON 顺序 + 已核验二维身份等价标签 + 保存 alignment embeddings”的 candidate/identity evaluation；没有重新运行 MassSpecGym loader 的谱图/分子编码，也没有重训 alignment。这是计划中明确保留的证据边界，不升级为端到端 official-loader equivalence。
+- 全池身份审计复用已跟踪的 `relative_identity_eval.json`，两个候选池均为 17,556/17,556 positive queries、0 multiple-positive、0 collision；因此没有再次对约 700 万个候选逐个生成 InChIKey。中止了一个低效的全候选重复映射任务，未将其未完成输出纳入结果。
+- 效率拆解已用 RTX 4090 完成；记录 coarse/relation/full、pointwise、参数/吞吐/显存，但正文仍不作部署效率优势声明。
+- 外部强 baseline、candidate-aware alignment、统一 loader fresh re-encoding 和跨数据集验证没有可审计输入，按原计划保留为限制，没有扩大目标或伪造实验。
