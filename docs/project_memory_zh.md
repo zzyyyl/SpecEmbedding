@@ -34,8 +34,10 @@
 - pointwise 与候选集合 Transformer 在 alignment seeds 42/43/44 的 12/12 个
   alignment--candidate--learned-model 聚合单元中均同时改善对应 base 的 Recall@1 和 MRR；
   Transformer 相对 pointwise 在两类候选和两项指标上都只有 2/3 alignment 方向为正。
-- Recall/MRR 使用本地 exact-target-SMILES 单正例规则，不等价于参考二维 InChIKey/可能
-  多正例 evaluator；差异影响尚未量化。
+- 主表现使用 MassSpecGym 1.3.1 retrieval JSON 顺序和二维 InChIKey 身份规则；同一 full-pool
+  候选列表的身份审计为 17,556/17,556 正例 query、0 多正例、0 碰撞，因此 exact-target 标签
+  在这些列表上等价。结果仍是保存嵌入的 official-compatible 评价，不是重新 loader 编码或
+  alignment 重训；local exact-target-SMILES 仅作为敏感性视图。
 - 因此可被当前实验支持的核心是“监督残差学习排序有效”，而不是“候选间关系是主要增益来源”。
 
 ## 2. 协作与工程约定
@@ -1012,3 +1014,29 @@ checkpoint；结果记录在 `official_candidate_eval_all.json`，候选源比�
 不构成因果、显著性或一般化证据。详见 `difficulty_analysis.json` 与
 `analysis/transfer2026_scholargpt_review/second_stage_report.md`。外部强基线、candidate-aware
 alignment 重训、跨数据集验证和统一官方 loader 端到端重跑仍未完成，论文继续明确保留这些边界。
+
+## 18. 2026-08-23 官方兼容三 seed 评价与效率拆解
+
+按完整评审意见补做的 `official_protocol_eval.json` 使用两个官方 retrieval JSON（mass
+SHA-256 `6256d841...cfca5`、formula `209f59f5...b6d05`）的候选顺序，对 relative/pointwise
+三个 reranker training seeds 42--44 逐 query 评价。候选集合对全部 17,556 个目标一致；由
+`relative_identity_eval.json` 对同一 full-pool cache 的二维 InChIKey 审计可知，两个池均无多正例
+或身份碰撞，因此 exact-target 标签与二维标签等价。结果仍复用保存的 alignment embedding，不
+重新运行 official loader 编码或重训 alignment。
+
+| pool / model | R@1 | R@5 | R@20 | R@40 | MRR |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| mass base | 43.78 | 61.10 | 75.55 | 82.15 | 52.19 |
+| mass pointwise | 51.37±0.54 | 67.34±0.39 | 80.71±0.55 | 86.03±0.61 | 59.03±0.44 |
+| mass relative | 50.98±0.87 | 67.06±0.67 | 80.49±0.55 | 86.13±0.70 | 58.71±0.76 |
+| formula base | 58.49 | 71.50 | 81.81 | 87.30 | 64.79 |
+| formula pointwise | 66.65±1.30 | 76.76±0.87 | 85.33±0.42 | 89.43±0.29 | 71.66±1.04 |
+| formula relative | 66.32±0.46 | 76.29±0.23 | 85.08±0.07 | 89.31±0.06 | 71.29±0.33 |
+
+relative 在主要 R@1/MRR 汇总中仍略低于 pointwise，不能写成独立关系模块收益。RTX 4090、batch
+64、2,048 queries、排除数据加载的效率拆解为：mass relative coarse/relation/full
+0.261/0.111/0.372 ms/query（2,685 q/s，302 MB），pointwise 0.030 ms/query（33,450 q/s，
+244 MB）；formula relative 0.026/0.050/0.076 ms/query（13,235 q/s，302 MB），pointwise
+0.026 ms/query（38,492 q/s，244 MB）。这些是 forward implementation audit，不是端到端部署
+效率结论。完整记录见 `second_stage_report.md`、`official_protocol_eval.json`、
+`efficiency_breakdown.json` 和 `second_stage_manifest.json`。

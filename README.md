@@ -202,33 +202,35 @@ The transfer-paper workflow uses spectrum--molecule alignment followed by a
 rank-free, no-forcing full-pool reranker: pointwise coarse scoring over at most
 256 supplied candidates, then a spectrum-conditioned relative branch on the
 coarse top-40. A capacity-matched pointwise control and the earlier rank-aware
-Transformer audit are kept separate. Recall and MRR use MassSpecGym-supplied
-candidate files with a local exact-target-SMILES single-positive rule. The
-reference loader defaults to two-dimensional InChIKey equivalence and may yield
-multiple positives. A MassSpecGym 1.3.1 transform audit of the saved 17,556-query
-mass/formula test caches found no multiple-positive query or candidate identity
-collision, and the seed-42 relative metrics were unchanged; this remains a
-cache-level audit rather than a full official-loader rerun.
+Transformer audit are kept separate. The main result uses the MassSpecGym 1.3.1
+retrieval JSON order and two-dimensional InChIKey identity rule. A tracked
+full-pool audit of the saved 17,556-query mass/formula caches found one
+identity-equivalent positive per query, with no multiple-positive query or
+candidate identity collision; exact-target labels are therefore equivalent on
+these lists. This is still a saved-embedding candidate/identity evaluation, not
+a fresh official-loader re-encoding or alignment retraining. Local
+exact-target-SMILES values remain a sensitivity view.
 
 The local cache candidate sets were also compared with the MassSpecGym 1.3.1
 retrieval JSON snapshot: both pools have set Jaccard 1.0 for all 17,556 test
 targets, while list order differs (mass 0/17,556 exact matches; formula
-231/17,556). An official-order cross-check recomputes base ranks from the
-saved alignment embeddings and evaluates the seed-42 checkpoints; it does not
-rerun the loader transforms, retrain alignment, or establish end-to-end
-official-loader equivalence. The tracked results and candidate hashes are in
-`analysis/transfer2026_scholargpt_review/official_candidate_eval_all.json`
-and `candidate_source_comparison.json`. A seed-42 difficulty-stratified
-query analysis is recorded in `difficulty_analysis.json`; it is descriptive
-and local-protocol only.
+231/17,556). The official-compatible all-seed evaluation recomputes base ranks
+and reranker scores from the saved alignment embeddings under that order; it
+does not rerun loader transforms or retrain alignment. Results and protocol
+fingerprints are in `official_protocol_eval.json`, with the identity audit in
+`relative_identity_eval.json`; the earlier seed-42 cross-check remains in
+`official_candidate_eval_all.json` and `candidate_source_comparison.json`. A
+seed-42 difficulty-stratified query analysis is recorded in
+`difficulty_analysis.json`; it is descriptive and local-protocol only.
 
 The no-forcing pilot uses pre-overlap-clean alignment checkpoint `d4c1f70`,
 5,000 training queries, three epochs, and reranker seeds 42--44. Both relative
 and capacity-matched pointwise improve the base in both pools; pointwise is
 slightly higher at the main R@1/MRR summaries, so no independent relative-module
 gain is claimed. Query-level predictions, K=20/40/80 evaluation-only sensitivity,
-bootstrap summaries, mechanism controls, and RTX 4090 forward audits are
-recorded in `analysis/transfer2026_scholargpt_review/second_stage_report.md` and
+bootstrap summaries, mechanism controls, and RTX 4090 forward audits (including
+coarse/relation/pointwise timing breakdown) are recorded in
+`analysis/transfer2026_scholargpt_review/second_stage_report.md` and
 `second_stage_manifest.json`. JESTR and GLMR remain reported-only, not
 independently reproduced, and not directly comparable mechanism background; no
 external numeric values are displayed.

@@ -1,0 +1,291 @@
+{
+  "mass": {
+    "protocol": {
+      "package": "massspecgym",
+      "version": "1.3.1",
+      "candidate_json": "MassSpecGym_retrieval_candidates_mass.json",
+      "candidate_json_sha256": "6256d8414fe02ef28c4179135ce454d1a7b77b64454241785935ad29114cfca5",
+      "identity_rule": "2D InChIKey prefix equality; exact-target labels are equivalent by the tracked full-pool identity audit",
+      "tie_breaking": "stable descending score order; candidate JSON order breaks exact ties",
+      "scope": "official candidate JSON order and 2D identity-equivalent labels with saved alignment embeddings; no alignment retraining",
+      "identity_audit": "relative_identity_eval.json",
+      "multiple_positive_queries": 0,
+      "candidate_identity_collisions": 0,
+      "missing_positive_queries": 0
+    },
+    "base": {
+      "queries": 17556,
+      "positive_queries": 17556,
+      "positive_fraction": 1.0,
+      "recall_at_1": 0.43779904306220097,
+      "recall_at_5": 0.6109592162223741,
+      "recall_at_20": 0.7554682159945317,
+      "recall_at_40": 0.8215424925951241,
+      "recall_at_256": 1.0,
+      "mrr": 0.5218600254928957
+    },
+    "rerank_seeds": {
+      "relative_seed42": {
+        "queries": 17556,
+        "positive_queries": 17556,
+        "positive_fraction": 1.0,
+        "recall_at_1": 0.5007974481658692,
+        "recall_at_5": 0.6641604010025063,
+        "recall_at_20": 0.8091250854408749,
+        "recall_at_40": 0.8689336978810663,
+        "recall_at_256": 1.0,
+        "mrr": 0.5795029514291498
+      },
+      "relative_seed43": {
+        "queries": 17556,
+        "positive_queries": 17556,
+        "positive_fraction": 1.0,
+        "recall_at_1": 0.5181134654818865,
+        "recall_at_5": 0.6774891774891775,
+        "recall_at_20": 0.8069036226930963,
+        "recall_at_40": 0.8594782410571884,
+        "recall_at_256": 1.0,
+        "mrr": 0.5947837633105678
+      },
+      "relative_seed44": {
+        "queries": 17556,
+        "positive_queries": 17556,
+        "positive_fraction": 1.0,
+        "recall_at_1": 0.5103668261562998,
+        "recall_at_5": 0.6702551834130781,
+        "recall_at_20": 0.7987012987012987,
+        "recall_at_40": 0.8553770790612896,
+        "recall_at_256": 1.0,
+        "mrr": 0.5870725781139269
+      },
+      "pointwise_seed42": {
+        "queries": 17556,
+        "positive_queries": 17556,
+        "positive_fraction": 1.0,
+        "recall_at_1": 0.516347687400319,
+        "recall_at_5": 0.6779448621553885,
+        "recall_at_20": 0.8126566416040101,
+        "recall_at_40": 0.8665413533834586,
+        "recall_at_256": 1.0,
+        "mrr": 0.5934901511209576
+      },
+      "pointwise_seed43": {
+        "queries": 17556,
+        "positive_queries": 17556,
+        "positive_fraction": 1.0,
+        "recall_at_1": 0.5173160173160173,
+        "recall_at_5": 0.6706539074960127,
+        "recall_at_20": 0.8016062884483938,
+        "recall_at_40": 0.8543517885623149,
+        "recall_at_256": 1.0,
+        "mrr": 0.5921174322257171
+      },
+      "pointwise_seed44": {
+        "queries": 17556,
+        "positive_queries": 17556,
+        "positive_fraction": 1.0,
+        "recall_at_1": 0.5075187969924813,
+        "recall_at_5": 0.6717361585782639,
+        "recall_at_20": 0.8070745044429255,
+        "recall_at_40": 0.859876965140123,
+        "recall_at_256": 1.0,
+        "mrr": 0.5852534484562338
+      }
+    },
+    "rerank_aggregate": {
+      "relative": {
+        "seeds": 3,
+        "recall_at_1": {
+          "mean": 0.5097592466013519,
+          "sample_sd": 0.008673982857306422
+        },
+        "recall_at_5": {
+          "mean": 0.6706349206349206,
+          "sample_sd": 0.006672497353026766
+        },
+        "recall_at_20": {
+          "mean": 0.8049100022784234,
+          "sample_sd": 0.005490421137434912
+        },
+        "recall_at_40": {
+          "mean": 0.8612630059998481,
+          "sample_sd": 0.006952303063128917
+        },
+        "mrr": {
+          "mean": 0.5871197642845482,
+          "sample_sd": 0.00764051522083722
+        }
+      },
+      "pointwise": {
+        "seeds": 3,
+        "recall_at_1": {
+          "mean": 0.5137275005696058,
+          "sample_sd": 0.005398649441097173
+        },
+        "recall_at_5": {
+          "mean": 0.6734449760765551,
+          "sample_sd": 0.003934405659450736
+        },
+        "recall_at_20": {
+          "mean": 0.8071124781651098,
+          "sample_sd": 0.0055252744473593554
+        },
+        "recall_at_40": {
+          "mean": 0.8602567023619655,
+          "sample_sd": 0.006103648327062741
+        },
+        "mrr": {
+          "mean": 0.5902870106009696,
+          "sample_sd": 0.004412895896123609
+        }
+      }
+    }
+  },
+  "formula": {
+    "protocol": {
+      "package": "massspecgym",
+      "version": "1.3.1",
+      "candidate_json": "MassSpecGym_retrieval_candidates_formula.json",
+      "candidate_json_sha256": "209f59f532752e10c4457a61a208d8b3fc1dc03cacfe3a05f5eb20a23b7b6d05",
+      "identity_rule": "2D InChIKey prefix equality; exact-target labels are equivalent by the tracked full-pool identity audit",
+      "tie_breaking": "stable descending score order; candidate JSON order breaks exact ties",
+      "scope": "official candidate JSON order and 2D identity-equivalent labels with saved alignment embeddings; no alignment retraining",
+      "identity_audit": "relative_identity_eval.json",
+      "multiple_positive_queries": 0,
+      "candidate_identity_collisions": 0,
+      "missing_positive_queries": 0
+    },
+    "base": {
+      "queries": 17556,
+      "positive_queries": 17556,
+      "positive_fraction": 1.0,
+      "recall_at_1": 0.5848712690817954,
+      "recall_at_5": 0.7150262018683071,
+      "recall_at_20": 0.8180678970152654,
+      "recall_at_40": 0.8730348598769652,
+      "recall_at_256": 1.0,
+      "mrr": 0.6479390394117899
+    },
+    "rerank_seeds": {
+      "relative_seed42": {
+        "queries": 17556,
+        "positive_queries": 17556,
+        "positive_fraction": 1.0,
+        "recall_at_1": 0.6679767600820232,
+        "recall_at_5": 0.7646958304853042,
+        "recall_at_20": 0.8513898382319435,
+        "recall_at_40": 0.8937115516062885,
+        "recall_at_256": 1.0,
+        "mrr": 0.7161446173010089
+      },
+      "relative_seed43": {
+        "queries": 17556,
+        "positive_queries": 17556,
+        "positive_fraction": 1.0,
+        "recall_at_1": 0.6630211893369788,
+        "recall_at_5": 0.7638414217361585,
+        "recall_at_20": 0.8500227842333106,
+        "recall_at_40": 0.8931989063568011,
+        "recall_at_256": 1.0,
+        "mrr": 0.7130479441222214
+      },
+      "relative_seed44": {
+        "queries": 17556,
+        "positive_queries": 17556,
+        "positive_fraction": 1.0,
+        "recall_at_1": 0.6587491455912509,
+        "recall_at_5": 0.7603098655730235,
+        "recall_at_20": 0.8510480747322853,
+        "recall_at_40": 0.8925153793574846,
+        "recall_at_256": 1.0,
+        "mrr": 0.7094658058574584
+      },
+      "pointwise_seed42": {
+        "queries": 17556,
+        "positive_queries": 17556,
+        "positive_fraction": 1.0,
+        "recall_at_1": 0.6805080884028253,
+        "recall_at_5": 0.7772271588061062,
+        "recall_at_20": 0.8579972658920028,
+        "recall_at_40": 0.8974709501025291,
+        "recall_at_256": 1.0,
+        "mrr": 0.7281765789237208
+      },
+      "pointwise_seed43": {
+        "queries": 17556,
+        "positive_queries": 17556,
+        "positive_fraction": 1.0,
+        "recall_at_1": 0.6549897470950102,
+        "recall_at_5": 0.7603098655730235,
+        "recall_at_20": 0.8500797448165869,
+        "recall_at_40": 0.891660970608339,
+        "recall_at_256": 1.0,
+        "mrr": 0.7078564518743351
+      },
+      "pointwise_seed44": {
+        "queries": 17556,
+        "positive_queries": 17556,
+        "positive_fraction": 1.0,
+        "recall_at_1": 0.6638755980861244,
+        "recall_at_5": 0.7651515151515151,
+        "recall_at_20": 0.8516746411483254,
+        "recall_at_40": 0.8938254727728412,
+        "recall_at_256": 1.0,
+        "mrr": 0.7138296032904632
+      }
+    },
+    "rerank_aggregate": {
+      "relative": {
+        "seeds": 3,
+        "recall_at_1": {
+          "mean": 0.6632490316700843,
+          "sample_sd": 0.004618024620348426
+        },
+        "recall_at_5": {
+          "mean": 0.7629490392648287,
+          "sample_sd": 0.002325173522404705
+        },
+        "recall_at_20": {
+          "mean": 0.8508202323991798,
+          "sample_sd": 0.0007114374570970895
+        },
+        "recall_at_40": {
+          "mean": 0.8931419457735247,
+          "sample_sd": 0.0006001169829604154
+        },
+        "mrr": {
+          "mean": 0.7128861224268962,
+          "sample_sd": 0.003342345025641946
+        }
+      },
+      "pointwise": {
+        "seeds": 3,
+        "recall_at_1": {
+          "mean": 0.6664578111946533,
+          "sample_sd": 0.012953659875839294
+        },
+        "recall_at_5": {
+          "mean": 0.7675628465102149,
+          "sample_sd": 0.00871261107674461
+        },
+        "recall_at_20": {
+          "mean": 0.8532505506189717,
+          "sample_sd": 0.004187410057501915
+        },
+        "recall_at_40": {
+          "mean": 0.8943191311612364,
+          "sample_sd": 0.0029362798545186294
+        },
+        "mrr": {
+          "mean": 0.7166208780295064,
+          "sample_sd": 0.010443672813115572
+        }
+      }
+    }
+  },
+  "metadata": {
+    "dataset": "MassSpecGym.tsv",
+    "protocol": "MassSpecGym 1.3.1 retrieval candidate JSON + 2D InChIKey-equivalent labels",
+    "scope": "formal all-seed candidate/order evaluation of saved embeddings; 2D equivalence is established by the tracked full-pool audit; no fresh loader encoding or alignment retraining"
+  }
+}

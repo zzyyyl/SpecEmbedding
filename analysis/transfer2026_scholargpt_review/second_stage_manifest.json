@@ -7,10 +7,10 @@
   "train_queries": 5000,
   "epochs": 3,
   "candidate_cache": "full supplied cache, at most 256 candidates; no positive forcing",
-  "identity_protocol": "local exact-target-SMILES plus MassSpecGym 1.3.1 2D InChIKey cache audit",
+  "identity_protocol": "MassSpecGym 1.3.1 retrieval JSON order plus 2D InChIKey-equivalent labels established by full-pool audit; local exact-target-SMILES sensitivity retained",
   "tracked_files": {
     "multiseed_summary.json": "sha256:f1aedab762263907e54ada99ae37e6da1b7f23d0c8617dbb4fe0003fc685e4e3",
-    "second_stage_report.md": "sha256:0649a80b4c16d354529250415ac1df65175d73c8b03537a9d8fd78564724efed",
+    "second_stage_report.md": "sha256:a9b4c4eb35aa8df6a3098024aca6767ad1798c84903e2d3b3a4ef1dd0b2ac497",
     "relative_identity_eval.json": "sha256:a74f6aa4ead3a1a3c25e8e385183c1a925d5ce4e2c5c019ee96619d2c71f134b",
     "summarize_pilot.py": "sha256:6a785fcff0c4bb7e3c31623d0d8ca2bc95713b97f0f1560dcb1053a4d1271a61",
     "official_candidate_eval.py": "sha256:9c2d2b3e1dd108aa30d9a5f2c504e73d43a772f5864a416d037272ce660e8039",
@@ -18,7 +18,11 @@
     "difficulty_analysis.py": "sha256:d858e65c24527c84aeccc029089f3f88abece6213b81e86c542f778c950005b3",
     "official_candidate_eval_all.json": "sha256:3318fcb53b68838b3da9d885654312ec80486282d16df4be0794f4b3959a68ef",
     "candidate_source_comparison.json": "sha256:535bd58491a6958ee0e9a95250fd54ea30f45935fc21cb966d6d677fa94cc8bf",
-    "difficulty_analysis.json": "sha256:d62601a670c48fcf8356038ab1a22c9d9c52ca17ad479c531365bd18c282eed3"
+    "difficulty_analysis.json": "sha256:d62601a670c48fcf8356038ab1a22c9d9c52ca17ad479c531365bd18c282eed3",
+    "official_protocol_eval.py": "sha256:8ab0758c69689886347177dc444822035aacb9688dd878950c256ed9fd7e398f",
+    "official_protocol_eval.json": "sha256:3608f4fe65f15b54dde95274d47653e92c238efdcd874fe160f820d373cebf61",
+    "efficiency_breakdown.py": "sha256:8f3aa2054197ba6b868588ebc707d52dca758605d46130e275f7ef5d7a3b9767",
+    "efficiency_breakdown.json": "sha256:d4390f901130c4f92696d197351ca8583daa4416dc7e29a4ed0db2b6bd2cb048"
   },
   "local_untracked_artifacts": {
     "pilot_predictions": "analysis/transfer2026_scholargpt_review/pilot_predictions/",
@@ -28,10 +32,10 @@
   "boundaries": [
     "three reranker seeds are not independent alignment replicates",
     "K sensitivity is evaluation-only truncation, not K-specific retraining",
-    "2D identity result is a cache-level audit, not a full official-loader rerun",
-    "official candidate-order cross-check uses saved alignment embeddings and does not rerun loader transforms or retrain alignment",
+    "2D identity equivalence is established on the saved full-pool candidate lists; no fresh official-loader re-encoding is claimed",
+    "official-compatible all-seed candidate-order evaluation uses saved alignment embeddings and does not rerun loader transforms or retrain alignment",
     "difficulty strata are descriptive seed-42 local-protocol analysis, not causal or significance evidence",
     "JESTR/GLMR remain reported-only and not directly comparable",
-    "forward latency/memory is not an end-to-end efficiency claim"
+    "forward latency/memory is a fixed-hardware implementation audit, not an end-to-end efficiency claim"
   ]
 }

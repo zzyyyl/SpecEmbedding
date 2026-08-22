@@ -1,0 +1,158 @@
+{
+  "hardware": {
+    "device": "cuda:0",
+    "torch": "2.5.1",
+    "cuda": true
+  },
+  "batch_size": 64,
+  "max_queries": 2048,
+  "measurement": "fixed-hardware forward audit; timings exclude data loading",
+  "pools": [
+    {
+      "cache": "rerank_cache/d4c1f70_massspecgym_nopretrain_mass/massspecgym_mass_test.pt",
+      "models": [
+        [
+          "relative_fullpool",
+          "checkpoints_rerank/scholargpt_relative_fullpool_experiments/mass/relative/best_reranker.pth",
+          true
+        ],
+        [
+          "pointwise_fullpool",
+          "checkpoints_rerank/scholargpt_relative_fullpool_experiments/mass/pointwise/best_reranker.pth",
+          false
+        ]
+      ]
+    },
+    {
+      "cache": "rerank_cache/d4c1f70_massspecgym_nopretrain_formula_topk256/massspecgym_formula_test.pt",
+      "models": [
+        [
+          "relative_fullpool",
+          "checkpoints_rerank/scholargpt_relative_fullpool_experiments/formula/relative/best_reranker.pth",
+          true
+        ],
+        [
+          "pointwise_fullpool",
+          "checkpoints_rerank/scholargpt_relative_fullpool_experiments/formula/pointwise/best_reranker.pth",
+          false
+        ]
+      ]
+    },
+    {
+      "cache": "rerank_cache/d4c1f70_massspecgym_nopretrain_mass_topk40/massspecgym_mass_test.pt",
+      "models": [
+        [
+          "legacy_transformer_top40",
+          "checkpoints_rerank/d4c1f70_massspecgym_nopretrain_topk40_multiseed/mass/transformer/seed42/attempt_001/best_reranker.pth",
+          false
+        ],
+        [
+          "legacy_pointwise_top40",
+          "checkpoints_rerank/d4c1f70_massspecgym_nopretrain_topk40_multiseed/mass/pointwise/seed42/attempt_001/best_reranker.pth",
+          false
+        ]
+      ]
+    },
+    {
+      "cache": "rerank_cache/d4c1f70_massspecgym_nopretrain_formula_topk40/massspecgym_formula_test.pt",
+      "models": [
+        [
+          "legacy_transformer_top40",
+          "checkpoints_rerank/d4c1f70_massspecgym_nopretrain_topk40_multiseed/formula/transformer/seed42/attempt_001/best_reranker.pth",
+          false
+        ],
+        [
+          "legacy_pointwise_top40",
+          "checkpoints_rerank/d4c1f70_massspecgym_nopretrain_topk40_multiseed/formula/pointwise/seed42/attempt_001/best_reranker.pth",
+          false
+        ]
+      ]
+    }
+  ],
+  "results": [
+    {
+      "cache": "rerank_cache/d4c1f70_massspecgym_nopretrain_mass/massspecgym_mass_test.pt",
+      "candidates": 256,
+      "relative_fullpool": {
+        "measurement_queries": 2048,
+        "measurement_batches": 32,
+        "parameter_count": 1485189,
+        "coarse_ms_per_query": 0.2613264150568284,
+        "relation_ms_per_query": 0.1110647262976272,
+        "full_ms_per_query": 0.3723911413544556,
+        "full_queries_per_second": 2685.3485192016506,
+        "peak_cuda_memory_mb": 302.3955078125
+      },
+      "pointwise_fullpool": {
+        "measurement_queries": 2048,
+        "measurement_batches": 32,
+        "parameter_count": 1478690,
+        "full_ms_per_query": 0.029895063562435098,
+        "full_queries_per_second": 33450.33864576086,
+        "peak_cuda_memory_mb": 244.40869140625
+      }
+    },
+    {
+      "cache": "rerank_cache/d4c1f70_massspecgym_nopretrain_formula_topk256/massspecgym_formula_test.pt",
+      "candidates": 32,
+      "relative_fullpool": {
+        "measurement_queries": 2048,
+        "measurement_batches": 32,
+        "parameter_count": 1485189,
+        "coarse_ms_per_query": 0.02576194856374059,
+        "relation_ms_per_query": 0.04979284949513385,
+        "full_ms_per_query": 0.07555479805887444,
+        "full_queries_per_second": 13235.426811951396,
+        "peak_cuda_memory_mb": 302.3955078125
+      },
+      "pointwise_fullpool": {
+        "measurement_queries": 2048,
+        "measurement_batches": 32,
+        "parameter_count": 1478690,
+        "full_ms_per_query": 0.025979214115068316,
+        "full_queries_per_second": 38492.31141368459,
+        "peak_cuda_memory_mb": 244.40869140625
+      }
+    },
+    {
+      "cache": "rerank_cache/d4c1f70_massspecgym_nopretrain_mass_topk40/massspecgym_mass_test.pt",
+      "candidates": 40,
+      "legacy_transformer_top40": {
+        "measurement_queries": 2048,
+        "measurement_batches": 32,
+        "parameter_count": 7783458,
+        "full_ms_per_query": 0.03858230138575891,
+        "full_queries_per_second": 25918.619783762028,
+        "peak_cuda_memory_mb": 113.26513671875
+      },
+      "legacy_pointwise_top40": {
+        "measurement_queries": 2048,
+        "measurement_batches": 32,
+        "parameter_count": 1478690,
+        "full_ms_per_query": 0.007304708560695872,
+        "full_queries_per_second": 136898.00102096566,
+        "peak_cuda_memory_mb": 51.2021484375
+      }
+    },
+    {
+      "cache": "rerank_cache/d4c1f70_massspecgym_nopretrain_formula_topk40/massspecgym_formula_test.pt",
+      "candidates": 32,
+      "legacy_transformer_top40": {
+        "measurement_queries": 2048,
+        "measurement_batches": 32,
+        "parameter_count": 7783458,
+        "full_ms_per_query": 0.02706622672121739,
+        "full_queries_per_second": 36946.413340138526,
+        "peak_cuda_memory_mb": 113.26513671875
+      },
+      "legacy_pointwise_top40": {
+        "measurement_queries": 2048,
+        "measurement_batches": 32,
+        "parameter_count": 1478690,
+        "full_ms_per_query": 0.008567585609853268,
+        "full_queries_per_second": 116718.99710578164,
+        "peak_cuda_memory_mb": 51.2021484375
+      }
+    }
+  ]
+}

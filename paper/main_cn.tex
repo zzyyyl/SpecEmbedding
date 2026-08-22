@@ -51,11 +51,11 @@
 top-40 上计算谱图条件的相对候选偏好。相对偏好由有序 pair 分数与其反向分数之差构成，
 因此具有反对称性，并对候选列表置换保持等变；新方法不使用检索 rank，也不在训练时插入
 正例。我们将其与容量匹配、无 rank 的 pointwise 对照比较，并将早期 candidate-set
-Transformer 保留为历史次级基线。结果在 MassSpecGym 的本地 exact-target-SMILES 单正例
-协议下报告，同时逐表说明候选覆盖率、seed 统计单位和尚未闭合的比较。参考 loader 允许
-二维 InChIKey 等价并可能产生多个正例，因此本文数值不等价于官方 evaluator。本文证据
-用于检验谱图条件的候选关系是否在 coarse 监督排序之外提供可复现信息，而非声称普适的
-self-attention 或外部基线优势。
+Transformer 保留为历史次级基线。主要评价使用 MassSpecGym 1.3.1 retrieval 候选顺序和
+二维 InChIKey 身份规则；受跟踪的完整池审计表明保存候选池中每条 query 恰有一个身份等价
+正例。本地 exact-target-SMILES 结果作为敏感性视图保留。候选覆盖率、seed 统计单位、保存
+嵌入的范围和未闭合比较均在结果旁明确说明。本文证据用于检验谱图条件的候选关系是否在
+coarse 监督排序之外提供可复现信息，而非声称普适的 self-attention 或外部基线优势。
 \end{abstract}
 
 \noindent\textbf{关键词：}
@@ -96,9 +96,9 @@ pointwise 模型是主要容量控制，早期 candidate-set Transformer 仅作�
   采用完整候选池 coarse 打分和谱图条件的相对候选比较。
   \item 使机制可检验：相对分支无 rank、具有 pair 反对称性并对候选置换保持等变，训练不执行
   正例强制插入；容量匹配的 pointwise 对照用于隔离候选关系的贡献。
-  \item 按本地协议报告候选覆盖率和 seed 统计单位，并用保存的嵌入交叉核对官方候选顺序；
-  将新方法与历史 Transformer 审计分开，把尚未完成的完整 loader 端到端重编码、外部基线和部署效率
-  问题保留为限制，而不填入不可控比较。
+  \item 使用保存嵌入报告三种子 MassSpecGym 1.3.1 候选顺序和二维身份兼容评价，同时保留本地
+  exact-SMILES 敏感性视图；将新方法与历史 Transformer 审计分开，把完整 loader 端到端重编码、
+  外部基线和部署效率保留为明确限制，而不填入不可控比较。
 \end{itemize}
 
 \paragraph{AI 使用披露。}
@@ -440,25 +440,23 @@ listwise cross-entropy：
 质量和分子式场景下平均为 253.88 和 165.75；对应 17,556 条查询中，分别只有 1 条和
 3,159 条的候选数少于 40。经过 top-40 截断后，平均候选数为 40.00 和 35.73。
 
-本地 cache 和 evaluator 以 exact target-SMILES equality 定义唯一正例。在官方代码
-commit \texttt{4f501b3} 中，\footnote{MassSpecGym
+主要评价遵循 MassSpecGym 1.3.1 retrieval JSON 顺序和参考的二维 InChIKey 身份规则。在
+官方代码 commit \texttt{4f501b3} 中，\footnote{MassSpecGym
 \href{https://github.com/pluskal-lab/MassSpecGym/blob/4f501b3207c9f466bc745a0353f61dbfaf150d32/massspecgym/data/datasets.py}{reference loader}
 与 \href{https://github.com/pluskal-lab/MassSpecGym/blob/4f501b3207c9f466bc745a0353f61dbfaf150d32/massspecgym/data/transforms.py}{label transform}，
 访问日期：2026-08-01。}参考 loader 默认使用二维 InChIKey 等价规则，可能标出多个正例。
-因此，本文 Recall 和 MRR 使用所提供候选文件上的本地 exact-target-SMILES 单正例协议；
-我们还对保存的 17,556 条测试 query 应用了 MassSpecGym 1.3.1 的二维 InChIKey 变换：质量
-和分子式候选池都没有多正例 query 或身份碰撞，seed-42 relative 指标在两种规则下不变。这是
-缓存层面的身份审计，不是通过官方 loader 的完整重跑，因此仍保留 local-protocol 标记。
-alignment 中的多个正例标签同样来自 cache 中的 raw exact-SMILES 标签，而不是二维分子身份
-标签。图特征没有显式编码原子手性或键立体化学，因此某个立体异构候选在本地协议中可能被
-标为负例，而二维身份规则可能将其合并；这一模型层面的后果尚未量化。
+受跟踪的完整池身份审计在两个候选池都得到 17,556/17,556 个正例 query，且多正例 query
+和身份碰撞均为 0。因此，在这些保存候选列表上，exact-target 标签与参考身份标签等价。这是
+基于保存嵌入的官方兼容候选/身份评价，不是重新通过官方 loader 编码或重训 alignment。alignment
+中的多个正例标签仍来自 cache 的 raw exact-SMILES 标签，而不是二维分子身份标签；这一区别
+作为训练 provenance 限制保留。图特征没有显式编码原子手性或键立体化学，因此在未审计的候选
+集合中，立体异构体可能受不同身份规则影响。
 
 本地 cache 的候选集合与 MassSpecGym 1.3.1 retrieval JSON 的集合完全一致，但列表顺序不同
 （质量场景逐列表完全相同的为 0/17,556，分子式场景为 231/17,556）。因此我们重建了官方
-JSON 顺序，用保存的 alignment 嵌入重新计算 cosine/Base 排名，并评价 seed-42 的 relative
-和 pointwise checkpoint。该官方顺序交叉核验只改变并列次序相关的数值（质量 relative/pointwise
-R@1 为 50.08/51.63，分子式为 66.80/68.05），不替代三 seed 本地主表：它使用保存的嵌入，
-没有重新通过完整 official loader 变换或重训 alignment。
+JSON 顺序，用保存的 alignment 嵌入重新计算 cosine/Base 排名，并评价 relative 与 pointwise
+的 42--44 三个 training seeds。该官方顺序评价使用保存的嵌入，没有重新通过完整 official
+loader 变换或重训 alignment；三 seed 结果作为主要结果，本地 exact-SMILES 数值作为敏感性视图。
 
 \subsection{实现细节}
 
@@ -497,7 +495,8 @@ $\delta=0.1$。容量匹配的 pointwise 对照使用相同绝对分支和优化
 但不包含 MassSpecGym 谱图、候选池、训练后的 alignment 或 reranker checkpoint、reranker
 cache、日志及私有分析工件；因此 smoke test 不能复现论文科学指标。质量和分子式两种候选池
 分别训练 reranker。pilot 的训练实现提交为 \texttt{488a04a}，逐 query 评估工具提交为
-\texttt{8ce2655}；参数哈希、cache 和 checkpoint 指纹记录在内部 pilot manifest 中；该
+\texttt{8ce2655}，官方顺序评价脚本为 \texttt{official\_protocol\_eval.py}；参数哈希、cache
+和 checkpoint 指纹记录在内部 pilot manifest 中；该
 manifest 不随匿名投稿包提供，release manifest 仅覆盖论文
 PDF。早期含 rank Transformer 审计仍由其历史工件记录追踪，不与本 pilot provenance 混合。
 公开的图特征包括原子符号、度、总氢数、芳香性、环大小分箱、形式电荷；键类型、共轭性、
@@ -516,51 +515,55 @@ $10^{-4}$、gradient clipping 为 1；谱图 cache 使用 FP32、分子 cache �
 当前代码库中独立复现 JESTR 和 GLMR，其基础检索器、候选处理、身份/canonicalization
 规则与 MCES 实现也未和本文的 exact-target-SMILES 单正例协议匹配；本文不展示这些外部数值。
 
-评价指标为全部测试查询上的 Recall@1、Recall@5、Recall@20 和 MRR。新的 pilot 使用同一
-pre-overlap-clean alignment checkpoint、5,000 条训练 query 和三个 reranker training seeds
-（42--44）；均值和样本标准差表示 seed 离散度，不是独立 alignment 重复。seed-42 的逐 query
-paired bootstrap 使用保存的预测和 2,000 次确定性重采样。新的 pilot 不重新计算 MCES；早期经过
-阈值处理的 myopic-MCES 审计仍作为独立的单 checkpoint 工件保留。
+评价指标为全部 17,556 条测试 query 上的 Recall@1、Recall@5、Recall@20、Recall@40 和 MRR。
+主要表使用官方 retrieval JSON 顺序，并在保存嵌入上采用已审计的二维身份等价标签。新的 pilot
+使用同一 pre-overlap-clean alignment checkpoint、5,000 条训练 query 和三个 reranker training
+seeds（42--44）；均值和样本标准差表示 seed 离散度，不是独立 alignment 重复。seed-42 的逐
+query paired bootstrap 使用保存的预测和 2,000 次确定性重采样，但属于本地敏感性协议。新的
+pilot 不重新计算 MCES；早期经过阈值处理的 myopic-MCES 审计仍作为独立的单 checkpoint 工件保留。
 
 \subsection{主要结果}
 
 \begin{table}[t]
   \centering
-  \caption{本地 MassSpecGym 无 forcing 完整候选池 pilot。Base 使用同一
-  pre-overlap-clean \texttt{d4c1f70} cache；学习式结果为 reranker training seeds 42--44 的均值
-  $\pm$ 样本标准差，每次使用 5,000 条 query 训练三个 epoch。Recall 和 MRR 采用本地
-  exact-target-SMILES 单正例协议。}
+  \caption{MassSpecGym 1.3.1-compatible 候选顺序和二维身份协议下的无 forcing 完整候选池 pilot（保存嵌入）。
+  Base 使用同一 pre-overlap-clean \texttt{d4c1f70} cache；学习式结果为 reranker training seeds
+  42--44 的均值 $\pm$ 样本标准差，每次使用 5,000 条 query 训练三个 epoch。完整池身份审计未发现多正例或碰撞。}
   \label{tab:main_results_cn}
   \scriptsize
   \setlength{\tabcolsep}{2pt}
-  \begin{tabular}{llrrrr}
+    \begin{tabular}{llrrrrr}
     \toprule
-    候选池 & 方法 & R@1 & R@5 & R@20 & MRR \\
+    候选池 & 方法 & R@1 & R@5 & R@20 & R@40 & MRR \\
     \midrule
     \multirow{3}{*}{质量}
-      & \base{}（完整池，seed 42） & 43.78 & 61.10 & 75.55 & 52.19 \\
+      & \base{}（完整池） & 43.78 & 61.10 & 75.55 & 82.15 & 52.19 \\
       & 容量匹配 pointwise
-      & 51.37$\pm$0.54 & 67.34$\pm$0.39 & 80.71$\pm$0.55 & 59.03$\pm$0.44 \\
+      & 51.37$\pm$0.54 & 67.34$\pm$0.39 & 80.71$\pm$0.55 & 86.03$\pm$0.61 & 59.03$\pm$0.44 \\
       & 相对候选模型
-      & 50.98$\pm$0.87 & 67.06$\pm$0.67 & 80.49$\pm$0.55 & 58.71$\pm$0.76 \\
+      & 50.98$\pm$0.87 & 67.06$\pm$0.67 & 80.49$\pm$0.55 & 86.13$\pm$0.70 & 58.71$\pm$0.76 \\
     \midrule
     \multirow{3}{*}{分子式}
-      & \base{}（完整池，seed 42） & 58.49 & 71.50 & 81.81 & 64.79 \\
+      & \base{}（完整池） & 58.49 & 71.50 & 81.81 & 87.30 & 64.79 \\
       & 容量匹配 pointwise
-      & 66.65$\pm$1.30 & 76.76$\pm$0.87 & 85.33$\pm$0.42 & 71.66$\pm$1.04 \\
+      & 66.65$\pm$1.30 & 76.76$\pm$0.87 & 85.33$\pm$0.42 & 89.43$\pm$0.29 & 71.66$\pm$1.04 \\
       & 相对候选模型
-      & 66.32$\pm$0.46 & 76.29$\pm$0.23 & 85.08$\pm$0.07 & 71.29$\pm$0.33 \\
+      & 66.32$\pm$0.46 & 76.29$\pm$0.23 & 85.08$\pm$0.07 & 89.31$\pm$0.06 & 71.29$\pm$0.33 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\noindent 两种学习式模型在两个候选池都超过完整池 Base。三个 seed 聚合中，pointwise 在 R@1
+\noindent 两种学习式模型在两个候选池都超过完整池 Base。官方兼容三 seed 聚合中，pointwise 在 R@1
 和 MRR 略高于 relative（质量：51.37 对 50.98、0.5903 对 0.5871；分子式：66.65 对 66.32、
 0.7166 对 0.7129）。同一 256 候选 cache 的评价时 K 敏感性显示，质量场景 relative/pointwise
 在 $K=20$ 为 80.49/80.71、$K=40$ 为 86.13/86.03、$K=80$ 为 93.45/93.38；这些不是
 按 K 重新训练的结果。seed-42 paired bootstrap 中，质量 relative 相对 Base 的 R@1 差为
 6.30 个百分点（95\% CI：5.69--6.93），MRR 差为 0.0576（0.0530--0.0625）。新的 pilot
 未计算 MCES；历史单 checkpoint MCES 审计仍单独保留。
+
+作为 local exact-target-SMILES 敏感性核对，本地三 seed 均值在当前显示精度下与上表一致。
+这一致性以已审计候选列表不存在二维身份碰撞为条件，并不等价于重新构建 official loader 或
+更换候选来源后的端到端结果。
 
 \paragraph{信息来源与机制审计。}
 在同一 seed-42 pilot 中，仅使用 base score 的对照在质量/分子式场景的 R@1/MRR 为
@@ -591,17 +594,19 @@ JESTR 和 GLMR 保留为 reported-only、未复现且不可直接比较的机制
 
 新的完整池 pilot 将候选覆盖与列表内排序分开。保存的完整池上界按构造为 100\%，而评价时
 截断到 top-40 后质量候选上界为 82.15\%。三个 reranker seeds 中两种模型都超过 Base；
-pointwise 在主要 R@1/MRR 汇总略强，relative 在不同 cutoff 并非始终更好。保存的 seed-42
-预测还给出 RTX 4090 仅前向测量：质量 relative 为 0.083 ms/query、峰值分配 302 MB，
-pointwise 为 0.030 ms/query、244 MB（分子式分别为 0.076/0.029 ms 和 302/244 MB）。
-这些是实现审计，不构成效率优越性结论。
+pointwise 在主要 R@1/MRR 汇总略强，relative 在不同 cutoff 并非始终更好。固定 RTX 4090、
+batch 64、2,048 条 query 且排除数据加载的前向审计显示，质量 relative 的 full-pool coarse、
+top-40 relation 和 full 分别为 0.261、0.111、0.372 ms/query（2,685 q/s，峰值 302 MB），
+pointwise 为 0.030 ms/query（33,450 q/s，244 MB）；分子式 relative 为 0.026、0.050、
+0.076 ms/query（13,235 q/s，302 MB），pointwise 为 0.026 ms/query（38,492 q/s，244 MB）。
+这些是实现审计，不构成端到端效率优越性结论。
 
 质量候选的 spectrum-shuffle 审计使相对模型降为 45.05\% Recall@1 和 0.5358 MRR，仍高于
 Base，但明显低于正确配对的相对结果。这说明模型并非完全不依赖谱图；然而打乱谱图后仍保留的
 性能也表明候选与基础分数路径贡献显著。因此，不能将 pointwise 到 relative 的差异归因于
 候选关系的因果收益。下方历史 Transformer 结果仅作为旧设计审计保留，不与本 pilot 合并。
 
-官方顺序交叉核验使用发布的候选 JSON 和保存的 alignment 嵌入，但没有通过新建的 official
+官方兼容评价使用发布的候选 JSON 和保存的 alignment 嵌入，但没有通过新建的 official
 loader 重新编码谱图/分子，也没有重训第一阶段。因此它不能证明另行重建的 loader、不同候选
 来源或外部方法的端到端等价性。
 
@@ -643,8 +648,8 @@ Transformer--Pointwise 方向进一步说明大部分增益不应归因于候选
 
 新的主要证据使用 194,119 条可用训练 query 中的 5,000 条、训练三个 epoch，以及同一
 alignment checkpoint 的三个 reranker training seeds。这不是 alignment 层级或端到端 seed
-稳定性；逐 query bootstrap 也不替代独立重训。二维 InChIKey 审计在保存的测试 cache 中未发现
-身份碰撞，但不是官方 loader 的完整重跑；外部基线和候选感知 alignment 重训仍不在范围内。
+稳定性。官方兼容结果使用保存嵌入和完整池二维 InChIKey 身份审计，但不是重新通过官方 loader
+编码；外部基线和候选感知 alignment 重训仍不在范围内。逐 query bootstrap 也不替代独立重训。
 
 无 forcing cache 只保留 MassSpecGym 文件提供的候选。目标若不在评价截断深度内，reranker
 无法恢复；闭集模型也不能提出候选池之外的结构。候选关系只在 coarse top-40 上计算，因此
@@ -704,11 +709,12 @@ exchangeability 且目标属于候选池等假设下生成具有边际覆盖率�
 \section{结论}
 
 本文提出 \method{}：一种无 rank、无 forcing 的第二阶段排序器，将完整候选池 coarse 打分
-与谱图条件的相对候选偏好结合。在本地 exact-target-SMILES 协议的三个 reranker training
-seeds 中，relative 和容量匹配 pointwise 都改善质量和分子式场景的完整池 Base；pointwise
-在主要 R@1/MRR 汇总略强，spectrum-shuffle 审计也显示候选/base-score 路径贡献显著。因此，
-当前证据支持该工程框架及其明确的证据边界，但尚未建立 relative 模块独立且普遍稳健的收益。
-二维 InChIKey cache 审计未发现身份碰撞，但官方 loader 等价性和外部基线比较仍不作主张。
+与谱图条件的相对候选偏好结合。在 MassSpecGym 1.3.1-compatible 候选顺序和二维身份协议的
+保存嵌入评价中，三个 reranker training seeds 的 relative 和容量匹配 pointwise 都改善质量和
+分子式场景的完整池 Base；pointwise 在主要 R@1/MRR 汇总略强，spectrum-shuffle 审计也显示
+候选/base-score 路径贡献显著。因此，当前证据支持一个边界明确的监督式重排序框架，但尚未
+建立 relative 模块独立且普遍稳健的收益。重新通过 official loader 编码、外部基线比较和端到端
+部署效率仍不作主张。
 
 \bibliographystyle{plain}
 \bibliography{references}
