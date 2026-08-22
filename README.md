@@ -210,6 +210,18 @@ mass/formula test caches found no multiple-positive query or candidate identity
 collision, and the seed-42 relative metrics were unchanged; this remains a
 cache-level audit rather than a full official-loader rerun.
 
+The local cache candidate sets were also compared with the MassSpecGym 1.3.1
+retrieval JSON snapshot: both pools have set Jaccard 1.0 for all 17,556 test
+targets, while list order differs (mass 0/17,556 exact matches; formula
+231/17,556). An official-order cross-check recomputes base ranks from the
+saved alignment embeddings and evaluates the seed-42 checkpoints; it does not
+rerun the loader transforms, retrain alignment, or establish end-to-end
+official-loader equivalence. The tracked results and candidate hashes are in
+`analysis/transfer2026_scholargpt_review/official_candidate_eval_all.json`
+and `candidate_source_comparison.json`. A seed-42 difficulty-stratified
+query analysis is recorded in `difficulty_analysis.json`; it is descriptive
+and local-protocol only.
+
 The no-forcing pilot uses pre-overlap-clean alignment checkpoint `d4c1f70`,
 5,000 training queries, three epochs, and reranker seeds 42--44. Both relative
 and capacity-matched pointwise improve the base in both pools; pointwise is

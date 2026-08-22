@@ -18,6 +18,14 @@ It is not a scientific result table.
 - The new relative full-pool cache was audited under the MassSpecGym 1.3.1
   2D-InChIKey transform; neither saved test cache contained multiple positives
   or candidate identity collisions.
+- The local candidate sets were compared with the MassSpecGym 1.3.1 retrieval
+  JSON snapshot (set Jaccard 1.0 for every test target), and an official-order
+  cross-check was evaluated from saved alignment embeddings. The mass lists
+  had 0/17,556 exact order matches and formula lists 231/17,556; this is not a
+  fresh official-loader re-encoding or alignment retraining.
+- A seed-42 local query difficulty analysis was completed for candidate count,
+  base rank, Morgan similarity, score margin, and peak count. It is descriptive
+  and does not establish causal or generalization claims.
 - RTX 4090 forward-only latency and peak allocation were measured for the
   primary relative/pointwise pair.
 
@@ -26,7 +34,9 @@ It is not a scientific result table.
 - A retriever-agnostic external baseline requires a second retriever and matched
   candidate construction; reported-only JESTR/GLMR numbers are not substitutes.
 - A full official-loader rerun requires the official data/loader environment;
-  the current identity result is a cache-level audit.
+  the current identity result remains a cache-level audit, and the official
+  candidate-order cross-check uses saved embeddings rather than fresh loader
+  transforms.
 - Candidate-aware alignment retraining and alignment-level confidence estimates
   were not added to this pilot.
 

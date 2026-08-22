@@ -31,9 +31,42 @@ seed-42 保存了四组逐 query prediction JSON（mass/formula × pointwise/rel
 
 `relative_identity_eval.json` 对新 relative full-pool seed-42 test cache 应用 MassSpecGym 1.3.1 的 2D InChIKey prefix transform。两个候选池均为 17,556/17,556 query，multiple-positive query=0、candidate identity collision=0；local exact-SMILES 与 reference 2D identity 的 base/rerank 指标完全相同。该结果是 cache-level identity audit，不是官方 loader 的完整重跑，也不覆盖未保存的外部候选池。
 
+## Official candidate-order cross-check
+
+本地 Hugging Face 缓存中可用 MassSpecGym 1.3.1 retrieval JSON。其候选**集合**与本地 test
+cache 完全一致（两个候选池的平均 set Jaccard 均为 `1.0`，17,556 个目标均在集合中），但
+有序列表并不完全一致：mass 为 `0/17,556` 个完全相同列表，formula 为 `231/17,556`。
+因此我们按官方 JSON 顺序重排候选，使用保存的 alignment embedding 重新计算 cosine/base
+rank，再评价 seed-42 checkpoint。该结果是官方候选顺序交叉核对，不是重新训练 alignment
+或外部方法复现。
+
+| official candidate order / seed 42 | R@1 | R@5 | R@20 | R@40 | MRR |
+|---|---:|---:|---:|---:|---:|
+| mass base | 43.78 | 61.10 | 75.55 | 82.15 | 52.19 |
+| mass pointwise | 51.63 | 67.79 | 81.27 | 86.65 | 59.35 |
+| mass relative | 50.08 | 66.42 | 80.91 | 86.89 | 57.95 |
+| formula base | 58.49 | 71.50 | 81.81 | 87.30 | 64.79 |
+| formula pointwise | 68.05 | 77.72 | 85.80 | 89.75 | 72.82 |
+| formula relative | 66.80 | 76.47 | 85.14 | 89.37 | 71.61 |
+
+官方顺序下的数值与本地 cache 结果仅有排序 tie 造成的微小差异。已跟踪的 2D InChIKey
+审计在本地列表中未发现额外正例；由于候选集合相同，官方顺序核对使用同一唯一正例。
+候选 JSON 哈希和完整结果见 `official_candidate_eval_all.json` 与
+`candidate_source_comparison.json`。
+
 ## 固定硬件前向审计
 
 RTX 4090、batch size 64、同一 test cache 的 forward-only 测量：relative mass 0.083 ms/query、302 MB peak allocation；pointwise mass 0.030 ms/query、244 MB；formula relative/pointwise 分别 0.076/0.029 ms/query、302/244 MB。这些是实现审计，不构成端到端吞吐或效率优势声明。
+
+## 困难候选分层（seed 42）
+
+`difficulty_analysis.json` 按候选池大小、Base 名次、top-1 候选与目标的 Morgan 相似度、Base
+top-1 与目标的分数间隔以及谱峰数汇总 local exact-target-SMILES 结果。Base 名次为 2--5/6--20
+的查询中，relative 相对 Base 的 R@1 增益分别为质量 `+42.17/+23.02` 个百分点、分子式
+`+52.72/+30.06` 个百分点；top-1 Morgan 相似度低于 0.25 时对应 `+24.59/+35.92` 个百分点。
+Base 名次为 1 或 top-1 相似度至少 0.5 时 relative 反而下降（质量 `-13.28/-11.86`、分子式
+`-5.41/-3.65` 个百分点）。这些是 seed-42 的描述性分层，支持收益集中在需要重排的困难查询
+这一现象，但不能证明相对模块的因果或普遍优势。
 
 ## 信息来源与机制消融（seed 42）
 
@@ -55,4 +88,6 @@ RTX 4090、batch size 64、同一 test cache 的 forward-only 测量：relative 
 
 - 逐 query：`pilot_predictions/`；聚合：`multiseed_summary.json`。
 - 2D identity：`relative_identity_eval.json`。
+- 官方候选顺序交叉核对：`official_candidate_eval_all.json`、`candidate_source_comparison.json`。
+- 困难候选分层：`difficulty_analysis.json`。
 - 训练 checkpoint 和 cache 位于本机/内部路径，未随匿名补充包发布。

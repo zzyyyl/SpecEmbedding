@@ -135,9 +135,11 @@ Our contributions are:
   a capacity-matched pointwise control isolates the contribution of candidate
   relations.
   \item We report local-protocol results with explicit coverage and seed units,
-  separate the new method from the historical Transformer audit, and retain
-  unmeasured official-evaluator, external-baseline, and efficiency questions as
-  limitations rather than filling them with uncontrolled comparisons.
+  cross-check the official candidate order using saved embeddings, separate the
+  new method from the historical Transformer audit, and retain full
+  end-to-end loader re-encoding, external-baseline, and deployment-efficiency
+  questions as limitations rather than filling them with uncontrolled
+  comparisons.
 \end{itemize}
 
 \paragraph{AI-assistance disclosure.}
@@ -579,6 +581,16 @@ stereo variant can be treated as a negative locally even when a two-dimensional
 identity rule would merge it; this model-level consequence has not been
 quantified.
 
+The locally cached candidate sets exactly match the MassSpecGym 1.3.1 retrieval
+JSON sets, although their ordering differs (mass: 0/17,556 exact ordered-list
+matches; formula: 231/17,556). We therefore reconstructed the official JSON
+order, recomputed cosine/base ranks from the saved alignment embeddings, and
+evaluated seed-42 relative and pointwise checkpoints. This official-order
+cross-check changes only tie-order-level values (mass relative/pointwise R@1
+50.08/51.63; formula 66.80/68.05) and does not replace the three-seed local
+main table: it uses saved embeddings and does not rerun the full loader's
+transforms or retrain alignment.
+
 \subsection{Implementation Details}
 
 The aligned model outputs 512-dimensional embeddings. Its spectrum Transformer
@@ -729,6 +741,16 @@ JESTR and GLMR remain reported-only, not reproduced, and not directly
 comparable background methods. We retain their mechanism descriptions but do
 not reproduce their numeric table or infer a relative ranking.
 
+\paragraph{Difficulty strata.}
+In the seed-42 local query analysis, relative gains concentrate among queries
+that the base ranker leaves unresolved. For base ranks 2--5/6--20, relative
+R@1 gains over base are +42.17/+23.02 percentage points for mass and
++52.72/+30.06 for formula; when the base top-1 Morgan similarity is below
+0.25, the gains are +24.59/+35.92 points. Base-rank-1 queries and top-1
+similarity at least 0.5 instead decline (mass -13.28/-11.86; formula
+-5.41/-3.65). These are descriptive seed-42 strata under the local protocol,
+not causal or significance evidence for the relative module.
+
 \paragraph{Historical audit boundary.}
 Earlier rank-aware Transformer results used the former top-40 cache and
 training-only positive replacement. They remain available in the internal
@@ -759,9 +781,12 @@ therefore do not attribute the pointwise-to-relative gap to a causal benefit of
 candidate relations. The historical Transformer results below are retained only
 as an audit of the previous design and are not merged with this pilot.
 
-The identity result is limited to the saved candidate caches: it does not
-establish equivalence for an unreconstructed official loader or an external
-candidate pool. JESTR/GLMR remain reported-only and were not reproduced.
+The official-order cross-check uses the published candidate JSON and saved
+alignment embeddings, but does not re-encode spectra/molecules through a fresh
+official loader or retrain the first stage. It therefore does not establish
+end-to-end equivalence for a separately reconstructed loader, a different
+candidate source, or an external method. JESTR/GLMR remain reported-only and
+were not reproduced.
 
 \iffalse
 \section{Historical discussion text}

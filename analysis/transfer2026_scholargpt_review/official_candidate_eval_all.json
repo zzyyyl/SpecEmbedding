@@ -1,0 +1,146 @@
+{
+  "mass_relative": {
+    "pool": "mass_relative",
+    "official_protocol": {
+      "package": "massspecgym",
+      "version": "1.3.1",
+      "candidate_json": "MassSpecGym_retrieval_candidates_mass.json",
+      "candidate_json_sha256": "6256d8414fe02ef28c4179135ce454d1a7b77b64454241785935ad29114cfca5",
+      "candidate_order": "official retrieval candidate JSON",
+      "identity_rule": "exact target is unique in each official list; prior tracked 2D-InChIKey audit found no extra positive",
+      "scope": "official candidate order with saved alignment embeddings; no retraining"
+    },
+    "cache": "rerank_cache/d4c1f70_massspecgym_nopretrain_mass/massspecgym_mass_test.pt",
+    "checkpoint": "checkpoints_rerank/scholargpt_relative_fullpool_experiments/mass/relative/best_reranker.pth",
+    "base": {
+      "queries": 17556,
+      "positive_queries": 17556,
+      "positive_fraction": 1.0,
+      "recall_at_1": 0.43779904306220097,
+      "recall_at_5": 0.6109592162223741,
+      "recall_at_20": 0.7554682159945317,
+      "recall_at_40": 0.8215424925951241,
+      "recall_at_256": 1.0,
+      "mrr": 0.5218600254928957
+    },
+    "rerank": {
+      "queries": 17556,
+      "positive_queries": 17556,
+      "positive_fraction": 1.0,
+      "recall_at_1": 0.5007974481658692,
+      "recall_at_5": 0.6641604010025063,
+      "recall_at_20": 0.8091250854408749,
+      "recall_at_40": 0.8689336978810663,
+      "recall_at_256": 1.0,
+      "mrr": 0.5795029514291498
+    }
+  },
+  "mass_pointwise": {
+    "pool": "mass_pointwise",
+    "official_protocol": {
+      "package": "massspecgym",
+      "version": "1.3.1",
+      "candidate_json": "MassSpecGym_retrieval_candidates_mass.json",
+      "candidate_json_sha256": "6256d8414fe02ef28c4179135ce454d1a7b77b64454241785935ad29114cfca5",
+      "candidate_order": "official retrieval candidate JSON",
+      "identity_rule": "exact target is unique in each official list; prior tracked 2D-InChIKey audit found no extra positive",
+      "scope": "official candidate order with saved alignment embeddings; no retraining"
+    },
+    "cache": "rerank_cache/d4c1f70_massspecgym_nopretrain_mass/massspecgym_mass_test.pt",
+    "checkpoint": "checkpoints_rerank/scholargpt_relative_fullpool_experiments/mass/pointwise/best_reranker.pth",
+    "base": {
+      "queries": 17556,
+      "positive_queries": 17556,
+      "positive_fraction": 1.0,
+      "recall_at_1": 0.43779904306220097,
+      "recall_at_5": 0.6109592162223741,
+      "recall_at_20": 0.7554682159945317,
+      "recall_at_40": 0.8215424925951241,
+      "recall_at_256": 1.0,
+      "mrr": 0.5218600254928957
+    },
+    "rerank": {
+      "queries": 17556,
+      "positive_queries": 17556,
+      "positive_fraction": 1.0,
+      "recall_at_1": 0.516347687400319,
+      "recall_at_5": 0.6779448621553885,
+      "recall_at_20": 0.8126566416040101,
+      "recall_at_40": 0.8665413533834586,
+      "recall_at_256": 1.0,
+      "mrr": 0.5934901511209576
+    }
+  },
+  "formula_relative": {
+    "pool": "formula_relative",
+    "official_protocol": {
+      "package": "massspecgym",
+      "version": "1.3.1",
+      "candidate_json": "MassSpecGym_retrieval_candidates_formula.json",
+      "candidate_json_sha256": "209f59f532752e10c4457a61a208d8b3fc1dc03cacfe3a05f5eb20a23b7b6d05",
+      "candidate_order": "official retrieval candidate JSON",
+      "identity_rule": "exact target is unique in each official list; prior tracked 2D-InChIKey audit found no extra positive",
+      "scope": "official candidate order with saved alignment embeddings; no retraining"
+    },
+    "cache": "rerank_cache/d4c1f70_massspecgym_nopretrain_formula_topk256/massspecgym_formula_test.pt",
+    "checkpoint": "checkpoints_rerank/scholargpt_relative_fullpool_experiments/formula/relative/best_reranker.pth",
+    "base": {
+      "queries": 17556,
+      "positive_queries": 17556,
+      "positive_fraction": 1.0,
+      "recall_at_1": 0.5848712690817954,
+      "recall_at_5": 0.7150262018683071,
+      "recall_at_20": 0.8180678970152654,
+      "recall_at_40": 0.8730348598769652,
+      "recall_at_256": 1.0,
+      "mrr": 0.6479390394117899
+    },
+    "rerank": {
+      "queries": 17556,
+      "positive_queries": 17556,
+      "positive_fraction": 1.0,
+      "recall_at_1": 0.6679767600820232,
+      "recall_at_5": 0.7646958304853042,
+      "recall_at_20": 0.8513898382319435,
+      "recall_at_40": 0.8937115516062885,
+      "recall_at_256": 1.0,
+      "mrr": 0.7161446173010089
+    }
+  },
+  "formula_pointwise": {
+    "pool": "formula_pointwise",
+    "official_protocol": {
+      "package": "massspecgym",
+      "version": "1.3.1",
+      "candidate_json": "MassSpecGym_retrieval_candidates_formula.json",
+      "candidate_json_sha256": "209f59f532752e10c4457a61a208d8b3fc1dc03cacfe3a05f5eb20a23b7b6d05",
+      "candidate_order": "official retrieval candidate JSON",
+      "identity_rule": "exact target is unique in each official list; prior tracked 2D-InChIKey audit found no extra positive",
+      "scope": "official candidate order with saved alignment embeddings; no retraining"
+    },
+    "cache": "rerank_cache/d4c1f70_massspecgym_nopretrain_formula_topk256/massspecgym_formula_test.pt",
+    "checkpoint": "checkpoints_rerank/scholargpt_relative_fullpool_experiments/formula/pointwise/best_reranker.pth",
+    "base": {
+      "queries": 17556,
+      "positive_queries": 17556,
+      "positive_fraction": 1.0,
+      "recall_at_1": 0.5848712690817954,
+      "recall_at_5": 0.7150262018683071,
+      "recall_at_20": 0.8180678970152654,
+      "recall_at_40": 0.8730348598769652,
+      "recall_at_256": 1.0,
+      "mrr": 0.6479390394117899
+    },
+    "rerank": {
+      "queries": 17556,
+      "positive_queries": 17556,
+      "positive_fraction": 1.0,
+      "recall_at_1": 0.6805080884028253,
+      "recall_at_5": 0.7772271588061062,
+      "recall_at_20": 0.8579972658920028,
+      "recall_at_40": 0.8974709501025291,
+      "recall_at_256": 1.0,
+      "mrr": 0.7281765789237208
+    }
+  }
+}

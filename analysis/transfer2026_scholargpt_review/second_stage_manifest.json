@@ -10,9 +10,15 @@
   "identity_protocol": "local exact-target-SMILES plus MassSpecGym 1.3.1 2D InChIKey cache audit",
   "tracked_files": {
     "multiseed_summary.json": "sha256:f1aedab762263907e54ada99ae37e6da1b7f23d0c8617dbb4fe0003fc685e4e3",
-    "second_stage_report.md": "sha256:5cceb3bf3e20034c42cce6cf358bb5886d091cb328c5b9de01783c5574fd2750",
+    "second_stage_report.md": "sha256:0649a80b4c16d354529250415ac1df65175d73c8b03537a9d8fd78564724efed",
     "relative_identity_eval.json": "sha256:a74f6aa4ead3a1a3c25e8e385183c1a925d5ce4e2c5c019ee96619d2c71f134b",
-    "summarize_pilot.py": "sha256:6a785fcff0c4bb7e3c31623d0d8ca2bc95713b97f0f1560dcb1053a4d1271a61"
+    "summarize_pilot.py": "sha256:6a785fcff0c4bb7e3c31623d0d8ca2bc95713b97f0f1560dcb1053a4d1271a61",
+    "official_candidate_eval.py": "sha256:9c2d2b3e1dd108aa30d9a5f2c504e73d43a772f5864a416d037272ce660e8039",
+    "candidate_source_comparison.py": "sha256:cb040866c25ae4c85962af96e191076b87ddf094c3285ebc810ad1220b8b2ddd",
+    "difficulty_analysis.py": "sha256:d858e65c24527c84aeccc029089f3f88abece6213b81e86c542f778c950005b3",
+    "official_candidate_eval_all.json": "sha256:3318fcb53b68838b3da9d885654312ec80486282d16df4be0794f4b3959a68ef",
+    "candidate_source_comparison.json": "sha256:535bd58491a6958ee0e9a95250fd54ea30f45935fc21cb966d6d677fa94cc8bf",
+    "difficulty_analysis.json": "sha256:d62601a670c48fcf8356038ab1a22c9d9c52ca17ad479c531365bd18c282eed3"
   },
   "local_untracked_artifacts": {
     "pilot_predictions": "analysis/transfer2026_scholargpt_review/pilot_predictions/",
@@ -23,6 +29,8 @@
     "three reranker seeds are not independent alignment replicates",
     "K sensitivity is evaluation-only truncation, not K-specific retraining",
     "2D identity result is a cache-level audit, not a full official-loader rerun",
+    "official candidate-order cross-check uses saved alignment embeddings and does not rerun loader transforms or retrain alignment",
+    "difficulty strata are descriptive seed-42 local-protocol analysis, not causal or significance evidence",
     "JESTR/GLMR remain reported-only and not directly comparable",
     "forward latency/memory is not an end-to-end efficiency claim"
   ]

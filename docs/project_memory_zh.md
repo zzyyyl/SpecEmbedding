@@ -24,7 +24,7 @@
 当前目标是完成转投稿件，暂定完稿日期为 2026-08-31；ADMA 2026 及其主题
 `Data mining for bioinformatics` 是原始投稿背景。英文标题暂定为：
 
-> Non-Generative Learning to Rerank for MS/MS-Based Molecule Retrieval
+> Spectrum-Conditioned Relative Reranking for MS/MS Molecule Retrieval
 
 三随机种子受控消融完成后，论文需要强调的证据边界是：
 
@@ -417,6 +417,17 @@ Train--val 模型选择审计：
 - clean reranker 12/12 组全部 early stop；9/12 组的 best/stop epoch 对与历史流水线不同，3/12 组相同。因此不能声称新旧下游模型选择逐项一致；该差异不能单独归因于 6 条重叠查询。
 - 新旧流水线对比同时包含 alignment 重训、checkpoint 和 cache 变化。因此测试指标差异只能解释为完整流水线对 validation 协议的敏感性，不是删除 6 条查询的隔离因果效应。
 
+### 6.3 ScholarGPT 复核补充
+
+- 本地 cache 与 MassSpecGym 1.3.1 retrieval JSON 的候选集合对全部 17,556 个测试目标完全一致，
+  平均 set Jaccard 为 1.0；有序列表完全匹配数为 mass 0/17,556、formula 231/17,556。
+- 已按官方 JSON 顺序，用保存的 alignment 嵌入重算 base rank 并评价 seed-42 relative/pointwise
+  checkpoint。该官方顺序核验不是完整 official loader 重编码、alignment 重训或外部基线复现，
+  结果见 `analysis/transfer2026_scholargpt_review/official_candidate_eval_all.json`。
+- 已完成 seed-42 困难 query 分层（候选数量、Base 名次、Morgan 相似度、分数间隔、谱峰数）；
+  relative 增益集中在 Base 名次 2--5/6--20 和低相似度 query，但在容易 query 上下降，
+  仅作 local exact-SMILES 协议下的描述性结果。
+
 下表是历史 `d4c1f70` 代表性 seed-42 Set Transformer 结果，仅保留为已完成 MCES@1 的追溯记录：
 
 | Candidate | Method | Upper bound | Recall@1 | Recall@5 | Recall@10 | Recall@20 | MRR | MCES@1 |
@@ -750,6 +761,7 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 已忽略的 `paper/build/main.pdf` 与 `main_cn.pdf` 已由 release build 同步为 18/16 页；
   发布证据以受跟踪的 `paper/release/` 为准。
 - 页数压缩：按用户决定延后到完稿后统一微调；最终投稿合规仍未完成。
+- 当前页数不绑定 15 页上限；在 venue 未确定前优先保持内容精炼、证据边界清楚，最终再按模板排版。
 - 英文 PDF 作者元数据：空
 - 致谢和基金：未加入
 - AI assistance disclosure：已移入 Introduction，并明确覆盖所有章节、代码编辑、实验编排和一致性审计；数值来自软件流水线，作者核验并承担全部责任。
@@ -826,7 +838,8 @@ venue 确认与格式适配、作者列表和 COI，以及定稿后的 PDF/源�
 2. 确认最终作者列表、单位、COI 及 venue 要求的声明。
 3. 当前初稿 release evidence 已生成；待 venue 格式与作者信息定稿后，重建最终提交副本并
    联合复扫 PDF、源码和匿名补充归档。
-4. 不新增实验目标；top-$K$、效率、排名迁移及 JESTR/GLMR 独立复现均不属于当前待办，
+4. 官方候选顺序交叉核验和 seed-42 困难分层已完成；不新增实验目标，top-$K$、效率、排名迁移
+   及 JESTR/GLMR 独立复现均不属于当前待办，
    除非用户以后另行开启任务。
 
 ## 12. 已知风险与容易混淆的地方
@@ -851,6 +864,13 @@ venue 确认与格式适配、作者列表和 COI，以及定稿后的 PDF/源�
   Pointwise 在 mass/formula 的 Recall@1 与 MRR 上都只有 2/3 alignment 为正。
 - 因此现有证据是内部描述性敏感性结果，不是置信区间、显著性或一般完整流水线稳定性；
   组件消融仍未跨 alignment 重复，不能将整体增益归因于候选间交互。
+
+### 12.5 官方候选顺序核验的边界
+
+- 官方 JSON 核验重排了候选并使用已保存的谱图/分子嵌入；它没有重新通过官方 loader 变换或
+  重训 alignment，因此不能宣称完整 official-evaluator 端到端等价。
+- 困难候选分层来自 seed-42、local exact-target-SMILES 逐 query 预测，只是描述性分析，
+  不提供因果、显著性或跨数据集泛化证据。
 
 ### 12.4 跨论文结果不能作为受控消融
 
@@ -975,3 +995,20 @@ score-only/embedding-only/embedding+base/candidate-only/no-spectrum/no-molecular
 均无 multiple-positive query 或 candidate identity collision，seed-42 local/reference 指标
 一致；该结果是 cache-level identity audit，不是完整官方 loader 重跑。JESTR/GLMR 仍为
 reported-only、未复现、不可直接比较。详见 `analysis/transfer2026_scholargpt_review/`。
+
+## 17. 2026-08-23 官方候选顺序与困难分层补充
+
+继续按 ScholarGPT 意见核对本地可访问的 MassSpecGym 1.3.1 快照后，发现本地 cache 与官方
+retrieval JSON 在两个候选池上对每个测试目标的候选集合均完全一致（平均 set Jaccard 为 1.0），
+但列表顺序不同：质量场景逐列表完全相同为 0/17,556，分子式场景为 231/17,556。已按官方
+JSON 顺序重排，并用保存的 alignment 嵌入重算 base 排名、评价 seed-42 relative/pointwise
+checkpoint；结果记录在 `official_candidate_eval_all.json`，候选源比较在
+`candidate_source_comparison.json`。这只是官方候选顺序交叉核验，不是完整 loader 变换、重新
+编码或 alignment 重训，因此不宣称端到端 official-evaluator equivalence。
+
+同一批保存的 seed-42 local query prediction 完成了候选数量、Base 名次、top-1 Morgan 相似度、
+基础分数间隔和谱峰数分层。relative 的增益集中在 Base 名次 2--5/6--20 及低相似度 query，
+但在 Base 名次 1 或高相似度 query 上下降；这些结果是 local exact-SMILES 协议下的描述性分层，
+不构成因果、显著性或一般化证据。详见 `difficulty_analysis.json` 与
+`analysis/transfer2026_scholargpt_review/second_stage_report.md`。外部强基线、candidate-aware
+alignment 重训、跨数据集验证和统一官方 loader 端到端重跑仍未完成，论文继续明确保留这些边界。

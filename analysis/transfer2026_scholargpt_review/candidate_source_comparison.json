@@ -1,0 +1,44 @@
+{
+  "mass": {
+    "cache": "rerank_cache/d4c1f70_massspecgym_nopretrain_mass/massspecgym_mass_test.pt",
+    "official_candidate_json": "MassSpecGym_retrieval_candidates_mass.json",
+    "queries": 17556,
+    "exact_ordered_list_matches": 0,
+    "exact_ordered_list_match_fraction": 0.0,
+    "mean_set_overlap": 253.87662337662337,
+    "mean_set_jaccard": 1.0,
+    "local_candidate_count_min_mean_max": [
+      28,
+      253.87662337662337,
+      256
+    ],
+    "official_candidate_count_min_mean_max": [
+      28,
+      253.87662337662337,
+      256
+    ],
+    "local_target_present_queries": 17556,
+    "official_target_present_queries": 17556
+  },
+  "formula": {
+    "cache": "rerank_cache/d4c1f70_massspecgym_nopretrain_formula_topk256/massspecgym_formula_test.pt",
+    "official_candidate_json": "MassSpecGym_retrieval_candidates_formula.json",
+    "queries": 17556,
+    "exact_ordered_list_matches": 231,
+    "exact_ordered_list_match_fraction": 0.013157894736842105,
+    "mean_set_overlap": 165.74726589200273,
+    "mean_set_jaccard": 1.0,
+    "local_candidate_count_min_mean_max": [
+      1,
+      165.74726589200273,
+      256
+    ],
+    "official_candidate_count_min_mean_max": [
+      1,
+      165.74726589200273,
+      256
+    ],
+    "local_target_present_queries": 17556,
+    "official_target_present_queries": 17556
+  }
+}
