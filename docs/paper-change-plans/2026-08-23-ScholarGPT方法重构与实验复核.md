@@ -1,6 +1,6 @@
 # 论文修改计划：ScholarGPT 方法重构与实验复核
 
-- 状态：`执行中`
+- 状态：`已执行`
 - 创建日期：2026-08-23
 - 最后更新：2026-08-23
 - 负责人：Codex
@@ -25,20 +25,20 @@
 - 现有 `prepare_rerank_cache.py` 支持 `pre_top_k=256`，但历史 canonical cache 使用 `force_include_positive=True`；训练期强制插入造成 rank/base-score shortcut。
 - `SpecEmbedding/models_rerank.py` 的现有模型含 rank embedding 和可选 generic Transformer；没有显式候选对关系，也没有 spectrum-dependency loss。
 - 工作区存在本地不可提交的完整 rerank cache、alignment checkpoint 和 RTX 4090 GPU；缓存元数据和路径必须通过实际读取核验，不以 manifest hash 冒充原始数据。
-- `/data1/zyl/SpecEmbedding/processed/MassSpecGym/` 提供候选源及数据入口，但其是否足以生成无 forcing 全池 cache 需在运行时确认。
+- 本地 `processed/MassSpecGym/` 数据入口已实际生成无 forcing 全池 cache；结果记录只保留仓库相对路径、字节数和 SHA-256，不把机器绝对路径写入发布材料。
 - 现有论文已明确 local exact-SMILES 与官方二维 InChIKey 协议边界；官方 evaluator、外部强 baseline、容量匹配、query bootstrap 只有在真实输入和运行完成后才能升级为主结果。
 
 ## 3. 修改范围
 
 ### 3.1 涉及文件与章节
 
-- [ ] `prepare_rerank_cache.py`、`SpecEmbedding/data/datasets_rerank.py`：把无 forcing 设为新实验的强制配置；训练集只使用自然有标签 query，保留全池候选和 coverage 元数据。
-- [ ] `SpecEmbedding/models_rerank.py`、`SpecEmbedding/utils/rerank.py`、`train_rerank.py`、`eval_rerank.py`：实现无 rank 的谱图条件相对候选 reranker、反对称 pair preference、谱图依赖损失和可审计配置。
-- [ ] 新增 `analysis/transfer2026_scholargpt_method/`：保存配置、参数量、训练/评价结果、难度分层和效率测量；不覆盖既有 canonical 工件。
-- [ ] `tests/`：增加模型等变性、反对称性、无 forcing 数据集、谱图依赖损失和参数统计测试。
-- [ ] `paper/main.tex` / `paper/main_cn.tex`：在新实验完成后按真实结果重写标题、摘要、引言、方法、RQ 主结果、消融、限制和结论；中英文逐段同步。
-- [ ] `README.md`、`reproducibility/`、`docs/project_memory_zh.md`：记录新命令、数据/检查点/匿名工件边界和未完成项目。
-- [ ] `paper/release/`：源稿变化后重新生成双语发布 PDF 和构建清单。
+- [x] `prepare_rerank_cache.py`、`SpecEmbedding/data/datasets_rerank.py`：无 forcing 设为新实验配置；训练只使用自然有标签 query，保留全池覆盖元数据。
+- [x] `SpecEmbedding/models_rerank.py`、`SpecEmbedding/utils/rerank.py`、`train_rerank.py`、`eval_rerank.py`：实现无 rank 的谱图条件相对候选 reranker、反对称 pair preference、谱图依赖损失和可审计配置。
+- [x] 新增 `analysis/transfer2026_scholargpt_method/`：保存配置、参数量、训练/评价结果、指纹和证据边界；未覆盖既有 canonical 工件。
+- [x] `tests/`：增加模型等变性、反对称性、无 forcing 数据集、谱图依赖损失和参数统计测试。
+- [x] `paper/main.tex` / `paper/main_cn.tex`：按真实 pilot 结果重写标题、摘要、引言、方法、主结果、限制和结论；中英文同步，并移除正文旧版大表以保持精炼。
+- [x] `README.md`、`docs/project_memory_zh.md`：记录新命令、数据/检查点/匿名工件边界和未完成项目。
+- [x] `paper/release/`：源稿变化后重新生成双语发布 PDF 和构建清单。
 
 ### 3.2 明确不做的事项
 
@@ -90,16 +90,16 @@
 
 ## 7. 分步执行清单
 
-- [ ] 步骤 1：提交本计划并将状态设为 `执行中`。
-- [ ] 步骤 2：确认无 forcing 256-cache、原始候选源和 GPU 运行入口；若失败记录阻塞。
-- [ ] 步骤 3：实现无 rank 的 relative reranker、谱图依赖损失及无泄漏数据集。
-- [ ] 步骤 4：单元测试形式性质、mask、loss 和训练配置；运行 Ruff/compileall。
-- [ ] 步骤 5：通过 detached `tmux` 生成新 cache，训练 mass/formula 核心配置和必要对照。
-- [ ] 步骤 6：评价主指标、coverage、难度/效率分析；保存 JSON/CSV/manifest。
-- [ ] 步骤 7：按真实结果重写英文稿，随后同步中文稿、README 和复现说明。
-- [ ] 步骤 8：完整双语构建、引用/匿名性/工件检查和测试。
-- [ ] 步骤 9：使用中文 Conventional Commit 提交论文/代码实质修改。
-- [ ] 步骤 10：回填本计划实际结果和 commit，将状态设为 `已执行`；用独立中文文档 commit 归档计划。
+- [x] 步骤 1：提交本计划并将状态设为 `执行中`（`389ee58`）。
+- [x] 步骤 2：确认无 forcing 256-cache、原始候选源和 RTX 4090 GPU 运行入口。
+- [x] 步骤 3：实现无 rank 的 relative reranker、谱图依赖损失及无泄漏数据集。
+- [x] 步骤 4：完成形式性质、mask、loss 和训练配置测试；运行 Ruff/compileall。
+- [x] 步骤 5：通过 detached `tmux` 生成 mass/formula 新 cache，完成 relative 与 pointwise pilot 对照。
+- [x] 步骤 6：完成主指标、coverage、谱图打乱审计和工件指纹记录；未把未完成的效率/难度分析写成结果。
+- [x] 步骤 7：按真实结果重写英文稿，同步中文稿、README 和项目记忆，并删除正文旧版大审计表。
+- [x] 步骤 8：完成双语构建、引用/匿名性/工件检查和测试。
+- [x] 步骤 9：使用中文 Conventional Commit 提交论文/代码实质修改（`f05cb86`）。
+- [x] 步骤 10：更新发布证据（`deddc2e`），回填本计划实际结果并用独立中文文档 commit 归档。
 
 ## 8. 风险、证据边界与待确认事项
 
@@ -110,22 +110,30 @@
 
 ## 9. 验证方案
 
-- [ ] `conda run -n specembedding python -m pytest -q tests`
-- [ ] `conda run -n specembedding python -m ruff check .`
-- [ ] `python freeze_adma2026_artifacts.py --check`
-- [ ] `python -m compileall` 覆盖新增脚本/模块。
-- [ ] `bash paper/build_release.sh`，检查双稿 citation/reference、LaTeX 错误、匿名元数据和私有路径。
-- [ ] `git diff --check`、工作区和 manifest/结果哈希一致。
+- [x] `conda run -n specembedding python -m pytest -q tests`：109 passed, 9 warnings。
+- [x] `conda run -n specembedding python -m ruff check .`：All checks passed。
+- [x] `python freeze_adma2026_artifacts.py --check`：60 canonical artifacts validated，manifest matches；这是旧 canonical 工件的历史校验，不覆盖新 pilot。
+- [x] `python -m compileall`：通过；`git diff --check`：通过。
+- [x] `bash paper/build_release.sh`：英文 15 页、中文 13 页；最终日志无 LaTeX error、undefined citation/reference、Overfull/Underfull；仅保留已知 amsmath/Fandol 非阻断警告。
+- [x] PDF 匿名性与哈希核对：Author 为空/缺失，私有路径扫描无命中；release manifest 与受跟踪 PDF 的 bytes/SHA-256 一致。
 
 ## 10. 执行记录
 
-2026-08-23：读取外部评审附件。确认其要求已超出上一份只做文字边界收紧的计划；新建本计划。发现本地存在历史 forced cache、alignment/reranker checkpoints 和候选数据入口，下一步先实现无 forcing/no-rank 核心并用小规模 GPU smoke test 验证。
+2026-08-23：读取外部评审附件。确认其要求已超出上一份只做文字边界收紧的计划；新建本计划并提交 `389ee58`。
+
+2026-08-23：完成实现提交 `a10a02c`、`69a5521`、`26e6294`、`684039c` 和分析边界提交 `d28106b`。在 RTX 4090 detached `tmux` 任务中生成 mass/formula 无 forcing full-pool cache；两者均为 194,119 条 valid query，`force_include_positive=False`，训练标签覆盖率 1.0。
+
+2026-08-23：完成 seed-42、5,000 query、3 epoch pilot。完整池结果为 mass Base/relative/pointwise R@1 43.7799/50.0797/51.6348、MRR 0.5219/0.5795/0.5935；formula 为 58.4871/66.7977/68.0508、0.6479/0.7161/0.7282。relative 均超过 matched base，但略低于 capacity-matched pointwise；spectrum shuffle 审计保留候选/base-score 路径贡献。结果和指纹写入 `analysis/transfer2026_scholargpt_method/pilot-results.md`。
+
+2026-08-23：英文/中文正文按真实结果重写，并移除旧版大规模历史审计表；旧工件仍在原分析目录中追溯。实测构建成功，英文 15 页、中文 13 页；页数仅记录，不假设固定投稿上限。
+
+2026-08-23：实质论文提交 `f05cb86`；发布 PDF/manifest 提交 `deddc2e`。旧 `paper/adma2026_artifact_manifest.json` 以 `freeze_adma2026_artifacts.py --check` 独立验证通过，未将新 pilot 强行写入旧 canonical manifest。
 
 ## 11. 最终结果
 
-- 完成日期：尚未完成
-- 最终状态：`执行中`
-- 验证结果：尚未完成
-- 论文修改 commit：尚未提交
-- 计划归档 commit：尚未生成
-- 相对原计划的偏差：本计划主动扩大到方法与训练实现；无法由现有工件可靠完成的官方 evaluator、外部 baseline 和跨编码器项目保留为未完成事项。
+- 完成日期：2026-08-23
+- 最终状态：`已执行`
+- 验证结果：109 tests passed；Ruff、compileall、diff check、canonical artifact check 和双语发布构建均通过；release 英文 15 页/466,347 bytes、中文 13 页/405,913 bytes，哈希记录在 `paper/release/build-manifest.yaml`。
+- 论文修改 commit：`f05cb86`；发布证据 commit：`deddc2e`。
+- 计划归档 commit：待本次文档提交生成。
+- 相对原计划的偏差：原评审建议中的官方 evaluator、外部 baseline、multi-seed aggregate、difficulty 分层、MCES 新计算和固定硬件效率测量均未执行；按评审边界和现有输入条件保留为明确未完成事项，不扩写为论文结果。正文历史大表改为内部审计边界说明，以满足精炼叙事；不影响既有工件追溯。
