@@ -1,10 +1,10 @@
 schema_version: 1
 artifact_kind: manuscript_release_build
 status: audit_evidence
-built_at: "2026-08-23T03:31:57+08:00"
+built_at: "2026-08-23T04:59:08+08:00"
 
 source:
-  git_commit: f05cb8696808a91a86e9026185efe8a069f43e1c
+  git_commit: acaa5ab
   branch: codex/transfer-2026-0831
   tracked_worktree_clean: true
   command: bash paper/build_release.sh
@@ -36,16 +36,16 @@ outputs:
   english:
     path: paper/release/specembedding-adma2026-en.pdf
     role: English submission draft
-    pages: 15
-    bytes: 466347
-    sha256: 426d8e4d57b6b7a8cce4c758e84ec26e10c39344a6db9d053361cedf970da48b
+    pages: 16
+    bytes: 476491
+    sha256: ebd00d87c21fd6e5d38e71484f59e9e8a9df9c4644f54632b034b05c10facc5e
     pdfinfo_author: empty
   chinese:
     path: paper/release/specembedding-adma2026-zh.pdf
     role: Chinese internal discussion draft
     pages: 13
-    bytes: 405913
-    sha256: aae0b7e5752d16adfb666931be0427bd7b450fa85e14f82c646f3c329d2c1a8a
+    bytes: 409796
+    sha256: 939c649ce682e8d7e2708b84b6c58bf80a69992c1e7f43223bd250c8b3810247
     pdfinfo_author: absent
 
 scope_note: >-
