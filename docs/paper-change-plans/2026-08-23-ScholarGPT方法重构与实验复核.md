@@ -98,8 +98,8 @@
 - [x] 步骤 6：完成主指标、coverage、谱图打乱审计和工件指纹记录；未把未完成的效率/难度分析写成结果。
 - [x] 步骤 7：按真实结果重写英文稿，同步中文稿、README 和项目记忆，并删除正文旧版大审计表。
 - [x] 步骤 8：完成双语构建、引用/匿名性/工件检查和测试。
-- [x] 步骤 9：使用中文 Conventional Commit 提交论文/代码实质修改（`f05cb86`）。
-- [x] 步骤 10：更新发布证据（`deddc2e`），回填本计划实际结果并用独立中文文档 commit 归档。
+- [x] 步骤 9：使用中文 Conventional Commit 提交论文/代码实质修改（`25b38a0`、排版收口 `acaa5ab`）。
+- [x] 步骤 10：更新发布证据，回填本计划实际结果并用独立中文文档 commit 归档。
 
 ## 8. 风险、证据边界与待确认事项
 
@@ -110,30 +110,40 @@
 
 ## 9. 验证方案
 
-- [x] `conda run -n specembedding python -m pytest -q tests`：109 passed, 9 warnings。
+- [x] `conda run -n specembedding python -m pytest -q tests`：110 passed, 9 warnings。
 - [x] `conda run -n specembedding python -m ruff check .`：All checks passed。
 - [x] `python freeze_adma2026_artifacts.py --check`：60 canonical artifacts validated，manifest matches；这是旧 canonical 工件的历史校验，不覆盖新 pilot。
 - [x] `python -m compileall`：通过；`git diff --check`：通过。
-- [x] `bash paper/build_release.sh`：英文 15 页、中文 13 页；最终日志无 LaTeX error、undefined citation/reference、Overfull/Underfull；仅保留已知 amsmath/Fandol 非阻断警告。
-- [x] PDF 匿名性与哈希核对：Author 为空/缺失，私有路径扫描无命中；release manifest 与受跟踪 PDF 的 bytes/SHA-256 一致。
+- [x] `bash paper/build_release.sh`（detached `tmux`）：英文 16 页、中文 13 页；最终日志无 LaTeX error、undefined citation/reference、Overfull/Underfull；仅保留已知 amsmath/Fandol 非阻断警告。页数仅作记录，不假定 venue 上限。
+- [x] PDF 匿名性与哈希核对：Author 为空/缺失，私有路径扫描无命中；发布稿与 manifest 已同步。英文 16 页、476491 bytes、SHA-256 `ebd00d87c21fd6e5d38e71484f59e9e8a9df9c4644f54632b034b05c10facc5e`；中文 13 页、409796 bytes、SHA-256 `939c649ce682e8d7e2708b84b6c58bf80a69992c1e7f43223bd250c8b3810247`。
 
 ## 10. 执行记录
 
-2026-08-23：读取外部评审附件。确认其要求已超出上一份只做文字边界收紧的计划；新建本计划并提交 `389ee58`。
+2026-08-23：读取外部评审附件，确认需补做评价协议、容量匹配、信息来源消融和 query-level 分析；本计划由初始 `389ee58` 进入第二阶段执行。
 
-2026-08-23：完成实现提交 `a10a02c`、`69a5521`、`26e6294`、`684039c` 和分析边界提交 `d28106b`。在 RTX 4090 detached `tmux` 任务中生成 mass/formula 无 forcing full-pool cache；两者均为 194,119 条 valid query，`force_include_positive=False`，训练标签覆盖率 1.0。
+2026-08-23：完成无 forcing full-pool cache 与 rank-free relative 实现；代码/配置/消融开关提交 `a10a02c`、`69a5521`、`26e6294`、`684039c`、`488a04a`、`8ce2655`。缓存日志确认 mass/formula 各 194,119 条 valid query，`force_include_positive=False`，训练标签覆盖率 1.0。
 
-2026-08-23：完成 seed-42、5,000 query、3 epoch pilot。完整池结果为 mass Base/relative/pointwise R@1 43.7799/50.0797/51.6348、MRR 0.5219/0.5795/0.5935；formula 为 58.4871/66.7977/68.0508、0.6479/0.7161/0.7282。relative 均超过 matched base，但略低于 capacity-matched pointwise；spectrum shuffle 审计保留候选/base-score 路径贡献。结果和指纹写入 `analysis/transfer2026_scholargpt_method/pilot-results.md`。
+2026-08-23：在 detached `tmux`、两张 RTX 4090 上完成同一 `d4c1f70` alignment checkpoint 的 relative 与容量匹配 pointwise seeds 42--44；每池 5,000 training queries、3 epochs。三 seed 汇总和逐 query bootstrap/K 敏感性写入 `analysis/transfer2026_scholargpt_review/multiseed_summary.json` 与本目录的 `second_stage_report.md`。
 
-2026-08-23：英文/中文正文按真实结果重写，并移除旧版大规模历史审计表；旧工件仍在原分析目录中追溯。实测构建成功，英文 15 页、中文 13 页；页数仅记录，不假设固定投稿上限。
+2026-08-23：完成 seed-42 信息来源/机制消融：score-only、embedding-only、embedding+base、candidate-only、no-spectrum-conditioning、no-molecular-relation、no-antisymmetric；两个候选池均有 R@1/MRR 结果，未将单 seed 方向写成因果组件结论。
 
-2026-08-23：实质论文提交 `f05cb86`；发布 PDF/manifest 提交 `deddc2e`。旧 `paper/adma2026_artifact_manifest.json` 以 `freeze_adma2026_artifacts.py --check` 独立验证通过，未将新 pilot 强行写入旧 canonical manifest。
+2026-08-23：对新 relative full-pool test cache 应用 MassSpecGym 1.3.1 2D InChIKey 变换；两个候选池均无 multiple-positive query 或 identity collision，local/reference 指标一致。结果为 cache-level identity audit，不称为完整 official-loader rerun。
 
-## 11. 最终结果
+2026-08-23：论文英文/中文正文、README、项目记忆已同步三 seed 主结果、信息来源分析、K 敏感性、前向资源审计和 identity 边界；页数继续仅作为后续排版事项。
 
-- 完成日期：2026-08-23
-- 最终状态：`已执行`
-- 验证结果：109 tests passed；Ruff、compileall、diff check、canonical artifact check 和双语发布构建均通过；release 英文 15 页/466,347 bytes、中文 13 页/405,913 bytes，哈希记录在 `paper/release/build-manifest.yaml`。
-- 论文修改 commit：`f05cb86`；发布证据 commit：`deddc2e`。
-- 计划归档 commit：待本次文档提交生成。
-- 相对原计划的偏差：原评审建议中的官方 evaluator、外部 baseline、multi-seed aggregate、difficulty 分层、MCES 新计算和固定硬件效率测量均未执行；按评审边界和现有输入条件保留为明确未完成事项，不扩写为论文结果。正文历史大表改为内部审计边界说明，以满足精炼叙事；不影响既有工件追溯。
+## 11. 当前结果与待归档
+
+- 当前状态：`已执行`；论文正文、双语构建、发布 manifest、测试和静态核验均已完成。页数只作当前快照，不假定具体 venue 上限。
+- 主要结论：relative/pointwise 均改善 base；pointwise 在主 R@1/MRR 汇总略高，relative 独立普遍收益未建立。
+- 证据边界：三 reranker seeds 不是 alignment 重复；identity 结果为 cache-level；JESTR/GLMR 仍 reported-only；前向 latency/显存不是端到端效率主张。
+- 外部 baseline、候选感知 alignment 重训和完整 official loader rerun 不纳入本轮范围，不写成已完成结果。
+
+## 12. 最终核验步骤
+
+1. 对新增 Python/分析脚本运行 Ruff、compileall 和相关单元测试；完整 `pytest -q tests` 为 110 passed, 9 warnings。
+2. 完成英文/中文 LaTeX/BibTeX 构建，检查 undefined citation/reference、Overfull/Underfull、PDF 匿名性和页数记录；已完成，页数不作为阻断。
+3. 更新 `paper/release/build-manifest.yaml` 与受跟踪双语 PDF，核对 bytes/SHA-256、源 commit `acaa5ab` 和构建日志；已完成。
+4. `git diff --check`、Ruff、compileall 已通过；canonical artifact check 将在归档 commit 后复核，私有 raw predictions/cache 未纳入 Git 或匿名包。
+5. 论文实质 commit `25b38a0`、排版收口 `acaa5ab`、发布清单 `f6725a7` 已提交；本计划以独立中文文档 commit 归档。已尝试向评审线程 `01a01f8c-fe25-7390-8811-fedfac865d3c` 请求只读复核，但该线程当前不在本会话可用 agent 列表，未能通过协作工具投递；本计划不将其误记为已完成审计。
+
+第二阶段明确不做：未经统一数据与 checkpoint 的外部方法“复现”声称；把历史 alignment revision 混写为同配置随机重复；把 cache-only 身份核对写成完整 official evaluator；以及为达到正向结果而事后选择 seed、K 或模型变体。
