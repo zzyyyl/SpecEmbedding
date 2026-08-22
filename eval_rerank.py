@@ -26,7 +26,7 @@ from SpecEmbedding.utils.runtime import configure_runtime_cache, resolve_device,
 
 
 @torch.no_grad()
-def evaluate(model, loader, device, top_k):
+def evaluate(model, loader, device, top_k, *, shuffle_spectrum: bool = False):
     base_metrics = init_ranking_metrics(top_k)
     rerank_metrics = init_ranking_metrics(top_k)
     positive_count = 0
@@ -41,6 +41,8 @@ def evaluate(model, loader, device, top_k):
         candidate_mask = batch["candidate_mask"].to(device)
         labels = batch["labels"].to(device)
 
+        if shuffle_spectrum:
+            spec_emb = torch.roll(spec_emb, shifts=1, dims=0)
         rerank_scores = model(spec_emb, candidate_embs, base_scores, base_ranks, candidate_mask)
         base_top1 = masked_argmax(base_scores, candidate_mask).cpu().tolist()
         rerank_top1 = masked_argmax(rerank_scores, candidate_mask).cpu().tolist()
@@ -112,6 +114,11 @@ def parse_args():
         help="Enable MCES@1 calculation. Use --no-mces for quick metric-only evaluation.",
     )
     parser.add_argument(
+        "--shuffle-spectrum",
+        action="store_true",
+        help="Cyclically mismatch spectra within each batch for a spectrum-dependence audit.",
+    )
+    parser.add_argument(
         "--exclude-query-indices",
         nargs="*",
         type=int,
@@ -181,12 +188,14 @@ def main():
     )
     model = load_reranker(args.checkpoint, device)
     top_k = sorted(set(args.top_k))
-    results = evaluate(model, loader, device, top_k)
+    results = evaluate(model, loader, device, top_k, shuffle_spectrum=args.shuffle_spectrum)
 
     logging.info("=" * 50)
     logging.info("Total queries: %s", results["total"])
     if args.max_candidates is not None:
         logging.info("Evaluation candidate truncation: K=%s (no positive forcing)", args.max_candidates)
+    if args.shuffle_spectrum:
+        logging.info("Spectrum-dependence audit: spectra cyclically shuffled within each batch")
     logging.info("Pre-retrieval upper bound: %.4f%%", results["upper_bound"] * 100)
     log_ranking_summary("BASE", results["base"], top_k)
     log_ranking_summary("RERANK", results["rerank"], top_k)
