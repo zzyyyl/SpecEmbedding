@@ -1,10 +1,10 @@
 schema_version: 1
 artifact_kind: manuscript_release_build
 status: audit_evidence
-built_at: "2026-08-21T00:00:00+08:00"
+built_at: "2026-08-23T03:31:57+08:00"
 
 source:
-  git_commit: 0a6ba1155a46c991fe4e2cb158dfedb4d30c2c4b
+  git_commit: f05cb8696808a91a86e9026185efe8a069f43e1c
   branch: codex/transfer-2026-0831
   tracked_worktree_clean: true
   command: bash paper/build_release.sh
@@ -36,20 +36,20 @@ outputs:
   english:
     path: paper/release/specembedding-adma2026-en.pdf
     role: English submission draft
-    pages: 18
-    bytes: 528820
-    sha256: 0859a2a71ebfce6279b6da3bca7263f3b34a2296512e4244f4e66bb1e8a2b8d6
+    pages: 15
+    bytes: 466347
+    sha256: 426d8e4d57b6b7a8cce4c758e84ec26e10c39344a6db9d053361cedf970da48b
     pdfinfo_author: empty
   chinese:
     path: paper/release/specembedding-adma2026-zh.pdf
     role: Chinese internal discussion draft
-    pages: 16
-    bytes: 439728
-    sha256: de08b5955160f7064be8aba8fdd619bb1a8d39bf85049c409435ec7df5e596dd
+    pages: 13
+    bytes: 405913
+    sha256: aae0b7e5752d16adfb666931be0427bd7b450fa85e14f82c646f3c329d2c1a8a
     pdfinfo_author: absent
 
 scope_note: >-
   These tracked PDFs and hashes preserve the audited build outputs from the
   stated source commit. PDF byte-for-byte reproducibility is not claimed
-  because TeX embeds build timestamps. Page-limit compression remains a
-  separate final-submission task by user decision.
+  because TeX embeds build timestamps. Page count is recorded for reference;
+  no fixed venue limit is assumed before the target venue is selected.
