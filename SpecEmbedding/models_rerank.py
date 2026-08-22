@@ -159,6 +159,9 @@ class RelativeCandidateReranker(nn.Module):
         use_relative_module: bool = True,
         use_spectrum_conditioning: bool = True,
         use_molecular_relation: bool = True,
+        use_spectrum_features: bool = True,
+        use_molecule_features: bool = True,
+        use_antisymmetric: bool = True,
     ):
         super().__init__()
         del rank_emb_dim, max_rank, n_layers, n_heads, use_rank_embedding
@@ -178,6 +181,9 @@ class RelativeCandidateReranker(nn.Module):
         self.use_relative_module = use_relative_module
         self.use_spectrum_conditioning = use_spectrum_conditioning
         self.use_molecular_relation = use_molecular_relation
+        self.use_spectrum_features = use_spectrum_features
+        self.use_molecule_features = use_molecule_features
+        self.use_antisymmetric = use_antisymmetric
         self.pair_chunk_size = pair_chunk_size
         self.relation_top_k = relation_top_k
         self.relation_dim = relation_dim or max(32, min(128, hidden_dim // 2))
@@ -207,11 +213,14 @@ class RelativeCandidateReranker(nn.Module):
 
         self.spec_relation = nn.Linear(embedding_dim, self.relation_dim)
         self.mol_relation = nn.Linear(embedding_dim, self.relation_dim)
-        relation_input_dim = self.relation_dim * 3 + 2
-        if not use_spectrum_conditioning:
-            relation_input_dim -= self.relation_dim
-        if not use_molecular_relation:
-            relation_input_dim -= self.relation_dim
+        relation_input_dim = (
+            (self.relation_dim if use_spectrum_conditioning else 0)
+            + (self.relation_dim * 2 if use_molecular_relation else 0)
+            + (1 if use_base_score_feature else 0)
+            + (1 if use_molecular_relation else 0)
+        )
+        if relation_input_dim <= 0:
+            raise ValueError("relative relation branch needs at least one relation feature")
         self.preference_mlp = nn.Sequential(
             nn.Linear(relation_input_dim, self.relation_dim),
             nn.LayerNorm(self.relation_dim),
@@ -221,11 +230,14 @@ class RelativeCandidateReranker(nn.Module):
             nn.GELU(),
             nn.Linear(self.relation_dim, 1),
         )
-        weight_input_dim = self.relation_dim * 2 + 1
-        if not use_spectrum_conditioning:
-            weight_input_dim -= self.relation_dim
-        if not use_molecular_relation:
-            weight_input_dim -= self.relation_dim
+        weight_input_dim = (
+            (self.relation_dim if use_spectrum_conditioning else 0)
+            + (self.relation_dim if use_molecular_relation else 0)
+            + (1 if use_molecular_relation else 0)
+            + (1 if use_base_score_feature else 0)
+        )
+        if weight_input_dim <= 0:
+            raise ValueError("relative weight branch needs at least one relation feature")
         self.weight_mlp = nn.Sequential(
             nn.Linear(weight_input_dim, self.relation_dim),
             nn.GELU(),
@@ -236,11 +248,24 @@ class RelativeCandidateReranker(nn.Module):
 
     def _absolute_features(self, spec_emb, candidate_embs, base_scores):
         spec_expand = spec_emb.unsqueeze(1).expand_as(candidate_embs)
-        features = [spec_expand, candidate_embs]
+        zero_spec = torch.zeros_like(spec_expand)
+        zero_molecule = torch.zeros_like(candidate_embs)
+        features = [
+            spec_expand if self.use_spectrum_features else zero_spec,
+            candidate_embs if self.use_molecule_features else zero_molecule,
+        ]
         if self.use_product_feature:
-            features.append(spec_expand * candidate_embs)
+            features.append(
+                spec_expand * candidate_embs
+                if self.use_spectrum_features and self.use_molecule_features
+                else zero_spec
+            )
         if self.use_abs_diff_feature:
-            features.append(torch.abs(spec_expand - candidate_embs))
+            features.append(
+                torch.abs(spec_expand - candidate_embs)
+                if self.use_spectrum_features and self.use_molecule_features
+                else zero_spec
+            )
         if self.use_base_score_feature:
             features.append(base_scores.unsqueeze(-1))
         return torch.cat(features, dim=-1)
@@ -257,7 +282,10 @@ class RelativeCandidateReranker(nn.Module):
         base_delta = base_i - base_j
         if base_delta.ndim == cosine.ndim - 1:
             base_delta = base_delta.unsqueeze(-1)
-        parts.extend([base_delta, cosine])
+        if self.use_base_score_feature:
+            parts.append(base_delta)
+        if self.use_molecular_relation:
+            parts.append(cosine)
         return torch.cat(parts, dim=-1)
 
     def _relative_scores(self, spec_emb, candidate_embs, base_scores, candidate_mask):
@@ -280,16 +308,24 @@ class RelativeCandidateReranker(nn.Module):
             reverse_features = self._relation_features(spec_pair, mol_j, mol_i, base_j, base_i)
             preference = self.preference_mlp(pair_features).squeeze(-1)
             reverse_preference = self.preference_mlp(reverse_features).squeeze(-1)
-            pair_preference = preference - reverse_preference
+            if self.use_antisymmetric:
+                pair_preference = preference - reverse_preference
+            else:
+                pair_preference = preference
 
             weight_parts = []
             if self.use_spectrum_conditioning:
                 weight_parts.append(spec_pair)
             if self.use_molecular_relation:
                 weight_parts.append(mol_i - mol_j)
-            weight_parts.append(
-                F.cosine_similarity(mol_i, mol_j, dim=-1).unsqueeze(-1)
-            )
+                weight_parts.append(
+                    F.cosine_similarity(mol_i, mol_j, dim=-1).unsqueeze(-1)
+                )
+            if self.use_base_score_feature:
+                base_delta = base_i - base_j
+                if base_delta.ndim == spec_pair.ndim - 1:
+                    base_delta = base_delta.unsqueeze(-1)
+                weight_parts.append(base_delta)
             weight_logits = self.weight_mlp(torch.cat(weight_parts, dim=-1)).squeeze(-1)
             valid = candidate_mask[:, start:stop].unsqueeze(-1) & candidate_mask.unsqueeze(1)
             eye = torch.zeros(

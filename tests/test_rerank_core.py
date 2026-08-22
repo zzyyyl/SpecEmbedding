@@ -243,6 +243,32 @@ class RerankerCoreTest(unittest.TestCase):
         self.assertIsNotNone(loss)
         self.assertTrue(torch.isfinite(loss))
 
+    def test_relative_ablation_controls_preserve_forward_shape(self):
+        variants = [
+            {"use_spectrum_features": False, "use_spectrum_conditioning": False},
+            {
+                "use_spectrum_features": False,
+                "use_molecule_features": False,
+                "use_spectrum_conditioning": False,
+                "use_molecular_relation": False,
+            },
+            {"use_antisymmetric": False},
+            {"use_relative_module": False},
+        ]
+        for variant in variants:
+            with self.subTest(variant=variant):
+                model = RelativeCandidateReranker(
+                    embedding_dim=4,
+                    hidden_dim=8,
+                    relation_dim=4,
+                    pair_chunk_size=2,
+                    dropout=0.0,
+                    **variant,
+                ).eval()
+                scores = model(**self.inputs)
+                self.assertEqual(scores.shape, self.inputs["base_scores"].shape)
+                self.assertTrue(torch.isfinite(scores).all())
+
 
 if __name__ == "__main__":
     unittest.main()

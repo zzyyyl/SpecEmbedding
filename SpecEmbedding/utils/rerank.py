@@ -78,6 +78,15 @@ def build_reranker(model_config, embedding_dim: int | None = None):
             use_molecular_relation=bool(
                 _config_value_default(model_config, "use_molecular_relation", True)
             ),
+            use_spectrum_features=bool(
+                _config_value_default(model_config, "use_spectrum_features", True)
+            ),
+            use_molecule_features=bool(
+                _config_value_default(model_config, "use_molecule_features", True)
+            ),
+            use_antisymmetric=bool(
+                _config_value_default(model_config, "use_antisymmetric", True)
+            ),
         )
     return model_cls(**common_kwargs)
 
@@ -104,6 +113,9 @@ def reranker_model_config(args, embedding_dim: int) -> dict:
         "use_relative_module": getattr(args, "use_relative_module", True),
         "use_spectrum_conditioning": getattr(args, "use_spectrum_conditioning", True),
         "use_molecular_relation": getattr(args, "use_molecular_relation", True),
+        "use_spectrum_features": getattr(args, "use_spectrum_features", True),
+        "use_molecule_features": getattr(args, "use_molecule_features", True),
+        "use_antisymmetric": getattr(args, "use_antisymmetric", True),
     }
 
 

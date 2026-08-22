@@ -203,6 +203,27 @@ def parse_args():
         help="Use candidate embedding differences in the relative branch.",
     )
     parser.add_argument(
+        "--spectrum-features",
+        dest="use_spectrum_features",
+        action=argparse.BooleanOptionalAction,
+        default=bool(getattr(config.rerank.train, "use_spectrum_features", True)),
+        help="Use spectrum features in the absolute compatibility branch.",
+    )
+    parser.add_argument(
+        "--molecule-features",
+        dest="use_molecule_features",
+        action=argparse.BooleanOptionalAction,
+        default=bool(getattr(config.rerank.train, "use_molecule_features", True)),
+        help="Use candidate molecular features in the absolute compatibility branch.",
+    )
+    parser.add_argument(
+        "--antisymmetric-pairs",
+        dest="use_antisymmetric",
+        action=argparse.BooleanOptionalAction,
+        default=bool(getattr(config.rerank.train, "use_antisymmetric", True)),
+        help="Use antisymmetric forward-minus-reverse pair preferences.",
+    )
+    parser.add_argument(
         "--train-k",
         type=int,
         default=int(config.rerank.train.train_k),

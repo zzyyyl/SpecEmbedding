@@ -110,6 +110,20 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument(
+        "--cache",
+        action="append",
+        default=[],
+        metavar="POOL=PATH",
+        help="Override a pool cache; repeat for mass and formula.",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        action="append",
+        default=[],
+        metavar="POOL=PATH",
+        help="Override a pool checkpoint; repeat for mass and formula.",
+    )
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     specs = {
@@ -122,6 +136,31 @@ def main() -> None:
             root / "checkpoints_rerank/a2280d2_massspecgym_nopretrain_valoverlapclean_topk40_multiseed/formula/transformer/seed42/attempt_001/best_reranker.pth",
         ),
     }
+    if args.cache or args.checkpoint:
+        def parse_overrides(values: list[str], label: str) -> dict[str, Path]:
+            parsed: dict[str, Path] = {}
+            for value in values:
+                try:
+                    pool, path = value.split("=", 1)
+                except ValueError as exc:
+                    raise SystemExit(f"{label} must use POOL=PATH: {value!r}") from exc
+                if pool not in {"mass", "formula"} or not path:
+                    raise SystemExit(f"{label} pool must be mass or formula: {value!r}")
+                if pool in parsed:
+                    raise SystemExit(f"duplicate {label} override for {pool}")
+                parsed[pool] = Path(path)
+            return parsed
+
+        cache_overrides = parse_overrides(args.cache, "--cache")
+        checkpoint_overrides = parse_overrides(args.checkpoint, "--checkpoint")
+        if set(cache_overrides) != set(checkpoint_overrides):
+            raise SystemExit("--cache and --checkpoint must provide the same pool names")
+        if set(cache_overrides) != {"mass", "formula"}:
+            raise SystemExit("--cache/--checkpoint overrides must include both mass and formula")
+        specs = {
+            pool: (cache_overrides[pool], checkpoint_overrides[pool])
+            for pool in ("mass", "formula")
+        }
     results = {name: evaluate(cache, checkpoint, args.device, args.batch_size) for name, (cache, checkpoint) in specs.items()}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(results, indent=2, sort_keys=True) + "\n", encoding="utf-8")
