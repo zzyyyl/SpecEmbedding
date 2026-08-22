@@ -234,8 +234,12 @@ class RelativeCandidateReranker(nn.Module):
             (self.relation_dim if use_spectrum_conditioning else 0)
             + (self.relation_dim if use_molecular_relation else 0)
             + (1 if use_molecular_relation else 0)
-            + (1 if use_base_score_feature else 0)
         )
+        # Preserve the original checkpoint shape for the default spectrum+
+        # molecular relation path.  A base-score-only ablation still needs a
+        # scalar weight input when both richer relation sources are disabled.
+        if weight_input_dim == 0 and use_base_score_feature:
+            weight_input_dim = 1
         if weight_input_dim <= 0:
             raise ValueError("relative weight branch needs at least one relation feature")
         self.weight_mlp = nn.Sequential(
@@ -322,10 +326,11 @@ class RelativeCandidateReranker(nn.Module):
                     F.cosine_similarity(mol_i, mol_j, dim=-1).unsqueeze(-1)
                 )
             if self.use_base_score_feature:
-                base_delta = base_i - base_j
-                if base_delta.ndim == spec_pair.ndim - 1:
-                    base_delta = base_delta.unsqueeze(-1)
-                weight_parts.append(base_delta)
+                if not self.use_spectrum_conditioning and not self.use_molecular_relation:
+                    base_delta = base_i - base_j
+                    if base_delta.ndim == spec_pair.ndim - 1:
+                        base_delta = base_delta.unsqueeze(-1)
+                    weight_parts.append(base_delta)
             weight_logits = self.weight_mlp(torch.cat(weight_parts, dim=-1)).squeeze(-1)
             valid = candidate_mask[:, start:stop].unsqueeze(-1) & candidate_mask.unsqueeze(1)
             eye = torch.zeros(
