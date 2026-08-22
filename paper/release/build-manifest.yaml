@@ -4,7 +4,7 @@ status: audit_evidence
 built_at: "2026-08-23T04:59:08+08:00"
 
 source:
-  git_commit: acaa5ab
+  git_commit: acaa5ab175e4f020e8b03638bfedef5ec64b6a2e
   branch: codex/transfer-2026-0831
   tracked_worktree_clean: true
   command: bash paper/build_release.sh
