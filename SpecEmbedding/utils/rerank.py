@@ -70,6 +70,7 @@ def build_reranker(model_config, embedding_dim: int | None = None):
         common_kwargs.update(
             relation_dim=int(_config_value_default(model_config, "relation_dim", 64)),
             pair_chunk_size=int(_config_value_default(model_config, "pair_chunk_size", 32)),
+            relation_top_k=int(_config_value_default(model_config, "relation_top_k", 40)),
             use_relative_module=bool(_config_value_default(model_config, "use_relative_module", True)),
             use_spectrum_conditioning=bool(
                 _config_value_default(model_config, "use_spectrum_conditioning", True)
@@ -99,6 +100,7 @@ def reranker_model_config(args, embedding_dim: int) -> dict:
         "use_abs_diff_feature": args.use_abs_diff_feature,
         "relation_dim": getattr(args, "relation_dim", 64),
         "pair_chunk_size": getattr(args, "pair_chunk_size", 32),
+        "relation_top_k": getattr(args, "relation_top_k", 40),
         "use_relative_module": getattr(args, "use_relative_module", True),
         "use_spectrum_conditioning": getattr(args, "use_spectrum_conditioning", True),
         "use_molecular_relation": getattr(args, "use_molecular_relation", True),

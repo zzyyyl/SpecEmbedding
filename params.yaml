@@ -117,6 +117,7 @@ rerank:
     spec_margin: 0.1
     relation_dim: 32
     pair_chunk_size: 16
+    relation_top_k: 40
     use_relative_module: true
     use_spectrum_conditioning: true
     use_molecular_relation: true

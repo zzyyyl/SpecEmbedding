@@ -155,6 +155,7 @@ class RelativeCandidateReranker(nn.Module):
         use_abs_diff_feature: bool = True,
         relation_dim: int | None = None,
         pair_chunk_size: int = 32,
+        relation_top_k: int = 40,
         use_relative_module: bool = True,
         use_spectrum_conditioning: bool = True,
         use_molecular_relation: bool = True,
@@ -165,6 +166,8 @@ class RelativeCandidateReranker(nn.Module):
             raise ValueError("embedding_dim and hidden_dim must be greater than 0")
         if pair_chunk_size <= 0:
             raise ValueError("pair_chunk_size must be greater than 0")
+        if relation_top_k <= 0:
+            raise ValueError("relation_top_k must be greater than 0")
 
         self.embedding_dim = embedding_dim
         self.hidden_dim = hidden_dim
@@ -176,6 +179,7 @@ class RelativeCandidateReranker(nn.Module):
         self.use_spectrum_conditioning = use_spectrum_conditioning
         self.use_molecular_relation = use_molecular_relation
         self.pair_chunk_size = pair_chunk_size
+        self.relation_top_k = relation_top_k
         self.relation_dim = relation_dim or max(32, min(128, hidden_dim // 2))
 
         absolute_dim = embedding_dim * 2
@@ -319,11 +323,30 @@ class RelativeCandidateReranker(nn.Module):
         absolute = self.absolute_score(self.absolute_mlp(
             self._absolute_features(spec_emb, candidate_embs, base_scores)
         )).squeeze(-1)
-        if self.use_relative_module:
-            relative = self._relative_scores(spec_emb, candidate_embs, base_scores, candidate_mask)
-            scores = absolute + self.beta * relative
-        else:
-            scores = absolute
+        coarse_scores = absolute
         if self.use_residual_score:
-            scores = scores + self.alpha * base_scores
+            coarse_scores = coarse_scores + self.alpha * base_scores
+        scores = coarse_scores
+        if self.use_relative_module:
+            relation_k = min(self.relation_top_k, candidate_embs.shape[1])
+            _, relation_indices = torch.topk(
+                coarse_scores.masked_fill(~candidate_mask, torch.finfo(coarse_scores.dtype).min),
+                k=relation_k,
+                dim=-1,
+                largest=True,
+                sorted=False,
+            )
+            gather_emb_indices = relation_indices.unsqueeze(-1).expand(-1, -1, candidate_embs.shape[-1])
+            relation_candidates = torch.gather(candidate_embs, 1, gather_emb_indices)
+            relation_base_scores = torch.gather(base_scores, 1, relation_indices)
+            relation_mask = torch.gather(candidate_mask, 1, relation_indices)
+            relation = self._relative_scores(
+                spec_emb,
+                relation_candidates,
+                relation_base_scores,
+                relation_mask,
+            )
+            relative_full = torch.zeros_like(scores)
+            relative_full.scatter_(1, relation_indices, relation)
+            scores = scores + self.beta * relative_full
         return scores.masked_fill(~candidate_mask, torch.finfo(scores.dtype).min)

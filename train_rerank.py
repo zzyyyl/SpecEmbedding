@@ -172,6 +172,12 @@ def parse_args():
         help="Number of query candidates processed per relation chunk.",
     )
     parser.add_argument(
+        "--relation-top-k",
+        type=int,
+        default=int(getattr(config.rerank.train, "relation_top_k", 40)),
+        help="Number of coarse-scored candidates sent to the relative branch.",
+    )
+    parser.add_argument(
         "--relative-module",
         dest="use_relative_module",
         action=argparse.BooleanOptionalAction,
@@ -286,6 +292,8 @@ def main():
         raise ValueError("--relation-dim must be greater than 0")
     if args.pair_chunk_size <= 0:
         raise ValueError("--pair-chunk-size must be greater than 0")
+    if args.relation_top_k <= 0:
+        raise ValueError("--relation-top-k must be greater than 0")
 
     save_dir = Path(args.save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
