@@ -35,7 +35,7 @@
 \newcommand{\zm}{\mathbf{z}_m}
 \newcommand{\candidates}{\mathcal{C}}
 
-\title{面向 MS/MS 分子检索的非生成式学习排序方法}
+\title{面向 MS/MS 分子检索的谱图条件相对重排序}
 \author{匿名作者}
 \date{}
 
@@ -44,28 +44,18 @@
 \maketitle
 
 \begin{abstract}
-从串联质谱中检索分子结构具有较大挑战，因为大量候选分子可能具有相同或相近的质量、
-分子式和子结构。联合嵌入方法按谱图--分子相似度排序，生成式检索则可能引入自回归
-分子解码器。本文研究另一种技术路线：直接对已检索分子列表进行非生成式学习排序。
-我们构建 \method{}：第一阶段对齐峰序列谱图编码器和分子图编码器；第二阶段在 listwise
-监督下，综合谱图与候选嵌入、显式交互特征、基础分数和原始排名进行残差重排序。
-我们在 overlap-clean alignment-seed-42 第一阶段 checkpoint 和 cache 上，使用三个
-reranker training seeds 比较不含学习式跨候选交互的 pointwise 打分器与候选集合 Transformer，
-并对 alignment seeds 42--44 另行完成分层分析。在包含 17,556 条测试查询的
-MassSpecGym 上，固定 alignment 结果中两者的
-Recall@1（三种子均值 $\pm$ 样本标准差）在质量约束场景分别为
-$67.44\pm0.74$ 和 $68.58\pm0.20$，在分子式
-约束场景分别为 $73.97\pm0.59$ 和 $74.57\pm0.28$，而固定基础检索器分别为 47.46 和
-63.10。Recall 和 MRR 使用所提供候选文件上的本地 exact-target-SMILES 单正例协议；参考
-loader 默认采用二维 InChIKey 等价并可能产生多个正例。两种身份规则之间的差异对指标的
-影响尚未量化，因此这些结果不等价于官方 evaluator。
-三个 alignment seeds 中，两种学习式排序器在 Recall@1 和 MRR 的 12 个
-alignment--候选--学习模型聚合单元均优于对应 base，但 Transformer--pointwise 的方向随
-alignment 改变。固定 alignment 的五项移除设置审计中，完整模型相对任一移除变体都未取得
-2 种候选池 $\times$ 3 个 reranker training seeds 的六个 MRR 配对全胜；无排名嵌入变体在每个配对中均同时提高 Recall@1
-和 MRR。因此，当前证据支持监督、非生成式第二阶段重排序框架，但尚不能确认候选间自注意力
-或任一受审计组件具有稳健的独立收益。两种变体均不生成分子，测试时也不把真实
-目标强制放入截断后的 top-40 列表。
+从串联质谱中检索分子结构具有较大挑战，因为质量或分子式约束后的候选池中仍包含大量
+化学上相近的 hard negatives。本文研究一种直接、非生成式的第二阶段：利用查询谱图比较
+这些候选，而不是只依赖谱图--分子余弦分数。\method{} 首先对齐峰序列谱图编码器和分子图
+编码器，并缓存至多 256 个候选的完整供给池；随后先逐候选 coarse 打分，再在 coarse
+top-40 上计算谱图条件的相对候选偏好。相对偏好由有序 pair 分数与其反向分数之差构成，
+因此具有反对称性，并对候选列表置换保持等变；新方法不使用检索 rank，也不在训练时插入
+正例。我们将其与容量匹配、无 rank 的 pointwise 对照比较，并将早期 candidate-set
+Transformer 保留为历史次级基线。结果在 MassSpecGym 的本地 exact-target-SMILES 单正例
+协议下报告，同时逐表说明候选覆盖率、seed 统计单位和尚未闭合的比较。参考 loader 允许
+二维 InChIKey 等价并可能产生多个正例，因此本文数值不等价于官方 evaluator。本文证据
+用于检验谱图条件的候选关系是否在 coarse 监督排序之外提供可复现信息，而非声称普适的
+self-attention 或外部基线优势。
 \end{abstract}
 
 \noindent\textbf{关键词：}
@@ -87,29 +77,27 @@ JESTR 使用 contrastive multiview coding 学习谱图--分子联合空间，并
 \cite{zhang2026glmr}。
 
 这两类方法仍留下一个重要的数据挖掘问题。逐候选余弦打分并未在已检索集合上显式训练
-第二阶段 listwise 目标；生成式检索则引入自回归解码器，最终排序依赖生成结构的质量和
-有效性。本文研究监督第二阶段排序器能否直接区分 hard candidates，以及候选间显式交互
-是否比 pointwise 残差打分提供额外收益。
+第二阶段目标；生成式检索则引入自回归解码器，最终排序依赖生成结构的质量和有效性。本文
+研究监督第二阶段排序器能否区分 hard candidates，以及谱图条件的候选相对比较是否比容量
+匹配的 pointwise 打分提供额外收益。问题范围有意保持克制：候选池、身份规则和第一阶段
+checkpoint 固定，只审计第二阶段机制，而不宣称一种普适检索器。
 
 本文基于 SpecEmbedding 提出的峰序列谱图架构 \cite{xiong2025specembedding} 构建
-\method{} 两阶段框架。第一阶段从零训练该谱图塔，并将其与 GINE 分子图编码器对齐；
-第二阶段只处理基础检索的 top-$K$ 列表，显式构造谱图--候选交互特征，将基础分数和排名
-作为检索先验，并预测对基础分数的残差修正。本文比较 pointwise 与候选集合 Transformer
-两种实现。
+\method{} 两阶段框架。第一阶段从零训练该谱图塔，并将其与 GINE 分子图编码器对齐；第二
+阶段先对完整供给池使用绝对分支，再对 coarse top-$K_r$ 子集使用谱图条件的候选关系。
+有序 pair 偏好通过反向 pair 分数相减得到，从而无需 rank embedding 即可满足反对称性。训练
+只使用自然进入候选池的正例，代码不通过插入目标修复截断列表。具有相同绝对分支的
+pointwise 模型是主要容量控制，早期 candidate-set Transformer 仅作为历史次级对照。
 
 本文贡献如下：
 
 \begin{itemize}
-  \item 在 MassSpecGym 候选池上实例化并系统审计面向 MS/MS 分子检索的直接、非生成式第二阶段 learning-to-rank，
-  同时避免仅以余弦作为最终排序信号和自回归分子解码。
-  \item 在相同输入特征、score head、损失和优化协议下比较 pointwise 与 self-attentive
-  两种实现，并保持第一阶段嵌入可缓存；在相同固定 cache 上进一步审计残差 shortcut、联合
-  基础分数路径、排名嵌入、乘积/绝对差特征和 pairwise loss 五项设计选择。
-  \item 在 MassSpecGym 划分和候选文件上，并按本地 exact-target-SMILES 单正例协议评价，
-  两种实现均在 alignment seeds 42--44 上优于各自固定的基础检索器；候选集合
-  Transformer 相对 pointwise 的方向在三个 checkpoint 间并不一致，因此未能建立稳健的
-  自注意力收益；在 overlap-clean alignment-seed-42 组件审计中，完整模型相对任一移除
-  变体都未取得 2 种候选池 $\times$ 3 个 reranker training seeds 的六个 MRR 配对全胜。
+  \item 在 MassSpecGym 候选池上实例化并审计直接、非生成式的第二阶段 learning-to-rank，
+  采用完整候选池 coarse 打分和谱图条件的相对候选比较。
+  \item 使机制可检验：相对分支无 rank、具有 pair 反对称性并对候选置换保持等变，训练不执行
+  正例强制插入；容量匹配的 pointwise 对照用于隔离候选关系的贡献。
+  \item 按本地协议报告候选覆盖率和 seed 统计单位，将新方法与历史 Transformer 审计分开，
+  并将尚未统一 evaluator、外部基线和效率测量的问题保留为限制，而不填入不可控比较。
 \end{itemize}
 
 \paragraph{AI 使用披露。}
@@ -220,17 +208,17 @@ $A_{k\mid K}$，不能改变第一阶段覆盖率 $U_K$。因此，我们同时�
 
 \subsection{总体框架}
 
-框架包含跨模态对齐、top-$K$ 检索和监督残差重排序三个步骤。训练 reranker 时冻结
-谱图和分子编码器，因此两个模态的嵌入可以离线计算并重复使用。
+框架包含跨模态对齐、完整候选池检索和相对重排序三个步骤；后者采用监督的 coarse-to-fine
+流程。训练 reranker 时冻结谱图和分子编码器，因此两个模态的嵌入可以离线计算并重复使用。
 
 \begin{figure}[t]
   \centering
   \input{figures/method_overview.tex}
   \methodoverview{1}
   \caption{\method{} 总体流程。面板 1 对齐谱图 Transformer 和分子 GINE；面板 2
-  使用冻结、缓存的嵌入构造 top-40 列表；面板 3 在共享候选特征上采用 pointwise
-  打分或候选集合自注意力，并向基础分数加入残差。虚线表示仅训练时使用的操作；验证
-  和测试均不执行强制 top-40 目标替换，整个流程不生成分子。}
+  使用冻结、缓存的嵌入构造完整候选池；面板 3 先逐候选 coarse 打分，再在 coarse top-40
+  上计算谱图条件的相对候选偏好，历史 Transformer 仅作为次级对照。虚线表示仅训练时使用的
+  操作；任何阶段均不执行正例强制替换，整个流程不生成分子。}
   \label{fig:overview_cn}
 \end{figure}
 
@@ -275,29 +263,58 @@ $b_i=\zs^\top\mathbf{z}_{m_i}$ 作为基础分数。
 \subsection{候选构造与训练协议}
 
 MassSpecGym 提供按目标分子键控的候选列表；每条 query 复用其目标分子对应的列表。基础
-检索器对该列表打分并保留 top-$K$，当前实验取 $K=40$。$K=40$ 是预先固定的设计与计算
-预算选择，本文不比较其它截断深度，结论仅适用于该截断深度。如果真实训练分子未进入基础 top-40，则
-用它替换最后一个候选，同时在 cache 中保留其在所提供完整候选池中的基础排名；
-该目标排名等于基础分数严格高于它的候选数加一，与目标同分的候选不计为排名更高。
-排名嵌入接收
-$\bar r_i=\min\{\max(r_i,0),512\}$，其中索引 0 专用于 padding。训练 reranker 时随机
-打乱候选顺序，但每个候选的嵌入、基础分数和排名始终同步移动；这是防止 cache 顺序
-伪特征的额外保护。
+检索器对最多 256 个完整候选打分。新的 coarse-to-fine reranker 先对完整池逐候选打分，
+再对 coarse top-$K_r=40$ 候选执行关系精排。256 和 40 都是本修订中预先固定的设计与计算
+预算选择；评价脚本可在不插入正例的情况下截断已保存的完整池。
 
-待打分候选池是标签目标与文件候选按 exact SMILES 去重后的并集。静态审计显示，目标已经
-存在于全部 32,010 个唯一目标键控冻结列表中，因此该并集没有扩大候选列表。与此不同，仅训练集执行
-检索后的强制替换：它将未进入基础 top-40 的 exact target 放入截断列表。验证和测试不执行
-该替换。未进入基础 top-40 的
-真实目标因此保持缺失，并降低召回上界和全部端到端指标。任何被分配到测试划分的记录、
-测试目标或标签都不用于任一阶段的参数优化或 checkpoint 选择。在冻结训练 cache 中，绝大多数
-强制正例的完整池排名大于 40（质量：12,038/12,071；分子式：
-18,561/18,605）。当排名大于 40 时，它会单向识别被强制的正例，暴露仅训练期存在、与标签
-相关的 rank shortcut，并造成训练--评价列表分布偏移。严格高分排名与 top-$K$ 同分消歧留下
-例外（质量 33 个，最小排名 28；分子式 44 个，最小排名 15），因此这不是绝对规则。这不是
-测试泄漏：验证和测试从不执行该替换。下文无排名嵌入审计应解释为对 shortcut 风险的披露，
-而不是排名具有独立正收益的证据。
+训练只使用正例自然出现在完整 256 候选池中的 query；没有自然正例的 query 保留在覆盖率
+统计中，但不进入 reranker 损失。训练时打乱候选顺序，并同步移动候选嵌入和基础分数。新模型
+完全不使用 rank embedding，cache 兼容字段 \texttt{base\_ranks} 也不进入其 forward 路径。因此，
+任何阶段都不会把正例插入截断列表。目标已存在于全部 32,010 个目标键控源列表中，完整池
+cache 不会扩大文件候选集；当使用更小的评价截断深度时，缺失正例只来自第一阶段覆盖率。
 
-\subsection{残差重排序器变体}
+\subsection{谱图条件的相对候选重排序器}
+
+对候选 $m_i$ 保留绝对匹配特征，但删除检索 rank：
+
+\begin{equation}
+  \mathbf{x}_i=[\zs,\ \mathbf{z}_{m_i},\ \zs\odot\mathbf{z}_{m_i},
+  |\zs-\mathbf{z}_{m_i}|,\ b_i].
+  \label{eq:relative_features_cn}
+\end{equation}
+
+绝对分支的 MLP 产生 coarse 分数 $c_i=f_{\rm abs}(\mathbf{x}_i)+\alpha b_i$。
+对 coarse top-$K_r$ 候选，令 $u_i=W_m\mathbf{z}_{m_i}$、$v=W_s\zs$，并用谱图条件、
+有向候选差异 $u_i-u_j$、其绝对值、基础分数差 $b_i-b_j$ 以及 $u_i,u_j$ 的余弦相似度
+构造有序关系向量 $\rho_{ij}$。共享 MLP 定义有向偏好：
+
+\begin{equation}
+  p_{ij}=g(\rho_{ij})-g(\rho_{ji}),
+  \qquad p_{ij}=-p_{ji}.
+  \label{eq:antisymmetry_cn}
+\end{equation}
+
+关系权重以谱图为条件，并在有效的非自身候选上归一化。令 $w_{ij}\ge0$，最终分数为
+
+\begin{equation}
+  q_i=c_i+\beta\sum_{j\ne i}w_{ij}p_{ij}.
+  \label{eq:relative_score_cn}
+\end{equation}
+
+关系分支只在 coarse top-$K_r$ 上计算，结果再散射回完整候选池。所有运算在候选维度共享，
+并使用附着在候选上的 mask；因此共同置换候选及其特征会以同样方式置换输出分数。
+式~\ref{eq:antisymmetry_cn} 给出与参数取值无关的成对反对称性质。模型不直接使用原始谱峰、
+SMILES token、前体质量、分子式或采集元数据，也没有 rank embedding。
+
+容量匹配的 pointwise 对照使用同一绝对分支，仅移除相对聚合。隐藏宽度 512 时，相对模型有
+1,485,189 个可训练参数，无 rank 的 pointwise 对照有 1,478,690 个，差异为 0.44\%。通用
+candidate-set Transformer 作为次级历史对照保留，不再作为本文提出的机制。两种模型都不生成分子。
+
+\subsection{历史 Candidate-Set Transformer 对照}
+
+为便于与早期审计比较，保留原先含 rank 的 candidate-set Transformer 及其 pointwise 对照。
+它们不是本修订的正式模型；其训练期 forcing 和 rank shortcut 只作为历史证据报告，不用于新的
+相对模型主张。
 
 对基础排名为 $r_i$ 的候选 $m_i$，构造
 
@@ -377,15 +394,26 @@ listwise cross-entropy：
 \begin{equation}
   \mathcal{L}
   =\mathcal{L}_{\mathrm{list}}
-  +\lambda\mathcal{L}_{\mathrm{pair}}.
+  +\lambda_{\mathrm{pair}}\mathcal{L}_{\mathrm{pair}}
+  +\lambda_{\mathrm{spec}}\mathcal{L}_{\mathrm{spec}}.
 \end{equation}
+对同一 minibatch 中循环错配的谱图 $s'$，谱图依赖项比较真实候选在正确和错误 query 下的分数：
+
+\begin{equation}
+  \mathcal{L}_{\mathrm{spec}}
+  =\operatorname{softplus}\!\left(
+  q(s',m^+)-q(s,m^+)+\delta\right).
+  \label{eq:spectrum_dependency_cn}
+\end{equation}
+
+这是 minibatch 内的依赖约束，不是因果识别结论。
 其中 listwise 项是一正例、多候选的 top-one likelihood，不规定负例之间的完整全序。
 两个损失都对同一查询内全部 $q_i$ 加上任意相同常数保持不变。因此，原始 $q_i$ 是相对
 排序分数而非概率；本文既未执行也未评价概率校准。
 
-对于 $L$ 层 Transformer 和隐藏维度 $h$，候选集合 Transformer 比 pointwise 打分额外引入
-$O(L(Kh^2+K^2h))$ 计算和 $O(LK^2)$ 注意力内存。两者都不需要逐 token 生成分子。
-本文不报告与 GLMR 的同硬件实测 latency 对比，因此不作实际推理速度声明。
+对嵌入宽度 $d$，完整池 coarse 打分每条 query 的结构复杂度为 $O(Kd)$，关系分支在分块计算
+下为 $O(K_r^2d)$，而不是对全部 256 个候选做二次计算。这是结构复杂度说明；只有在固定硬件
+基准完成后，才报告实测 latency、吞吐和峰值显存。
 
 \section{实验}
 
@@ -434,39 +462,33 @@ stopping patience 为 5。每个 epoch 对每个唯一分子标签采样 10 次�
 谱图。谱图和分子图增强分别以 0.5 概率启用：谱图增强删除归一化强度低于 0.3 的碎片峰中
 20\%（向下取整），并进行 $\pm15\%$ 强度扰动；图增强执行 10\% node dropout 和 10\%
 directed edge-entry dropout。验证关闭增强，但在固定随机流下保留关联谱图的随机采样。
-本文将 overlap-clean project-default seed-42 实验及其 cache 定义为 canonical 配置。seed 42
-来自项目默认配置，并在 43/44 敏感性运行前冻结；本文不声称它按测试性能选择。该实验
-应用上述验证排除，选择 epoch 16，并于 epoch 21 停止。
+历史审计将 overlap-clean project-default seed-42 实验及其 cache 定义为 canonical 配置；seed
+42 来自项目默认配置，在 43/44 敏感性运行前冻结，且不按测试性能选择。本修订的 no-forcing
+pilot 则使用当前可用的 pre-overlap-clean alignment checkpoint \texttt{d4c1f70}，单独报告且不声称
+overlap-clean 或 alignment seed 稳定性；它不更新历史 canonical 工件 manifest。
 
-reranker 隐藏维度为 512，rank embedding 为 32 维，dropout 为 0.1。候选集合 Transformer
-使用两层 Transformer 和八个 attention heads，pointwise 对照移除这两层。优化器为 AdamW，
-学习率 $10^{-4}$，batch size 16，最多训练 30 个 epoch，并根据验证集 MRR 进行 patience 为 5
-的 early stopping。$\lambda=0.2$，$\gamma=0.1$。canonical 受控分析固定 alignment
-seed 42 的 overlap-clean checkpoint 和 cache，两种变体均使用 reranker seeds 42、43 和
-44 训练；这三个是 reranker training seeds，同时控制初始化、DataLoader 顺序、候选打乱和
-dropout；相应样本标准差只衡量给定第一阶段下的 reranker 变异。独立的跨 alignment
-敏感性分析对 alignment seeds 42、43 和 44 分别使用相同三个 reranker seeds，并先在每个
-alignment 内聚合。因此跨 alignment 的统计单位是三个 alignment checkpoints，而不是展平
-后的九次运行。组件审计仍只使用 canonical alignment seed 42 的 cache 和 reranker seeds，
-其五项移除分别为：
-只关闭残差 shortcut、但仍保留基础分数作为 MLP 输入；同时关闭基础分数特征和残差路径；
-以零向量替代排名嵌入并保持输入宽度；
-去除乘积与绝对差特征但保留 self-attention；以及令 $\lambda=0$、只保留 listwise 训练。
-所有模型均不访问测试集进行选择，并在单张 NVIDIA RTX 4090 上评估。
+reranker 隐藏维度为 512，相对分支维度为 32，pair chunk 为 16，dropout 为 0.1。模型先对
+$K=256$ 的完整候选池打分，再对 coarse top-$K_r=40$ 使用相对分支。优化器为 AdamW，学习率
+$10^{-4}$，batch size 16，最多训练 30 个 epoch，并根据验证集 MRR 使用 patience 为 5 的
+early stopping。pairwise 与谱图依赖损失的权重和 margin 为
+$\lambda_{\mathrm{pair}}=0.2$、$\lambda_{\mathrm{spec}}=0.1$、$\gamma=0.1$ 和
+$\delta=0.1$。容量匹配的 pointwise 对照使用相同绝对分支和优化协议，但不做相对聚合；
+历史 candidate-set Transformer 仅作为次级对照，保留其已记录的 rank-aware 配置。
 
-训练集中，执行仅训练使用的强制正例替换之前，基础 top-40 召回上界在质量和分子式场景下
-分别为 93.78\% 和 90.42\%；按前述训练协议补全后，训练列表的 labeled coverage 为
-100\%。测试阶段不把真实目标强制放入 top-40，对应上界分别为 83.88\% 和 89.26\%。
+每项结果工件都列出 alignment checkpoint 和 reranker training seeds。training seed 同时控制
+初始化、DataLoader 顺序、候选打乱和 dropout，并不是独立的 alignment 重复。训练只使用正例
+自然存在于完整候选池中的 query；无此标签的 query 从 reranker loss 中排除，但保留在覆盖率
+统计中。任何 cache 都不插入正例。模型选择不访问测试集；相应运行在 NVIDIA RTX 4090 上完成
+时才记录为 GPU 结果，CPU smoke test 不作为科学结果。
 
 \subsection{代码、数据与工件可用性}
 
 匿名补充包提供源码检查、锁定的环境文件、自动化测试和一个小型 CPU 合成 smoke test，
 但不包含 MassSpecGym 谱图、候选池、训练后的 alignment 或 reranker checkpoint、reranker
 cache、日志及私有分析工件；因此 smoke test 不能复现论文科学指标。质量和分子式两种候选池
-分别训练 reranker。冻结候选工件及其 provenance 记录在内部实验/分析 manifest 中（不随匿名
-投稿包提供）；论文 release manifest 仅覆盖提交 PDF。分析记录中的源提交为
-\texttt{a2280d2}（完整模型）、\texttt{8bd2ca4}（消融）和 \texttt{28bdce2}（alignment
-seeds 43--44），配置哈希前缀为 \texttt{b6260dad043f}（完整哈希保存在该内部 manifest）。
+分别训练 reranker。pilot 的源提交为 \texttt{d28106b}，参数哈希、cache 和 checkpoint 指纹
+记录在内部 pilot manifest 中；该 manifest 不随匿名投稿包提供，release manifest 仅覆盖论文
+PDF。早期含 rank Transformer 审计仍由其历史工件记录追踪，不与本 pilot provenance 混合。
 公开的图特征包括原子符号、度、总氢数、芳香性、环大小分箱、形式电荷；键类型、共轭性、
 环内标志；以及 $\log(1+n_\mathrm{atoms})$、$\log(1+n_\mathrm{bonds})$ 图规模特征。
 alignment 投影为 512 维、$\tau=0.07$；AdamW weight decay 为
@@ -475,41 +497,28 @@ $10^{-4}$、gradient clipping 为 1；谱图 cache 使用 FP32、分子 cache �
 
 \subsection{对比方法与指标}
 
-受控基线包括与 reranker 使用同一对齐 checkpoint 的基础检索器，以及保留全部输入和损失、
-仅移除候选间自注意力但不匹配参数量的 pointwise reranker。JESTR 和 GLMR 仅作为 GLMR
+受控比较包括同一对齐 checkpoint 的余弦基础检索器、容量匹配且无 rank 的 pointwise coarse
+打分器、本文提出的相对 reranker，以及历史 candidate-set Transformer；后者只作为机制基线，
+不是本文正式方法。JESTR 和 GLMR 仅作为 GLMR
 论文中的 reported-only 机制背景 \cite{zhang2026glmr}；本文不展示其外部数值。这些外部
 结果不是受控比较：我们未在
 当前代码库中独立复现 JESTR 和 GLMR，其基础检索器、候选处理、身份/canonicalization
 规则与 MCES 实现也未和本文的 exact-target-SMILES 单正例协议匹配；本文不展示这些外部数值。
 
-评价指标为全部测试查询上的 Recall@1、Recall@5、Recall@20 和 MRR。对每条测试查询，
-包括真实目标未进入检索 top-40 的查询，记 $\hat m_n^{(1)}$ 为排序第一的候选。本文报告
-
-\begin{equation}
-  \operatorname{MCES@1}
-  =\frac{1}{N}\sum_{n=1}^{N}
-  \tilde d_{15}\!\left(\hat m_n^{(1)},m_n^+\right),
-  \qquad N=17{,}556.
-\end{equation}
-
-其中，$\tilde d_{15}$ 是 \texttt{myopic-MCES} 在阈值 15、启用 stronger-bound
-选项设置下的输出 \cite{kretschmer2025coverage}。对于足够接近的分子对该值是精确 MCES；对于较远分子对，
-它可能返回阈值或计算得到的下界，而不是无约束的精确 MCES 距离。因此，本文数值是经过
-阈值处理的 myopic MCES，越低越好。完全相同的 SMILES 字符串直接记为 0。主结果实验选择
-\texttt{PULP\_CBC\_CMD}，日志中没有 MCES worker 失败。canonical 审计中的 Recall/MRR
-均值和样本标准差来自固定基础 checkpoint 上的三个 reranker training seeds；跨 alignment 汇总先在
-每个 checkpoint 内平均 reranker seeds，再使用三个 alignment-level 配对估计，二者的样本
-标准差都不是置信区间。MCES@1 使用 overlap-clean 基础模型和 project-default
-seed-42 Transformer checkpoint 计算；这些单 checkpoint 数值不包含随机种子不确定性。
+评价指标为全部测试查询上的 Recall@1、Recall@5、Recall@20 和 MRR。新的 pilot 不重新计算
+MCES；早期经过阈值处理的 myopic-MCES 审计仅作为内部历史工件保留，不与本 pilot 合并。历史
+审计中的 Recall/MRR 种子离散度来自三个 reranker training seeds；跨 alignment 汇总先在每个
+checkpoint 内平均 seeds。这些描述性汇总不是置信区间，历史 MCES 也只是单 checkpoint 测量，
+不含种子层面的不确定性。
 
 \subsection{主要结果}
 
 \begin{table}[t]
   \centering
-  \caption{project-default 本地 MassSpecGym 结果。Base 使用 alignment seed 42，学习式行报告
-  reranker training seeds 42--44 的均值 $\pm$ 样本标准差。Recall 和 MRR 以百分比报告，采用
-  所提供候选文件上的本地 exact-target-SMILES 单正例协议，并不等价于官方 evaluator。MCES
-  另以单 checkpoint 审计报告。}
+  \caption{本地 MassSpecGym 无 forcing 完整候选池初始 pilot。Base 和两行学习式结果使用同一
+  pre-overlap-clean \texttt{d4c1f70} alignment-seed-42 cache、单个 reranker training seed（42）、5,000 条训练 query 和三个 epoch；
+  学习式结果不是多 seed 聚合。Recall 和 MRR 以百分比报告，采用本地 exact-target-SMILES
+  单正例协议，并不等价于官方 evaluator。}
   \label{tab:main_results_cn}
   \scriptsize
   \setlength{\tabcolsep}{2pt}
@@ -518,173 +527,55 @@ seed-42 Transformer checkpoint 计算；这些单 checkpoint 数值不包含随�
     候选池 & 方法 & R@1 & R@5 & R@20 & MRR \\
     \midrule
     \multirow{3}{*}{质量}
-      & \base{}（alignment seed 42） & 47.46 & 63.51 & 77.76 & 55.03 \\
-      & Pointwise reranker（training seeds 42--44）
-      & $67.44\pm0.74$ & $77.02\pm0.59$ & $82.26\pm0.16$ & $71.79\pm0.66$ \\
-      & 候选集合 Transformer（training seeds 42--44）
-      & $68.58\pm0.20$ & $77.36\pm0.36$ & $82.20\pm0.07$ & $72.60\pm0.25$ \\
+      & \base{}（完整池，seed 42） & 43.78 & 61.10 & 68.43 & 52.19 \\
+      & 容量匹配 pointwise
+      & 51.63 & 67.79 & 74.39 & 59.35 \\
+      & 相对候选模型
+      & 50.08 & 66.42 & 73.51 & 57.95 \\
     \midrule
     \multirow{3}{*}{分子式}
-      & \base{}（alignment seed 42） & 63.10 & 75.79 & 84.93 & 68.86 \\
-      & Pointwise reranker（training seeds 42--44）
-      & $73.97\pm0.59$ & $81.94\pm0.27$ & $86.78\pm0.27$ & $77.64\pm0.49$ \\
-      & 候选集合 Transformer（training seeds 42--44）
-      & $74.57\pm0.28$ & $81.97\pm0.26$ & $86.77\pm0.14$ & $78.02\pm0.26$ \\
+      & \base{}（完整池，seed 42） & 58.49 & 71.49 & 76.86 & 64.79 \\
+      & 容量匹配 pointwise
+      & 68.05 & 77.72 & 82.17 & 72.82 \\
+      & 相对候选模型
+      & 66.80 & 76.47 & 81.36 & 71.61 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\begin{table}[t]
-  \centering
-  \caption{单 checkpoint 的 thresholded myopic-MCES@1 审计：project-default alignment-seed-42
-  checkpoint、reranker training seed 42；越低越好。solver 为 \texttt{PULP\_CBC\_CMD}，日志中
-  failed pairs 为 0；不表示存在 seed 均值或标准差。}
-  \label{tab:mces_audit_cn}
-  \small
-  \begin{tabular}{lrr}
-    \toprule
-    候选池 & Base & 候选集合 Transformer \\
-    \midrule
-    质量 & 15.3681 & 7.7057 \\
-    分子式 & 5.4389 & 3.0913 \\
-    \bottomrule
-  \end{tabular}
-\end{table}
+\noindent 本 pilot 在两个候选池上都超过完整池 Base，但相对候选模块低于容量匹配 pointwise：
+质量 R@1 低 1.55 个百分点、MRR 低 0.016；分子式 R@1 低 1.25 个百分点、MRR 低 0.012。
+因此这只是单 seed、有限训练 query 的结果，不能证明候选关系具有稳健独立收益。质量相对模型
+在评价时截断到 top-40 后为 50.52\% R@1、0.5784 MRR，而完整池为 50.08\%、0.5795。
+本 pilot 未计算 MCES；历史单 checkpoint MCES 审计仅保留在下方次级章节。
 
-\noindent JESTR 和 GLMR 保留为 reported-only、未复现且不可直接比较的机制背景；本文不再
-复现其数值表，也不据此推断相对排名。
+JESTR 和 GLMR 保留为 reported-only、未复现且不可直接比较的机制背景；本文不再复现其数值表，
+也不据此推断相对排名。
 
-在单一 project-default seed 审计中，候选集合 Transformer 在质量约束 Recall@1 上带来 21.28 个百分点提升，
-在分子式约束场景带来 11.65 个百分点提升；MRR 分别提升 17.84 和 9.36 个百分点。
-Recall@20 的提升较小，因为此时主要瓶颈已经变为基础 top-40 召回上界。相对对应的固定
-overlap-clean 基础模型，表~\ref{tab:mces_audit_cn} 的单 checkpoint seed-42 Transformer 将质量候选 MCES@1 从 15.3681
-降低到 7.7057（$49.86\%$），将分子式候选 MCES@1 从 5.4389 降低到 3.0913
-（$43.16\%$）。这些是单 checkpoint 审计，不是跨 seed 聚合估计。
-
-\subsection{跨 alignment 与受控组件证据}
-
-\begin{table}[t]
-  \centering
-  \caption{采用 MassSpecGym supplied-candidate top-40 列表和本地
-  exact-target-SMILES 单正例评价的分 alignment 内部结果；该评价不等价于官方
-  evaluator。学习式行先在每个
-  alignment 内平均 reranker seeds 42--44。三个 checkpoints 来自两个代码修订，
-  仅提供描述性敏感性证据，不构成置信区间、显著性或一般端到端随机种子稳定性结论。
-  Recall@1 和 MRR 均为百分比。}
-  \label{tab:cross_alignment_cn}
-  \tiny
-  \setlength{\tabcolsep}{1pt}
-  \begin{tabular}{@{}clrrrrrrr@{}}
-    \toprule
-    Alignment & 候选池 & U40 & Base R@1 & Point. R@1 & Trans. R@1
-      & Base MRR & Point. MRR & Trans. MRR \\
-    \midrule
-    42 & 质量   & 83.88 & 47.46 & 67.44 & 68.58 & 55.03 & 71.79 & 72.60 \\
-    42 & 分子式 & 89.26 & 63.10 & 73.97 & 74.57 & 68.86 & 77.64 & 78.02 \\
-    43 & 质量   & 80.98 & 35.92 & 66.92 & 67.19 & 44.33 & 70.42 & 70.58 \\
-    43 & 分子式 & 81.65 & 45.08 & 69.64 & 69.30 & 51.85 & 72.14 & 71.96 \\
-    44 & 质量   & 72.20 & 23.91 & 57.78 & 57.42 & 32.26 & 61.22 & 60.91 \\
-    44 & 分子式 & 75.60 & 28.73 & 59.76 & 59.82 & 36.87 & 63.14 & 63.34 \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-\begin{table}[t]
-  \centering
-  \caption{冻结 alignment seed 42 的基础检索器和 cache 后进行的 reranker 与组件比较。
-  Base 行固定；其余行报告 reranker seeds 42--44 的均值 $\pm$ 样本标准差。Recall@1 和
-  MRR 均为百分比。移除行是围绕预先确定的完整候选集合 Transformer 配置、使用相同 cache
-  和种子分别训练的审计变体，不用于事后选择主模型。所有数值均采用本地
-  exact-target-SMILES
-  单正例协议，并不等价于官方 evaluator。}
-  \label{tab:reranker_ablation_cn}
-  \scriptsize
-  \setlength{\tabcolsep}{4pt}
-  \begin{tabular}{@{}>{\raggedright\arraybackslash}p{5.0cm}cccc@{}}
-    \toprule
-    & \multicolumn{2}{c}{质量} & \multicolumn{2}{c}{分子式} \\
-    \cmidrule(lr){2-3}\cmidrule(lr){4-5}
-    方法 & R@1 & MRR & R@1 & MRR \\
-    \midrule
-    Base & 47.46 & 55.03 & 63.10 & 68.86 \\
-    Pointwise
-      & $67.44\pm0.74$ & $71.79\pm0.66$
-      & $73.97\pm0.59$ & $77.64\pm0.49$ \\
-    候选集合 Transformer（完整）
-      & $68.58\pm0.20$ & $72.60\pm0.25$
-      & $74.57\pm0.28$ & $78.02\pm0.26$ \\
-    \midrule
-    去除残差 shortcut
-      & $68.16\pm0.06$ & $72.33\pm0.06$
-      & $75.01\pm0.54$ & $78.38\pm0.42$ \\
-    去除基础分数特征与残差路径
-      & $68.07\pm0.20$ & $72.28\pm0.18$
-      & $74.39\pm0.55$ & $77.93\pm0.38$ \\
-    去除排名嵌入
-      & $70.12\pm0.30$ & $73.75\pm0.28$
-      & $76.62\pm0.69$ & $79.38\pm0.58$ \\
-    去除乘积/绝对差特征
-      & $68.10\pm0.85$ & $72.29\pm0.66$
-      & $75.76\pm0.55$ & $78.90\pm0.38$ \\
-    仅 listwise（$\lambda=0$）
-      & $68.91\pm0.76$ & $72.86\pm0.46$
-      & $74.24\pm0.25$ & $77.71\pm0.25$ \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-表~\ref{tab:cross_alignment_cn} 保留了 alignment 层级：先在每个第一阶段 checkpoint 内
-平均 reranker seeds。两种学习式排序器在 Recall@1 和 MRR 的全部 12 个
-alignment--候选--学习模型聚合单元中均优于对应 base。相对地，对每种候选设置和每项指标，
-Transformer--Pointwise 差值都只有 2/3 个 alignment 为正。三个 alignment-level 配对估计的
-均值 $\pm$ 样本标准差为：质量候选 Recall@1 $0.35\pm0.75$ 个百分点、MRR
-$0.22\pm0.56$ 个百分点；分子式候选分别为 $0.11\pm0.47$ 和 $0.13\pm0.29$ 个百分点。
-这些只是描述性汇总，不是置信区间或显著性检验。三个 checkpoints 具有相同的记录超参数，
-但来自两个代码修订；逐 alignment provenance 已保存在分析工件中。因此，现有内部结果
-支持监督残差重排序，但不支持候选 self-attention 具有跨 checkpoint 稳健独立收益。
-
-在表~\ref{tab:reranker_ablation_cn} 的 canonical alignment-seed-42 checkpoint 上，候选集合
-Transformer 相对 Pointwise 的平均 Recall@1 在质量和分子式场景分别高 $1.14$ 和 $0.60$
-个百分点，MRR 分别高 $0.81$ 和 $0.38$ 个百分点；在六个（2 种候选池 $\times$ 3 个
-reranker training seeds）配对中，
-Recall@1 和 MRR 均偏向 Transformer。由于 Transformer 还多出约 630 万个可训练参数，
-该对比仍无法把候选交互与模型容量增加的影响分离，而跨 alignment 方向变化进一步排除了
-稳健自注意力收益主张。
-
-五项移除行是在同一固定 alignment checkpoint 上进行的描述性组件审计。完整模型相对任一
-移除变体都未取得上述六个 MRR 配对全胜。去除排名嵌入在每个配对中均
-同时提高 Recall@1 和 MRR：相对完整模型，其质量候选的平均提升分别为 1.54 和 1.15 个
-百分点，分子式候选分别为 2.05 和 1.36 个百分点。残差 shortcut、显式乘积/绝对差特征和
-pairwise loss 的方向随候选协议变化。联合去除基础分数特征与残差路径时，完整模型的平均
-MRR 高 0.32 和 0.08 个百分点，且种子级方向混合。这些三种子比较不是显著性检验；本文
-保留预先确定的完整配置作为报告参照，不在查看结果后把某个移除版本升级为新主模型。
-
-为便于核验，五项移除的 MRR 胜/平/负（P/Z/N）计数，均在上述 2 种候选池 $\times$ 3 个
-reranker training seeds 上计算：去除残差 shortcut 为 $2/0/4$，去除基础分数路径为
-$3/0/3$，去除排名嵌入为 $0/0/6$，去除交互特征为 $2/0/4$，仅 listwise 为 $3/0/3$。
-这些是每个移除的六个配对比较，不是独立的 alignment 重复。
-
-上述结果只是有限的信息来源审计。排序器可能同时学习基础分数的非线性校准，以及利用
-冻结的谱图和分子嵌入进行兼容性修正；但当前设计无法分离两类信息各自贡献了多少。本文尚未
-训练“仅嵌入”“仅基础分数”或“嵌入加基础分数”的隔离排序器。因此，受控的信息来源消融、
-参数量匹配的 pointwise 对照和 query-level 配对不确定性分析仍是待完成项目，不能从现有移除
-行反推其结果。
-
-作为 pre-overlap-clean 固定 checkpoint 上单独进行的测试重叠敏感性检查，我们剔除上述
-3 条测试查询，保留 17,553 条查询。在两种候选设置和两种 reranker 中，三种子平均
-Recall@1 下降 0.0045--0.0055 个百分点，单种子绝对变化最大为 0.0056 个百分点；所有
-变化均低于 0.006 个百分点。canonical 表格仍保留论文发布的全部测试查询。
-
-验证重叠审计对模型选择的启示更明显。overlap-clean 与 pre-clean 流水线选择了相同的
-alignment epoch
-（best epoch 16，stop epoch 21），但 12 组配置中有 9 组 reranker 的 best/stop epoch 组合
-不同。由于 alignment 也被重新训练，且其测试检索指标发生变化，该对比应解释为端到端流水线
-敏感性，而不是这 6 条验证查询本身的因果效应。
-
-本文不报告候选顺序或完整 top-$K$ 消融。除上述解析得到的 reranker 参数量外，本文不报告
-峰值显存、cache 构造时间、reranker latency 或端到端 latency。
+\paragraph{历史审计边界。}
+早期含 rank 的 Transformer 结果使用旧的 top-40 cache 和仅训练期正例替换。
+它们仍保存在内部分析工件中以便追溯，但不是当前无 rank、无 forcing 方法的测量，也不用于
+当前主张；早期的多种子和跨 alignment 汇总不能被理解为相对模块的证据。
 
 \section{讨论}
+
+新的完整池 pilot 将候选覆盖与列表内排序分开。保存的完整池上界按构造为 100\%，而评价时
+截断到 top-40 后质量候选上界为 82.15\%。在完整池内，相对模型把质量场景 Base 从
+43.78\%/0.5219 提升到 50.08\%/0.5795（Recall@1/MRR），容量匹配 pointwise 更高，为
+51.63\%/0.5935。分子式场景呈现相同顺序：相对模型 66.80\%/0.7161、pointwise
+68.05\%/0.7282、Base 58.49\%/0.6479。这些是单 seed、5,000 条训练 query 的 pilot，
+不是稳定性估计。
+
+质量候选的 spectrum-shuffle 审计使相对模型降为 45.05\% Recall@1 和 0.5358 MRR，仍高于
+Base，但明显低于正确配对的相对结果。这说明模型并非完全不依赖谱图；然而打乱谱图后仍保留的
+性能也表明候选与基础分数路径贡献显著。因此，不能将 pointwise 到 relative 的差异归因于
+候选关系的因果收益。下方历史 Transformer 结果仅作为旧设计审计保留，不与本 pilot 合并。
+
+本文不在此宣称新的 MCES、官方 evaluator、多 seed 稳定性或固定硬件效率结果；这些仍是明确
+的证据边界。
+
+\iffalse
+\section{历史讨论文本}
 
 式~\eqref{eq:upper_bound_cn}--\eqref{eq:coverage_decomposition_cn} 将第一阶段候选覆盖率与
 列表内部排序能力区分开。当 $k=1$、$K=40$ 时，已定义的条件量 $A_{1\mid40}$ 等于
@@ -713,7 +604,31 @@ pointwise 与候选集合模型在质量场景下分别恢复 54.86\% 和 57.99\
 仍保持较大的描述性优势。这增强了三个已审计运行内的框架级观察；与此同时，混合的
 Transformer--Pointwise 方向进一步说明大部分增益不应归因于候选 self-attention。
 
+\fi
+
 \section{局限性与负责任评估}
+
+新的主要证据是使用 194,119 条可用训练 query 中的 5,000 条、训练三个 epoch 的 seed-42
+pilot。因此它不足以支持 seed 聚合、alignment 敏感性、置信区间，或 relative 普遍优于
+pointwise 的结论。pilot 还使用本地 exact-target-SMILES 单正例协议；本文没有运行参考的
+二维 InChIKey/多正例 evaluator，身份规则和立体化学影响仍未量化。
+
+无 forcing cache 只保留 MassSpecGym 文件提供的候选。目标若不在评价截断深度内，reranker
+无法恢复；闭集模型也不能提出候选池之外的结构。候选关系只在 coarse top-40 上计算，因此
+结论不扩展到其它 cutoff 或开放分子库。spectrum-shuffle 是 batch 内依赖审计，不是因果或
+不变性保证。
+
+匿名补充包包含源码检查、锁定环境、测试和合成 smoke test，但不含真实数据、候选文件、cache、
+checkpoint、日志或 pilot 结果工件。官方 evaluator、匹配的外部基线、候选感知 alignment
+重训、难度分层以及固定硬件 latency/显存测量仍因输入不可用或尚未完成而阻塞；本文不对这些
+项目作主张。
+
+谱图塔不接收加合物、仪器或碰撞能量元数据，分子式条件也假设公式已知。向其它采集条件、
+候选构造、身份规则、基准或更大候选列表迁移尚未测试。历史 forced-positive Transformer
+结果与新方法分开保存，不能替代新方法的证据边界。
+
+\iffalse
+\section{历史局限性文本}
 
 三个 reranker training seeds 的均值 $\pm$ 样本标准差和 paired-win 次数只是描述性统计，不是
 置信区间或显著性检验。canonical 表和全部组件移除固定 alignment seed 42。独立的跨
@@ -727,9 +642,10 @@ pointwise 的 5.26 倍（多 6,304,768 个，约 $+426\%$），因而候选交�
 分离。外部 JESTR 与 GLMR 结果未在相同软件和候选处理下复现；本文不作确定的 SOTA、
 组件因果贡献或 self-attention 收益声明。
 
-训练专用的正例替换改变了检索列表分布，也不能解决比例为 $1-U_K$ 的覆盖失败。冻结的完整
-候选池包含 exact target，因此评价在完整池层面属于闭集，即使目标可能在 top-40 截断后缺失。
-本文未量化 exact-target-SMILES 身份规则相对参考二维 InChIKey 规则的影响，因此
+历史 Transformer 审计曾使用仅训练期的正例替换，这会改变列表分布且不能解决比例为 $1-U_K$
+的覆盖失败；本修订的 relative 和 pointwise 运行不执行该操作。冻结的完整候选池包含 exact
+target，因此评价在完整池层面属于闭集，即使目标可能在 top-40 截断后缺失。本文未量化
+exact-target-SMILES 身份规则相对参考二维 InChIKey 规则的影响，因此
 Recall/MRR 是明确的本地协议结果，并不等价于官方 evaluator。精确记录重叠审计也不能
 排除近重复样本或相关数据来源。模型选择排除审计出的 6 条 train--validation 记录重叠，并
 保留全部测试查询。当前事后验收环境已锁定版本，并已从显式 Conda/PyPI 锁重建；但历史训练
@@ -751,18 +667,16 @@ exchangeability 且目标属于候选池等假设下生成具有边际覆盖率�
 更大列表、其他基准和外部分子库上的稳健性未经验证。闭集方法也不能提出所提供候选池之外的
 结构，即便它避免了自回归生成有效性失败。
 
+\fi
+
 \section{结论}
 
-本文研究并评估 \method{}，一个面向 MS/MS 分子检索的监督、非生成式第二阶段排序器。
-Recall 和 MRR 使用 MassSpecGym 提供候选文件上的本地 exact-target-SMILES 单正例协议。
-参考 loader 默认使用二维 InChIKey 等价并可能产生多个正例；该差异影响尚未量化，因此本文
-结果不等价于官方 evaluator。在该协议下，两种学习式实现跨 alignment seeds 42--44 的 12 个
-聚合单元均在 Recall@1 和 MRR 上改善对应 base。候选集合 Transformer 在 canonical
-checkpoint 上相对 pointwise 呈现小幅优势，但对每种候选设置和指标都只有 2/3 个 alignment
-方向为正。完整模型相对五个移除变体中的任一个都未取得上述六个 MRR
-配对全胜（六个配对为 2 种候选池 $\times$ 3 个 reranker training seeds）；去除排名嵌入反而在每个配对中同时提高 Recall@1 和 MRR。最稳健的结论是
-第二阶段重排序框架的价值，而不是 self-attention 或任一受审计设计的独立收益。JESTR/GLMR
-仅作为 reported-only、未复现、不可直接比较的机制背景；匹配外部基线和实测效率仍超出当前证据范围。
+本文提出 \method{}：一种无 rank、无 forcing 的第二阶段排序器，将完整候选池 coarse 打分
+与谱图条件的相对候选偏好结合。在本地 exact-target-SMILES 协议的 seed-42 pilot 中，relative
+模型及容量匹配 pointwise 对照均改善质量和分子式场景的完整池 Base；pointwise 在该 pilot
+略强，spectrum-shuffle 审计也显示候选/base-score 路径贡献显著。因此，当前证据支持该工程
+框架及其明确的证据边界，但尚未建立 relative 模块独立且普遍稳健的收益。官方 evaluator
+等价性、外部基线、alignment 重训和效率测量仍是未完成事项，本文不作相关主张。
 
 \bibliographystyle{plain}
 \bibliography{references}

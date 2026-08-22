@@ -198,24 +198,33 @@ and `SPECEMBEDDING_TSNE_CLUSTER_DIR`.
 
 #### 4.1 Paper-result workflow and protocol
 
-The transfer-paper results use the spectrum--molecule alignment and top-40
-reranking workflow, not the earlier spectrum-to-spectrum notebook evaluation.
-Recall and MRR use MassSpecGym-supplied candidate files with a local
-exact-target-SMILES single-positive rule. The reference loader defaults to
-two-dimensional InChIKey equivalence and may yield multiple positives; the
-effect of this difference is unquantified, so the local values are not
-official-evaluator-equivalent.
+The transfer-paper workflow uses spectrum--molecule alignment followed by a
+rank-free, no-forcing full-pool reranker: pointwise coarse scoring over at most
+256 supplied candidates, then a spectrum-conditioned relative branch on the
+coarse top-40. A capacity-matched pointwise control and the earlier rank-aware
+Transformer audit are kept separate. Recall and MRR use MassSpecGym-supplied
+candidate files with a local exact-target-SMILES single-positive rule. The
+reference loader defaults to two-dimensional InChIKey equivalence and may yield
+multiple positives; the effect of this difference is unquantified, so local
+values are not official-evaluator-equivalent.
 
-The main table uses project-default alignment seed 42 for the base and summarizes
-reranker training seeds 42--44. The fixed-alignment table holds alignment seed 42
-constant and summarizes those same training seeds. The cross-alignment analysis first summarizes those reranker seeds
-within each of alignment seeds 42--44 and then treats the three alignment-level
-estimates descriptively; it does not flatten nine runs or provide confidence
-intervals. The versioned evidence is in
-`analysis/transfer2026_alignment_multiseed/` and
-`analysis/transfer2026_core_ablations/`. JESTR and GLMR are retained only as
-reported-only, not independently reproduced, not directly comparable mechanism
-background; the paper does not display their external numeric values.
+The initial no-forcing pilot uses pre-overlap-clean alignment checkpoint
+`d4c1f70`, reranker seed 42, 5,000 training queries, and three epochs. It is a
+descriptive pilot, not a multi-seed main result: relative improves its base but
+is slightly below the capacity-matched pointwise control in both pools. Full
+metrics, fingerprints, commands, and boundaries are recorded in
+`analysis/transfer2026_scholargpt_method/pilot-results.md`. The earlier
+overlap-clean seed-42/43/44 tables remain historical evidence in their original
+analysis directories. JESTR and GLMR are reported-only, not independently
+reproduced, and not directly comparable mechanism background; no external
+numeric values are displayed.
+
+The new method entry points are `prepare_rerank_cache.py` with
+`--topk 256 --no-force_include_positive`, `train_rerank.py --model_type
+relative --train-k 256 --relation-top-k 40`, and `eval_rerank.py` with
+`--max-candidates 256` or `40`; `--shuffle-spectrum` runs the dependency audit.
+Long real-data runs should be launched in a detached `tmux` session. These
+commands require the excluded MassSpecGym data and alignment checkpoint.
 
 The following commands describe the repository's broader and legacy workflows;
 their outputs should not be substituted for the paper tables without matching

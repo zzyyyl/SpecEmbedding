@@ -17,11 +17,10 @@
 ```bash
 conda run -n specembedding python prepare_rerank_cache.py \
   --checkpoint checkpoints_align/d4c1f70_massspecgym_nopretrain/best_model_stage2.pth \
-  --dataset_type massspecgym --data_path /data1/zyl/SpecEmbedding/processed \
+  --dataset_type massspecgym --data_path /path/to/processed \
   --candidate_type mass --split train --device cuda:0 --topk 256 \
   --no-force_include_positive \
   --save_path rerank_cache/scholargpt_relative_fullpool_mass/massspecgym_mass_train.pt
 ```
 
 训练和评价命令应把 `--model_type relative`、`--train-k 256`、`--relation-top-k 40`、`--no-rank-embedding`、`--lambda-spec 0.1` 和 seed 显式记录到结果 manifest；初始 smoke/预算受限运行可使用 `--max-train-queries`，但不得冒充全训练集结果。
-

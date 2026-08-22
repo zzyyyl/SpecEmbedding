@@ -935,3 +935,25 @@ checkpoint，也不沿用原谱图--谱图目标；第一阶段改为从零训�
 - 第 9 节投稿状态。
 - 第 11 节最高优先级待办。
 - 第 12 节风险。
+
+## 15. 2026-08-23 ScholarGPT 方法重构 pilot
+
+外部评审要求将旧的 rank-aware、训练期 positive-forcing Transformer 设计与新方法分开。
+当前代码已加入无 rank、无 forcing 的 full-pool coarse-to-fine relative reranker：完整供给池
+最多 256 个候选，先逐候选 coarse 打分，再在 top-40 上计算谱图条件的反对称候选关系；同时
+保留容量匹配的 no-rank pointwise 对照和 spectrum-dependency loss。实现、测试和设计边界见
+`analysis/transfer2026_scholargpt_method/`。
+
+2026-08-23 在 RTX 4090 上完成 seed-42、5,000 条训练 query、3 epochs 的初始 pilot；mass/formula
+训练 cache 均记录 `force_include_positive: False`，不把正例插入列表。完整池本地结果为：
+
+| pool | base R@1/MRR | relative R@1/MRR | pointwise R@1/MRR |
+|---|---:|---:|---:|
+| mass | 43.78 / 0.5219 | 50.08 / 0.5795 | 51.63 / 0.5935 |
+| formula | 58.49 / 0.6479 | 66.80 / 0.7161 | 68.05 / 0.7282 |
+
+relative 超过匹配 base，但在此有限 pilot 中略低于 pointwise；mass spectrum-shuffle 后为
+45.05 / 0.5358，formula 为 63.79 / 0.6860。因此不得声称候选关系的独立、因果或一般稳健
+收益。该 pilot 不更新历史 overlap-clean canonical artifact manifest；官方 evaluator、外部
+baseline、multi-seed aggregate、difficulty 分层和效率测量仍未完成。页数不作为当前阻断，正文
+优先保持精炼和证据可靠。
