@@ -410,6 +410,16 @@ prove better hard-negative discrimination, or imply an advantage over the
 pointwise control. Those are empirical questions for future, separately
 authorized experiments.
 
+The implementation exposes an explicit \texttt{pair\_mode} control. The
+reported relative model uses \texttt{pair\_mode=antisymmetric}, which realizes
+Equation~\ref{eq:antisymmetry}; \texttt{pair\_mode=directed} keeps the same
+ordered preference network but omits the reverse-pair subtraction as a
+controlled implementation path. No directed training run is reported here, so
+this interface does not constitute a new performance result. The legacy
+\texttt{use\_antisymmetric} flag remains only for configuration compatibility,
+and missing fields in older checkpoints default to the former antisymmetric
+semantics.
+
 The capacity-matched pointwise control uses the same absolute branch and
 removes only the relative aggregation. At hidden width 512, the relative model
 has 1,485,189 trainable parameters and the no-rank pointwise control has
@@ -481,8 +491,12 @@ neither performed nor evaluated.
 For embedding width $d$, full-pool coarse scoring costs $O(Kd)$ per query and
 the relative branch costs $O(K_r^2d)$ with chunked pair evaluation, rather than
 quadratic work over all 256 candidates. This is a structural complexity
-statement; measured latency, throughput, and peak memory are reported only if
-the fixed-hardware benchmark in the analysis artifacts has completed.
+statement. The repository also provides a parameterized forward-only benchmark
+that varies candidate cutoffs, warm-up and measurement batches, batch size, and
+device while recording timing metadata; it excludes data loading and does not
+compute retrieval metrics. Existing fixed-hardware timings in Appendix~C remain
+implementation-cost references, and this revision adds no new timing, memory,
+throughput, or deployment result.
 
 \section{Experiments}
 
@@ -554,7 +568,11 @@ automated tests, and a tiny synthetic CPU smoke test. It does not provide the
 MassSpecGym spectra, candidate pools, trained checkpoints, caches, or private
 analysis artifacts. The real-data entry point is
 \texttt{run\_rerank\_pipeline.py}; additional implementation and
-reproducibility notes are given in Appendix~D.
+reproducibility notes are given in Appendix~D. The repository source also
+contains a query-level case exporter that records candidate identities and
+base/reranker ranks for selected cache queries. It provides ranking evidence
+for subsequent manual inspection, not fragment attribution or a chemical
+causal interpretation.
 
 \subsection{Baselines and Metrics}
 
@@ -865,6 +883,14 @@ replicates. Training queries without a naturally present positive remain in
 coverage statistics but do not enter the reranker loss. No positive is inserted
 into a current-method cache.
 
+The current training entry point writes a lightweight \texttt{data\_summary} into
+new reranker checkpoints. It records the actual labeled training-query count,
+the requested maximum count, \texttt{train\_k}, model type, pair mode, seed, and
+available cache-protocol fields such as split, candidate type, pre-retrieval
+cutoff, and positive-forcing status. This metadata helps distinguish pilot
+artifacts from other training scopes, but it does not change the forward path
+or replace full-split, alignment-level, or uncertainty experiments.
+
 The historical Candidate-Set Transformer uses a rank embedding and generic
 candidate self-attention. Its earlier training-time positive forcing and
 rank-aware configuration are not part of the current relative/pointwise
@@ -900,7 +926,10 @@ reranker seeds, and one alignment checkpoint. The anonymous supplement contains
 source inspection, locked environment files, tests and a synthetic CPU smoke
 test, but not the real spectra, candidate pools, caches, checkpoints, logs or
 private result artifacts. The smoke test is therefore not a reproduction of the
-scientific metrics.
+scientific metrics. For subsequent analysis, the repository includes the
+candidate-scaling forward benchmark described above and the query-level case
+exporter; neither was used to add a new timing curve or chemical case result to
+this manuscript.
 
 JESTR and GLMR are reported-only related methods and were not reproduced under
 the same candidate, identity and preprocessing protocol. The paper does not

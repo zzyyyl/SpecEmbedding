@@ -314,6 +314,11 @@ SMILES token、前体质量、分子式或采集元数据，也没有 rank embed
 证明 hard-negative discrimination 更好，也不能推出相对模型优于 pointwise 对照。这些问题仍
 需要未来经授权的独立实验检验。
 
+当前实现提供显式的 \texttt{pair\_mode} 控制。论文报告的 relative 模型使用 antisymmetric 模式，
+即实现式~\ref{eq:antisymmetry_cn}；directed 模式保留同一个有序偏好网络，但省略反向 pair 相减，
+作为受控的实现入口。本文没有报告 directed 训练运行，因此该接口不构成新的性能结果。旧的布尔配置
+参数仅用于兼容；旧 checkpoint 缺少新字段时仍回退到原有的 antisymmetric 语义。
+
 容量匹配的 pointwise 对照使用同一绝对分支，仅移除相对聚合。隐藏宽度 512 时，相对模型有
 1,485,189 个可训练参数，无 rank 的 pointwise 对照有 1,478,690 个，差异为 0.44\%。通用
 candidate-set Transformer 作为次级历史对照保留，不再作为本文提出的机制。两种模型都不生成分子。
@@ -424,8 +429,9 @@ listwise cross-entropy：
 排序分数而非概率；本文既未执行也未评价概率校准。
 
 对嵌入宽度 $d$，完整池 coarse 打分每条 query 的结构复杂度为 $O(Kd)$，关系分支在分块计算
-下为 $O(K_r^2d)$，而不是对全部 256 个候选做二次计算。这是结构复杂度说明；只有在固定硬件
-基准完成后，才报告实测 latency、吞吐和峰值显存。
+下为 $O(K_r^2d)$，而不是对全部 256 个候选做二次计算。这是结构复杂度说明。仓库同时提供可配置
+候选截断、warm-up、测量批次、batch size 和设备的 forward-only benchmark；它排除数据读取且不计算
+检索指标。Appendix~C 中已有的固定硬件计时仍只是实现成本参考，本轮不新增 timing、显存、吞吐或部署结果。
 
 \section{实验}
 
@@ -479,7 +485,8 @@ $\delta=0.1$。容量匹配的 pointwise 对照使用相同绝对分支和优化
 
 匿名补充包提供源码检查、锁定的环境文件、自动化测试和一个小型 CPU 合成 smoke test。
 其中不包含真实谱图、候选池、训练 checkpoint、cache 或私有分析工件。真实数据入口及更多
-复现边界见 Appendix~D。
+复现边界见 Appendix~D。仓库源码还包含 query-level case exporter，可为指定 cache query 导出候选身份
+以及 base/reranker 排名，供后续人工核验；它不执行 fragment attribution，也不生成化学因果解释。
 
 \subsection{对比方法与指标}
 
@@ -703,6 +710,11 @@ reranker seed 控制初始化、DataLoader 顺序、候选打乱和 dropout。42
 描述 reranker 层级离散度，不是独立 alignment 重复。当前训练中自然没有正例的 query 保留在
 覆盖率统计中，但不进入 loss；当前方法 cache 不插入正例。
 
+当前训练入口会在新 reranker checkpoint 中写入轻量的 \texttt{data\_summary}，记录实际有标签训练
+query 数、请求的最大 query 数、\texttt{train\_k}、model type、pair mode、seed，以及可用的 cache
+协议字段（如 split、candidate type、预检索 cutoff 和 positive-forcing 状态）。这些元数据用于区分
+pilot 工件和其它训练范围，不进入 forward，也不能替代完整训练集、alignment 层级或不确定性实验。
+
 历史 Candidate-Set Transformer 使用 rank embedding 和通用候选 self-attention，其训练期
 positive forcing 和 rank-aware 配置不属于当前 relative/pointwise 正式协议。它只用于连接早期
 设计，且参数量和训练协议不同，不能作为容量匹配的主要对照。
@@ -727,6 +739,8 @@ spectrum-shuffle 结果使质量候选的 relative 模型降为 45.05\% Recall@1
 当前 pilot 使用 194,119 条可用训练 query 中的 5,000 条、三个 reranker seed 和一个 alignment
 checkpoint。匿名补充包包含源码检查、锁定环境、测试和合成 CPU smoke test，但不包含真实谱图、
 候选池、cache、checkpoint、日志或私有结果工件，因此 smoke test 不能复现科学指标。
+后续分析所需的候选规模 forward benchmark 和 query-level case exporter 也已包含在仓库源码中；本稿
+没有使用它们新增 timing 曲线或化学案例结果。
 
 JESTR 和 GLMR 是 reported-only 的相关方法，未在相同候选、身份和预处理协议下复现。本文不
 声称 SOTA、统计显著性、完整 alignment 稳定性、跨数据集泛化或端到端部署 latency；这些内容
