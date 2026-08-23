@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "mentor review 2026-08-23",
-  "repository_head_at_index": "6f27a5f55ffe687be0ff27b3578d09978a04ceb7",
+  "repository_head_at_index": "dff4ae009c746c4fb247e4c35478523b4028e5a5",
   "params": {
     "path": "params.yaml",
     "exists": true,
@@ -8449,6 +8449,42 @@
   },
   "analysis_outputs": [
     {
+      "path": "analysis/mentor2026_baseline/formula_align42_topk40.json",
+      "exists": true,
+      "bytes": 1661,
+      "sha256": "53376d8a409f7ba5add372f03b8744fb7c93a9fc626bfe7eb210c5354cba9fe6"
+    },
+    {
+      "path": "analysis/mentor2026_baseline/formula_align43_topk40.json",
+      "exists": true,
+      "bytes": 1699,
+      "sha256": "756ef6c74c8f73940f98a80142616e298ce936778b364681148066e46d275093"
+    },
+    {
+      "path": "analysis/mentor2026_baseline/formula_align44_topk40.json",
+      "exists": true,
+      "bytes": 1701,
+      "sha256": "f7a68c105365670f9e693e3c2c24317593cf83ccc1e19ea8e6dbab824d63622e"
+    },
+    {
+      "path": "analysis/mentor2026_baseline/mass_align42_topk40.json",
+      "exists": true,
+      "bytes": 1651,
+      "sha256": "4899ae71944e5082c3d4096fca9e712ba7c815274af489f1534136d6562e5a30"
+    },
+    {
+      "path": "analysis/mentor2026_baseline/mass_align43_topk40.json",
+      "exists": true,
+      "bytes": 1685,
+      "sha256": "58a86b7e1c0cc61eedf0333d0dd3d9445136fa34683bf7050db295ebd404b63d"
+    },
+    {
+      "path": "analysis/mentor2026_baseline/mass_align44_topk40.json",
+      "exists": true,
+      "bytes": 1683,
+      "sha256": "97cdc5020e3dd17686854766720da5d947471a0fd1393f3d91c5f3219cf891b6"
+    },
+    {
       "path": "analysis/mentor2026_experiments/ablation_summary/alignment_summary.csv",
       "exists": true,
       "bytes": 3337,
@@ -8591,7 +8627,7 @@
   ],
   "notes": [
     "Checkpoint, cache, training-log, and evaluation-log paths are repository-relative and refer to local ignored artifacts; they must be copied into a controlled supplement or release archive before submission.",
-    "The complete per-run ranking metrics are in eval_rerank.log. The tracked hard-query JSON files contain selected-query ranking/prediction outputs for alignment-42 seed-42 pointwise and relative runs.",
+    "The complete per-run ranking metrics are in eval_rerank.log. The tracked hard-query JSON files contain selected-query ranking/prediction outputs for alignment-42 seed-42 pointwise and relative runs; the tracked mentor2026_baseline JSON files contain the local JESTR-style cosine controls.",
     "Cache metadata records source paths, sizes, and mtimes in each status file; raw MassSpecGym data and caches are not redistributed by this index.",
     "The failed-attempt list is retained for provenance; only the latest complete attempt for each experiment key is used in the complete_runs lists.",
     "All seed and alignment aggregates are descriptive; this index does not imply significance testing or bitwise retraining equivalence."
