@@ -77,6 +77,8 @@ bash paper/build_release.sh
 
 发布 PDF、工具链、页数和哈希见 `paper/release/`。论文正文以方法叙事为主，协议、历史对照和复现边界集中在正文后的附录；双语稿和参考文献以 `paper/` 为准，本文不重复实验表格。
 
+论文的核心发现分为两层：监督式第二阶段重排序改善固定候选池内的排序；relative interaction 的结构性质已形式化，但当前结果尚未证明其独立优于容量匹配的 pointwise 对照。
+
 匿名补充包由显式 allowlist 构建，排除 Git 历史、数据、checkpoint、cache、日志和内部 artifact manifest。构建与独立验收记录见 `reproducibility/`。
 
 ## 6. 文档地图

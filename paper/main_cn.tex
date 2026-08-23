@@ -77,10 +77,11 @@ JESTR 使用 contrastive multiview coding 学习谱图--分子联合空间，并
 \cite{zhang2026glmr}。
 
 这两类方法仍留下一个重要的数据挖掘问题。逐候选余弦打分并未在已检索集合上显式训练
-第二阶段目标；生成式检索则引入自回归解码器，最终排序依赖生成结构的质量和有效性。本文
-研究监督第二阶段排序器能否区分 hard candidates，以及谱图条件的候选相对比较是否比容量
-匹配的 pointwise 打分提供额外收益。候选池和第一阶段表示保持固定，使比较集中于第二阶段
-排序机制。
+第二阶段目标；生成式检索则引入自回归解码器，最终排序依赖生成结构的质量和有效性。因此，
+本文回答两个相互关联的问题：监督第二阶段排序器能否区分 hard candidates，以及谱图条件的
+候选相对比较是否比容量匹配的 pointwise 打分提供额外收益。前一个问题检验学习式列表重排
+本身是否有价值，后一个问题检验该收益是否必须依赖候选交互。候选池和第一阶段表示保持固定，
+使比较集中于第二阶段排序机制。
 
 本文基于 SpecEmbedding 提出的峰序列谱图架构 \cite{xiong2025specembedding} 构建
 \method{} 两阶段框架。第一阶段从零训练该谱图塔，并将其与 GINE 分子图编码器对齐；第二
@@ -96,8 +97,8 @@ pointwise 模型是主要容量控制，早期 candidate-set Transformer 仅作�
   采用完整候选池 coarse 打分和谱图条件的相对候选比较。
   \item 定义无 rank、具有 pair 反对称性、对候选置换保持等变且不执行正例强制插入的相对分支，
   并设置容量匹配的 pointwise 对照。
-  \item 在质量和分子式候选协议上刻画该框架：监督重排序改善基础检索器，但当前证据尚不能
-  建立相对候选交互相对 pointwise 打分的独立优势。
+  \item 在质量和分子式候选协议上系统考察该框架：监督重排序改善基础检索器，但当前证据
+  尚不能建立相对候选交互相对 pointwise 打分的独立优势。
 \end{itemize}
 
 \paragraph{AI 使用披露。}
@@ -305,6 +306,14 @@ MassSpecGym 提供按目标分子键控的候选列表；每条 query 复用其�
 式~\ref{eq:antisymmetry_cn} 给出与参数取值无关的成对反对称性质。模型不直接使用原始谱峰、
 SMILES token、前体质量、分子式或采集元数据，也没有 rank embedding。
 
+\paragraph{结构解释。}
+反向 pair 分数之差使一个有序候选对只有一个偏好方向：交换 $i$ 和 $j$ 时，pair 贡献只改变
+符号。这种归纳偏置适合表达“对当前谱图而言候选 $i$ 优于候选 $j$”这样的局部判断，也与训练
+目标中的 pairwise 项相容。候选维度共享运算则在列表层面施加相应的置换等变性。但这些是函数
+类别的结构性质，不是性能保证：成对反对称本身不能排除三个或更多候选之间的循环偏好，不能
+证明 hard-negative discrimination 更好，也不能推出相对模型优于 pointwise 对照。这些问题仍
+需要未来经授权的独立实验检验。
+
 容量匹配的 pointwise 对照使用同一绝对分支，仅移除相对聚合。隐藏宽度 512 时，相对模型有
 1,485,189 个可训练参数，无 rank 的 pointwise 对照有 1,478,690 个，差异为 0.44\%。通用
 candidate-set Transformer 作为次级历史对照保留，不再作为本文提出的机制。两种模型都不生成分子。
@@ -312,7 +321,8 @@ candidate-set Transformer 作为次级历史对照保留，不再作为本文提
 \subsection{次级 Candidate-Set Transformer 对照}
 
 为提供背景对照，保留原先含 rank embedding 和候选 self-attention 的 Candidate-Set
-Transformer。其历史 forcing 协议和 rank-aware 配置不属于本文正式方法；详细区别见 Appendix~B。
+Transformer \cite{vaswani2017attention}。其历史 forcing 协议和 rank-aware 配置不属于本文正式方法；
+详细区别见 Appendix~B。
 
 \iffalse
 
@@ -520,6 +530,10 @@ $\delta=0.1$。容量匹配的 pointwise 对照使用相同绝对分支和优化
 模型。seed-42 paired comparison 显示第二阶段相对 Base 有明显改善，但不能据此建立相对模块
 的独立收益。
 
+这一受控比较形成本文的两部分发现：在所提供候选池内，监督式第二阶段打分确实有用；但当前
+观测到的改善并不要求相对交互，而且 relative 并未在匹配的 pointwise 对照上普遍占优。后一个
+结果是所提机制的适用边界，而不是需要隐藏的比较失败。
+
 local exact-target-SMILES 敏感性结果见 Appendix~A，不改变上述结论。
 
 \paragraph{机制分析。}
@@ -551,6 +565,10 @@ pointwise 在主要 R@1/MRR 汇总略强，relative 在不同 cutoff 并非始�
 
 补充的机制分析显示，学习到的排序依赖谱图表示，同时候选和基础分数路径也很重要。这些
 结果是描述性分析，用于说明方法行为，不构成组件因果收益。
+
+relative 分支的结构计算成本也高于 pointwise：完整候选池的绝对分支为 $O(Kd)$，coarse 子集
+上的 pair 计算为 $O(K_r^2d)$。已有固定硬件的 forward-only 参考保留在 Appendix~C，作为实现
+成本观察；它不是端到端 latency、吞吐或部署性能结论。
 
 官方兼容评价使用发布的候选 JSON 和保存的 alignment 嵌入，但没有通过新建的 official
 loader 重新编码谱图/分子，也没有重训第一阶段。因此它不能证明另行重建的 loader、不同候选
@@ -595,11 +613,13 @@ Transformer--Pointwise 方向进一步说明大部分增益不应归因于候选
 当前 reranker pilot 使用 5,000 条训练 query、三个 reranker seed 和一个 alignment checkpoint。
 因此它刻画的是固定表示下的监督第二阶段方法，而不是完整的 alignment 层级或端到端 seed
 稳定性。评价复用保存嵌入和所提供候选池，不声称重新通过官方 loader 编码、外部 baseline
-复现或候选感知 alignment 重训。
+复现或候选感知 alignment 重训。这些限制也界定了本文的两部分发现：框架级重排序观察只在
+当前 pilot 内得到支持，而 relative 模块的普适性仍未确定。
 
 本文方法是闭集方法，在分子式协议下还假设分子式已知。它不能恢复候选池之外的目标，也不能
 自动迁移到其它候选构造和采集条件。谱图塔使用选定峰和前体 $m/z$，但不显式接收加合物、
-仪器或碰撞能量元数据。更多协议和复现边界见 Appendix~A 和 Appendix~D。
+仪器或碰撞能量元数据。其 pairwise 结构约束也不提供概率校准或全局一致排序保证。更多协议
+和复现边界见 Appendix~A 和 Appendix~D。
 
 \iffalse
 \section{历史局限性文本}
@@ -649,8 +669,9 @@ exchangeability 且目标属于候选池等假设下生成具有边际覆盖率�
 与谱图条件的相对候选偏好结合。在 MassSpecGym 1.3.1-compatible 候选顺序和二维身份协议的
 保存嵌入评价中，三个 reranker training seeds 的 relative 和容量匹配 pointwise 都改善质量和
 分子式场景的完整池 Base；pointwise 在主要 R@1/MRR 汇总略强，补充机制分析也显示候选和
-基础分数路径贡献显著。因此，当前证据支持一个边界明确的监督式重排序框架，但尚未建立
-relative 模块独立且普遍稳健的收益。本文方法仍限定于固定的保存嵌入候选协议。
+基础分数路径贡献显著。因此，当前证据支持一个边界明确的监督式重排序框架，并明确了
+relative 交互的边界：它是具有结构依据的候选关系机制，但当前 pilot 尚未建立其相对
+pointwise 打分的独立且普遍稳健收益。本文方法仍限定于固定的保存嵌入候选协议。
 
 \appendix
 

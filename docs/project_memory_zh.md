@@ -57,6 +57,8 @@ python run_rerank_pipeline.py massspecgym \
 
 当前可辩护的论文主张是：在固定跨模态检索器已召回的候选列表内，监督式、非生成式 residual learning-to-rank 可以改善 Recall/MRR；当前容量匹配的 pointwise 对照在主要 R@1/MRR 汇总中略高于 relative。不能把增益归因于 candidate self-attention 或 relative 模块的独立普遍收益，也不能据此声称 SOTA、统计显著性、端到端稳定性或部署 latency。
 
+论文当前采用两部分科学叙事：监督式第二阶段重排序在固定候选池内有效；relative candidate interaction 的结构性质值得研究，但其相对 pointwise 的独立收益尚未被当前 pilot 建立。
+
 ## 4. 运行与验证
 
 ```bash

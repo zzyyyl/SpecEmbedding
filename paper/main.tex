@@ -105,11 +105,13 @@ Both approaches leave an important data mining question open. Candidate-wise
 cosine scoring does not explicitly train a second-stage objective over the
 retrieved set, while generative retrieval adds an autoregressive decoder and
 makes ranking depend on the quality and validity of a generated structure. We
-ask whether a supervised second-stage ranker can separate hard candidates and
-whether a spectrum-conditioned relative comparison adds value beyond a
-capacity-matched pointwise scorer. The candidate pool and first-stage
-representations are fixed so that the comparison concerns the second-stage
-ranking mechanism.
+therefore ask two related questions: can a supervised second-stage ranker
+separate hard candidates, and does spectrum-conditioned relative comparison
+add value beyond a capacity-matched pointwise scorer? The first question tests
+the value of learning to reorder a fixed list; the second tests whether
+candidate interaction is needed for that gain. The candidate pool and
+first-stage representations are fixed so that the comparison concerns the
+second-stage ranking mechanism.
 
 Building on the peak-sequence spectrum architecture introduced by SpecEmbedding
 \cite{xiong2025specembedding}, we construct \method{}, a two-stage retrieval and
@@ -133,7 +135,7 @@ Our contributions are:
   \item We define a rank-free relative branch with antisymmetric pair
   preferences, candidate-list permutation equivariance, and no training-time
   positive forcing, together with a capacity-matched pointwise control.
-  \item We characterize the framework on MassSpecGym mass- and
+  \item We systematically examine the framework on MassSpecGym mass- and
   formula-conditioned pools: supervised reranking improves the base retriever,
   while the current evidence does not establish an independent advantage of
   relative interactions over pointwise scoring.
@@ -395,6 +397,19 @@ gives pairwise antisymmetry independently of the learned parameter values.
 The model uses no raw peaks, SMILES tokens, precursor mass, formula, or
 acquisition metadata, and no rank embedding is present in its parameter path.
 
+\paragraph{Structural interpretation.}
+The reversed-pair difference constrains one ordered candidate pair to have a
+single preference direction: swapping $i$ and $j$ changes only the sign of the
+pair contribution. This is a useful inductive bias for local statements of the
+form ``candidate $i$ is preferred to candidate $j$ for this spectrum,'' and it
+is compatible with the pairwise term in the training objective. The shared
+candidate operations impose the corresponding equivariance at the list level.
+These are function-class properties, not performance guarantees: pairwise
+antisymmetry alone does not rule out cycles across three or more candidates,
+prove better hard-negative discrimination, or imply an advantage over the
+pointwise control. Those are empirical questions for future, separately
+authorized experiments.
+
 The capacity-matched pointwise control uses the same absolute branch and
 removes only the relative aggregation. At hidden width 512, the relative model
 has 1,485,189 trainable parameters and the no-rank pointwise control has
@@ -405,7 +420,7 @@ is retained as a secondary legacy comparison, not as the proposed mechanism.
 
 For context, we retain the earlier rank-aware candidate-set Transformer as a
 secondary baseline. It uses a candidate-attached rank embedding and cross-
-candidate self-attention, unlike the current rank-free relative model. Its
+candidate self-attention \cite{vaswani2017attention}, unlike the current rank-free relative model. Its
 historical training-time positive forcing and configuration are not part of the
 formal protocol of the proposed method; further details and results are given
 in Appendix~B.
@@ -595,6 +610,12 @@ The seed-42 paired comparison with the base retriever shows a substantial
 second-stage improvement for mass, while it does not establish an independent
 relative-module effect.
 
+This controlled comparison gives the paper a two-part result. Supervised
+second-stage scoring is useful within the supplied candidate pool, but adding
+the relative interaction is not required for the observed improvement and is
+not uniformly better than the matched pointwise scorer. The latter result is a
+boundary of the proposed mechanism, not a failed comparison to be hidden.
+
 The local exact-target-SMILES sensitivity view is summarized in Appendix~A and
 does not change the displayed conclusion.
 
@@ -647,6 +668,12 @@ The supplementary mechanism analyses show that the learned score depends on the
 spectrum representation, while candidate and base-score pathways also remain
 important. These observations are descriptive: they motivate the relative
 module and clarify its behavior, but do not establish a causal component gain.
+
+The relative branch also has a higher structural cost than pointwise scoring:
+the full-pool absolute branch is $O(Kd)$, while pair evaluation on the coarse
+subset is $O(K_r^2d)$. The existing fixed-hardware forward-only reference is
+kept in Appendix~C as an implementation-cost observation; it is not an
+end-to-end latency, throughput, or deployment claim.
 
 The official-compatible evaluation uses the published candidate JSON and saved
 alignment embeddings, but does not re-encode spectra/molecules through a fresh
@@ -702,15 +729,18 @@ second-stage method under a fixed representation, rather than complete
 alignment-level or end-to-end seed stability. The evaluation also reuses saved
 embeddings and supplied candidate pools; it does not claim fresh official-loader
 re-encoding, external-baseline reproduction, or candidate-aware alignment
-retraining.
+retraining. These limitations bound the scope of the two-part result: the
+framework-level reranking observation is supported within this pilot, whereas
+the relative module's generality remains open.
 
 The method is closed-set and formula-conditioned when the formula candidate
 protocol is used. It cannot recover a target absent from the candidate pool,
 generate a molecule outside that pool, or generalize automatically to other
 candidate constructions and acquisition conditions. The spectrum tower uses
 selected peaks and precursor $m/z$ but no explicit adduct, instrument, or
-collision-energy metadata. Further protocol and reproducibility notes appear
-in Appendices~A and~D.
+collision-energy metadata. Its pairwise structural constraints likewise do not
+provide probability calibration or a guarantee of globally consistent ranking.
+Further protocol and reproducibility notes appear in Appendices~A and~D.
 
 \iffalse
 \section{Historical limitations text}
@@ -782,9 +812,11 @@ improved the full-pool base in mass- and formula-conditioned retrieval. Pointwis
 was slightly stronger at the main R@1/MRR summaries, while supplementary
 spectrum-shuffle and feature controls show that both spectrum and candidate/base
 score pathways contribute to the learned ranking. The evidence therefore
-supports a carefully scoped supervised reranking framework, but does not
-establish an independent or generally robust benefit of the relative module.
-The method remains limited to the fixed saved-embedding candidate protocol.
+supports a carefully scoped supervised reranking framework and makes the
+relative interaction's boundary explicit: it is a principled candidate-relation
+mechanism, but the current pilot does not establish an independent or generally
+robust benefit over pointwise scoring. The method remains limited to the fixed
+saved-embedding candidate protocol.
 \end{sloppypar}
 
 \appendix
