@@ -44,23 +44,32 @@ entry points on CPU. It validates spectrum and molecule encoding, cache
 serialization, reranker training, checkpoint compatibility, and metric-only
 evaluation from a working directory outside the extracted package. It requires
 no external data, GPU, Git metadata, or network access. The random alignment
-checkpoint and one-epoch tiny Transformer are execution fixtures only: this
+checkpoint and one-epoch tiny relative reranker are execution fixtures only: this
 smoke does not reproduce or support any reported scientific metric.
 
-## Real-data entry points
+## Current method and real-data entry points
 
-The orchestration entry point is `run_rerank_pipeline.py`; it connects offline
-cache preparation, reranker training, and evaluation around a frozen alignment
-checkpoint. Real runs require separately supplied datasets, candidate files,
-and checkpoints; none are bundled in this anonymous archive. Alignment model
-definitions are included so the cache-preparation path can be inspected, but
-the historical training runs and their artifacts are intentionally absent.
+The current method is a rank-free, non-generative relative reranker. It uses a
+no-forcing candidate cache, pointwise coarse scoring over the supplied pool,
+and a spectrum-conditioned relative branch on the coarse top-40. The default
+configuration is `model_type=relative`, `train_k=256`, and
+`use_rank_embedding=false`. The synthetic smoke test exercises this current
+relative path; it is an executable integration check, not a paper experiment.
 
-Recall and MRR in the accompanying study use a local exact-target-SMILES
-single-positive rule over supplied candidate files. This is not equivalent to
-the reference evaluator's default two-dimensional InChIKey equivalence and
-possible multiple positives. External reported baselines are therefore not
-directly comparable to the local results.
+`run_rerank_pipeline.py` connects offline cache preparation, reranker training,
+and evaluation around a frozen alignment checkpoint. Its default is
+no-forcing. The legacy train-cache behavior can be selected explicitly with
+`--force-include-positive`; validation and test caches never force positives.
+Real runs require separately supplied datasets, candidate files, and
+checkpoints; none are bundled in this anonymous archive.
+
+The study's current primary protocol uses MassSpecGym 1.3.1 retrieval JSON
+candidate order and a two-dimensional InChIKey identity rule evaluated from
+saved embeddings. This is an official-compatible candidate/identity audit, not
+a fresh official-loader re-encoding or alignment retraining. Local
+exact-target-SMILES results are retained only as a sensitivity view. The
+reranker remains closed-library, and the `formula` candidate protocol is
+formula-conditioned retrieval.
 
 `ANONYMOUS_MANIFEST.json` records the byte size, SHA-256 digest, and mode of
 every archive member. `SOURCE_ALLOWLIST.txt` records the exact source-file

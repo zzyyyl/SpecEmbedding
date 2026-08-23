@@ -113,7 +113,7 @@ def write_smoke_config(path: Path, data_root: Path) -> None:
     )
     config["rerank"]["train"].update(
         {
-            "model_type": "transformer",
+            "model_type": "relative",
             "train_k": 3,
             "batch_size": 2,
             "epochs": 1,
@@ -126,6 +126,10 @@ def write_smoke_config(path: Path, data_root: Path) -> None:
             "n_layers": 1,
             "n_heads": 2,
             "dropout": 0.0,
+            "relation_dim": 4,
+            "pair_chunk_size": 2,
+            "relation_top_k": 2,
+            "use_rank_embedding": False,
             "shuffle_candidates": False,
             "num_workers": 0,
             "top_k": [1, 3],
@@ -271,8 +275,8 @@ def validate_cache(path: Path, *, split: str, expected_queries: int) -> None:
     meta = payload["meta"]
     if meta["split"] != split or meta["num_queries"] != expected_queries:
         raise RuntimeError(f"{split} cache metadata is inconsistent")
-    if bool(meta["force_include_positive"]) != (split == "train"):
-        raise RuntimeError(f"{split} positive-forcing policy is inconsistent")
+    if bool(meta["force_include_positive"]):
+        raise RuntimeError(f"{split} unexpectedly enabled positive forcing")
 
 
 def validate_checkpoint(model_dir: Path) -> None:
@@ -285,7 +289,7 @@ def validate_checkpoint(model_dir: Path) -> None:
 
     checkpoint = load_torch_payload(best_path)
     expected_config = {
-        "model_type": "transformer",
+        "model_type": "relative",
         "embedding_dim": 8,
         "hidden_dim": 8,
         "n_layers": 1,
@@ -404,8 +408,7 @@ def execute_smoke(work_dir: Path) -> dict[str, object]:
             "--mol_norm_eps",
             "0.00001",
         ]
-        if split == "train":
-            command.append("--force_include_positive")
+        command.append("--no-force_include_positive")
         run_checked(command, work_dir=work_dir, environment=environment)
         validate_cache(cache_path, split=split, expected_queries=len(smiles_values))
         prepare_log = cache_dir / f"prepare_rerank_cache_{split}.log"
@@ -425,7 +428,7 @@ def execute_smoke(work_dir: Path) -> dict[str, object]:
             "--device",
             "cpu",
             "--model_type",
-            "transformer",
+            "relative",
             "--seed",
             "7",
             "--train-k",
@@ -470,7 +473,7 @@ def execute_smoke(work_dir: Path) -> dict[str, object]:
         "prepared_queries": {
             split: len(smiles_values) for split, smiles_values in SPLIT_SMILES.items()
         },
-        "reranker": "tiny transformer, one epoch",
+        "reranker": "tiny relative reranker, one epoch",
         "mces": "skipped",
         "reported_metrics_reproduced": False,
     }

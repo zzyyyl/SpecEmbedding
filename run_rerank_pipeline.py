@@ -145,7 +145,7 @@ def build_prepare_command(args, checkpoint, split, save_path):
     append_optional_arg(command, "--mol_norm_type", args.mol_norm_type)
     append_optional_arg(command, "--mol_norm_eps", args.mol_norm_eps)
 
-    if split == "train":
+    if split == "train" and args.force_include_positive:
         command.append("--force_include_positive")
     else:
         command.append("--no-force_include_positive")
@@ -209,7 +209,21 @@ def main():
     parser.add_argument("--device", help='Device to use, for example "cpu", "cuda", "cuda:0", or "cuda:1".')
     parser.add_argument("--mol_norm_type", choices=["layernorm", "rmsnorm"], help="Must match the alignment checkpoint.")
     parser.add_argument("--mol_norm_eps", type=float, help="Must match the alignment checkpoint.")
-    parser.add_argument("--model_type", choices=["transformer", "pointwise"], help="Reranker model variant.")
+    parser.add_argument(
+        "--model_type",
+        choices=["transformer", "pointwise", "relative"],
+        help="Reranker model variant.",
+    )
+    parser.add_argument(
+        "--force-include-positive",
+        dest="force_include_positive",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "Legacy training-cache behavior: force the positive into the train "
+            "candidate list. Validation and test caches never force positives."
+        ),
+    )
     parser.add_argument(
         "--pre_top_k",
         "--topk",
