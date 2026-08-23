@@ -162,6 +162,7 @@ class RelativeCandidateReranker(nn.Module):
         use_spectrum_features: bool = True,
         use_molecule_features: bool = True,
         use_antisymmetric: bool = True,
+        pair_mode: str | None = None,
     ):
         super().__init__()
         del rank_emb_dim, max_rank, n_layers, n_heads, use_rank_embedding
@@ -171,6 +172,10 @@ class RelativeCandidateReranker(nn.Module):
             raise ValueError("pair_chunk_size must be greater than 0")
         if relation_top_k <= 0:
             raise ValueError("relation_top_k must be greater than 0")
+        if pair_mode is None:
+            pair_mode = "antisymmetric" if use_antisymmetric else "directed"
+        if pair_mode not in {"antisymmetric", "directed"}:
+            raise ValueError("pair_mode must be either 'antisymmetric' or 'directed'")
 
         self.embedding_dim = embedding_dim
         self.hidden_dim = hidden_dim
@@ -183,7 +188,9 @@ class RelativeCandidateReranker(nn.Module):
         self.use_molecular_relation = use_molecular_relation
         self.use_spectrum_features = use_spectrum_features
         self.use_molecule_features = use_molecule_features
-        self.use_antisymmetric = use_antisymmetric
+        self.pair_mode = pair_mode
+        # Keep the legacy attribute for callers and old analysis code.
+        self.use_antisymmetric = pair_mode == "antisymmetric"
         self.pair_chunk_size = pair_chunk_size
         self.relation_top_k = relation_top_k
         self.relation_dim = relation_dim or max(32, min(128, hidden_dim // 2))
@@ -312,7 +319,7 @@ class RelativeCandidateReranker(nn.Module):
             reverse_features = self._relation_features(spec_pair, mol_j, mol_i, base_j, base_i)
             preference = self.preference_mlp(pair_features).squeeze(-1)
             reverse_preference = self.preference_mlp(reverse_features).squeeze(-1)
-            if self.use_antisymmetric:
+            if self.pair_mode == "antisymmetric":
                 pair_preference = preference - reverse_preference
             else:
                 pair_preference = preference

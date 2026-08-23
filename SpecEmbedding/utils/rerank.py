@@ -87,11 +87,15 @@ def build_reranker(model_config, embedding_dim: int | None = None):
             use_antisymmetric=bool(
                 _config_value_default(model_config, "use_antisymmetric", True)
             ),
+            pair_mode=_config_value_default(model_config, "pair_mode", None),
         )
     return model_cls(**common_kwargs)
 
 
 def reranker_model_config(args, embedding_dim: int) -> dict:
+    pair_mode = getattr(args, "pair_mode", None)
+    if pair_mode is None:
+        pair_mode = "antisymmetric" if args.use_antisymmetric else "directed"
     return {
         "model_type": args.model_type,
         "embedding_dim": embedding_dim,
@@ -116,6 +120,7 @@ def reranker_model_config(args, embedding_dim: int) -> dict:
         "use_spectrum_features": getattr(args, "use_spectrum_features", True),
         "use_molecule_features": getattr(args, "use_molecule_features", True),
         "use_antisymmetric": getattr(args, "use_antisymmetric", True),
+        "pair_mode": pair_mode,
     }
 
 

@@ -10,7 +10,8 @@ from SpecEmbedding.data.datasets_rerank import (
     rerank_collate_fn,
 )
 from SpecEmbedding.models_rerank import CandidateReranker, RelativeCandidateReranker
-from SpecEmbedding.utils.rerank import load_reranker, spectrum_dependency_loss
+from SpecEmbedding.utils.rerank import build_reranker, load_reranker, spectrum_dependency_loss
+from train_rerank import build_data_summary
 
 
 class RerankerCoreTest(unittest.TestCase):
@@ -268,6 +269,82 @@ class RerankerCoreTest(unittest.TestCase):
                 scores = model(**self.inputs)
                 self.assertEqual(scores.shape, self.inputs["base_scores"].shape)
                 self.assertTrue(torch.isfinite(scores).all())
+
+    def test_pair_mode_is_explicit_and_backward_compatible(self):
+        directed = RelativeCandidateReranker(
+            embedding_dim=4,
+            hidden_dim=8,
+            relation_dim=4,
+            dropout=0.0,
+            use_antisymmetric=True,
+            pair_mode="directed",
+        )
+        self.assertEqual(directed.pair_mode, "directed")
+        self.assertFalse(directed.use_antisymmetric)
+
+        antisymmetric = RelativeCandidateReranker(
+            embedding_dim=4,
+            hidden_dim=8,
+            relation_dim=4,
+            dropout=0.0,
+            use_antisymmetric=False,
+            pair_mode="antisymmetric",
+        )
+        self.assertEqual(antisymmetric.pair_mode, "antisymmetric")
+        self.assertTrue(antisymmetric.use_antisymmetric)
+
+        with self.assertRaisesRegex(ValueError, "pair_mode"):
+            RelativeCandidateReranker(
+                embedding_dim=4,
+                hidden_dim=8,
+                relation_dim=4,
+                dropout=0.0,
+                pair_mode="invalid",
+            )
+
+        old_config = {
+            "model_type": "relative",
+            "embedding_dim": 4,
+            "hidden_dim": 8,
+            "rank_emb_dim": 2,
+            "max_rank": 8,
+            "n_layers": 0,
+            "n_heads": 1,
+            "dropout": 0.0,
+            "alpha_init": 1.0,
+            "use_antisymmetric": False,
+            "relation_dim": 4,
+        }
+        loaded = build_reranker(old_config)
+        self.assertEqual(loaded.pair_mode, "directed")
+
+    def test_training_data_summary_records_actual_scope(self):
+        class DatasetStub:
+            meta = {
+                "split": "train",
+                "candidate_type": "formula",
+                "pre_top_k": 256,
+                "force_include_positive": False,
+            }
+
+            def __len__(self):
+                return 17
+
+        args = type(
+            "Args",
+            (),
+            {
+                "max_train_queries": 17,
+                "train_k": 256,
+                "model_type": "relative",
+                "pair_mode": "antisymmetric",
+                "seed": 42,
+            },
+        )()
+        summary = build_data_summary(args, DatasetStub())
+        self.assertEqual(summary["labeled_train_queries"], 17)
+        self.assertEqual(summary["cache_protocol"]["force_include_positive"], False)
+        self.assertEqual(summary["pair_mode"], "antisymmetric")
 
 
 if __name__ == "__main__":

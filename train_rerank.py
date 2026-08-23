@@ -28,6 +28,29 @@ from SpecEmbedding.utils.rerank import (
 from SpecEmbedding.utils.runtime import configure_runtime_cache, resolve_device, setup_logging, startup_logging
 
 
+def build_data_summary(args, train_dataset) -> dict:
+    cache_meta = train_dataset.meta if isinstance(train_dataset.meta, dict) else {}
+    return {
+        "labeled_train_queries": len(train_dataset),
+        "requested_max_train_queries": args.max_train_queries,
+        "train_k": args.train_k,
+        "model_type": args.model_type,
+        "pair_mode": args.pair_mode,
+        "seed": args.seed,
+        "cache_protocol": {
+            key: cache_meta.get(key)
+            for key in (
+                "split",
+                "dataset_type",
+                "candidate_type",
+                "pre_top_k",
+                "force_include_positive",
+            )
+            if key in cache_meta
+        },
+    }
+
+
 @torch.no_grad()
 def evaluate(model, loader, device, top_k):
     model.eval()
@@ -220,8 +243,14 @@ def parse_args():
         "--antisymmetric-pairs",
         dest="use_antisymmetric",
         action=argparse.BooleanOptionalAction,
-        default=bool(getattr(config.rerank.train, "use_antisymmetric", True)),
-        help="Use antisymmetric forward-minus-reverse pair preferences.",
+        default=None,
+        help="Legacy alias for --pair-mode antisymmetric/directed.",
+    )
+    parser.add_argument(
+        "--pair-mode",
+        choices=["antisymmetric", "directed"],
+        default=None,
+        help="Pair preference mode. Defaults to params.yaml, then the legacy boolean setting.",
     )
     parser.add_argument(
         "--train-k",
@@ -241,6 +270,22 @@ def parse_args():
     if any(index < 0 for index in args.exclude_val_query_indices):
         parser.error("--exclude-val-query-indices must contain non-negative integers")
     args.exclude_val_query_indices = sorted(set(args.exclude_val_query_indices))
+
+    if args.pair_mode is None:
+        if args.use_antisymmetric is not None:
+            args.pair_mode = "antisymmetric" if args.use_antisymmetric else "directed"
+        else:
+            configured_mode = getattr(config.rerank.train, "pair_mode", None)
+            if configured_mode is None:
+                configured_mode = (
+                    "antisymmetric"
+                    if bool(getattr(config.rerank.train, "use_antisymmetric", True))
+                    else "directed"
+                )
+            args.pair_mode = configured_mode
+    if args.pair_mode not in {"antisymmetric", "directed"}:
+        parser.error("pair_mode must be either 'antisymmetric' or 'directed'")
+    args.use_antisymmetric = args.pair_mode == "antisymmetric"
 
     args.batch_size = int(
         config.rerank.train.batch_size if args.batch_size is None else args.batch_size
@@ -376,6 +421,7 @@ def main():
     model = build_reranker(args, embedding_dim=train_dataset.embedding_dim).to(device)
     optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     model_config = reranker_model_config(args, embedding_dim=train_dataset.embedding_dim)
+    data_summary = build_data_summary(args, train_dataset)
 
     best_metric = -float("inf")
     best_epoch = 0
@@ -454,6 +500,7 @@ def main():
                     "val_metrics": val_metrics,
                     "seed": args.seed,
                     "training_config": vars(args).copy(),
+                    "data_summary": data_summary,
                 },
                 save_path,
             )
@@ -470,6 +517,7 @@ def main():
             "model_config": model_config,
             "seed": args.seed,
             "training_config": vars(args).copy(),
+            "data_summary": data_summary,
         },
         save_dir / "last_reranker.pth",
     )

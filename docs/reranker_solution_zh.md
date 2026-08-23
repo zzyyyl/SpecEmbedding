@@ -35,6 +35,8 @@ pair_preference(i, j) = g(i, j) - g(j, i)
 
 形成反对称偏好。候选顺序变化时，输出按同样顺序置换。relation branch 只在 coarse top-40 上运行，以限制 pairwise 计算规模。
 
+模型配置中的 `pair_mode` 显式取 `antisymmetric` 或 `directed`。前者是当前默认方法；后者只用于普通 directed pair control。旧 checkpoint 若没有该字段，则由 `use_antisymmetric` 推断，不改变旧模型语义。
+
 `pointwise` 是容量匹配对照；`transformer` 是 legacy 兼容模型，不是当前论文主线。完整超参数以 `params.yaml` 和 checkpoint 配置为准。
 
 ## 3. Cache 与正例协议
@@ -79,13 +81,30 @@ python run_rerank_pipeline.py massspecgym --mode eval \
 
 调试运行使用 `--limit N`，并检查输出目录后缀，避免覆盖正式工件。使用 `--dry-run` 检查实际命令。默认入口会打印并执行 train/val/test 的 no-forcing cache 命令。
 
+训练 checkpoint 的 `data_summary` 记录实际 labeled train query 数、`max_train_queries`、`train_k`、`pair_mode` 和 cache 的 forcing/top-k 摘要，便于区分 pilot 与 full-split 运行。
+
+固定硬件的候选规模 forward benchmark：
+
+```bash
+PYTHONPATH=. python analysis/benchmark_reranker_efficiency.py \
+  --cache <test-cache.pt> \
+  --checkpoint relative=<relative.pth> \
+  --checkpoint pointwise=<pointwise.pth> \
+  --candidate-counts 40 80 160 256 \
+  --warmup-batches 2 --measure-batches 16 \
+  --batch-size 64 --device cuda:0 \
+  --output analysis/<run>/efficiency.json
+```
+
+该工具只测 forward work，不包含数据读取，也不生成 Recall/MRR 或部署保证。指定 query 的 base/rerank top-k 导出使用 `analysis/export_rerank_cases.py`；导出结果需要结合原始谱峰和结构资料人工解释。
+
 ## 5. 代码与验证
 
 - 模型：`SpecEmbedding/models_rerank.py`；
 - 数据：`SpecEmbedding/data/datasets_rerank.py`；
 - 公共逻辑：`SpecEmbedding/utils/rerank.py`；
 - 入口：`prepare_rerank_cache.py`、`train_rerank.py`、`eval_rerank.py`、`run_rerank_pipeline.py`；
-- 回归测试：`tests/test_rerank_core.py`、`tests/test_rerank_pipeline_paths.py`。
+- 回归测试：`tests/test_rerank_core.py`、`tests/test_rerank_tools.py`、`tests/test_rerank_pipeline_paths.py`。
 
 至少运行：
 

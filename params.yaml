@@ -124,6 +124,7 @@ rerank:
     use_spectrum_features: true
     use_molecule_features: true
     use_antisymmetric: true
+    pair_mode: "antisymmetric"
     margin: 0.1
     grad_clip: 1.0
     metric_for_best: "mrr"
