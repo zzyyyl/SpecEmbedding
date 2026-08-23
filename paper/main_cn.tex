@@ -51,7 +51,7 @@
 top-40 上计算谱图条件的相对候选偏好。相对偏好由有序 pair 分数与其反向分数之差构成，
 因此具有反对称性，并对候选列表置换保持等变；新方法不使用检索 rank，也不在训练时插入
 正例。我们将其与容量匹配、无 rank 的 pointwise 对照比较，并将早期 candidate-set
-Transformer 保留为次级对照。在 MassSpecGym 的质量和分子式候选池上，两种监督重排序器都
+Transformer 保留为次级对照。在 MassSpecGym 的质量和分子式候选池以及三个 alignment checkpoint 上，两种监督重排序器都
 改善了固定跨模态检索器，而容量匹配的 pointwise 对照在主要 R@1 和 MRR 汇总上略高于相对
 模型。因此，本文将相对模块作为形式化的候选交互机制并分析其边界，而不声称关系模块或
 外部基线具有普遍优势。本文方法是闭集、非生成式方法：它只能改善已有候选的顺序，不能
@@ -97,8 +97,9 @@ pointwise 模型是主要容量控制，早期 candidate-set Transformer 仅作�
   采用完整候选池 coarse 打分和谱图条件的相对候选比较。
   \item 定义无 rank、具有 pair 反对称性、对候选置换保持等变且不执行正例强制插入的相对分支，
   并设置容量匹配的 pointwise 对照。
-  \item 在质量和分子式候选协议上系统考察该框架：监督重排序改善基础检索器，但当前证据
-  尚不能建立相对候选交互相对 pointwise 打分的独立优势。
+  \item 在质量和分子式候选协议、三个 alignment checkpoint 以及 30 次 relative 模块消融矩阵
+  上系统考察该框架：监督重排序改善基础检索器，但当前证据尚不能建立相对候选交互相对
+  pointwise 打分的独立优势。
 \end{itemize}
 
 \paragraph{AI 使用披露。}
@@ -464,12 +465,13 @@ stopping patience 为 5。每个 epoch 对每个唯一分子标签采样 10 次�
 谱图。谱图和分子图增强分别以 0.5 概率启用：谱图增强删除归一化强度低于 0.3 的碎片峰中
 20\%（向下取整），并进行 $\pm15\%$ 强度扰动；图增强执行 10\% node dropout 和 10\%
 directed edge-entry dropout。验证关闭增强，但在固定随机流下保留关联谱图的随机采样。
-当前 reranker pilot 使用一个 alignment checkpoint；alignment 层级变化不包含在 reranker seed
-汇总中。
+当前主 reranker 矩阵使用 seed 42、43、44 产生的 alignment checkpoint。每个 checkpoint 内，
+reranker seed 42--44 控制初始化、DataLoader 顺序、候选打乱和 dropout；这些 checkpoint 是
+内部描述性运行，并不等价于来自已知总体的独立抽样。
 
 reranker 隐藏维度为 512，相对分支维度为 32，pair chunk 为 16，dropout 为 0.1。模型先对
 $K=256$ 的完整候选池打分，再对 coarse top-$K_r=40$ 使用相对分支。优化器为 AdamW，学习率
-$10^{-4}$，batch size 16，最多训练 30 个 epoch，并根据验证集 MRR 使用 patience 为 5 的
+$10^{-4}$，batch size 32，最多训练 30 个 epoch，并根据验证集 MRR 使用 patience 为 5 的
 early stopping。pairwise 与谱图依赖损失的权重和 margin 为
 $\lambda_{\mathrm{pair}}=0.2$、$\lambda_{\mathrm{spec}}=0.1$、$\gamma=0.1$ 和
 $\delta=0.1$。容量匹配的 pointwise 对照使用相同绝对分支和优化协议，但不做相对聚合；
@@ -478,34 +480,42 @@ $\delta=0.1$。容量匹配的 pointwise 对照使用相同绝对分支和优化
 每项结果工件都列出 alignment checkpoint 和 reranker training seeds。training seed 同时控制
 初始化、DataLoader 顺序、候选打乱和 dropout，并不是独立的 alignment 重复。训练只使用正例
 自然存在于完整候选池中的 query；无此标签的 query 从 reranker loss 中排除，但保留在覆盖率
-统计中。任何 cache 都不插入正例。模型选择不访问测试集。pilot 使用 5,000 条训练 query
-和三个 reranker seed；该范围是当前证据的限制，而不是完整训练或端到端 seed 稳定性声明。
+统计中。任何 cache 都不插入正例。模型选择不访问测试集。每项正式 reranker 运行最多请求
+20,000 条训练 query，并使用三个 reranker seed。三个 alignment checkpoint 和九组
+alignment--reranker 配对提供描述性稳健性信息，但不是置信区间、显著性检验或完整端到端
+seed 分析。
 
 \subsection{代码、数据与工件可用性}
 
 匿名补充包提供源码检查、锁定的环境文件、自动化测试和一个小型 CPU 合成 smoke test。
-其中不包含真实谱图、候选池、训练 checkpoint、cache 或私有分析工件。真实数据入口及更多
-复现边界见 Appendix~D。仓库源码还包含 query-level case exporter，可为指定 cache query 导出候选身份
+其中不包含真实谱图、候选池、训练 checkpoint 或 cache。仓库的复现索引记录正式结果所用的
+本地 checkpoint、解析后的配置、日志、哈希和选定的 ranking 输出。真实数据入口及更多复现
+边界见 Appendix~D。仓库源码还包含 query-level case exporter，可为指定 cache query 导出候选身份
 以及 base/reranker 排名，供后续人工核验；它不执行 fragment attribution，也不生成化学因果解释。
 
 \subsection{对比方法与指标}
 
-受控比较包括同一对齐 checkpoint 的余弦基础检索器、容量匹配且无 rank 的 pointwise coarse
-打分器、本文提出的相对 reranker，以及次级 candidate-set Transformer。JESTR 和 GLMR 仅作为
-相关工作背景；本文不将其 reported 数值作为受控比较。
+受控比较包括余弦基础检索器、容量匹配且无 rank 的 pointwise coarse 打分器、本文提出的
+相对 reranker，以及次级 candidate-set Transformer。我们还运行了与 JESTR 类似打分形式的
+本地保存嵌入 cosine 对照；该对照是 reimplemented control，不是官方 JESTR 编码器或 checkpoint
+复现。由于该对照与基础检索器都在相同的保存归一化嵌入上使用 cosine 分数，二者的本地数字
+一致；因此它是协议匹配的打分控制，而不是独立的 JESTR 比较。GLMR 仍为 reported-only，
+因为其条件生成流程未在本文中复现。
 
 评价指标为全部 17,556 条测试 query 上的 Recall@1、Recall@5、Recall@20、Recall@40 和 MRR。
-主要表使用官方兼容候选顺序和保存嵌入上的身份标签。新的 pilot 使用一个 alignment checkpoint、
-5,000 条训练 query 和三个 reranker training seeds（42--44）；均值和样本标准差表示 seed
-离散度，不是独立 alignment 重复。本文不声称外部 baseline 复现、alignment 层级稳定性或
-端到端部署性能。
+主要表使用官方兼容候选顺序和保存嵌入上的身份标签。canonical 表使用 alignment seed 42、
+三个 reranker training seeds（42--44）和最多 20,000 条训练 query；另一个表报告 alignment
+seeds 42--44 的相同 pointwise/relative 对照。均值和样本标准差在单个 alignment 内描述
+reranker 离散度，跨 alignment 行是 checkpoint 敏感性描述，不是总体重复。本文不声称官方
+JESTR 复现、统计显著性或端到端部署性能。
 
 \subsection{主要结果}
 
 \begin{table}[t]
   \centering
-  \caption{MassSpecGym 1.3.1-compatible 候选顺序和二维身份协议下的无 forcing 完整候选池 pilot（保存嵌入）。
-  学习式结果为 reranker training seeds 42--44 的均值 $\pm$ 样本标准差。}
+  \caption{保存嵌入上的 canonical、官方兼容候选顺序和二维身份无 forcing 评价。学习式结果为
+  reranker training seeds 42--44 的均值 $\pm$ 样本标准差；扩展的 cache-local alignment 敏感性
+  见表~\ref{tab:alignment_sensitivity_cn}。}
   \label{tab:main_results_cn}
   \scriptsize
   \setlength{\tabcolsep}{2pt}
@@ -543,35 +553,79 @@ $\delta=0.1$。容量匹配的 pointwise 对照使用相同绝对分支和优化
 
 local exact-target-SMILES 敏感性结果见 Appendix~A，不改变上述结论。
 
+\begin{table}[t]
+  \centering
+  \caption{扩展无 forcing top-40 reranker cache 下的 alignment checkpoint 描述性敏感性。
+  学习式结果为 reranker seeds 42--44 的均值 $\pm$ 样本标准差；该矩阵未重新通过 official loader 编码。}
+  \label{tab:alignment_sensitivity_cn}
+  \scriptsize
+  \setlength{\tabcolsep}{2pt}
+  \begin{tabular}{@{}llrrr@{}}
+    \toprule
+    alignment & 候选池 & Base R@1/MRR & Pointwise R@1/MRR & Relative R@1/MRR \\
+    \midrule
+    42 & 质量 & 47.46/.5503 & 58.12/.6491 & 57.88/.6478 \\
+    43 & 质量 & 35.92/.4433 & 58.32/.6398 & 57.61/.6350 \\
+    44 & 质量 & 23.91/.3226 & 46.42/.5238 & 47.05/.5284 \\
+    \midrule
+    42 & 分子式 & 63.10/.6886 & 70.76/.7517 & 70.88/.7538 \\
+    43 & 分子式 & 45.08/.5185 & 64.72/.6836 & 64.10/.6795 \\
+    44 & 分子式 & 28.73/.3687 & 54.26/.5877 & 54.35/.5911 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+在九组 alignment--候选池--seed 配对中，relative 减 pointwise 的 R@1 平均差在质量和分子式
+场景分别为 $-0.11$ 和 $-0.14$ 个百分点，MRR 平均差分别为 $-0.0005$ 和 $+0.0005$；两种
+候选协议中 relative 均在 9 组配对中的 5 组取得较高 R@1。这些是描述性配对估计，不是显著性
+检验，支持的结论是监督重排序框架比任何独立的 relative 模块优势更稳妥。
+
 \paragraph{机制分析。}
-在同一 seed-42 pilot 中，仅使用 base score 的对照在质量/分子式场景的 R@1/MRR 为
-43.78\%/0.5219 和 58.49\%/0.6479，与 Base 相同；仅使用 embedding 的绝对打分器为
-50.07\%/0.5808 和 66.13\%/0.7110；加入 base-score 但不使用相对分支为 50.07\%/0.5798
-和 66.28\%/0.7141。完整 relative 模型为 50.08\%/0.5795 和 66.80\%/0.7161。仅使用
-候选分子信息的对照为 45.00\%/0.5245 和 52.73\%/0.5960，弱于含谱图条件的变体。移除
-分子关系、谱图条件或反对称 pair 后两个候选池方向不一致；这些单 seed 对照支持的是信息
-来源分析，而不是组件因果排序。
+表~\ref{tab:relative_ablations_cn} 报告完整的 30 次 relative 模块消融矩阵：5 种 relative
+配置、两种候选协议以及三个 reranker seed，均在 alignment-42 checkpoint 上运行。完整配置为
+带谱图条件的反对称模型。改为 directed pair、移除 pair loss、移除谱图 loss 或移除谱图条件后，
+两个候选协议的变化方向并不一致；没有一个变体在所有指标上统一超过完整模型。因此该实验
+说明的是模块行为边界，而不是组件因果排序。
+
+\begin{table}[t]
+  \centering
+  \caption{cache-local 无 forcing top-40 协议下的 relative 模块消融。数值依次为 R@1 和 MRR；
+  每项为 reranker seeds 42--44 的均值 $\pm$ 样本标准差。}
+  \label{tab:relative_ablations_cn}
+  \scriptsize
+  \setlength{\tabcolsep}{2pt}
+  \begin{tabular}{@{}lrr@{}}
+    \toprule
+    变体 & 质量 R@1/MRR & 分子式 R@1/MRR \\
+    \midrule
+    完整反对称 & 57.88$\pm$0.59 / .6478$\pm$.0052 & 70.88$\pm$0.38 / .7538$\pm$.0027 \\
+    Directed pair & 57.97$\pm$0.49 / .6471$\pm$.0047 & 70.06$\pm$1.29 / .7471$\pm$.0106 \\
+    移除谱图条件 & 58.42$\pm$0.81 / .6522$\pm$.0069 & 71.01$\pm$0.40 / .7546$\pm$.0033 \\
+    移除 $\mathcal{L}_{\mathrm{pair}}$ & 58.01$\pm$0.38 / .6488$\pm$.0037 & 70.91$\pm$0.36 / .7541$\pm$.0027 \\
+    移除 $\mathcal{L}_{\mathrm{spec}}$ & 58.44$\pm$0.54 / .6516$\pm$.0064 & 70.59$\pm$0.79 / .7515$\pm$.0056 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 JESTR 和 GLMR 保留为 reported-only 的相关工作背景；本文不据此推断相对排名。
 
 \paragraph{困难候选分层。}
-在 seed-42 本地 query 分析中，relative 的增益集中在基础排序器未能解决的 query。基础排名为
-2--5/6--20 时，relative 相对 Base 的 R@1 增益在质量场景为 +42.17/+23.02 个百分点，
-分子式场景为 +52.72/+30.06 个百分点；当基础 top-1 的 Morgan 相似度低于 0.25 时，增益
-分别为 +24.59/+35.92 个百分点。基础排名为 1 或 top-1 相似度至少为 0.5 时则下降
-（质量 -13.28/-11.86，分子式 -5.41/-3.65）。这些是本地协议下 seed-42 的描述性分层，
-不是相对模块的因果或显著性证据。
+在 seed-42 本地 query 分析中，选定的有标签子集包含质量 14,726 条和分子式 15,670 条 query。
+relative 模型在基础排名为 2--5/6--20/21--40 时相对 Base 的 R@1 增益，质量场景分别为
++54.05/+38.13/+29.98 个百分点，分子式场景分别为 +55.41/+34.18/+19.10 个百分点。基础
+排名为 1 的 query 则下降到质量 87.41\%、分子式 95.12\%，而 Base 分层为 100\%。Pointwise
+对照也呈现相同的未解决 query 模式；这些分层是描述性分析，不建立相对模块的因果效应。
 
 早期含 rank 的 Transformer 结果和协议说明移至 Appendix~B，不作为当前相对方法的性能证据。
 
 \section{讨论}
 
-新的完整池 pilot 将候选覆盖与列表内排序分开。三个 reranker seeds 中两种模型都超过 Base；
-pointwise 在主要 R@1/MRR 汇总略强，relative 在不同 cutoff 并非始终更好。该结果支持监督
-第二阶段重排序作为框架组件，但不能隔离相对模块的独立收益。
+扩展 pilot 将候选覆盖与列表内排序分开。三个 alignment checkpoint 的每个 checkpoint 内，
+两种模型都超过对应 Base；pointwise 在主要 R@1/MRR 汇总略强，relative 在不同 cutoff 并非
+始终更好。该结果支持监督第二阶段重排序作为框架组件，但不能隔离相对模块的独立收益。
 
-补充的机制分析显示，学习到的排序依赖谱图表示，同时候选和基础分数路径也很重要。这些
-结果是描述性分析，用于说明方法行为，不构成组件因果收益。
+30 次消融显示，directed 与 antisymmetric pair、谱图条件以及两项辅助损失对两个候选池的
+影响方向不同。这些结果是描述性分析，用于说明方法行为，不构成组件因果收益。
 
 relative 分支的结构计算成本也高于 pointwise：完整候选池的绝对分支为 $O(Kd)$，coarse 子集
 上的 pair 计算为 $O(K_r^2d)$。已有固定硬件的 forward-only 参考保留在 Appendix~C，作为实现
@@ -617,11 +671,11 @@ Transformer--Pointwise 方向进一步说明大部分增益不应归因于候选
 
 \section{局限性与负责任评估}
 
-当前 reranker pilot 使用 5,000 条训练 query、三个 reranker seed 和一个 alignment checkpoint。
-因此它刻画的是固定表示下的监督第二阶段方法，而不是完整的 alignment 层级或端到端 seed
-稳定性。评价复用保存嵌入和所提供候选池，不声称重新通过官方 loader 编码、外部 baseline
-复现或候选感知 alignment 重训。这些限制也界定了本文的两部分发现：框架级重排序观察只在
-当前 pilot 内得到支持，而 relative 模块的普适性仍未确定。
+扩展 reranker 矩阵最多请求 20,000 条训练 query，评价三个 alignment checkpoint，并在每个
+主要配置上使用三个 reranker seed。这提供描述性 checkpoint 敏感性，而不是置信区间、显著性
+检验或完整端到端 seed 分析。评价复用保存嵌入和所提供候选池，不声称重新通过官方 loader
+编码、外部 baseline 复现或候选感知 alignment 重训。这些限制也界定了本文的两部分发现：
+框架级重排序观察在所评价 checkpoint 内得到支持，而 relative 模块的普适性仍未确定。
 
 本文方法是闭集方法，在分子式协议下还假设分子式已知。它不能恢复候选池之外的目标，也不能
 自动迁移到其它候选构造和采集条件。谱图塔使用选定峰和前体 $m/z$，但不显式接收加合物、
@@ -674,10 +728,11 @@ exchangeability 且目标属于候选池等假设下生成具有边际覆盖率�
 
 本文提出 \method{}：一种无 rank、无 forcing 的第二阶段排序器，将完整候选池 coarse 打分
 与谱图条件的相对候选偏好结合。在 MassSpecGym 1.3.1-compatible 候选顺序和二维身份协议的
-保存嵌入评价中，三个 reranker training seeds 的 relative 和容量匹配 pointwise 都改善质量和
-分子式场景的完整池 Base；pointwise 在主要 R@1/MRR 汇总略强，补充机制分析也显示候选和
-基础分数路径贡献显著。因此，当前证据支持一个边界明确的监督式重排序框架，并明确了
-relative 交互的边界：它是具有结构依据的候选关系机制，但当前 pilot 尚未建立其相对
+在扩展的 cache-local 矩阵中，三个 alignment checkpoint 内的 relative 和容量匹配 pointwise
+都改善质量和分子式场景的对应 Base；canonical 的 MassSpecGym 1.3.1-compatible 候选顺序和
+二维身份主表使用 alignment-42 保存嵌入。Pointwise 在主要 R@1/MRR 汇总略强，30 次消融也
+显示 relative 组件没有统一的独立优势。因此，当前证据支持一个边界明确的监督式重排序框架，并明确了
+relative 交互的边界：它是具有结构依据的候选关系机制，但当前证据尚未建立其相对
 pointwise 打分的独立且普遍稳健收益。本文方法仍限定于固定的保存嵌入候选协议。
 
 \appendix
@@ -695,16 +750,16 @@ cache 的候选集合与所提供 retrieval 集合一致，但列表顺序可能
 分子式候选假设公式已知。两种设置都是闭集方法，目标不在评价截断内时 reranker 不能恢复它。
 
 谱图记录签名分析还记录了 6 条验证和 3 条测试记录与训练记录匹配、但标签分子不同的情况。
-overlap-clean 配置在验证阶段排除受影响记录；本文 pilot 使用其所列的单 alignment checkpoint，
-不将该结果解释为 alignment 层级稳定性。$K=20,40,80$ 的评价时候选截断敏感性使用同一
-256-candidate cache，并非按候选规模重新训练。
+overlap-clean 配置在验证阶段排除受影响记录；用于敏感性分析的三个 alignment checkpoint
+只是内部描述性 estimates，不是总体稳定性声明。$K=20,40,80$ 的评价时候选截断敏感性使用
+同一 256-candidate cache，并非按候选规模重新训练。
 
 \section{实现细节与历史对照}
 
 alignment 模型输出 512 维归一化嵌入。谱图塔为 4 层、16 heads、宽度 512 的 Transformer；
 分子塔为 4 层、隐藏宽度 128 的 GINE。reranker 隐藏宽度为 512、关系宽度为 32、pair chunk
 为 16、dropout 为 0.1，使用 $K=256$ 和 $K_r=40$。两阶段均使用 AdamW；reranker 使用
-$10^{-4}$ 学习率、batch size 16、验证集 MRR early stopping，以及正文所列损失权重和 margin。
+$10^{-4}$ 学习率、batch size 32、验证集 MRR early stopping，以及正文所列损失权重和 margin。
 
 reranker seed 控制初始化、DataLoader 顺序、候选打乱和 dropout。42--44 的均值和样本标准差
 描述 reranker 层级离散度，不是独立 alignment 重复。当前训练中自然没有正例的 query 保留在
@@ -721,30 +776,30 @@ positive forcing 和 rank-aware 配置不属于当前 relative/pointwise 正式�
 
 \section{补充机制分析}
 
-seed-42 信息来源对照显示，base-score-only 不改善 Base，embedding-only 可以改善 Base，
-候选分子信息-only 对照弱于含谱图条件的变体。移除分子关系、谱图条件或反对称 pair 后，
-两个候选协议的方向不完全一致；这些是描述性控制，不是组件因果估计。
+表~\ref{tab:relative_ablations_cn} 的 30 次消融覆盖完整反对称模型、directed pair、移除谱图
+条件、移除 pair loss 和移除谱图 loss，横跨两个候选协议与 reranker seeds 42--44。没有任何
+消融在所有指标上统一最优，因此表中结果是关于模块行为和敏感性的证据，而不是组件因果估计。
 
 困难候选分层显示，relative 相对 Base 的主要增益集中在基础排名为 2--5 和 6--20 的 query，
 而基础排名为 1 或高相似度 query 可能退化。这一模式支持候选关系假设，但不表示关系模块
 对所有 query 都有益。
 
-spectrum-shuffle 结果使质量候选的 relative 模型降为 45.05\% Recall@1 和 0.5358 MRR，
-低于正确配对结果但高于 Base。这说明排序依赖谱图表示，同时候选和基础分数路径仍有作用。
-固定硬件的前向成本结果显示 relative 比 pointwise 更昂贵；这些数字只作为实现成本参考，
+上述困难候选分层也可视为固定候选池剩余空间的检查：增益主要出现在基础排名 2--5 和
+6--20，而排名 1 query 可能退化。评价时的 cutoff 结果和固定硬件前向成本只作为实现参考，
 不是端到端部署基准。
 
 \section{复现与负责任评价说明}
 
-当前 pilot 使用 194,119 条可用训练 query 中的 5,000 条、三个 reranker seed 和一个 alignment
-checkpoint。匿名补充包包含源码检查、锁定环境、测试和合成 CPU smoke test，但不包含真实谱图、
-候选池、cache、checkpoint、日志或私有结果工件，因此 smoke test 不能复现科学指标。
-后续分析所需的候选规模 forward benchmark 和 query-level case exporter 也已包含在仓库源码中；本稿
-没有使用它们新增 timing 曲线或化学案例结果。
+正式矩阵最多请求 194,119 条可用训练 query 中的 20,000 条，使用 alignment checkpoints 42--44，
+并以 seeds 42--44 重复 reranker 配置。复现索引记录 source commit、解析后的配置、cache 元数据、
+checkpoint 和日志哈希，以及选定的 ranking 输出。匿名补充包包含源码检查、锁定环境、测试和合成
+CPU smoke test，但不包含真实谱图、候选池、cache 或训练 checkpoint，因此 smoke test 不能复现科学
+指标；本地工件边界在 Appendix~D 中明确说明。
 
-JESTR 和 GLMR 是 reported-only 的相关方法，未在相同候选、身份和预处理协议下复现。本文不
-声称 SOTA、统计显著性、完整 alignment 稳定性、跨数据集泛化或端到端部署 latency；这些内容
-界定方法结果的适用范围，而不是额外实验结论。
+本地保存嵌入 cosine 对照是 JESTR-style scoring 的 reimplemented control，不是官方 JESTR
+编码器或 checkpoint 复现；GLMR 仍为 reported-only。本文不声称 SOTA、统计显著性、完整
+alignment 稳定性、跨数据集泛化或端到端部署 latency；这些内容界定方法结果的适用范围，而
+不是额外实验结论。
 
 \bibliographystyle{plain}
 \bibliography{references}

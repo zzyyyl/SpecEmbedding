@@ -1,7 +1,7 @@
 {
   "cache": "rerank_cache/a2280d2_massspecgym_nopretrain_valoverlapclean_mass_topk40/massspecgym_mass_test.pt",
   "checkpoint": "checkpoints_rerank/mentor2026_align42_topk40_full_gpu_b32/mass/relative/seed42/attempt_001/best_reranker.pth",
-  "device": "cuda:1",
+  "device": "cuda:0",
   "candidate_protocol": "full cached candidate pool; no positive forcing; K summaries are evaluation-only",
   "total_queries": 14726,
   "parameter_count": 1485189,
@@ -176,9 +176,9 @@
     }
   },
   "benchmark": {
-    "mean_forward_ms_per_query": 0.09907502953931963,
-    "benchmark_batches": 273,
-    "peak_cuda_memory_mb": 86.73388671875
+    "mean_forward_ms_per_query": 0.26402730331713614,
+    "benchmark_batches": 547,
+    "peak_cuda_memory_mb": 50.19580078125
   },
   "predictions": [
     {

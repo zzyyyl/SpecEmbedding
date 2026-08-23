@@ -176,9 +176,9 @@
     }
   },
   "benchmark": {
-    "mean_forward_ms_per_query": 0.013223973029521687,
-    "benchmark_batches": 273,
-    "peak_cuda_memory_mb": 50.25927734375
+    "mean_forward_ms_per_query": 0.04685655020439565,
+    "benchmark_batches": 547,
+    "peak_cuda_memory_mb": 32.51416015625
   },
   "predictions": [
     {
