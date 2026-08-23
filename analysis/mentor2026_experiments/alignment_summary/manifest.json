@@ -1,0 +1,9 @@
+{
+  "source_inputs": [
+    "align42=checkpoints_rerank/mentor2026_align42_topk40_full_gpu_b32/summary.csv"
+  ],
+  "row_count": 12,
+  "alignment_summary_rows": 4,
+  "paired_rows": 6,
+  "interpretation": "descriptive seed/alignment summaries; no significance claim"
+}
