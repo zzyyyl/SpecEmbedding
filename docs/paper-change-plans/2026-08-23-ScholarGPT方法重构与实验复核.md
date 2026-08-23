@@ -1,6 +1,6 @@
 # 论文修改计划：ScholarGPT 方法重构与实验复核
 
-- 状态：`已执行`
+- 状态：`执行中`
 - 创建日期：2026-08-23
 - 最后更新：2026-08-23
 - 负责人：Codex
@@ -45,7 +45,7 @@
 - 不把现有 forced top-40 结果改名为无 forcing 新方法结果。
 - 没有完整 loader 环境、外部模型或统一重训输入时，不声称外部 baseline 或 official-evaluator 端到端等价；本轮仅从本地 MassSpecGym 1.3.1 快照核对候选集合/顺序，并在保存嵌入上单独记录交叉核验范围。
 - 不把新模型的单次运行或同 alignment 多次运行写成一般稳定性；种子、alignment checkpoint 和训练配置逐项记录。
-- 不要求本轮无依据地新增文献；现有 25 条引用继续核验闭包。
+- 不要求本轮无依据地新增文献；当前正文与 BibTeX 使用的 24 条引用继续核验闭包。
 
 ## 4. 具体内容设计
 
@@ -76,10 +76,10 @@
 
 | 引用键 | 文献 | 支持的论断 | 一手来源 | 核验状态 |
 |---|---|---|---|---|
-| `bushuiev2024massspecgym` | MassSpecGym, NeurIPS 2024 | 数据集、候选池和 evaluator 背景 | 原有论文/官方代码 | 已核验，沿用现有 25-key 闭包 |
+| `bushuiev2024massspecgym` | MassSpecGym, NeurIPS 2024 | 数据集、候选池和 evaluator 背景 | 原有论文/官方代码 | 已核验 |
 | `kalia2025jestr` | JESTR, Bioinformatics 2025 | 外部机制背景，非本项目复现 | 原有论文 | 已核验，沿用 |
 | `zhang2026glmr` | GLMR, AAAI 2026 | 外部机制背景，reported-only | 原有论文 | 已核验，沿用 |
-| 其余现有 22 条 | `paper/references.bib` | 方法、数据和评价背景 | 原有 DOI/出版商来源 | 不新增，保持闭包 |
+| 其余现有 21 条 | `paper/references.bib` | 方法、数据和评价背景 | 原有 DOI/出版商来源 | 不新增，保持闭包 |
 
 ## 6. 实验与计算边界
 
@@ -182,3 +182,32 @@
 - 全池身份审计复用已跟踪的 `relative_identity_eval.json`，两个候选池均为 17,556/17,556 positive queries、0 multiple-positive、0 collision；因此没有再次对约 700 万个候选逐个生成 InChIKey。中止了一个低效的全候选重复映射任务，未将其未完成输出纳入结果。
 - 效率拆解已用 RTX 4090 完成；记录 coarse/relation/full、pointwise、参数/吞吐/显存，但正文仍不作部署效率优势声明。
 - 外部强 baseline、candidate-aware alignment、统一 loader fresh re-encoding 和跨数据集验证没有可审计输入，按原计划保留为限制，没有扩大目标或伪造实验。
+
+## 15. 发布与复现验收补充（2026-08-23）
+
+独立评审指出当前正文主张基本与证据一致，但发布与复现材料尚未闭合。本阶段只处理发布一致性、入口语义和归档文档，不新增科学结果，不改变论文正文主结论。
+
+### 15.1 处理范围
+
+- 修复 `run_rerank_pipeline.py` 的默认 positive-forcing 语义：当前默认使用 no-forcing；legacy forced-positive 只能通过显式开关启用；显式支持 `relative` 模型类型。
+- 更新 `reproducibility/anonymous-supplement-README.md`、allowlist 相关验证和匿名 smoke，使补充包描述并执行当前 rank-free relative/no-forcing 方法。
+- 从当前 `HEAD` 重建 `dist/specembedding-anonymous-supplement.zip`，更新匿名 manifest、验证记录，并完成静态扫描、解包测试和 synthetic CPU smoke。
+- 清理 `docs/project_memory_zh.md`、`docs/README_zh.md` 与相关计划的旧发布快照、重复状态和模板残留；历史实验数字保留时必须标明历史/非当前发布状态。
+- 核对 `paper/references.bib` 与双语正文引用键闭包；未被正文使用的条目删除或补入有直接证据支持的引用。
+
+### 15.2 不做事项
+
+- 不重新训练 alignment 或 reranker，不修改已报告实验数字。
+- 不把匿名 smoke 或静态验证写成论文实验结果。
+- 不把 release manifest 的历史 source commit 改写成当前论文源码 commit；若源文件未变化，记录二者关系即可。
+
+### 15.3 验证与归档要求
+
+- [ ] pipeline dry-run/regression test 明确验证 train 默认 no-forcing、val/test 永不 forcing，以及显式 legacy 开关行为。
+- [ ] 匿名包 manifest 与 zip 哈希从当前源码重新生成；allowlist 静态身份扫描、解包测试和 smoke 全部通过。
+- [ ] `pytest -q tests`、Ruff、compileall、`git diff --check` 通过。
+- [ ] 文档/计划只保留一个最终状态；执行记录回填实际 commit、工件哈希和验证结果。
+
+### 15.4 当前状态
+
+本补充阶段开始时，工作树干净，旧匿名包仍由 `c565d29` 构建，且其 README、params 和验证记录均为旧 rank-aware/top-40 语义。完成上述处理并经过最终验收后，才可将本计划状态恢复为 `已执行`。

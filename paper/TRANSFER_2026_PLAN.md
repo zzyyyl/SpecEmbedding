@@ -364,15 +364,16 @@ JESTR/GLMR 统一复现必须满足：
 - 包体积满足目标 venue 限制。
 - 冻结工作树再次通过 60/60 canonical artifact 校验。
 
-2026-08-20 已完成匿名代码包阶段验收：source commit `c565d29` 通过显式 40 文件
-allowlist 构建；两次重建得到相同 SHA-256
-`0e6b775a15ca0d54a58d6072ce1fbce0deb0951c0a357958a7d99e3f5c8baf52`，包体
-63,991 bytes。包内不含 Git 历史、论文/内部清单、数据、checkpoint、cache 或日志；
-静态与运行时身份扫描零命中。从全新外部目录解包后，7 项包内测试、Ruff、compileall、
-shell 语法和合成 `prepare -> train -> eval` CPU cold smoke 全部通过；60/60 canonical
-artifact 复核保持通过。该 smoke 只证明执行集成，不复现论文指标；本轮复用了现有事后
-验收 Conda 环境，没有再次从 lock 文件新建环境。完整证据见
-`reproducibility/anonymous-supplement-validation.yaml`。
+2026-08-20 的匿名代码包验收（source commit `c565d29`、63,991 bytes）保留为历史快照，
+不再代表当前发布包。
+
+2026-08-23 发布补充验收已从当前 rerank/no-forcing 修复提交 `1d9b5eb` 重建 40 文件
+allowlist 包；当前包体 69,584 bytes，SHA-256 为
+`3d09d7c870a327fe454c8bbd98f27570875736947d439e9fd85e7f4637107071`。包内包含当前
+relative reranker、no-forcing pipeline 和 relative CPU smoke；从全新外部目录解包后 13 项
+包内测试和合成 `prepare -> train -> eval` smoke 通过。该 smoke 只证明执行集成，不复现论文
+指标；身份扫描、Ruff、compileall、shell 语法和最终冻结工作树的结果以
+`reproducibility/anonymous-supplement-validation.yaml` 的最新记录为准。
 
 ## 7. 时间表与冻结点
 

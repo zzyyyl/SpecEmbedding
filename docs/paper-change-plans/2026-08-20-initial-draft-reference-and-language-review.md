@@ -14,7 +14,7 @@
 
 本轮目标是完成现有论文初稿的写作收口，而不是增加研究目标。具体包括：
 
-1. 对当前全部 25 条参考文献逐条核对题名、作者、年份、出版物、卷期页码、DOI/稳定链接与发表状态；
+1. 对当时全部 25 条参考文献逐条核对题名、作者、年份、出版物、卷期页码、DOI/稳定链接与发表状态；
 2. 压缩 Related Work 中重复的定位文字，同时保留“reranking 并非本文首创”及与 JESTR/GLMR 的必要机制边界；
 3. 修复英文稿中会导致协议、组件方向、配对计数或实验层级误读的措辞，并做一次人工语言润色；
 4. 同步修正中文稿的实质内容，尤其是当前误写为“跳过 alignment 阶段”的实现描述；
@@ -28,7 +28,7 @@
 ### 2.1 结构、数字和证据边界已经成立
 
 - 英文稿包含 Abstract、Introduction、Related Work、Problem Formulation、Method、Experiments、Discussion、Limitations 与 Conclusion；没有未完成章节或占位结果。
-- 中英文稿使用完全相同的 25 个引用键；25 个 BibTeX 条目均被引用，没有未使用或缺失键。
+- 当时中英文稿使用完全相同的 25 个引用键；25 个 BibTeX 条目均被引用，没有未使用或缺失键。
 - 独立双语审读未发现摘要、结果、讨论、局限和结论之间的数值冲突。
 - 必须保留的边界已经一致：本地 exact-target-SMILES 单正例协议不等价于参考二维 InChIKey/可能多正例 evaluator；cross-alignment 只有三个描述性 alignment 单位；组件消融固定 alignment seed 42；JESTR/GLMR 未独立复现且不可直接比较；没有实测延迟、显存或效率优势。
 
@@ -62,7 +62,7 @@
 
 ### 2.6 参考文献核验结论
 
-- 25 个条目均真实可追溯，未发现伪造 DOI、错误年份、错误题名或把预印本误写成期刊论文。
+- 当时的 25 个条目均真实可追溯，未发现伪造 DOI、错误年份、错误题名或把预印本误写成期刊论文；后续正文闭包复核删除了未使用的 `kretschmer2025coverage` 条目。
 - 需要补齐的书目信息：GLMR 期号与官方 proceedings 名称；MassSpecGym 完整作者；CMC 的 LNCS 系列/卷；Attention Is All You Need 的页码与稳定链接；LC-MS2Struct 的期号；Set Transformer 与 GNN pretraining 的官方稳定链接。
 - `liu2026massspecgymwild` 仍是 arXiv preprint；即使有非归档 workshop 展示，也不改为正式会议论文。
 - SpecEmbedding 论文支持峰序列 Transformer 架构；本文 tokenizer 的逐项细节来自本地实现。正文应把细节明确写成“in our implementation”，避免让单条论文引用承担未直接核验的代码级细节。
@@ -159,7 +159,7 @@
 | `chen2024cmssp` | Chen et al.; *Analytical Chemistry* 96(42):16871--16881, 2024 | 对比式谱图--结构预训练 | [ACS](https://doi.org/10.1021/acs.analchem.4c03724) | 已核验；无需修改 |
 | `tian2020cmc` | Tian, Krishnan, Isola; ECCV 2020, LNCS 12356:776--794 | Contrastive Multiview Coding | [Springer](https://doi.org/10.1007/978-3-030-58621-8_45) | 已核验；补 LNCS 系列、卷号与出版地 |
 | `vaswani2017attention` | Vaswani et al.; *NeurIPS* 30:5998--6008, 2017 | Transformer/self-attention 架构先例 | [NeurIPS](https://proceedings.neurips.cc/paper_files/paper/2017/hash/3f5ee243547dee91fbd053c1c4a845aa-Abstract.html) | 已核验；补页码、稳定 URL 与作者重音 |
-| `kretschmer2025coverage` | Kretschmer et al.; *Nature Communications* 16:554, 2025 | thresholded myopic-MCES 及 stronger bound 边界 | [Nature](https://doi.org/10.1038/s41467-024-55462-w) | 已核验；无需修改 |
+| `kretschmer2025coverage` | Kretschmer et al.; *Nature Communications* 16:554, 2025 | thresholded myopic-MCES 及 stronger bound 边界 | [Nature](https://doi.org/10.1038/s41467-024-55462-w) | 已核验；后续引用闭包复核确认正文未使用，2026-08-23 删除 BibTeX 条目 |
 | `duhrkop2015csifingerid` | Dührkop et al.; *PNAS* 112(41):12580--12585, 2015 | 谱图到分子指纹并搜索结构数据库 | [PNAS](https://doi.org/10.1073/pnas.1509788112) | 已核验；无需修改 |
 | `young2024massformer` | Young, Röst, Wang; *Nature Machine Intelligence* 6(4):404--416, 2024 | 从分子图模拟 tandem mass spectrum | [Nature](https://doi.org/10.1038/s42256-024-00816-8) | 已核验；无需修改 |
 | `dejonge2023ms2query` | de Jonge et al.; *Nature Communications* 14:1752, 2023 | top-2000 MS2DeepScore 后五特征随机森林重排 | [Nature](https://doi.org/10.1038/s41467-023-37446-4) | 已核验；无需修改 |
@@ -254,7 +254,8 @@
 - 最终状态：`已执行`
 - 验证结果：完整初稿成立。双语严格 release build 通过，英文 17 页、中文 15 页；致命
   LaTeX 错误、未定义引用/交叉引用及 Overfull/Underfull 均为零。两稿与 BibTeX 使用相同
-  25 个引用键，无缺失、未使用或重复条目；全部 25 条文献已按一手来源核验。当前 PDF 与
+  25 个引用键，无缺失、未使用或重复条目；全部 25 条文献已按一手来源核验。该段是当时
+  的历史快照；当前 PDF 与
   manifest 的页数、字节数、SHA-256 一致，作者元数据为空或缺失，私有身份扫描零命中。
   60 个 canonical artifacts 匹配。指定审计任务最终判定无 P0/P1/P2。
 - 论文修改 commit：`076c5c5 docs(paper): 完成初稿引用与语言收口`
@@ -262,7 +263,7 @@
 - 归档一致性修复 commit：`8478bfb docs(audit): 同步当前双语发布快照`
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：Related Work 实际净压缩约 80 个英文词，少于计划的 100--150 词，
-  原因是保留全部 25 个引用及必要机制边界；未以删减证据换取篇幅。只读终审触发两项小幅
+  原因是当时保留全部 25 个引用及必要机制边界；未以删减证据换取篇幅。只读终审触发两项小幅
   范围扩展：同步共享方法图中的 supplied-candidate/candidate-set 术语，并把历史 ADMA
   实验、效率与提交动作明确降级为非当前目标；后续又修正旧审计归档中的 17/16 历史快照
   标注。这些调整均未改变方法、评价协议、结果数字或研究结论。

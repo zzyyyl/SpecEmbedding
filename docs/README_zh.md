@@ -184,18 +184,18 @@ legacy Python 常量还可通过 `SPECEMBEDDING_LEGACY_DATA_ROOT`、
 
 #### 4.1 论文主结果流程与协议
 
-转投稿件的结果来自谱图--分子 alignment 与 top-40 reranking 流程，而不是早期的谱图到
-谱图 notebook 评价。Recall 和 MRR 使用 MassSpecGym 提供的候选文件，并按本地
-exact-target-SMILES 单正例规则计算。参考 loader 默认使用二维 InChIKey 等价规则，可能为
-一条查询标出多个正例；该差异影响尚未量化，因此本文数值不等价于官方参考 evaluator 结果。
+转投稿件的当前结果来自谱图--分子 alignment、full-pool candidate cache 与 rank-free
+relative/pointwise reranking，而不是早期的谱图到谱图 notebook 评价。主评价使用 MassSpecGym
+1.3.1 retrieval JSON 候选顺序、二维 InChIKey 身份规则和保存的 alignment embeddings；这是
+official-compatible candidate/identity audit，不是重新运行 official loader、重新编码或重训
+alignment。local exact-target-SMILES 结果仅作为敏感性视图。
 
-代表性主表使用 alignment seed 42 和 reranker seed 42；固定 alignment 表在 alignment
-seed 42 下汇总 reranker seeds 42--44；跨 alignment 分析先在 alignment seeds 42--44
-各自内部汇总 reranker seeds，再以三个 alignment-level estimates 作描述性比较，不把九次
-运行展平，也不提供置信区间。版本化证据位于
-`analysis/transfer2026_alignment_multiseed/` 与
-`analysis/transfer2026_core_ablations/`。论文中的 JESTR/GLMR 数字来自外部论文，未在
-本项目独立复现，也不可与本地结果直接比较。
+当前方法使用最多 256 个供给候选，先做 pointwise coarse scoring，再在 coarse top-40 上做
+spectrum-conditioned relative refinement；训练、验证和测试均默认不强制插入正例。Pointwise
+是容量匹配对照。三种 reranker seeds 和官方候选顺序结果见
+`analysis/transfer2026_scholargpt_review/`；relative 在主要 R@1/MRR 汇总中略低于 pointwise，
+因此不声称候选关系模块具有独立普遍收益。论文中的 JESTR/GLMR 为 reported-only，未在本项目
+统一复现，也不可与本地结果直接比较。
 
 下列命令还包括仓库的通用流程与 legacy 流程；若候选、身份、划分、cache 和 checkpoint
 协议没有与记录工件完全匹配，其输出不得替代论文表格。
@@ -265,6 +265,39 @@ dict[str, list[str]]
 ```
 
 其中 key 是 `test.pkl` 中 query 或真实分子的 SMILES，value 是该 query 对应的候选分子 SMILES 列表。评估时会先按 test split 中存在的 SMILES 过滤候选集。分子 embedding 默认存储在 CPU；只有确认完整候选 embedding 矩阵能放入显存时，才建议使用 `--mol_embedding_storage cuda`。`--candidate_chunk_size 0` 会根据可用 CUDA 显存自动估计候选分块大小，`--no-mces` 可关闭 MCES 计算。
+
+#### 4.2 当前 rerank 流程
+
+当前论文方法使用最多 256 个自然候选，训练、验证和测试均不强制插入正例：
+
+```bash
+python prepare_rerank_cache.py \
+  --checkpoint ./checkpoints_align/run/best_model_stage2.pth \
+  --dataset_type massspecgym \
+  --candidate_type mass \
+  --split train \
+  --topk 256 \
+  --no-force_include_positive \
+  --save_path ./rerank_cache/run/mass_train.pt
+
+python train_rerank.py \
+  --train_cache ./rerank_cache/run/mass_train.pt \
+  --val_cache ./rerank_cache/run/mass_val.pt \
+  --model_type relative \
+  --train-k 256 \
+  --relation-top-k 40 \
+  --save_dir ./checkpoints_rerank/run
+
+python eval_rerank.py \
+  --cache ./rerank_cache/run/mass_test.pt \
+  --checkpoint ./checkpoints_rerank/run/best_reranker.pth \
+  --max-candidates 256 \
+  --save_dir ./checkpoints_rerank/run
+```
+
+也可以使用 `run_rerank_pipeline.py` 编排 cache、训练和测试；它默认 no-forcing，并支持
+`--model_type relative`。只有需要复核历史训练协议时，才显式传入
+`--force-include-positive`；该开关只作用于 train cache，验证和测试始终不插入正例。
 
 ### 5. Web 服务
 

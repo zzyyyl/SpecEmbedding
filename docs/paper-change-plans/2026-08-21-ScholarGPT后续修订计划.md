@@ -45,7 +45,7 @@
 - 不在没有新训练授权和 parameter-matched checkpoint 时声称容量控制结论。
 - 不复现 JESTR/GLMR 或引入未经核验的新 external baseline 数字。
 - 不把已有三 seed SD 改写成显著性检验；只有实际生成逐 query 配对结果后才报告 bootstrap CI。
-- 不新增未经一手来源核验的参考文献；评审列出的相关工作均已有 25-key 引用闭包。
+- 不新增未经一手来源核验的参考文献；当前正文与 `references.bib` 已完成 24-key 引用闭包。
 
 ## 4. 具体内容设计
 
@@ -77,13 +77,13 @@
 ### 4.5 双语与引用
 
 - 中英文摘要、贡献、讨论、结论逐段同步。
-- 现有 25 条引用继续使用；不新增引用。若需引用 official loader，仅使用已在正文核验的 MassSpecGym commit。
+- 现有 24 条正文引用继续使用；不新增引用。若需引用 official loader，仅使用已在正文核验的 MassSpecGym commit。
 
 ## 5. 引用文献与真实性核验
 
 | 引用键 | 文献 | 支持的论断 | 一手来源 | 核验状态 |
 |---|---|---|---|---|
-| `bushuiev2024massspecgym` | MassSpecGym, NeurIPS 2024 | 数据集、候选池和官方协议背景 | 论文/官方代码 commit | 已核验，现有 25-key 闭包 |
+| `bushuiev2024massspecgym` | MassSpecGym, NeurIPS 2024 | 数据集、候选池和官方协议背景 | 论文/官方代码 commit | 已核验 |
 | `kalia2025jestr` | JESTR, Bioinformatics 2025 | 外部机制背景，不报告本项目复现数字 | 论文 | 已核验，现有引用 |
 | `zhang2026glmr` | GLMR, AAAI 2026 | 外部机制背景，reported-only | 论文 | 已核验，现有引用 |
 | `liu2026massspecgymwild` | MassSpecGym in the Wild, 2026 preprint | protocol/shortcut 风险背景 | 预印本 | 已核验，现有引用 |
@@ -118,11 +118,11 @@
 
 ## 9. 验证方案
 
-- [ ] 运行 `conda run -n specembedding python -m pytest -q tests`、Ruff、`freeze_adma2026_artifacts.py --check`。
-- [ ] 检查双稿引用键与 `references.bib` 25 条闭包，确保不新增未经核验文献。
-- [ ] 检查 local/reference evaluator 标签和所有新增数字的来源；逐 query 结果若存在需保存 hash/manifest。
-- [ ] 英文/中文 `bash paper/build_release.sh`，检查 fatal、undefined citation/reference、overfull/underfull、页数、匿名元数据和私有路径。
-- [ ] `git diff --check`、工作区状态、PDF 与 build-manifest 哈希一致。
+- [x] 该阶段已运行 `conda run -n specembedding python -m pytest -q tests`、Ruff、`freeze_adma2026_artifacts.py --check`；记录为 106 passed、9 warnings、60 artifacts。
+- [x] 该阶段已检查双稿引用键与 `references.bib` 的 25 条历史闭包；2026-08-23 复核后当前正文闭包为 24 条，详见后续计划。
+- [x] 已检查 local/reference evaluator 标签和新增数字来源；逐 query 结果的 hash/manifest 已记录在 `analysis/transfer2026_scholargpt_review/`。
+- [x] 英文/中文已由 `bash paper/build_release.sh` 重建，并检查 fatal、undefined citation/reference、overfull/underfull、页数、匿名元数据和私有路径。
+- [x] 已完成 `git diff --check`、工作区核验及 PDF/build-manifest 哈希核对；当前发布补充验收另行记录。
 
 ## 10. 执行记录
 

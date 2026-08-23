@@ -29,8 +29,9 @@
 三随机种子受控消融完成后，论文需要强调的证据边界是：
 
 - 在已有跨模态检索器之上直接优化候选列表排序。
-- 结合 base score、base rank 和显式谱图--候选交互特征。
-- 使用 residual listwise reranking，在不生成分子的情况下修正基础排序。
+- legacy pointwise/Transformer 变体可结合 base score、base rank 和显式谱图--候选交互特征；当前
+  relative 主线不使用 rank embedding。
+- 使用不生成分子的 residual reranking，在固定候选列表内修正基础排序。
 - pointwise 与候选集合 Transformer 在 alignment seeds 42/43/44 的 12/12 个
   alignment--candidate--learned-model 聚合单元中均同时改善对应 base 的 Recall@1 和 MRR；
   Transformer 相对 pointwise 在两类候选和两项指标上都只有 2/3 alignment 方向为正。
@@ -749,19 +750,11 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 中文稿：`paper/main_cn.tex`
 - 参考文献：`paper/references.bib`
 - 待办清单：`paper/ADMA2026_TODO.md`
-- 上一版受跟踪 release evidence 对应 source commit `e597d89`，英文 17 页、中文 16 页；
-  这是历史审计快照，不再代表当前初稿。
-- 2026-08-21 从专家预审修订 source commit `22c6b65` 强制完整重建当前初稿：英文 18 页、
-  527,837 bytes、SHA-256
-  `5a7218b0ba46981836fce4729f92f8254840019798be2b573262e255fd266203`；中文 16 页、
-  434,822 bytes、SHA-256
-  `0d4c4f5627ea2bcd97e1507cc74185216ac322123ad99e9c202d09614afa839a`。两份 PDF、工具链、
-  页数和哈希清单已留存在 `paper/release/`。
-- 第三轮独立审计基于远端 `5a1fe38` 复跑 88 项测试、临时 cwd 总管线、Ruff、artifact check
-  和双语发布证据；结合用户明确“页数可以延后且不阻塞审计”的范围决定，本轮最终无 P0/P1
-  阻断项。英文 17 页仅作为独立非阻断投稿整理事项，待确认转投 venue 页数规则后处理。
-- 已忽略的 `paper/build/main.pdf` 与 `main_cn.pdf` 已由 release build 同步为 18/16 页；
-  发布证据以受跟踪的 `paper/release/` 为准。
+- 当前受跟踪 release evidence 对应 source commit `620bf2b`：英文 16 页、中文 14 页；
+  PDF、工具链、页数和哈希清单位于 `paper/release/`。这是当前双语构建快照，页数仍需按目标
+  venue 最终核对。
+- 旧 source commit `e597d89`、`22c6b65` 及其 17/18 页构建均为历史审计快照，不代表当前稿件。
+- 当前仓库代码修复提交为 `1d9b5eb`；正式投稿前应在最终源代码提交后重新生成并核对发布工件。
 - 页数压缩：按用户决定延后到完稿后统一微调；最终投稿合规仍未完成。
 - 当前页数不绑定 15 页上限；在 venue 未确定前优先保持内容精炼、证据边界清楚，最终再按模板排版。
 - 英文 PDF 作者元数据：空
@@ -769,7 +762,7 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - AI assistance disclosure：已移入 Introduction，并明确覆盖所有章节、代码编辑、实验编排和一致性审计；数值来自软件流水线，作者核验并承担全部责任。
 - SpecEmbedding 增量审计：已完成；正文在引言、相关工作和方法中就地归因继承的峰序列 Transformer，区分原工作的重复谱图 SupCon + Tanimoto-MSE 与本文从零训练的跨模态目标，并将本文贡献限定为第二阶段非生成式残差 learning-to-rank。
 - SpecEmbedding 书目信息：已按 ACS 正式页面补齐为 Analytical Chemistry 2025, 97(37), 20137--20146。
-- 初稿内容收口：全部 25 条参考文献已逐项核对一手来源；Related Work 在保留全部引用的
+- 初稿内容收口：当前正文使用的 24 条参考文献已逐项核对一手来源；Related Work 在保留引用的
   前提下净压缩约 80 个英文词；英文语言、证据边界及中英文一致性复核均已完成。
 - 正式方法架构图：已使用共享 TikZ 源 `paper/figures/method_overview.tex` 替换中英文稿文本占位图；图中包含三阶段流程、两种 reranker 变体、残差跳连和训练/测试协议。
 - overlap-clean mass/formula MCES@1：已完成（mass Base/seed-42 Set Transformer 15.3681/7.7057；formula 5.4389/3.0913；四项均为 17,556/17,556，batch 状态 `complete`）
@@ -779,21 +772,20 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
   相对 base 的 12/12 聚合单元均改善，Transformer--Pointwise 方向不一致。
 - canonical 核心组件消融：五项移除、两种候选、三个 reranker seeds 共 30/30 组完成；
   没有组件通过严格独立收益门槛。
-- 匿名补充代码包：已从 source commit `c565d29` 以 40 文件显式 allowlist 构建；包体
-  63,991 bytes，SHA-256 为
-  `0e6b775a15ca0d54a58d6072ce1fbce0deb0951c0a357958a7d99e3f5c8baf52`。身份扫描
-  零命中，独立解包后 7 项测试、Ruff、compileall 与合成
-  `prepare -> train -> eval` CPU cold smoke 通过；证据见
-  `reproducibility/anonymous-supplement-validation.yaml`。该 smoke 不复现论文指标，
-  本轮也未再次从 lock 新建 Conda 环境。
+- 匿名补充代码包的旧 `c565d29` 构建已废弃；当前包需从包含 `1d9b5eb` 的最终源代码提交重建，
+  并以 `reproducibility/anonymous-supplement-validation.yaml` 记录最新哈希、扫描、解包测试和
+  relative CPU smoke。该 smoke 不复现论文指标，也不包含真实数据、候选池、checkpoint、cache
+  或内部日志。
 - train--test 输入重叠敏感性：12/12 组完成；剔除 3 条重叠输入后主结论不变
 - train--val 输入重叠：overlap-clean 审计已完成；clean 与历史 alignment best/stop epoch 相同，reranker 9/12 组选择不同
-- 中心主张：已收窄为本地 exact-target-SMILES 协议下非生成式残差 learning-to-rank 的框架级
-  收益；不主张官方 evaluator 等价、稳健 self-attention 独立收益或 SOTA。
+- 中心主张：在固定跨模态检索器已召回的候选列表内，监督式、非生成式 residual learning-to-rank
+  可以改善 Recall/MRR。官方-compatible 表仍是保存 embedding 的候选/身份审计，不主张完整
+  official-loader 端到端等价、稳健 self-attention/relative 独立收益或 SOTA。
 
-当前双语内容初稿及其 release evidence 已经完成，但尚不是最终投稿版本。后续仅处理转投
+当前双语内容初稿及其 release evidence 已经完成，但尚不是最终投稿版本。后续还需处理转投
 venue 确认与格式适配、作者列表和 COI，以及定稿后的 PDF/源码/补充归档联合匿名检查；
-页数调整暂不阻断。本阶段不新增实验、外部基线复现或论文主张。
+匿名补充包和 rerank pipeline 的发布一致性验收由 2026-08-23 专项计划记录。本阶段不新增
+实验、外部基线复现或论文主张。
 
 ## 10. 论文文件与结构
 

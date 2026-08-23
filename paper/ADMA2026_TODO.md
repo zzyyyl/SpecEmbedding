@@ -79,7 +79,7 @@
 - [x] 将本地结果与外部 reported 结果拆为独立表；外部表明确 `not reproduced / not directly comparable`。
 - [x] 补充数据集、完整候选池规模和平均候选数量统计。
 - [x] 统一使用 `Recall@K`、`MRR`、`MCES@1` 等术语。
-- [x] 2026-08-20 压缩并重组相关工作：保留 25 个既有引用及候选重排、联合嵌入、
+- [x] 2026-08-20 压缩并重组相关工作：保留当前正文使用的 24 个引用及候选重排、联合嵌入、
   模拟/生成和 learning-to-rank 的证据链，合并重复的 Method Positioning 小节；英文
   Related Work 净减少约 80 词，未新增文献或扩大主张。
 - [x] 根据受控消融收窄核心论点：在三个审计 alignment 内，两种监督残差 reranker
@@ -89,7 +89,7 @@
   pool-by-reranker-seed 配对计数、pre-clean 指代和组件方向表述。
 - [x] 检查中英文稿内容一致性（2026-08-17 逐表、逐证据边界复核；2026-08-20 在
   相关工作压缩和语言收口后再次同步复核）。
-- [x] 2026-08-20 对全部 25 条参考文献逐项核对一手来源、作者、题名、年份、卷期页码、
+- [x] 2026-08-20 对当时的 25 条参考文献逐项核对一手来源、作者、题名、年份、卷期页码；
   DOI/稳定链接和发表状态；补齐 7 条不完整元数据，MassSpecGym in the Wild 继续明确为
   arXiv preprint。
 
@@ -108,11 +108,11 @@
 - [x] 清理当前受跟踪源码、配置和归档 notebook 中的私有机器绝对路径。
 - [ ] 最终匿名检查 Git 远端地址、公开仓库链接及 Git 历史信息；当前 allowlist 代码包
   已通过上述扫描且不含 `.git`，最终提交副本仍需复扫。
-- [x] 准备不含 `.git` 历史的匿名代码压缩包：source commit `c565d29`，40 个 allowlisted
-  源文件，63,991 bytes，SHA-256
-  `0e6b775a15ca0d54a58d6072ce1fbce0deb0951c0a357958a7d99e3f5c8baf52`；从包外 cwd
-  独立执行 7 项测试和合成 `prepare -> train -> eval` CPU smoke 均通过。
-- [x] 当前匿名压缩包不超过历史 20 MB 限制（63,991 bytes）；目标 venue 确定后仍需
+- [x] 旧匿名包（source commit `c565d29`）作为历史快照归档；2026-08-23 已从当前
+  no-forcing/relative 修复提交重建 40 个 allowlisted 源文件，69,584 bytes，SHA-256
+  `3d09d7c870a327fe454c8bbd98f27570875736947d439e9fd85e7f4637107071`；包外 cwd 独立执行
+  13 项测试和 tiny relative `prepare -> train -> eval` CPU smoke 均通过。
+- [x] 当前匿名压缩包不超过历史 20 MB 限制（69,584 bytes）；目标 venue 确定后仍需
   按其实际规则复核文件格式和上限。
 - [-] 当前采用匿名单文件压缩包，不建立匿名仓库；若目标 venue 改要求仓库，再重新开放冻结检查。
 - [ ] 目标 venue 确定后，在其投稿系统中确认最终作者列表。
