@@ -31,10 +31,13 @@ class Experiment:
 FULL_RERANKER_OVERRIDES = {
     "use_base_score_feature": True,
     "use_residual_score": True,
-    "use_rank_embedding": True,
+    "use_rank_embedding": False,
     "use_product_feature": True,
     "use_abs_diff_feature": True,
     "lambda_pair": 0.2,
+    "lambda_spec": 0.1,
+    "pair_mode": "antisymmetric",
+    "use_spectrum_conditioning": True,
     "shuffle_candidates": True,
 }
 
@@ -55,6 +58,14 @@ ABLATION_OVERRIDES = {
         "use_abs_diff_feature": False,
     },
     "listwise_only": {**FULL_RERANKER_OVERRIDES, "lambda_pair": 0.0},
+    "no_spectrum_conditioning": {
+        **FULL_RERANKER_OVERRIDES,
+        "use_spectrum_conditioning": False,
+    },
+    "no_lambda_pair": {**FULL_RERANKER_OVERRIDES, "lambda_pair": 0.0},
+    "no_lambda_spec": {**FULL_RERANKER_OVERRIDES, "lambda_spec": 0.0},
+    "directed_pair": {**FULL_RERANKER_OVERRIDES, "pair_mode": "directed"},
+    "antisymmetric_pair": {**FULL_RERANKER_OVERRIDES, "pair_mode": "antisymmetric"},
     "no_candidate_shuffle": {**FULL_RERANKER_OVERRIDES, "shuffle_candidates": False},
 }
 
@@ -142,6 +153,7 @@ def experiment_fingerprint(args, experiment: Experiment, caches: dict[str, Path]
         "ablation": experiment.ablation,
         "ablation_overrides": ablation_overrides(experiment),
         "seed": experiment.seed,
+        "max_train_queries": args.max_train_queries,
         "exclude_val_query_indices": args.exclude_val_query_indices,
         "cache_files": {split: cache_file_metadata(path) for split, path in caches.items()},
     }
@@ -182,8 +194,17 @@ def checkpoint_matches(
         actual_exclusions = sorted(set(training_config.get("exclude_val_query_indices", [])))
         if actual_exclusions != expected_val_exclusions:
             return False
+    model_config_keys = {
+        "pair_mode",
+        "use_base_score_feature",
+        "use_residual_score",
+        "use_rank_embedding",
+        "use_product_feature",
+        "use_abs_diff_feature",
+        "use_spectrum_conditioning",
+    }
     for key, expected in ablation_overrides(experiment).items():
-        source = model_config if key.startswith("use_") else training_config
+        source = model_config if key in model_config_keys else training_config
         if source.get(key) != expected:
             return False
     return True
@@ -318,6 +339,7 @@ def build_train_command(
     experiment: Experiment,
     device: str,
     train_k: int,
+    max_train_queries: int | None = None,
     exclude_val_query_indices: list[int] | None = None,
 ) -> list[str]:
     command = [
@@ -338,17 +360,24 @@ def build_train_command(
         "--train-k",
         str(train_k),
     ]
+    if max_train_queries is not None:
+        command.extend(["--max-train-queries", str(max_train_queries)])
     flag_names = {
         "use_base_score_feature": "--base-score-feature",
         "use_residual_score": "--residual-score",
         "use_rank_embedding": "--rank-embedding",
         "use_product_feature": "--product-feature",
         "use_abs_diff_feature": "--abs-diff-feature",
+        "use_spectrum_conditioning": "--spectrum-conditioning",
         "shuffle_candidates": "--shuffle-candidates",
     }
     for key, value in ablation_overrides(experiment).items():
         if key == "lambda_pair":
             command.extend(["--lambda-pair", str(value)])
+        elif key == "lambda_spec":
+            command.extend(["--lambda-spec", str(value)])
+        elif key == "pair_mode":
+            command.extend(["--pair-mode", value])
         elif key in flag_names:
             command.append(flag_names[key] if value else flag_names[key].replace("--", "--no-", 1))
         else:
@@ -475,6 +504,7 @@ def execute_experiment(
         experiment,
         device,
         args.topk,
+        args.max_train_queries,
         args.exclude_val_query_indices,
     )
     eval_command = build_eval_command(repo_root, caches, attempt_dir, device, args.mces)
@@ -589,7 +619,7 @@ def discover_experiments(args, requested: list[Experiment]) -> list[Experiment]:
         seed = status.get("seed")
         if candidate_type not in {"mass", "formula"}:
             continue
-        if model_type not in {"pointwise", "transformer"}:
+        if model_type not in {"pointwise", "relative", "transformer"}:
             continue
         if ablation not in ABLATION_OVERRIDES or not isinstance(seed, int):
             continue
@@ -703,7 +733,7 @@ def parse_args():
     parser.add_argument(
         "--model-types",
         nargs="+",
-        choices=["pointwise", "transformer"],
+        choices=["pointwise", "relative", "transformer"],
         default=["pointwise", "transformer"],
     )
     parser.add_argument(
@@ -714,6 +744,12 @@ def parse_args():
         help="Matched single-factor reranker ablations. Defaults to the full model.",
     )
     parser.add_argument("--seeds", nargs="+", type=int, default=[42, 43, 44])
+    parser.add_argument(
+        "--max-train-queries",
+        type=int,
+        default=None,
+        help="Limit labeled training queries per run and record the limit in the experiment fingerprint.",
+    )
     parser.add_argument(
         "--exclude-val-query-indices",
         nargs="*",
@@ -747,6 +783,8 @@ def parse_args():
         parser.error("--seeds must contain only non-negative integers")
     if len(set(args.seeds)) != len(args.seeds):
         parser.error("--seeds must not contain duplicates")
+    if args.max_train_queries is not None and args.max_train_queries <= 0:
+        parser.error("--max-train-queries must be greater than 0")
     if len(set(args.ablations)) != len(args.ablations):
         parser.error("--ablations must not contain duplicates")
     if len(set(args.devices)) != len(args.devices):
