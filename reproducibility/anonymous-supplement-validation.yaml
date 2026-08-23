@@ -1,9 +1,9 @@
 schema_version: 1
 status: audit_evidence
-validated_on: 2026-08-20
+validated_on: 2026-08-23
 
 source:
-  commit: c565d29e8b4bfd9e44c5863ebbd94aee08a85389
+  commit: 88e37c5
   branch: codex/transfer-2026-0831
   build_origin: clean local clone of the source commit
   worktree_clean_before_build: true
@@ -14,8 +14,8 @@ archive:
   archive_root: specembedding-supplement
   allowlisted_source_files: 40
   zip_members_including_generated_manifest: 41
-  bytes: 63991
-  sha256: 0e6b775a15ca0d54a58d6072ce1fbce0deb0951c0a357958a7d99e3f5c8baf52
+  bytes: 69584
+  sha256: 3d09d7c870a327fe454c8bbd98f27570875736947d439e9fd85e7f4637107071
   historical_adma_limit_bytes: 20971520
   under_historical_20_mib_limit: true
   deterministic_rebuild_sha256_match: true
@@ -59,7 +59,7 @@ independent_unpack_validation:
   cold_install_from_locks_performed_this_round: false
   pytest:
     result: passed
-    tests: 7
+    tests: 13
     warnings: 4
     seconds: 1.56
   ruff: passed
@@ -75,14 +75,14 @@ independent_unpack_validation:
       train: 6
       val: 4
       test: 4
-    reranker: tiny Transformer, one epoch
+    reranker: tiny relative reranker, one epoch
     mces: skipped
     reported_scientific_metrics_reproduced: false
 
 repository_validation:
   pytest:
     result: passed
-    tests: 106
+    tests: 112
     warnings: 9
     seconds: 32.01
   ruff: passed

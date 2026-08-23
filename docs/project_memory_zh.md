@@ -750,7 +750,7 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
 - 中文稿：`paper/main_cn.tex`
 - 参考文献：`paper/references.bib`
 - 待办清单：`paper/ADMA2026_TODO.md`
-- 当前受跟踪 release evidence 对应 source commit `620bf2b`：英文 16 页、中文 14 页；
+- 当前受跟踪 release evidence 对应 source commit `88e37c5`：英文 16 页、中文 14 页；
   PDF、工具链、页数和哈希清单位于 `paper/release/`。这是当前双语构建快照，页数仍需按目标
   venue 最终核对。
 - 旧 source commit `e597d89`、`22c6b65` 及其 17/18 页构建均为历史审计快照，不代表当前稿件。
@@ -772,10 +772,12 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
   相对 base 的 12/12 聚合单元均改善，Transformer--Pointwise 方向不一致。
 - canonical 核心组件消融：五项移除、两种候选、三个 reranker seeds 共 30/30 组完成；
   没有组件通过严格独立收益门槛。
-- 匿名补充代码包的旧 `c565d29` 构建已废弃；当前包需从包含 `1d9b5eb` 的最终源代码提交重建，
-  并以 `reproducibility/anonymous-supplement-validation.yaml` 记录最新哈希、扫描、解包测试和
-  relative CPU smoke。该 smoke 不复现论文指标，也不包含真实数据、候选池、checkpoint、cache
-  或内部日志。
+- 匿名补充代码包的旧 `c565d29` 构建已废弃；当前包从 source commit `88e37c5` 以 40 文件
+  allowlist 重建，包体 69,584 bytes，SHA-256 为
+  `3d09d7c870a327fe454c8bbd98f27570875736947d439e9fd85e7f4637107071`。独立解包后 13 项
+  测试和 tiny relative CPU smoke 通过；该 smoke 不复现论文指标，也不包含真实数据、候选池、
+  checkpoint、cache 或内部日志。完整扫描、环境和验证结果见
+  `reproducibility/anonymous-supplement-validation.yaml`。
 - train--test 输入重叠敏感性：12/12 组完成；剔除 3 条重叠输入后主结论不变
 - train--val 输入重叠：overlap-clean 审计已完成；clean 与历史 alignment best/stop epoch 相同，reranker 9/12 组选择不同
 - 中心主张：在固定跨模态检索器已召回的候选列表内，监督式、非生成式 residual learning-to-rank
@@ -893,8 +895,9 @@ venue 确认与格式适配、作者列表和 COI，以及定稿后的 PDF/源�
 2026-08-20 已落实为 `reproducibility/anonymous-allowlist.txt` 和确定性 ZIP builder；
 归档默认生成到 Git 忽略的 `dist/`，不把提交 artifact 反向纳入源码历史。当前包已通过
 用户名、hostname、Git remote/author、绝对路径、邮箱/ORCID、GPU UUID、公开托管链接和
-敏感文件类型扫描。提交前仍需从固定 source commit 重建最终副本，并与最终 PDF/源码一起
-复扫；当前验证使用既有事后验收环境，不等于又完成了一次从 lock 的全新安装。
+敏感文件类型扫描。当前副本已从固定 source commit 重建并完成独立复扫；若后续修改
+allowlist、源码或投稿材料，仍需重新生成并与最终 PDF/源码一起复扫。当前验证使用既有
+事后验收环境，不等于又完成了一次从 lock 的全新安装。
 
 ### 12.7 AI 披露
 

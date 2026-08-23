@@ -1,6 +1,6 @@
 # 论文修改计划：ScholarGPT 方法重构与实验复核
 
-- 状态：`执行中`
+- 状态：`已执行`
 - 创建日期：2026-08-23
 - 最后更新：2026-08-23
 - 负责人：Codex
@@ -203,11 +203,11 @@
 
 ### 15.3 验证与归档要求
 
-- [ ] pipeline dry-run/regression test 明确验证 train 默认 no-forcing、val/test 永不 forcing，以及显式 legacy 开关行为。
-- [ ] 匿名包 manifest 与 zip 哈希从当前源码重新生成；allowlist 静态身份扫描、解包测试和 smoke 全部通过。
-- [ ] `pytest -q tests`、Ruff、compileall、`git diff --check` 通过。
-- [ ] 文档/计划只保留一个最终状态；执行记录回填实际 commit、工件哈希和验证结果。
+- [x] pipeline dry-run/regression test 明确验证 train 默认 no-forcing、val/test 永不 forcing，以及显式 legacy 开关行为。
+- [x] 匿名包 manifest 与 zip 哈希从当前源码重新生成；allowlist 静态身份扫描、解包测试和 smoke 全部通过。
+- [x] `pytest -q tests`、Ruff、compileall、`git diff --check` 通过。
+- [x] 文档/计划只保留一个最终状态；执行记录回填实际 commit、工件哈希和验证结果。
 
 ### 15.4 当前状态
 
-本补充阶段开始时，工作树干净，旧匿名包仍由 `c565d29` 构建，且其 README、params 和验证记录均为旧 rank-aware/top-40 语义。完成上述处理并经过最终验收后，才可将本计划状态恢复为 `已执行`。
+本补充阶段开始时，工作树干净，旧匿名包由 `c565d29` 构建，且其 README、params 和验证记录均为旧 rank-aware/top-40 语义。现已完成修复与验收：代码提交为 `1d9b5eb`，发布与归档提交为 `88e37c5`；匿名包从 `88e37c5` 重建，40 个源文件、69,584 bytes，SHA-256 为 `3d09d7c870a327fe454c8bbd98f27570875736947d439e9fd85e7f4637107071`。仓库测试为 112 passed、9 warnings；包外解包测试为 13 passed、4 warnings；Ruff、compileall、shell 语法、匿名扫描和 relative CPU smoke 均通过。双语 release 为英文 16 页、中文 14 页，哈希已写入 `paper/release/build-manifest.yaml`。目标 venue 的最终页数、作者/COI 及提交副本联合匿名检查仍保留为投稿前事项。

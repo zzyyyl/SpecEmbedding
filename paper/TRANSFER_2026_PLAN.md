@@ -367,7 +367,7 @@ JESTR/GLMR 统一复现必须满足：
 2026-08-20 的匿名代码包验收（source commit `c565d29`、63,991 bytes）保留为历史快照，
 不再代表当前发布包。
 
-2026-08-23 发布补充验收已从当前 rerank/no-forcing 修复提交 `1d9b5eb` 重建 40 文件
+2026-08-23 发布补充验收已从当前 source commit `88e37c5` 重建 40 文件
 allowlist 包；当前包体 69,584 bytes，SHA-256 为
 `3d09d7c870a327fe454c8bbd98f27570875736947d439e9fd85e7f4637107071`。包内包含当前
 relative reranker、no-forcing pipeline 和 relative CPU smoke；从全新外部目录解包后 13 项

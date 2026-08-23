@@ -109,7 +109,7 @@
 - [ ] 最终匿名检查 Git 远端地址、公开仓库链接及 Git 历史信息；当前 allowlist 代码包
   已通过上述扫描且不含 `.git`，最终提交副本仍需复扫。
 - [x] 旧匿名包（source commit `c565d29`）作为历史快照归档；2026-08-23 已从当前
-  no-forcing/relative 修复提交重建 40 个 allowlisted 源文件，69,584 bytes，SHA-256
+  source commit `88e37c5` 重建 40 个 allowlisted 源文件，69,584 bytes，SHA-256
   `3d09d7c870a327fe454c8bbd98f27570875736947d439e9fd85e7f4637107071`；包外 cwd 独立执行
   13 项测试和 tiny relative `prepare -> train -> eval` CPU smoke 均通过。
 - [x] 当前匿名压缩包不超过历史 20 MB 限制（69,584 bytes）；目标 venue 确定后仍需

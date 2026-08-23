@@ -1,10 +1,10 @@
 schema_version: 1
 artifact_kind: manuscript_release_build
 status: audit_evidence
-built_at: "2026-08-23T06:34:48+08:00"
+built_at: "2026-08-23T14:09:07+08:00"
 
 source:
-  git_commit: 620bf2b
+  git_commit: 88e37c5
   branch: codex/transfer-2026-0831
   tracked_worktree_clean: true
   command: bash paper/build_release.sh
@@ -38,14 +38,14 @@ outputs:
     role: English submission draft
     pages: 16
     bytes: 479372
-    sha256: c066ed41b657a2aaa3957295c6ed064e7bd31aa83fe2319846cb9b6db86a5dcc
+    sha256: 8584c589960684c4efa23457266e56f6eaa906444f185ba96d860e9810ec4d00
     pdfinfo_author: empty
   chinese:
     path: paper/release/specembedding-adma2026-zh.pdf
     role: Chinese internal discussion draft
     pages: 14
-    bytes: 416682
-    sha256: f1e1fe30d8481184f1007a25c669cb2f2d3843650d7646f4ec0046a5d2de3376
+    bytes: 416686
+    sha256: 9ba8314ca5f288de7b650aa1552960aca4b5b48d53a0774bb970e9d91794c127
     pdfinfo_author: absent
 
 scope_note: >-
