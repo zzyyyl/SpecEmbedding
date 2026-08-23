@@ -1,0 +1,37 @@
+{
+  "baseline_status": "reimplemented_control",
+  "baseline_name": "JESTR-style saved-embedding cosine",
+  "source_commit": "0cf4e30b71f010878f412c74576f5ce8c2f40a2d",
+  "cache": "rerank_cache/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44_mass_topk40/massspecgym_mass_test.pt",
+  "cache_meta": {
+    "dataset_type": "massspecgym",
+    "split": "test",
+    "candidate_label": "mass",
+    "candidate_type": "mass",
+    "candidate_path": null,
+    "candidate_source_path": "/data1/zyl/SpecEmbedding/processed/MassSpecGym/candidates_mass.pkl",
+    "candidate_sha256": "b4ddf39783ea2dceb32217eab68b71133572f63cc482ba9d17ed9a530c906a8f",
+    "pre_top_k": 40,
+    "force_include_positive": false,
+    "checkpoint": "checkpoints_align/transfer2026_massspecgym_nopretrain_valoverlapclean_alignseed44/best_model_stage2.pth",
+    "checkpoint_sha256": "d007f832cfde8c02f61c053ee2b4098664c631868571f23ee83a96e107935a5c",
+    "num_queries": 17556,
+    "num_molecules": 196539,
+    "upper_bound": 0.722032353611301,
+    "labeled_fraction": 0.722032353611301
+  },
+  "evaluation": {
+    "top1": 0.23912052859421282,
+    "top5": 0.4077808156755525,
+    "top10": 0.4994303941672363,
+    "top20": 0.6008771929824561,
+    "mrr": 0.3226316008737238,
+    "total_queries": 17556,
+    "labeled_queries": 12676,
+    "coverage_upper_bound": 0.722032353611301,
+    "max_candidates": null
+  },
+  "metric_definition": "cosine(normalized saved spectrum embedding, normalized saved candidate embedding)",
+  "official_jest_reproduction": false,
+  "protocol_note": "Uses the local cache order, local two-dimensional identity labels, and local metrics; does not claim official JESTR encoder training or checkpoint equivalence."
+}
