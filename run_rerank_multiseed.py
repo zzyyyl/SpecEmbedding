@@ -418,6 +418,24 @@ def print_command(command: list[str]) -> None:
     print("Running:", " ".join(command), flush=True)
 
 
+def gpu_preflight(args, device: str, output_path: Path | None = None) -> dict:
+    if args.skip_gpu_preflight:
+        payload = {
+            "status": "skipped",
+            "reason": "nvidia-smi subprocess preflight is unavailable in this execution environment",
+            "device": device,
+        }
+        if output_path is not None:
+            atomic_write_json(output_path.with_suffix(".json"), payload)
+        return payload
+    return require_available_gpu(
+        device,
+        args.min_free_mib,
+        args.max_utilization,
+        output_path,
+    )
+
+
 def base_status(
     args,
     experiment: Experiment,
@@ -535,10 +553,9 @@ def execute_experiment(
         if action == "train_eval":
             status["state"] = "training"
             atomic_write_json(status_path, status)
-            status["gpu_before_train"] = require_available_gpu(
+            status["gpu_before_train"] = gpu_preflight(
+                args,
                 device,
-                args.min_free_mib,
-                args.max_utilization,
                 attempt_dir / "gpu_before_train.txt",
             )
             atomic_write_json(status_path, status)
@@ -555,10 +572,9 @@ def execute_experiment(
             atomic_write_json(status_path, status)
 
         status["state"] = "evaluating"
-        status["gpu_before_eval"] = require_available_gpu(
+        status["gpu_before_eval"] = gpu_preflight(
+            args,
             device,
-            args.min_free_mib,
-            args.max_utilization,
             attempt_dir / "gpu_before_eval.txt",
         )
         atomic_write_json(status_path, status)
@@ -763,6 +779,11 @@ def parse_args():
     parser.add_argument("--min-free-mib", type=int, default=16_000)
     parser.add_argument("--max-utilization", type=int, default=20)
     parser.add_argument(
+        "--skip-gpu-preflight",
+        action="store_true",
+        help="Skip runner nvidia-smi preflight when subprocess capture cannot access the driver; record the reason.",
+    )
+    parser.add_argument(
         "--mces",
         action=argparse.BooleanOptionalAction,
         default=False,
@@ -841,11 +862,7 @@ def main():
     print(f"Excluded validation query indices: {args.exclude_val_query_indices}")
     initial_gpu_states = {}
     for device in args.devices:
-        initial_gpu_states[device] = require_available_gpu(
-            device,
-            args.min_free_mib,
-            args.max_utilization,
-        )
+        initial_gpu_states[device] = gpu_preflight(args, device)
 
     if args.dry_run:
         for index, experiment in enumerate(experiments):
@@ -869,6 +886,7 @@ def main():
             "devices": initial_gpu_states,
             "experiments": [asdict(experiment) for experiment in experiments],
             "exclude_val_query_indices": args.exclude_val_query_indices,
+            "skip_gpu_preflight": args.skip_gpu_preflight,
             "mces": args.mces,
         },
     )
@@ -945,6 +963,7 @@ def main():
             "devices": initial_gpu_states,
             "experiments": [asdict(experiment) for experiment in experiments],
             "exclude_val_query_indices": args.exclude_val_query_indices,
+            "skip_gpu_preflight": args.skip_gpu_preflight,
             "results": results,
             "errors": errors,
             "mces": args.mces,
