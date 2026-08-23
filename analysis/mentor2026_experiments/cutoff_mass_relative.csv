@@ -1,0 +1,5 @@
+candidate_type,model_type,candidate_cutoff,total_queries,upper_bound_pct,base_top1_pct,base_top5_pct,base_top10_pct,base_top20_pct,base_mrr_raw,rerank_top1_pct,rerank_top5_pct,rerank_top10_pct,rerank_top20_pct,rerank_mrr_raw,log_path
+mass,relative,5,17556,63.5111,47.4596,63.5111,63.5111,63.5111,0.5334,54.2891,63.5111,63.5111,63.5111,0.58,analysis/mentor2026_experiments/cutoff_runs/mass_relative_k5/eval_rerank.log
+mass,relative,10,17556,71.0242,47.4596,63.5111,71.0242,71.0242,0.5434,56.3454,68.5635,71.0242,71.0242,0.6136,analysis/mentor2026_experiments/cutoff_runs/mass_relative_k10/eval_rerank.log
+mass,relative,20,17556,77.7626,47.4596,63.5111,71.0242,77.7626,0.5482,57.1315,71.6963,75.769,77.7626,0.6336,analysis/mentor2026_experiments/cutoff_runs/mass_relative_k20/eval_rerank.log
+mass,relative,40,17556,83.8802,47.4596,63.5111,71.0242,77.7626,0.5503,57.4277,73.3481,78.7024,82.1941,0.6443,analysis/mentor2026_experiments/cutoff_runs/mass_relative_k40/eval_rerank.log

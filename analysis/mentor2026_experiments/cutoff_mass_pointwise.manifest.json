@@ -1,0 +1,13 @@
+{
+  "candidate_protocol": "alignment-42 saved-embedding top-40 cache; evaluation-only truncation; no positive forcing",
+  "candidate_type": "mass",
+  "model_type": "pointwise",
+  "rows": 4,
+  "cutoffs": [
+    5,
+    10,
+    20,
+    40
+  ],
+  "source_root": "analysis/mentor2026_experiments/cutoff_runs"
+}
