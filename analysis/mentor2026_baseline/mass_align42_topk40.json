@@ -9,7 +9,7 @@
     "candidate_label": "mass",
     "candidate_type": "mass",
     "candidate_path": null,
-    "candidate_source_path": "/data1/zyl/SpecEmbedding/processed/MassSpecGym/candidates_mass.pkl",
+    "candidate_source_path": "data:MassSpecGym/candidates_mass.pkl",
     "candidate_sha256": "b4ddf39783ea2dceb32217eab68b71133572f63cc482ba9d17ed9a530c906a8f",
     "pre_top_k": 40,
     "force_include_positive": false,

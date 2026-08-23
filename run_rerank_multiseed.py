@@ -153,7 +153,7 @@ def experiment_fingerprint(args, experiment: Experiment, caches: dict[str, Path]
         "ablation": experiment.ablation,
         "ablation_overrides": ablation_overrides(experiment),
         "seed": experiment.seed,
-        "max_train_queries": args.max_train_queries,
+        "max_train_queries": getattr(args, "max_train_queries", None),
         "batch_size": getattr(args, "batch_size", None),
         "exclude_val_query_indices": args.exclude_val_query_indices,
         "cache_files": {split: cache_file_metadata(path) for split, path in caches.items()},
@@ -205,7 +205,11 @@ def checkpoint_matches(
         "use_spectrum_conditioning",
     }
     for key, expected in ablation_overrides(experiment).items():
-        source = model_config if key in model_config_keys else training_config
+        source = (
+            model_config
+            if key in model_config_keys and key in model_config
+            else training_config
+        )
         if source.get(key) != expected:
             return False
     return True
@@ -344,6 +348,12 @@ def build_train_command(
     exclude_val_query_indices: list[int] | None = None,
     batch_size: int | None = None,
 ) -> list[str]:
+    # Keep the historical positional call ``(..., train_k, exclusions)`` valid
+    # while allowing the newer max-query and batch-size controls to be passed
+    # explicitly by the expanded experiment matrix.
+    if isinstance(max_train_queries, (list, tuple)) and exclude_val_query_indices is None:
+        exclude_val_query_indices = list(max_train_queries)
+        max_train_queries = None
     command = [
         sys.executable,
         str(repo_root / "train_rerank.py"),
