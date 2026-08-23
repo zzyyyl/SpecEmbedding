@@ -3,19 +3,20 @@ status: audit_evidence
 validated_on: 2026-08-23
 
 source:
-  commit: 69df121
+  commit: 67cf29f
   branch: codex/transfer-2026-0831
-  build_origin: clean local clone of the source commit
-  worktree_clean_before_build: true
+  build_origin: repository source content matching the committed source
+  worktree_clean_before_build: false
+  content_committed_after_build: true
 
 archive:
   generated_path: dist/specembedding-anonymous-supplement.zip
-  tracked_in_git: false
+  tracked_in_git: true
   archive_root: specembedding-supplement
-  allowlisted_source_files: 40
-  zip_members_including_generated_manifest: 41
-  bytes: 69584
-  sha256: 3d09d7c870a327fe454c8bbd98f27570875736947d439e9fd85e7f4637107071
+  allowlisted_source_files: 43
+  zip_members_including_generated_manifest: 44
+  bytes: 81693
+  sha256: 199e1e729b6f540c8ba5003052f1b8556817af13fa276375e73d88baecfa15e1
   historical_adma_limit_bytes: 20971520
   under_historical_20_mib_limit: true
   deterministic_rebuild_sha256_match: true
@@ -59,9 +60,9 @@ independent_unpack_validation:
   cold_install_from_locks_performed_this_round: false
   pytest:
     result: passed
-    tests: 13
+    tests: 18
     warnings: 4
-    seconds: 1.56
+    seconds: 2.03
   ruff: passed
   compileall: passed
   shell_syntax: passed
@@ -82,9 +83,9 @@ independent_unpack_validation:
 repository_validation:
   pytest:
     result: passed
-    tests: 112
+    tests: 125
     warnings: 9
-    seconds: 32.01
+    seconds: 35.87
   ruff: passed
   compileall: passed
   canonical_artifacts:
@@ -93,9 +94,9 @@ repository_validation:
     manifest_matches: true
 
 scope_boundaries:
-  - The archive is a generated submission artifact and is intentionally not tracked in Git.
+  - The archive is a generated submission artifact; this current copy is tracked for release handoff.
   - The cold smoke uses synthetic spectra, synthetic candidates, and a random alignment checkpoint.
   - The smoke validates executable integration only and does not reproduce paper metrics.
   - This round reused the audited post-hoc Conda environment; it did not create a new environment from the lock files.
-  - Generic hostile-ZIP schema and unusual-text hardening remains P2; the actual 40-file allowlist has no control bytes or NFC/casefold collisions.
+  - Generic hostile-ZIP schema and unusual-text hardening remains P2; the actual 43-file allowlist has no control bytes or NFC/casefold collisions.
   - Final PDF, source, archive, author, conflict-of-interest, and target-venue checks still require one combined pre-submission pass.

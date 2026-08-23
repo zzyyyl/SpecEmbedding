@@ -17,7 +17,8 @@ python -m compileall -q .
 ```
 
 当前运行环境和匿名补充包验收记录分别见 `reproducibility/runtime-snapshot.yaml` 与
-`reproducibility/anonymous-supplement-validation.yaml`。快照是验收证据，不代表所有历史实验逐包使用同一环境。
+`reproducibility/anonymous-supplement-validation.yaml`；三组 alignment 的 36 个主运行和 30 个
+relative 消融的索引见 `reproducibility/mentor2026_experiment_index.json`。快照是验收证据，不代表所有历史实验逐包使用同一环境。
 
 ## 2. 代码分工
 
@@ -75,11 +76,11 @@ python run_rerank_pipeline.py massspecgym \
 bash paper/build_release.sh
 ```
 
-发布 PDF、工具链、页数和哈希见 `paper/release/`。论文正文以方法叙事为主，协议、历史对照和复现边界集中在正文后的附录；双语稿和参考文献以 `paper/` 为准，本文不重复实验表格。
+发布 PDF、工具链、页数和哈希见 `paper/release/`。当前英文 18 页、中文 15 页。论文正文以方法叙事为主，协议、历史对照和复现边界集中在正文后的附录；双语稿和参考文献以 `paper/` 为准，本文不重复实验表格。
 
 论文的核心发现分为两层：监督式第二阶段重排序改善固定候选池内的排序；relative interaction 的结构性质已形式化，但当前结果尚未证明其独立优于容量匹配的 pointwise 对照。
 
-匿名补充包由显式 allowlist 构建，排除 Git 历史、数据、checkpoint、cache、日志和内部 artifact manifest。构建与独立验收记录见 `reproducibility/`。
+匿名补充包由显式 allowlist 构建，当前发布包为 `dist/specembedding-anonymous-supplement.zip`，排除 Git 历史、数据、checkpoint、cache、日志和内部 artifact manifest。构建与独立验收记录见 `reproducibility/`。
 
 ## 6. 文档地图
 

@@ -51,13 +51,13 @@ python run_rerank_pipeline.py massspecgym \
 - 数据集为 MassSpecGym，使用官方 structure-disjoint split；不要写成 scaffold-disjoint。
 - `mass` 是质量候选协议；`formula` 假设真实分子式已知，称为 formula-conditioned retrieval。
 - reranker 只能重排输入候选，不能生成候选库外分子，也不能救回未被 base top-$K$ 召回的真值。
-- 当前官方兼容评价复用 official retrieval JSON 顺序、二维 InChIKey 身份规则和保存的 alignment embedding；没有重新运行 official loader、谱图/分子编码或 alignment 重训。
+- 当前 canonical 官方兼容评价复用 official retrieval JSON 顺序、二维 InChIKey 身份规则和 alignment-42 的保存嵌入；没有重新运行 official loader、谱图/分子编码或 alignment 重训。另有 cache-local 的 alignment-42/43/44 敏感性矩阵，不能与 canonical 表混称为完整 official evaluator 重跑。
 - local exact-target-SMILES 只作为敏感性视图。训练、验证和测试的候选覆盖、正例 forcing 和 miss 处理必须以 cache 元数据为准。
-- JESTR/GLMR 只作为 reported-only 机制背景；不做未经协议匹配的性能比较。
+- JESTR/GLMR 只作为外部机制背景；本仓库的 JESTR-style cosine 是保存嵌入上的 reimplemented control，不是官方 JESTR encoder/checkpoint 复现，GLMR 仍为 reported-only，不做未经协议匹配的性能比较。
 
-当前可辩护的论文主张是：在固定跨模态检索器已召回的候选列表内，监督式、非生成式 residual learning-to-rank 可以改善 Recall/MRR；当前容量匹配的 pointwise 对照在主要 R@1/MRR 汇总中略高于 relative。不能把增益归因于 candidate self-attention 或 relative 模块的独立普遍收益，也不能据此声称 SOTA、统计显著性、端到端稳定性或部署 latency。
+当前可辩护的论文主张是：在固定跨模态检索器已召回的候选列表内，监督式、非生成式 residual learning-to-rank 可以改善 Recall/MRR；在三组 alignment checkpoint 的描述性 cache-local 矩阵中，pointwise 在主要 R@1/MRR 汇总略高于 relative。36 个主矩阵运行使用最多 20,000 条训练 query、alignment seeds 42--44 和 reranker seeds 42--44；另有 30 个 relative 消融运行。不能把增益归因于 candidate self-attention 或 relative 模块的独立普遍收益，也不能据此声称 SOTA、统计显著性、端到端稳定性或部署 latency。
 
-论文当前采用两部分科学叙事：监督式第二阶段重排序在固定候选池内有效；relative candidate interaction 的结构性质值得研究，但其相对 pointwise 的独立收益尚未被当前 pilot 建立。
+论文当前采用两部分科学叙事：监督式第二阶段重排序在固定候选池内有效；relative candidate interaction 的结构性质得到形式化和消融，但其相对 pointwise 的独立收益尚未被当前多 checkpoint 证据建立。
 
 ## 4. 运行与验证
 
@@ -70,16 +70,17 @@ bash paper/build_release.sh
 ```
 
 最近一次发布验收的完整结果、匿名扫描、解包测试和 smoke 记录在
-`reproducibility/anonymous-supplement-validation.yaml`；双语 PDF 与构建信息在
+`reproducibility/anonymous-supplement-validation.yaml`；36+30 实验索引在
+`reproducibility/mentor2026_experiment_index.json`；双语 PDF 与构建信息在
 `paper/release/`；实验原始结果和分析工件在 `analysis/`。不要把这里的摘要替代为日志或工件核验。
 
-匿名补充包为生成工件，默认位于 `dist/` 且不纳入 Git。它只包含显式 allowlist 源文件，不包含 `.git`、数据、checkpoint、cache、日志和内部 manifest。
+匿名补充包为由显式 allowlist 构建的当前发布工件，位于 `dist/specembedding-anonymous-supplement.zip` 并已纳入 Git 以便交接。它不包含 `.git`、数据、checkpoint、cache、日志和内部 artifact manifest；当前包含 43 个 allowlisted 源文件。
 
 ## 5. 论文与待办
 
 - 英文稿：`paper/main.tex`；中文讨论稿：`paper/main_cn.tex`；参考文献：`paper/references.bib`。
 - 当前正文与 BibTeX 引用闭包为 24 个键；未使用的 `kretschmer2025coverage` 已删除。
-- 当前发布记录仍需按目标 venue 完成最终页数、作者/COI、预印本政策和联合匿名检查。
+- 当前 release 源稿提交为 `6f27a5f`，英文 PDF 18 页、中文 PDF 15 页；当前代码 HEAD 为 `67cf29f`。仍需按目标 venue 完成最终页数、作者/COI、预印本政策和联合匿名检查。
 - 外部强 baseline、candidate-aware alignment、跨数据集验证和完整 official-loader 端到端重跑不在当前证据范围内。
 
 文档修改计划的规则见 `docs/paper-change-plans/README.md`，当前执行计划见

@@ -160,7 +160,12 @@ def collect_attempts(root: Path) -> tuple[list[dict[str, Any]], list[dict[str, A
 
 def tracked_analysis_files() -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []
-    command = ["git", "ls-files", "analysis/mentor2026_experiments"]
+    command = [
+        "git",
+        "ls-files",
+        "analysis/mentor2026_experiments",
+        "analysis/mentor2026_baseline",
+    ]
     for line in subprocess.check_output(command, cwd=REPOSITORY_ROOT, text=True).splitlines():
         path = REPOSITORY_ROOT / line
         if path.is_file():
@@ -213,7 +218,7 @@ def main() -> None:
         ],
         "notes": [
             "Checkpoint, cache, training-log, and evaluation-log paths are repository-relative and refer to local ignored artifacts; they must be copied into a controlled supplement or release archive before submission.",
-            "The complete per-run ranking metrics are in eval_rerank.log. The tracked hard-query JSON files contain selected-query ranking/prediction outputs for alignment-42 seed-42 pointwise and relative runs.",
+            "The complete per-run ranking metrics are in eval_rerank.log. The tracked hard-query JSON files contain selected-query ranking/prediction outputs for alignment-42 seed-42 pointwise and relative runs; the tracked mentor2026_baseline JSON files contain the local JESTR-style cosine controls.",
             "Cache metadata records source paths, sizes, and mtimes in each status file; raw MassSpecGym data and caches are not redistributed by this index.",
             "The failed-attempt list is retained for provenance; only the latest complete attempt for each experiment key is used in the complete_runs lists.",
             "All seed and alignment aggregates are descriptive; this index does not imply significance testing or bitwise retraining equivalence.",

@@ -96,9 +96,9 @@
 ## 投稿合规
 
 - [x] 使用 Springer LNCS/LNAI 模板。
-- [x] 2026-08-20 从干净 source commit `033ac22`（论文实质 commit `076c5c5`）强制完整
-  重建为英文 17 页、中文 15 页，并将当前 PDF、页数和 SHA-256 留存在 `paper/release/`；
-  `paper/build` 已同步。用户决定完稿后再统一微调页数，故最终页数合规仍未完成。
+- [x] 2026-08-23 从论文实质 commit `6f27a5f` 强制完整重建为英文 18 页、中文 15 页，
+  并将当前 PDF、页数和 SHA-256 留存在 `paper/release/`；当前 release manifest 已记录
+  工具链和哈希。目标 venue 尚未确定，最终页数合规仍未完成。
 - [x] 当前留存 PDF 的作者元数据为空或缺失；正文中的作者和单位已隐藏。
 - [x] 未包含致谢和基金信息。
 - [x] 已在 Introduction 中加入覆盖全部章节和实际辅助范围的 AI 使用披露。
@@ -108,11 +108,10 @@
 - [x] 清理当前受跟踪源码、配置和归档 notebook 中的私有机器绝对路径。
 - [ ] 最终匿名检查 Git 远端地址、公开仓库链接及 Git 历史信息；当前 allowlist 代码包
   已通过上述扫描且不含 `.git`，最终提交副本仍需复扫。
-- [x] 旧匿名包（source commit `c565d29`）作为历史快照归档；2026-08-23 已从当前
-  source commit `69df121` 重建 40 个 allowlisted 源文件，69,584 bytes，SHA-256
-  `3d09d7c870a327fe454c8bbd98f27570875736947d439e9fd85e7f4637107071`；包外 cwd 独立执行
-  13 项测试和 tiny relative `prepare -> train -> eval` CPU smoke 均通过。
-- [x] 当前匿名压缩包不超过历史 20 MB 限制（69,584 bytes）；目标 venue 确定后仍需
+- [x] 2026-08-23 从当前代码 source commit `67cf29f` 重建 43 个 allowlisted 源文件，
+  81,693 bytes，SHA-256 `199e1e729b6f540c8ba5003052f1b8556817af13fa276375e73d88baecfa15e1`；
+  包外 cwd 独立执行 18 项测试和 tiny relative `prepare -> train -> eval` CPU smoke 均通过。
+- [x] 当前匿名压缩包不超过历史 20 MB 限制（81,693 bytes）；目标 venue 确定后仍需
   按其实际规则复核文件格式和上限。
 - [-] 当前采用匿名单文件压缩包，不建立匿名仓库；若目标 venue 改要求仓库，再重新开放冻结检查。
 - [ ] 目标 venue 确定后，在其投稿系统中确认最终作者列表。
