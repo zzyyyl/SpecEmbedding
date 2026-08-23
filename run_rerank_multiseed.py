@@ -154,6 +154,7 @@ def experiment_fingerprint(args, experiment: Experiment, caches: dict[str, Path]
         "ablation_overrides": ablation_overrides(experiment),
         "seed": experiment.seed,
         "max_train_queries": args.max_train_queries,
+        "batch_size": getattr(args, "batch_size", None),
         "exclude_val_query_indices": args.exclude_val_query_indices,
         "cache_files": {split: cache_file_metadata(path) for split, path in caches.items()},
     }
@@ -341,6 +342,7 @@ def build_train_command(
     train_k: int,
     max_train_queries: int | None = None,
     exclude_val_query_indices: list[int] | None = None,
+    batch_size: int | None = None,
 ) -> list[str]:
     command = [
         sys.executable,
@@ -362,6 +364,8 @@ def build_train_command(
     ]
     if max_train_queries is not None:
         command.extend(["--max-train-queries", str(max_train_queries)])
+    if batch_size is not None:
+        command.extend(["--batch-size", str(batch_size)])
     flag_names = {
         "use_base_score_feature": "--base-score-feature",
         "use_residual_score": "--residual-score",
@@ -453,6 +457,7 @@ def base_status(
         "ablation_overrides": ablation_overrides(experiment),
         "exclude_val_query_indices": args.exclude_val_query_indices,
         "max_train_queries": args.max_train_queries,
+        "batch_size": args.batch_size,
         "seed": experiment.seed,
         "device": device,
         "attempt_dir": str(attempt_dir),
@@ -525,6 +530,7 @@ def execute_experiment(
         args.topk,
         args.max_train_queries,
         args.exclude_val_query_indices,
+        args.batch_size,
     )
     eval_command = build_eval_command(repo_root, caches, attempt_dir, device, args.mces)
     label = (
@@ -768,6 +774,12 @@ def parse_args():
         help="Limit labeled training queries per run and record the limit in the experiment fingerprint.",
     )
     parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=None,
+        help="Override reranker train/validation batch size and record it in the experiment fingerprint.",
+    )
+    parser.add_argument(
         "--exclude-val-query-indices",
         nargs="*",
         type=int,
@@ -807,6 +819,8 @@ def parse_args():
         parser.error("--seeds must not contain duplicates")
     if args.max_train_queries is not None and args.max_train_queries <= 0:
         parser.error("--max-train-queries must be greater than 0")
+    if args.batch_size is not None and args.batch_size <= 0:
+        parser.error("--batch-size must be greater than 0")
     if len(set(args.ablations)) != len(args.ablations):
         parser.error("--ablations must not contain duplicates")
     if len(set(args.devices)) != len(args.devices):
@@ -888,6 +902,7 @@ def main():
             "experiments": [asdict(experiment) for experiment in experiments],
             "exclude_val_query_indices": args.exclude_val_query_indices,
             "max_train_queries": args.max_train_queries,
+            "batch_size": args.batch_size,
             "skip_gpu_preflight": args.skip_gpu_preflight,
             "mces": args.mces,
         },
@@ -966,6 +981,7 @@ def main():
             "experiments": [asdict(experiment) for experiment in experiments],
             "exclude_val_query_indices": args.exclude_val_query_indices,
             "max_train_queries": args.max_train_queries,
+            "batch_size": args.batch_size,
             "skip_gpu_preflight": args.skip_gpu_preflight,
             "results": results,
             "errors": errors,

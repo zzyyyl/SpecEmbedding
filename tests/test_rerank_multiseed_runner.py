@@ -31,6 +31,7 @@ class RerankMultiseedRunnerTest(unittest.TestCase):
             args = SimpleNamespace(
                 max_train_queries=20_000,
                 exclude_val_query_indices=[1, 2],
+                batch_size=32,
             )
             experiment = Experiment("mass", "relative", "directed_pair", 43)
             command = build_train_command(
@@ -42,10 +43,12 @@ class RerankMultiseedRunnerTest(unittest.TestCase):
                 40,
                 args.max_train_queries,
                 args.exclude_val_query_indices,
+                args.batch_size,
             )
             command_text = " ".join(command)
 
         self.assertIn("--max-train-queries 20000", command_text)
+        self.assertIn("--batch-size 32", command_text)
         self.assertIn("--pair-mode directed", command_text)
         self.assertIn("--lambda-spec 0.1", command_text)
         self.assertIn("--no-rank-embedding", command_text)
@@ -67,6 +70,7 @@ class RerankMultiseedRunnerTest(unittest.TestCase):
                 run_prefix="run",
                 topk=40,
                 max_train_queries=20_000,
+                batch_size=32,
                 exclude_val_query_indices=[],
                 cache_root=root,
             )
