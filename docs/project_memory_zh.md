@@ -55,7 +55,7 @@ python run_rerank_pipeline.py massspecgym \
 - local exact-target-SMILES 只作为敏感性视图。训练、验证和测试的候选覆盖、正例 forcing 和 miss 处理必须以 cache 元数据为准。
 - JESTR/GLMR 只作为 reported-only 机制背景；不做未经协议匹配的性能比较。
 
-当前可辩护的论文主张是：在固定跨模态检索器已召回的候选列表内，监督式、非生成式 residual learning-to-rank 可以改善 Recall/MRR。不能把增益归因于 candidate self-attention 或 relative 模块的独立普遍收益，也不能据此声称 SOTA、统计显著性、端到端稳定性或部署 latency。
+当前可辩护的论文主张是：在固定跨模态检索器已召回的候选列表内，监督式、非生成式 residual learning-to-rank 可以改善 Recall/MRR；当前容量匹配的 pointwise 对照在主要 R@1/MRR 汇总中略高于 relative。不能把增益归因于 candidate self-attention 或 relative 模块的独立普遍收益，也不能据此声称 SOTA、统计显著性、端到端稳定性或部署 latency。
 
 ## 4. 运行与验证
 
@@ -80,5 +80,5 @@ bash paper/build_release.sh
 - 当前发布记录仍需按目标 venue 完成最终页数、作者/COI、预印本政策和联合匿名检查。
 - 外部强 baseline、candidate-aware alignment、跨数据集验证和完整 official-loader 端到端重跑不在当前证据范围内。
 
-文档修改计划的规则见 `docs/paper-change-plans/README.md`，当前最终计划见
-`docs/paper-change-plans/2026-08-23-ScholarGPT方法重构与实验复核.md`。
+文档修改计划的规则见 `docs/paper-change-plans/README.md`，当前执行计划见
+`docs/paper-change-plans/2026-08-23-ChatGPT导师修改执行计划.md`。

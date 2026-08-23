@@ -65,7 +65,7 @@ python run_rerank_pipeline.py massspecgym \
 - 数据集：MassSpecGym；官方 structure-disjoint split 不表述为 scaffold-disjoint。
 - 候选协议：`mass` 或已知分子式的 `formula`；后者称为 formula-conditioned retrieval。
 - reranker 是 closed-library 方法，只能重排输入候选，不能恢复未被 base retrieval 召回的真值。
-- 当前主评价使用官方 retrieval JSON 的候选顺序、二维 InChIKey 身份规则和保存的 alignment embedding；这是 official-compatible candidate/identity audit，不是 fresh loader 重编码或 alignment 重训。
+- 当前主评价使用官方 retrieval JSON 的候选顺序、二维 InChIKey 身份规则和保存的 alignment embedding；这是 official-compatible candidate-order/identity evaluation，不是 fresh loader 重编码或 alignment 重训。
 - 训练、验证、测试的 no-forcing 语义和候选覆盖上界必须与 cache 元数据一起核对。
 - JESTR/GLMR 是 reported-only 外部背景，未在本仓库统一复现，不与本地数字直接排序比较。
 
@@ -75,7 +75,7 @@ python run_rerank_pipeline.py massspecgym \
 bash paper/build_release.sh
 ```
 
-发布 PDF、工具链、页数和哈希见 `paper/release/`。论文正文的当前科学边界、双语稿和参考文献以 `paper/` 为准；本文不重复实验表格。
+发布 PDF、工具链、页数和哈希见 `paper/release/`。论文正文以方法叙事为主，协议、历史对照和复现边界集中在正文后的附录；双语稿和参考文献以 `paper/` 为准，本文不重复实验表格。
 
 匿名补充包由显式 allowlist 构建，排除 Git 历史、数据、checkpoint、cache、日志和内部 artifact manifest。构建与独立验收记录见 `reproducibility/`。
 
