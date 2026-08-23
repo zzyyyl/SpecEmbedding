@@ -1,0 +1,132 @@
+{
+  "cache": "rerank_cache/a2280d2_massspecgym_nopretrain_valoverlapclean_mass_topk40/massspecgym_mass_test.pt",
+  "candidate_counts": [
+    5,
+    10,
+    20,
+    40
+  ],
+  "batch_size": 64,
+  "warmup_batches": 2,
+  "measure_batches": 16,
+  "device": "cuda:0",
+  "torch": "2.5.1",
+  "cuda_available": true,
+  "measurement": "forward-only; excludes DataLoader and data loading",
+  "models": {
+    "pointwise": {
+      "checkpoint": "checkpoints_rerank/mentor2026_align42_topk40_full_gpu_b32/mass/pointwise/seed42/attempt_001/best_reranker.pth",
+      "results": [
+        {
+          "model_type": "PointwiseReranker",
+          "parameter_count": 1478690,
+          "measurement_queries": 1024,
+          "measurement_batches": 16,
+          "coarse_ms_per_query": null,
+          "relation_ms_per_query": null,
+          "full_ms_per_query": 0.013703811418963596,
+          "queries_per_second": 72972.39938782147,
+          "peak_cuda_memory_mb": 19.3154296875,
+          "candidate_count": 5,
+          "relation_top_k": null
+        },
+        {
+          "model_type": "PointwiseReranker",
+          "parameter_count": 1478690,
+          "measurement_queries": 1024,
+          "measurement_batches": 16,
+          "coarse_ms_per_query": null,
+          "relation_ms_per_query": null,
+          "full_ms_per_query": 0.008181528755812906,
+          "queries_per_second": 122226.54589944558,
+          "peak_cuda_memory_mb": 23.73681640625,
+          "candidate_count": 10,
+          "relation_top_k": null
+        },
+        {
+          "model_type": "PointwiseReranker",
+          "parameter_count": 1478690,
+          "measurement_queries": 1024,
+          "measurement_batches": 16,
+          "coarse_ms_per_query": null,
+          "relation_ms_per_query": null,
+          "full_ms_per_query": 0.007263492079800926,
+          "queries_per_second": 137674.82486570117,
+          "peak_cuda_memory_mb": 32.580078125,
+          "candidate_count": 20,
+          "relation_top_k": null
+        },
+        {
+          "model_type": "PointwiseReranker",
+          "parameter_count": 1478690,
+          "measurement_queries": 1024,
+          "measurement_batches": 16,
+          "coarse_ms_per_query": null,
+          "relation_ms_per_query": null,
+          "full_ms_per_query": 0.007193644705694169,
+          "queries_per_second": 139011.5916078597,
+          "peak_cuda_memory_mb": 50.2666015625,
+          "candidate_count": 40,
+          "relation_top_k": null
+        }
+      ]
+    },
+    "relative": {
+      "checkpoint": "checkpoints_rerank/mentor2026_align42_topk40_full_gpu_b32/mass/relative/seed42/attempt_001/best_reranker.pth",
+      "results": [
+        {
+          "model_type": "antisymmetric",
+          "parameter_count": 1485189,
+          "measurement_queries": 1024,
+          "measurement_batches": 16,
+          "coarse_ms_per_query": 0.007069442290230654,
+          "relation_ms_per_query": 0.019148190403939225,
+          "full_ms_per_query": 0.02621763269416988,
+          "queries_per_second": 38142.26904713537,
+          "peak_cuda_memory_mb": 19.68359375,
+          "candidate_count": 5,
+          "relation_top_k": 40
+        },
+        {
+          "model_type": "antisymmetric",
+          "parameter_count": 1485189,
+          "measurement_queries": 1024,
+          "measurement_batches": 16,
+          "coarse_ms_per_query": 0.011207648640265688,
+          "relation_ms_per_query": 0.029874214305891655,
+          "full_ms_per_query": 0.041081862946157344,
+          "queries_per_second": 24341.641987137213,
+          "peak_cuda_memory_mb": 25.7197265625,
+          "candidate_count": 10,
+          "relation_top_k": 40
+        },
+        {
+          "model_type": "antisymmetric",
+          "parameter_count": 1485189,
+          "measurement_queries": 1024,
+          "measurement_batches": 16,
+          "coarse_ms_per_query": 0.0069951984187355265,
+          "relation_ms_per_query": 0.035803739592665806,
+          "full_ms_per_query": 0.04279893801140133,
+          "queries_per_second": 23365.065734425632,
+          "peak_cuda_memory_mb": 47.4765625,
+          "candidate_count": 20,
+          "relation_top_k": 40
+        },
+        {
+          "model_type": "antisymmetric",
+          "parameter_count": 1485189,
+          "measurement_queries": 1024,
+          "measurement_batches": 16,
+          "coarse_ms_per_query": 0.007084836397552863,
+          "relation_ms_per_query": 0.05196758320380468,
+          "full_ms_per_query": 0.05905241960135754,
+          "queries_per_second": 16934.107133131107,
+          "peak_cuda_memory_mb": 87.56640625,
+          "candidate_count": 40,
+          "relation_top_k": 40
+        }
+      ]
+    }
+  }
+}
