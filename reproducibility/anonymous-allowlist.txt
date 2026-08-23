@@ -17,6 +17,7 @@ prepare_rerank_cache.py
 train_rerank.py
 eval_rerank.py
 run_rerank_pipeline.py
+run_rerank_multiseed.py
 
 SpecEmbedding/__init__.py
 SpecEmbedding/config.py
@@ -31,6 +32,7 @@ SpecEmbedding/data/graph_utils.py
 SpecEmbedding/data/tokenizer.py
 SpecEmbedding/trainer/trainer.py
 SpecEmbedding/utils/align.py
+SpecEmbedding/utils/gpu.py
 SpecEmbedding/utils/mces.py
 SpecEmbedding/utils/providers.py
 SpecEmbedding/utils/rerank.py
@@ -46,3 +48,4 @@ src/data/NPLIB1.py
 
 tests/test_rerank_core.py
 tests/test_rerank_pipeline_paths.py
+tests/test_rerank_multiseed_runner.py

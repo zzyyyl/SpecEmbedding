@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "mentor review 2026-08-23",
-  "repository_head_at_index": "435fdb2957b5cb4fec3637ba669d1e12db2db626",
+  "repository_head_at_index": "6f27a5f55ffe687be0ff27b3578d09978a04ceb7",
   "params": {
     "path": "params.yaml",
     "exists": true,
@@ -8541,26 +8541,26 @@
     {
       "path": "analysis/mentor2026_experiments/hard_query_formula_pointwise42.json",
       "exists": true,
-      "bytes": 1797808,
-      "sha256": "bb1fa9ee9154e79e61a42b3c9fc9d1d603271f06e5873f8b1bbeae7268af8ba4"
+      "bytes": 1797809,
+      "sha256": "3a1d8b605c6dced88723d830e3062bedda6e6e63656e8b570d7fcd96d3fd712c"
     },
     {
       "path": "analysis/mentor2026_experiments/hard_query_formula_relative42.json",
       "exists": true,
-      "bytes": 1797764,
-      "sha256": "b77056697906b915e13946cfe5b5c236e4ba5bf1e3e801e92d0a692e9d3e2759"
+      "bytes": 1797765,
+      "sha256": "95cb78b4464366310dc973efc4a715dc9923131146ad59a663c8f0dcd0791fab"
     },
     {
       "path": "analysis/mentor2026_experiments/hard_query_mass_pointwise42.json",
       "exists": true,
-      "bytes": 1691152,
-      "sha256": "742803a9889a135e683ec4c974207d85f5107f8a4aebf918c82d266c3b95e5eb"
+      "bytes": 1691151,
+      "sha256": "70115f42830d5f0388e956ea392fcb2f7066a9a3de059d24ca4c178b32689719"
     },
     {
       "path": "analysis/mentor2026_experiments/hard_query_mass_relative42.json",
       "exists": true,
       "bytes": 1691203,
-      "sha256": "47c0cd3a0292be3865a1af8a1470fcae41967ac06102fc31dfdb3c0b914e9364"
+      "sha256": "826a5d8e78daa2f36c2857317b1e7cb9e92dfd4699ae176dfcbee5f8e2526a55"
     }
   ],
   "environment_files": [
