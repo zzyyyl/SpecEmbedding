@@ -23,3 +23,19 @@ To validate both lock layers in a fresh environment, run:
 ```bash
 bash reproducibility/validate_linux_lock.sh <unused-environment-name>
 ```
+
+## Mentor-review experiment index
+
+`mentor2026_experiment_index.json` records the repository-relative paths,
+source commits, resolved run metadata, SHA-256 digests, and local availability
+of the 36 pointwise/relative main runs and 30 relative ablation runs used for
+the 2026-08-23 paper revision. The corresponding ignored checkpoint, cache,
+training-log, and evaluation-log files remain local artifacts and must be
+copied into the controlled submission archive before release.
+
+The tracked `analysis/mentor2026_experiments/` files contain the alignment
+summary, ablation summary, candidate-cutoff results, forward-only reference,
+and selected-query hard-case ranking outputs. The hard-case JSON files are
+ranking/prediction outputs for alignment-42 seed-42 pointwise and relative
+runs; they are not a claim that every ignored checkpoint has a full prediction
+dump.
