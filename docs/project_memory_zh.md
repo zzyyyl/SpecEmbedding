@@ -772,7 +772,7 @@ GLMR 的核心是把跨模态检索转为分子--分子同模态相似度，但�
   相对 base 的 12/12 聚合单元均改善，Transformer--Pointwise 方向不一致。
 - canonical 核心组件消融：五项移除、两种候选、三个 reranker seeds 共 30/30 组完成；
   没有组件通过严格独立收益门槛。
-- 匿名补充代码包的旧 `c565d29` 构建已废弃；当前包从 source commit `88e37c5` 以 40 文件
+- 匿名补充代码包的旧 `c565d29` 构建已废弃；当前包从 source commit `69df121` 以 40 文件
   allowlist 重建，包体 69,584 bytes，SHA-256 为
   `3d09d7c870a327fe454c8bbd98f27570875736947d439e9fd85e7f4637107071`。独立解包后 13 项
   测试和 tiny relative CPU smoke 通过；该 smoke 不复现论文指标，也不包含真实数据、候选池、

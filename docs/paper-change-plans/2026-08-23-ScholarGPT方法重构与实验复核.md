@@ -210,4 +210,4 @@
 
 ### 15.4 当前状态
 
-本补充阶段开始时，工作树干净，旧匿名包由 `c565d29` 构建，且其 README、params 和验证记录均为旧 rank-aware/top-40 语义。现已完成修复与验收：代码提交为 `1d9b5eb`，发布与归档提交为 `88e37c5`；匿名包从 `88e37c5` 重建，40 个源文件、69,584 bytes，SHA-256 为 `3d09d7c870a327fe454c8bbd98f27570875736947d439e9fd85e7f4637107071`。仓库测试为 112 passed、9 warnings；包外解包测试为 13 passed、4 warnings；Ruff、compileall、shell 语法、匿名扫描和 relative CPU smoke 均通过。双语 release 为英文 16 页、中文 14 页，哈希已写入 `paper/release/build-manifest.yaml`。目标 venue 的最终页数、作者/COI 及提交副本联合匿名检查仍保留为投稿前事项。
+本补充阶段开始时，工作树干净，旧匿名包由 `c565d29` 构建，且其 README、params 和验证记录均为旧 rank-aware/top-40 语义。现已完成修复与验收：代码提交为 `1d9b5eb`，发布与归档提交为 `88e37c5`；最终归档提交 `69df121` 后再次重建匿名包，40 个源文件、69,584 bytes，SHA-256 为 `3d09d7c870a327fe454c8bbd98f27570875736947d439e9fd85e7f4637107071`。仓库测试为 112 passed、9 warnings；包外解包测试为 13 passed、4 warnings；Ruff、compileall、shell 语法、匿名扫描和 relative CPU smoke 均通过。双语 release 为英文 16 页、中文 14 页，哈希已写入 `paper/release/build-manifest.yaml`；该 release 的实际论文源稿仍为 `88e37c5`，其后仅追加归档记录。目标 venue 的最终页数、作者/COI 及提交副本联合匿名检查仍保留为投稿前事项。

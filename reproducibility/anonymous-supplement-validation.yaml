@@ -3,7 +3,7 @@ status: audit_evidence
 validated_on: 2026-08-23
 
 source:
-  commit: 88e37c5
+  commit: 69df121
   branch: codex/transfer-2026-0831
   build_origin: clean local clone of the source commit
   worktree_clean_before_build: true
