@@ -1,0 +1,9 @@
+{
+  "source_inputs": [
+    "align42_ablations=checkpoints_rerank/mentor2026_align42_topk40_relative_ablations_gpu_b32/summary.csv"
+  ],
+  "row_count": 30,
+  "alignment_summary_rows": 10,
+  "paired_rows": 0,
+  "interpretation": "descriptive seed/alignment summaries; no significance claim"
+}
