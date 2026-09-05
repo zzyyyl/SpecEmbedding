@@ -11,9 +11,17 @@ from types import SimpleNamespace
 import numpy as np
 import torch
 
+from analysis.audit_nplib1_overlap import (
+    overlap_summary,
+    spectrum_signature,
+    split_inventory,
+)
+from data_processing.download_nplib1 import SourceFile, git_blob_sha1, validate_source_file
 from data_processing.nplib1 import (
     build_candidate_mapping,
+    build_inchikey_to_smiles,
     canonicalize_2d_smiles,
+    merge_candidate_mappings,
     spectrum_from_entry,
 )
 from prepare_rerank_cache import build_query_record
@@ -23,6 +31,17 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 class NPLIB1ProcessingTest(unittest.TestCase):
+    def test_build_inchikey_to_smiles_accepts_rdkit_molecules(self):
+        from rdkit import Chem
+
+        mapping, summary = build_inchikey_to_smiles(
+            {"AAAA-BBBB-CC": Chem.MolFromSmiles("C[C@H](O)F")}
+        )
+
+        self.assertEqual(mapping["AAAA-BBBB-CC"], "C[C@H](O)F")
+        self.assertEqual(summary["mapped_molecules"], 1)
+        self.assertEqual(summary["invalid_molecules"], 0)
+
     def test_candidate_mapping_preserves_order_without_inserting_positive(self):
         query = "AAAA-BBBB-CC"
         other_a = "DDDD-EEEE-FF"
@@ -71,6 +90,14 @@ class NPLIB1ProcessingTest(unittest.TestCase):
         )
         self.assertIsNone(canonicalize_2d_smiles("not-a-smiles"))
 
+    def test_merge_candidate_mappings_rejects_conflicting_sources(self):
+        self.assertEqual(
+            merge_candidate_mappings({"CCO": ["CCC"]}, {"CCN": ["CCCC"]}),
+            {"CCO": ["CCC"], "CCN": ["CCCC"]},
+        )
+        with self.assertRaisesRegex(ValueError, "Conflicting"):
+            merge_candidate_mappings({"CCO": ["CCC"]}, {"CCO": ["CCN"]})
+
     def test_spectrum_conversion_does_not_mutate_source_entry(self):
         entry = {
             "inchikey": "AAAA-BBBB-CC",
@@ -108,6 +135,60 @@ class NPLIB1ProviderTest(unittest.TestCase):
                 provider.load_data("test")
             with self.assertRaisesRegex(ValueError, "supplied"):
                 provider.load_candidates("mass")
+
+
+class NPLIB1DownloadTest(unittest.TestCase):
+    def test_validate_source_file_records_sha256_and_git_blob_hash(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "split.pkl"
+            path.write_bytes(b"nplib1-test")
+            source = SourceFile(
+                filename="split.pkl",
+                url="https://example.invalid/split.pkl",
+                size_bytes=path.stat().st_size,
+                checksum_kind="git_blob_sha1",
+                checksum=git_blob_sha1(path),
+                source_record="https://example.invalid/source",
+            )
+
+            record = validate_source_file(path, source)
+
+            self.assertEqual(record["bytes"], len(b"nplib1-test"))
+            self.assertEqual(
+                record["sha256"],
+                "f247b8d001072dc5b929386bdcacbdd5a3b66338b2cac4721cb3fbc96895594e",
+            )
+
+
+class NPLIB1OverlapAuditTest(unittest.TestCase):
+    @staticmethod
+    def _record(smiles, inchikey, peaks, precursor_mz=100.0):
+        return {
+            "smiles": smiles,
+            "inchikey": inchikey,
+            "peaks": peaks,
+            "precursor_mz": precursor_mz,
+        }
+
+    def test_spectrum_signature_is_order_and_scale_invariant(self):
+        first = self._record("CCO", "LFQSCWFLJHTTHZ-UHFFFAOYSA-N", [[20, 1], [30, 2]])
+        second = self._record("CCO", "LFQSCWFLJHTTHZ-TESTTEST-N", [[30, 20], [20, 10]])
+
+        self.assertEqual(spectrum_signature(first), spectrum_signature(second))
+
+    def test_overlap_uses_two_dimensional_identity_and_spectrum_signature(self):
+        left = split_inventory(
+            [self._record("C[C@H](O)F", "AAAA-BBBB-CC", [[20, 1]])]
+        )
+        right = split_inventory(
+            [self._record("C[C@@H](O)F", "AAAA-ZZZZ-YY", [[20, 5]])]
+        )
+
+        summary = overlap_summary(left, right)
+
+        self.assertEqual(summary["shared_2d_inchikeys"], 1)
+        self.assertEqual(summary["shared_canonical_2d_smiles"], 1)
+        self.assertEqual(summary["shared_spectrum_signatures"], 1)
 
 
 class NPLIB1RerankCacheProtocolTest(unittest.TestCase):

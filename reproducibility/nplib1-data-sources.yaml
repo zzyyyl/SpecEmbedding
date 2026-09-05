@@ -1,0 +1,67 @@
+schema_version: 1
+dataset: NPLIB1
+recorded_on: "2026-09-05"
+purpose: "第二数据集的 in-domain 与跨数据集检索/重排序评价"
+identity_policy: "二维 InChIKey；实现使用 RDKit canonical non-isomeric SMILES 作为模型输入键"
+candidate_policy: "JESTR 发布的 cand_dict_large supplied candidates；不插入正例"
+
+upstream:
+  repository:
+    name: "HassounLab/JESTR1"
+    url: "https://github.com/HassounLab/JESTR1"
+    commit: "a5619c18a85a49171d60ead079684ae667cc0dd0"
+    license: "MIT"
+    role: "split、数据文件说明与 Zenodo 发布链接"
+  dataset_background:
+    name: "MIST canopus_train / NPLIB1"
+    url: "https://github.com/samgoldman97/mist/tree/main_v2"
+    doi: "10.5281/zenodo.8316682"
+    note: "用于核验 NPLIB1/CANOPUS 数据背景；本实验实际下载 JESTR 下列 pickle 工件。"
+
+files:
+  - filename: "split.pkl"
+    source: "HassounLab/JESTR1 pinned Git blob"
+    source_record: "https://github.com/HassounLab/JESTR1/tree/a5619c18a85a49171d60ead079684ae667cc0dd0/data/NPLIB1"
+    bytes: 216240
+    source_checksum: "git_blob_sha1:ba259183fcc045857f8389cec4936dbe296ca22d"
+    sha256: "45218ac309754c0ceb29629d700da49b87c6b3b0fd931b5ccca580bdabae41b8"
+  - filename: "data_dict.pkl"
+    title: "Spectra data for NPLIB1 dataset"
+    doi: "10.5281/zenodo.11237532"
+    license: "CC-BY-4.0"
+    bytes: 117212575
+    source_checksum: "md5:2b1d3c6f8c90b385a5c7ee50fa47dca3"
+    sha256: "b5d5583145541ca94a11e8aa56c0e71763f9cac0a15652f83dbe5ae8053f2ff3"
+  - filename: "mol_dict.pkl"
+    title: "Mol graph dictionary for NPLIB1 dataset"
+    doi: "10.5281/zenodo.11237413"
+    license: "CC-BY-4.0"
+    bytes: 3367180389
+    source_checksum: "md5:99090d074351468937e06e291f8be2e9"
+    sha256: null
+  - filename: "cand_dict_large.pkl"
+    title: "Candidates for test set of NPLIB1"
+    doi: "10.5281/zenodo.11237561"
+    license: "CC-BY-4.0"
+    bytes: 49745029
+    source_checksum: "md5:3e9f0caefffb3e855da3c7d5ab579409"
+    sha256: "fad96e75ecb73c1019d2f7232dee866c874509257c091ca995741a727361544b"
+  - filename: "cand_dict_train_updated.pkl"
+    title: "Training candidates for NPLIB1 dataset"
+    doi: "10.5281/zenodo.11237582"
+    license: "CC-BY-4.0"
+    bytes: 888629969
+    source_checksum: "md5:c278b7e2966768de04aef525b66f10f4"
+    sha256: null
+
+local_layout:
+  raw: "<storage-root>/raw/NPLIB1"
+  processed: "<storage-root>/processed/NPLIB1"
+  note: "本次运行的 storage-root 为用户指定的 /data1/zyl/SpecEmbedding；绝对路径不进入匿名工件。"
+
+verification:
+  downloader: "data_processing/download_nplib1.py"
+  download_command: >-
+    python data_processing/download_nplib1.py
+    --output-dir <storage-root>/raw/NPLIB1
+  post_download: "下载器校验官方 size/checksum，并在原始目录记录 SHA-256 acquisition manifest。"

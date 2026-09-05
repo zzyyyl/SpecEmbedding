@@ -29,8 +29,9 @@ from SpecEmbedding.utils.runtime import configure_runtime_cache, setup_logging
 SOURCE_FILENAMES = (
     "split.pkl",
     "data_dict.pkl",
-    "inchikey_to_smiles.pkl",
+    "mol_dict.pkl",
     "cand_dict_large.pkl",
+    "cand_dict_train_updated.pkl",
 )
 FOLD_MAP = {"train": "train", "valid": "val", "test": "test"}
 
@@ -70,6 +71,29 @@ def load_nplib1_inputs(raw_dir: str | Path) -> dict:
         with path.open("rb") as handle:
             inputs[filename] = pickle.load(handle)
     return inputs
+
+
+def build_inchikey_to_smiles(mol_dict: dict) -> tuple[dict, dict]:
+    mapping = {}
+    invalid_molecules = 0
+    for inchikey, value in mol_dict.items():
+        if isinstance(value, str):
+            source_smiles = value
+        else:
+            try:
+                source_smiles = Chem.MolToSmiles(value, canonical=True, isomericSmiles=True)
+            except (RuntimeError, TypeError, ValueError):
+                invalid_molecules += 1
+                continue
+        if not source_smiles:
+            invalid_molecules += 1
+            continue
+        mapping[inchikey] = source_smiles
+    return mapping, {
+        "source_molecules": len(mol_dict),
+        "mapped_molecules": len(mapping),
+        "invalid_molecules": invalid_molecules,
+    }
 
 
 def build_candidate_mapping(cand_dict_large: dict, ik_to_smiles: dict) -> tuple[dict, dict]:
@@ -175,6 +199,20 @@ def build_candidate_mapping(cand_dict_large: dict, ik_to_smiles: dict) -> tuple[
         "smiles_identity_policy": "rdkit_canonical_non_isomeric_smiles",
     }
     return candidates_smiles, summary
+
+
+def merge_candidate_mappings(*mappings: dict) -> dict:
+    merged = {}
+    for mapping in mappings:
+        for query_smiles, candidates in mapping.items():
+            previous = merged.get(query_smiles)
+            if previous is not None and previous != candidates:
+                raise ValueError(
+                    "Conflicting NPLIB1 candidate lists for normalized query SMILES: "
+                    f"{query_smiles}"
+                )
+            merged[query_smiles] = candidates
+    return merged
 
 
 def spectrum_from_entry(
@@ -294,13 +332,42 @@ def process_nplib1(
     inputs = load_nplib1_inputs(raw_dir)
     split = inputs["split.pkl"]
     data_dict = inputs["data_dict.pkl"]
-    ik_to_smiles = inputs["inchikey_to_smiles.pkl"]
+    ik_to_smiles, molecule_summary = build_inchikey_to_smiles(inputs["mol_dict.pkl"])
     cand_dict_large = inputs["cand_dict_large.pkl"]
+    cand_dict_train = inputs["cand_dict_train_updated.pkl"]
 
-    candidates_smiles, candidate_summary = build_candidate_mapping(
+    test_candidates, test_candidate_summary = build_candidate_mapping(
         cand_dict_large,
         ik_to_smiles,
     )
+    train_candidates, train_candidate_summary = build_candidate_mapping(
+        cand_dict_train,
+        ik_to_smiles,
+    )
+    candidates_smiles = merge_candidate_mappings(train_candidates, test_candidates)
+    source_candidate_keys = set(cand_dict_train).union(cand_dict_large)
+    candidate_summary = {
+        "sources": {
+            "train_updated": train_candidate_summary,
+            "test_large": test_candidate_summary,
+        },
+        "merged_candidate_sets": len(candidates_smiles),
+        "source_key_coverage_by_split": {
+            output_fold: {
+                "covered_inchikeys": sum(
+                    inchikey in source_candidate_keys
+                    for inchikey in split.get(source_fold, [])
+                ),
+                "total_inchikeys": len(split.get(source_fold, [])),
+                "coverage": sum(
+                    inchikey in source_candidate_keys
+                    for inchikey in split.get(source_fold, [])
+                )
+                / max(len(split.get(source_fold, [])), 1),
+            }
+            for source_fold, output_fold in FOLD_MAP.items()
+        },
+    }
     candidate_path = output_dir / "candidates_supplied.pkl"
     with candidate_path.open("wb") as handle:
         pickle.dump(candidates_smiles, handle)
@@ -349,6 +416,7 @@ def process_nplib1(
             "sha256": sha256_file(candidate_path),
         },
         "candidate_summary": candidate_summary,
+        "molecule_summary": molecule_summary,
         "folds": fold_summaries,
     }
     manifest_path = output_dir / "nplib1_processing_manifest.json"
