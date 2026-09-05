@@ -43,7 +43,8 @@ def main():
     parser.add_argument(
         "--candidate_type",
         choices=["mass", "formula", "supplied"],
-        default="mass",
+        default=None,
+        help="Defaults to supplied for NPLIB1 and mass otherwise.",
     )
     parser.add_argument("--candidate_path", help="Custom evaluation candidates pickle")
     parser.add_argument("--device", help='Device to use, for example "cpu", "cuda", "cuda:0", or "cuda:1"')
@@ -51,6 +52,8 @@ def main():
     parser.add_argument("--seed", type=int, default=config.general.seed, help="Random seed for alignment training")
 
     args = parser.parse_args()
+    if args.candidate_type is None:
+        args.candidate_type = "supplied" if args.dataset_type == "nplib1" else "mass"
     if args.seed < 0:
         parser.error("--seed must be a non-negative integer")
 

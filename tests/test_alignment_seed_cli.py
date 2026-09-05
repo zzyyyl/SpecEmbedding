@@ -254,6 +254,20 @@ class RunPipelineSeedTest(unittest.TestCase):
                 "supplied",
             )
 
+    def test_pipeline_defaults_nplib1_to_supplied_candidates(self):
+        commands = self.run_pipeline_commands(
+            "nplib1",
+            "--mode",
+            "eval",
+        )
+
+        self.assertEqual(len(commands), 3)
+        for command in commands:
+            self.assertEqual(
+                command[command.index("--candidate_type") + 1],
+                "supplied",
+            )
+
     def test_subprocesses_run_from_repository_root(self):
         completed = subprocess.CompletedProcess(["python"], returncode=0)
         with mock.patch.object(
