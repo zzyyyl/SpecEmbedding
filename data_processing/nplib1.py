@@ -1,4 +1,5 @@
 import argparse
+import gc
 import hashlib
 import json
 import logging
@@ -15,7 +16,11 @@ from matchms.filtering import default_filters
 from rdkit import Chem
 from tqdm import tqdm
 
-from data_processing.nplib1_candidates import unpack_candidate_inchikeys
+from data_processing.nplib1_candidates import (
+    candidate_inchikey_inventory,
+    unpack_candidate_inchikeys,
+)
+from data_processing.nplib1_formula import build_formula_library
 from SpecEmbedding.config import config
 from SpecEmbedding.utils.clean import (
     clean_metadata,
@@ -34,6 +39,7 @@ SOURCE_FILENAMES = (
     "cand_dict_large.pkl",
     "cand_dict_train_updated.pkl",
 )
+PROCESS_INPUT_FILENAMES = SOURCE_FILENAMES[:-1]
 FOLD_MAP = {"train": "train", "valid": "val", "test": "test"}
 
 
@@ -49,7 +55,7 @@ def two_dimensional_inchikey(value: str) -> str:
     return str(value).split("-", maxsplit=1)[0]
 
 
-def validate_split_identity_disjointness(split: dict) -> dict:
+def split_identity_overlaps(split: dict) -> dict:
     identities = {
         source_fold: {
             two_dimensional_inchikey(value)
@@ -57,11 +63,15 @@ def validate_split_identity_disjointness(split: dict) -> dict:
         }
         for source_fold in FOLD_MAP
     }
-    overlaps = {
+    return {
         "train_vs_val": len(identities["train"] & identities["valid"]),
         "train_vs_test": len(identities["train"] & identities["test"]),
         "val_vs_test": len(identities["valid"] & identities["test"]),
     }
+
+
+def validate_split_identity_disjointness(split: dict) -> dict:
+    overlaps = split_identity_overlaps(split)
     if any(overlaps.values()):
         details = ", ".join(f"{name}={count}" for name, count in overlaps.items())
         raise ValueError(
@@ -69,6 +79,58 @@ def validate_split_identity_disjointness(split: dict) -> dict:
             f"({details}). Freeze an explicit de-overlap policy before processing."
         )
     return overlaps
+
+
+def derive_deoverlapped_split(split: dict) -> tuple[dict, dict]:
+    source_overlaps = split_identity_overlaps(split)
+    if source_overlaps["train_vs_test"] or source_overlaps["val_vs_test"]:
+        details = ", ".join(
+            f"{name}={count}" for name, count in source_overlaps.items()
+        )
+        raise ValueError(
+            "NPLIB1 test identities must remain unchanged, but source split overlaps "
+            f"test ({details})."
+        )
+
+    train_identities = {
+        two_dimensional_inchikey(value) for value in split.get("train", [])
+    }
+    removed_validation_inchikeys = [
+        value
+        for value in split.get("valid", [])
+        if two_dimensional_inchikey(value) in train_identities
+    ]
+    derived_split = {
+        name: list(values)
+        for name, values in split.items()
+    }
+    derived_split["valid"] = [
+        value
+        for value in split.get("valid", [])
+        if two_dimensional_inchikey(value) not in train_identities
+    ]
+    derived_overlaps = validate_split_identity_disjointness(derived_split)
+    removed_digest = hashlib.sha256()
+    for value in sorted(removed_validation_inchikeys):
+        removed_digest.update(value.encode("utf-8"))
+        removed_digest.update(b"\n")
+
+    return derived_split, {
+        "policy": "remove_from_validation_if_2d_inchikey_occurs_in_train",
+        "source_fold_inchikeys": {
+            output_fold: len(split.get(source_fold, []))
+            for source_fold, output_fold in FOLD_MAP.items()
+        },
+        "source_2d_identity_overlaps": source_overlaps,
+        "removed_validation_inchikeys": len(removed_validation_inchikeys),
+        "removed_validation_inchikeys_sha256": removed_digest.hexdigest(),
+        "derived_fold_inchikeys": {
+            output_fold: len(derived_split.get(source_fold, []))
+            for source_fold, output_fold in FOLD_MAP.items()
+        },
+        "derived_2d_identity_overlaps": derived_overlaps,
+        "test_unchanged": derived_split.get("test", []) == split.get("test", []),
+    }
 
 
 def canonicalize_2d_smiles(value: str) -> str | None:
@@ -89,12 +151,12 @@ def load_nplib1_inputs(raw_dir: str | Path) -> dict:
         )
 
     inputs = {}
-    for filename in SOURCE_FILENAMES:
+    for filename in PROCESS_INPUT_FILENAMES:
         path = raw_dir / filename
         with path.open("rb") as handle:
             inputs[filename] = pickle.load(handle)
         if filename == "split.pkl":
-            validate_split_identity_disjointness(inputs[filename])
+            derive_deoverlapped_split(inputs[filename])
     return inputs
 
 
@@ -346,19 +408,36 @@ def process_nplib1(
 
     logging.info("Loading NPLIB1 source files from %s", raw_dir)
     inputs = load_nplib1_inputs(raw_dir)
-    split = inputs["split.pkl"]
-    split_identity_overlaps = validate_split_identity_disjointness(split)
+    split, split_derivation = derive_deoverlapped_split(inputs["split.pkl"])
     data_dict = inputs["data_dict.pkl"]
-    ik_to_smiles, molecule_summary = build_inchikey_to_smiles(inputs["mol_dict.pkl"])
     cand_dict_large = inputs["cand_dict_large.pkl"]
-    cand_dict_train = inputs["cand_dict_train_updated.pkl"]
+
+    query_inchikeys = list(
+        dict.fromkeys(
+            inchikey
+            for source_fold in FOLD_MAP
+            for inchikey in split.get(source_fold, [])
+        )
+    )
+    required_inchikeys = candidate_inchikey_inventory(cand_dict_large)
+    required_inchikeys.update(query_inchikeys)
+    library_data, molecule_summary = build_formula_library(
+        inputs["mol_dict.pkl"],
+        query_inchikeys,
+        required_inchikeys,
+        show_progress=True,
+    )
+    query_source_smiles = {
+        inchikey: record["source_smiles"]
+        for inchikey, record in library_data["query_records"].items()
+    }
 
     test_candidates, test_candidate_summary = build_candidate_mapping(
         cand_dict_large,
-        ik_to_smiles,
+        library_data["canonical_by_required_inchikey"],
     )
+    formula_candidates = library_data["candidate_mapping"]
     retrieval_candidate_keys = set(cand_dict_large)
-    regularization_candidate_keys = set(cand_dict_train)
 
     def source_key_coverage(candidate_keys: set) -> dict:
         return {
@@ -380,30 +459,44 @@ def process_nplib1(
                 retrieval_candidate_keys
             ),
         },
+        "formula_conditioned_fixed_library": {
+            "source_file": "mol_dict.pkl",
+            "summary": molecule_summary,
+            "source_key_coverage_by_split": source_key_coverage(
+                set(library_data["query_records"])
+            ),
+        },
         "regularization_negative_pools": {
             "source_file": "cand_dict_train_updated.pkl",
-            "candidate_sets": len(cand_dict_train),
-            "source_key_coverage_by_split": source_key_coverage(
-                regularization_candidate_keys
-            ),
-            "processing_status": "not_converted_or_used_as_retrieval_candidates",
+            "processing_status": "not_loaded_or_used_as_retrieval_candidates",
         },
-        "query_key_overlap_between_sources": len(
-            retrieval_candidate_keys.intersection(regularization_candidate_keys)
-        ),
         "protocol_decision": (
-            "cand_dict_train_updated.pkl contains JESTR regularization negative "
-            "pools and is not merged into retrieval candidates"
+            "formula candidates are complete formula buckets from the fixed "
+            "mol_dict library; cand_dict_train_updated.pkl remains an unused "
+            "JESTR regularization negative source"
         ),
     }
-    candidate_path = output_dir / "candidates_supplied.pkl"
-    with candidate_path.open("wb") as handle:
+    supplied_candidate_path = output_dir / "candidates_supplied.pkl"
+    with supplied_candidate_path.open("wb") as handle:
         pickle.dump(test_candidates, handle)
+    formula_candidate_path = output_dir / "candidates_formula.pkl"
+    with formula_candidate_path.open("wb") as handle:
+        pickle.dump(formula_candidates, handle)
     logging.info(
         "Saved %s test retrieval candidate sets without positive insertion to %s",
         len(test_candidates),
-        candidate_path,
+        supplied_candidate_path,
     )
+    logging.info(
+        "Saved %s fixed-library formula candidate sets without positive insertion "
+        "to %s",
+        len(formula_candidates),
+        formula_candidate_path,
+    )
+
+    del formula_candidates, test_candidates, library_data
+    del inputs["mol_dict.pkl"], inputs["cand_dict_large.pkl"]
+    gc.collect()
 
     fold_summaries = {}
     for source_fold, output_fold in FOLD_MAP.items():
@@ -411,7 +504,7 @@ def process_nplib1(
         raw_spectra, fold_summary = build_fold_spectra(
             list(split.get(source_fold, [])),
             data_dict,
-            ik_to_smiles,
+            query_source_smiles,
         )
         filtered_spectra = filters_nplib1(raw_spectra)
         output_path = output_dir / f"{output_fold}.pkl"
@@ -438,11 +531,18 @@ def process_nplib1(
         "source_dir": str(raw_dir.resolve()),
         "output_dir": str(output_dir.resolve()),
         "source_files": source_files,
-        "split_identity_overlaps": split_identity_overlaps,
-        "candidate_file": {
-            "path": str(candidate_path.resolve()),
-            "bytes": candidate_path.stat().st_size,
-            "sha256": sha256_file(candidate_path),
+        "split_derivation": split_derivation,
+        "candidate_files": {
+            "supplied": {
+                "path": str(supplied_candidate_path.resolve()),
+                "bytes": supplied_candidate_path.stat().st_size,
+                "sha256": sha256_file(supplied_candidate_path),
+            },
+            "formula": {
+                "path": str(formula_candidate_path.resolve()),
+                "bytes": formula_candidate_path.stat().st_size,
+                "sha256": sha256_file(formula_candidate_path),
+            },
         },
         "candidate_summary": candidate_summary,
         "molecule_summary": molecule_summary,
@@ -459,7 +559,10 @@ def process_nplib1(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Prepare NPLIB1 splits and supplied candidates without positive insertion."
+        description=(
+            "Prepare de-overlapped NPLIB1 splits plus supplied and fixed-library "
+            "formula candidates without positive insertion."
+        )
     )
     parser.add_argument(
         "--raw-dir",
@@ -469,7 +572,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         default=str(Path(config.data.data_path) / "NPLIB1"),
-        help="Output directory for train/val/test and candidates_supplied.pkl.",
+        help=(
+            "Output directory for train/val/test, candidates_supplied.pkl, and "
+            "candidates_formula.pkl."
+        ),
     )
     return parser.parse_args()
 

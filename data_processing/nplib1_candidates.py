@@ -30,3 +30,11 @@ def unpack_candidate_inchikeys(candidate_value) -> tuple[list[str], str]:
             raise TypeError(f"Unsupported NPLIB1 candidate entry: {item!r}")
         inchikeys.append(inchikey)
     return inchikeys, source_format
+
+
+def candidate_inchikey_inventory(candidate_dict: dict) -> set[str]:
+    inchikeys = set(candidate_dict)
+    for candidate_value in candidate_dict.values():
+        candidate_inchikeys, _ = unpack_candidate_inchikeys(candidate_value)
+        inchikeys.update(candidate_inchikeys)
+    return inchikeys

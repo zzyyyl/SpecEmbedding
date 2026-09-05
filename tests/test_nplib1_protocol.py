@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 import numpy as np
 import torch
@@ -25,10 +26,14 @@ from data_processing.nplib1 import (
     build_candidate_mapping,
     build_inchikey_to_smiles,
     canonicalize_2d_smiles,
+    derive_deoverlapped_split,
+    process_nplib1,
     spectrum_from_entry,
     unpack_candidate_inchikeys,
     validate_split_identity_disjointness,
 )
+from data_processing.nplib1_candidates import candidate_inchikey_inventory
+from data_processing.nplib1_formula import build_formula_library
 from prepare_rerank_cache import build_query_record
 from src.data.NPLIB1 import NPLIB1Provider
 
@@ -107,6 +112,14 @@ class NPLIB1ProcessingTest(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "Unsupported"):
             unpack_candidate_inchikeys([object()])
 
+    def test_candidate_inventory_includes_queries_and_members(self):
+        self.assertEqual(
+            candidate_inchikey_inventory(
+                {"AAAA-BBBB-CC": [("DDDD-EEEE-FF", 0.5)]}
+            ),
+            {"AAAA-BBBB-CC", "DDDD-EEEE-FF"},
+        )
+
     def test_source_candidate_audit_reports_split_and_positive_coverage(self):
         split = {
             "train": ["AAAA-BBBB-CC"],
@@ -159,6 +172,113 @@ class NPLIB1ProcessingTest(unittest.TestCase):
                     "valid": ["SHARED-CCCC-DD"],
                     "test": ["TTTT-UUUU-VV"],
                 }
+            )
+
+    def test_derived_split_removes_validation_overlap_and_keeps_test(self):
+        source = {
+            "train": ["SHARED-AAAA-BB", "TRAIN-AAAA-BB"],
+            "valid": ["SHARED-CCCC-DD", "VALID-AAAA-BB"],
+            "test": ["TEST-AAAA-BB"],
+        }
+
+        derived, summary = derive_deoverlapped_split(source)
+
+        self.assertEqual(derived["valid"], ["VALID-AAAA-BB"])
+        self.assertEqual(derived["test"], source["test"])
+        self.assertEqual(summary["removed_validation_inchikeys"], 1)
+        self.assertEqual(summary["derived_2d_identity_overlaps"]["train_vs_val"], 0)
+        self.assertTrue(summary["test_unchanged"])
+
+    def test_formula_library_uses_natural_fixed_library_membership(self):
+        from rdkit import Chem
+
+        mol_dict = {
+            "QUERY-AAAA-BB": Chem.MolFromSmiles("CCO"),
+            "ISOMER-AAAA-BB": Chem.MolFromSmiles("COC"),
+            "DUPLICATE-AAAA-BB": Chem.MolFromSmiles("OCC"),
+            "OTHER-AAAA-BB": Chem.MolFromSmiles("CCN"),
+        }
+
+        library, summary = build_formula_library(
+            mol_dict,
+            ["QUERY-AAAA-BB"],
+            set(mol_dict),
+        )
+
+        self.assertEqual(library["candidate_mapping"]["CCO"], ["CCO", "COC"])
+        self.assertEqual(summary["natural_positive_coverage"], 1.0)
+        self.assertEqual(summary["unique_2d_library_smiles_in_query_formulas"], 2)
+        self.assertEqual(summary["candidate_policy"], (
+            "fixed-library formula buckets without per-query insertion"
+        ))
+
+    def test_processing_writes_deoverlapped_splits_and_formula_candidates(self):
+        from rdkit import Chem
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            raw_dir = root / "raw"
+            output_dir = root / "processed"
+            raw_dir.mkdir()
+            split = {
+                "train": ["SHARED-AAAA-BB", "TRAIN-AAAA-BB"],
+                "valid": ["SHARED-CCCC-DD", "VALID-AAAA-BB"],
+                "test": ["TEST-AAAA-BB"],
+            }
+            mol_dict = {
+                "SHARED-AAAA-BB": Chem.MolFromSmiles("CCO"),
+                "SHARED-CCCC-DD": Chem.MolFromSmiles("CCO"),
+                "TRAIN-AAAA-BB": Chem.MolFromSmiles("CCN"),
+                "VALID-AAAA-BB": Chem.MolFromSmiles("CCC"),
+                "TEST-AAAA-BB": Chem.MolFromSmiles("COC"),
+                "CANDIDATE-AAAA-BB": Chem.MolFromSmiles("CCO"),
+            }
+            data_dict = {
+                index: {
+                    "inchikey": inchikey,
+                    "ms": np.asarray([[1.0, 10.0], [0.5, 20.0]]),
+                    "Precursor": "[M+H]+",
+                    "PrecursorMZ": 50.0,
+                }
+                for index, inchikey in enumerate(
+                    {
+                        "SHARED-AAAA-BB",
+                        "TRAIN-AAAA-BB",
+                        "VALID-AAAA-BB",
+                        "TEST-AAAA-BB",
+                    }
+                )
+            }
+            sources = {
+                "split.pkl": split,
+                "data_dict.pkl": data_dict,
+                "mol_dict.pkl": mol_dict,
+                "cand_dict_large.pkl": {
+                    "TEST-AAAA-BB": ["TEST-AAAA-BB", "CANDIDATE-AAAA-BB"]
+                },
+                "cand_dict_train_updated.pkl": {},
+            }
+            for filename, value in sources.items():
+                with (raw_dir / filename).open("wb") as handle:
+                    pickle.dump(value, handle)
+
+            with mock.patch(
+                "data_processing.nplib1.filters_nplib1",
+                side_effect=lambda spectra: spectra,
+            ):
+                manifest = process_nplib1(raw_dir, output_dir)
+
+            with (output_dir / "candidates_formula.pkl").open("rb") as handle:
+                formula_candidates = pickle.load(handle)
+            self.assertEqual(
+                manifest["split_derivation"]["removed_validation_inchikeys"],
+                1,
+            )
+            self.assertEqual(manifest["folds"]["val"]["requested_inchikeys"], 1)
+            self.assertEqual(formula_candidates["COC"], ["CCO", "COC"])
+            self.assertEqual(
+                manifest["molecule_summary"]["natural_positive_coverage"],
+                1.0,
             )
 
     def test_spectrum_conversion_does_not_mutate_source_entry(self):

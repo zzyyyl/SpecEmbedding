@@ -64,8 +64,24 @@ files:
 
 local_layout:
   raw: "<storage-root>/raw/NPLIB1"
-  processed: "<storage-root>/processed/NPLIB1"
+  processed: "<storage-root>/processed/nplib1_formula_deoverlap/NPLIB1"
   note: "本次运行使用用户指定的仓库外 <storage-root>；绝对路径不进入版本库或匿名工件。"
+
+derived_protocol:
+  confirmed_on: "2026-09-05"
+  split_policy: "从 validation 移除二维 InChIKey 已出现在 train 的 74 个身份；train/test 不变"
+  split_name: "JESTR NPLIB1 split with derived de-overlapped validation"
+  formula_candidate_library: "固定 mol_dict.pkl 全库中与任一派生 split query 分子式相同的二维结构"
+  formula_algorithm: "RDKit CalcMolFormula"
+  identity_algorithm: "RDKit canonical non-isomeric SMILES"
+  candidate_order: "mol_dict.pkl insertion order 中的首次二维结构出现"
+  positive_policy: "只接受固定分子库的自然成员关系；禁止逐 query 插入或强制进入 top-K"
+  separation: "candidates_formula.pkl 与 test-only candidates_supplied.pkl 分开生成、命名和评价"
+  processor: "data_processing/nplib1.py"
+  processing_command: >-
+    python data_processing/nplib1.py
+    --raw-dir <storage-root>/raw/NPLIB1
+    --output-dir <storage-root>/processed/nplib1_formula_deoverlap/NPLIB1
 
 verification:
   downloader: "data_processing/download_nplib1.py"
