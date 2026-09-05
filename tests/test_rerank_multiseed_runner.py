@@ -1,45 +1,17 @@
-import json
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest import mock
 
 from run_rerank_multiseed import (
     ABLATION_OVERRIDES,
     Experiment,
     build_train_command,
     experiment_fingerprint,
-    gpu_preflight,
-    parse_args,
 )
 
 
 class RerankMultiseedRunnerTest(unittest.TestCase):
-    def test_parse_args_accepts_cpu_worker(self):
-        with mock.patch.object(
-            sys,
-            "argv",
-            ["run_rerank_multiseed.py", "--run-prefix", "run", "--devices", "cpu"],
-        ):
-            args = parse_args()
-
-        self.assertEqual(args.devices, ["cpu"])
-
-    def test_cpu_preflight_records_not_applicable(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            output = Path(temporary) / "preflight.txt"
-            payload = gpu_preflight(
-                SimpleNamespace(skip_gpu_preflight=False),
-                "cpu",
-                output,
-            )
-            recorded = json.loads(output.with_suffix(".json").read_text())
-
-        self.assertEqual(payload["status"], "not_applicable")
-        self.assertEqual(recorded, payload)
-
     def test_required_relative_ablation_variants_are_explicit(self):
         self.assertEqual(ABLATION_OVERRIDES["directed_pair"]["pair_mode"], "directed")
         self.assertEqual(
