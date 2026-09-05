@@ -1,6 +1,6 @@
 # SpecEmbedding 项目记忆
 
-最后更新：2026-08-23
+最后更新：2026-09-06
 
 本文档是内部协作的当前状态摘要，不是实验原始记录，也不应放入匿名补充材料。数字、路径和结论以代码、`params.yaml`、原始日志及可校验工件为准。
 
@@ -60,6 +60,11 @@ python run_rerank_pipeline.py massspecgym \
 论文当前采用两部分科学叙事：监督式第二阶段重排序在固定候选池内有效；relative candidate interaction 的结构性质得到形式化和消融，但其相对 pointwise 的独立收益尚未被当前多 checkpoint 证据建立。
 
 ## 4. 运行与验证
+
+正式论文实验的训练设备规则：alignment 与 reranker 训练严格使用显式 `cuda:N`，启动前检查
+GPU 空闲显存和利用率；GPU 高负载或显存不足时等待，不切换到 CPU 训练。CPU 只用于 synthetic
+测试、数据处理、审计和明确标注为非论文结果的实现 smoke，不能产生正式 checkpoint、模型选择
+指标或论文结果。被中断的 CPU 训练工件必须隔离并明确排除。
 
 ```bash
 conda activate specembedding
