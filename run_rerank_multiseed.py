@@ -433,6 +433,15 @@ def print_command(command: list[str]) -> None:
 
 
 def gpu_preflight(args, device: str, output_path: Path | None = None) -> dict:
+    if device == "cpu":
+        payload = {
+            "status": "not_applicable",
+            "reason": "CPU execution does not require a GPU preflight",
+            "device": device,
+        }
+        if output_path is not None:
+            atomic_write_json(output_path.with_suffix(".json"), payload)
+        return payload
     if args.skip_gpu_preflight:
         payload = {
             "status": "skipped",
@@ -796,7 +805,12 @@ def parse_args():
         default=[],
         help="Zero-based validation cache query indices excluded before model selection.",
     )
-    parser.add_argument("--devices", nargs="+", required=True, help="Explicit devices, for example cuda:0 cuda:1.")
+    parser.add_argument(
+        "--devices",
+        nargs="+",
+        required=True,
+        help="Worker devices: cpu and/or explicit CUDA devices such as cuda:0 cuda:1.",
+    )
     parser.add_argument("--cache-root", type=Path, default=Path("rerank_cache"))
     parser.add_argument("--output-root", type=Path)
     parser.add_argument("--min-free-mib", type=int, default=16_000)
@@ -843,6 +857,8 @@ def parse_args():
     if not 0 <= args.max_utilization <= 100:
         parser.error("--max-utilization must be between 0 and 100")
     for device in args.devices:
+        if device == "cpu":
+            continue
         try:
             parse_cuda_device(device)
         except ValueError as error:
