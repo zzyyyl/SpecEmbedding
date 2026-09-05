@@ -159,6 +159,14 @@ verification:
       remaining_max_tanimoto_median: 0.5476190476190477
       remaining_max_tanimoto_p95: 0.873406352683461
     implication: "NPLIB1 可作为第二套 in-domain 派生协议；未经严格过滤的 test 不作为独立外部泛化证据，153 谱图子集仅作低功效敏感性分析。"
+  alignment_tokenset:
+    path: "<storage-root>/train_cache/tokenset_nplib1_formula_deoverlap_v1.pkl"
+    bytes: 8436615
+    sha256: "5e38845c93e06059b76eb0ff4cd2266d4df4ef6ae8d06f919cc6df52d4f4f088"
+    source_processed_splits:
+      train: {spectra: 7601, unique_2d_structures: 5894}
+      val: {spectra: 344, unique_2d_structures: 313}
+    policy: "显式路径隔离于旧 tokenset_nplib1.pkl；正式 alignment seeds 42--44 共用此只读缓存。"
 
 preexisting_local_cache:
   filename: "inchikey_to_smiles.pkl"
