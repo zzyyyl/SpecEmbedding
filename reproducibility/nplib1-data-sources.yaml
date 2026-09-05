@@ -3,7 +3,7 @@ dataset: NPLIB1
 recorded_on: "2026-09-05"
 purpose: "第二数据集的 in-domain 与跨数据集检索/重排序评价"
 identity_policy: "二维 InChIKey；实现使用 RDKit canonical non-isomeric SMILES 作为模型输入键"
-candidate_policy: "retrieval 仅使用 cand_dict_large test 候选；cand_dict_train_updated 是不含精确真值的正则化负池，禁止合并为 retrieval 候选；不插入正例"
+candidate_policy: "in-domain 主协议使用固定 mol_dict.pkl 全库派生的 formula-conditioned 候选；cand_dict_large 仅作 test-only supplied 对照；cand_dict_train_updated 是不含精确真值的正则化负池，禁止合并为 retrieval 候选；任何协议均不插入正例"
 
 upstream:
   publication:
@@ -107,6 +107,58 @@ verification:
       test_retrieval_exact_positive_coverage: 1.0
     report_sha256: "9e788310cd5b90e2437376e95e4d4244c24abc5ef27024889365977a90037541"
     implication: "官方 train/val 有 74 个二维身份重叠，且官方包不足以在 no-forcing 条件下直接构造 train/val/test 一致的 reranker retrieval 协议。"
+  processing:
+    completed_on: "2026-09-05"
+    processor_git_commit: "8ae6d93442394f7656b371bd94d24558dc4079eb"
+    manifest: "<storage-root>/processed/nplib1_formula_deoverlap/NPLIB1/nplib1_processing_manifest.json"
+    manifest_sha256: "50bafd12831579b89409d84bbea76721d6732b2aa23fed4fce1dfb156dfa1d73"
+    split_derivation:
+      source_inchikeys: {train: 6092, val: 399, test: 714}
+      removed_validation_inchikeys: 74
+      removed_validation_inchikeys_sha256: "fc05488dd87f2c256c31430ad0a956616ea428e13b73c6a50ae775749ed3030d"
+      derived_inchikeys: {train: 6092, val: 325, test: 714}
+      derived_shared_2d_inchikeys: {train_vs_val: 0, train_vs_test: 0, val_vs_test: 0}
+      test_unchanged: true
+    processed_spectra:
+      train: {count: 7601, sha256: "61f6db4ddc111fb1dd95423ff9992635de94db9e89692aa94d7614af1ccbd04f"}
+      val: {count: 344, sha256: "68b13d2a5a561d809ab9303aa0c3014bfebe2d14a4ea7aaa93270adc2c20bff3"}
+      test: {count: 879, sha256: "033275806e0a8a488dcdddbba0571fe655d330276667a76b6bfa0922dec109f6"}
+    formula_candidates:
+      path: "<storage-root>/processed/nplib1_formula_deoverlap/NPLIB1/candidates_formula.pkl"
+      bytes: 355466078
+      sha256: "cb1450407831e77cfca4d480ae1efe68963980978fb1c5510d7b7daf37c097f5"
+      source_library_molecules: 9358407
+      query_sets: 7131
+      query_formulas: 4805
+      natural_positive_coverage: 1.0
+      candidate_size: {min: 1, median: 720.0, mean: 2260.034357032674, max: 36289}
+      per_query_insertion: false
+    supplied_candidates:
+      path: "<storage-root>/processed/nplib1_formula_deoverlap/NPLIB1/candidates_supplied.pkl"
+      bytes: 63662881
+      sha256: "146ff5f9459e8777f572417be209a336f0366d00921d6601e22096e75bbd90b8"
+      query_sets: 714
+      source_candidates: 1657037
+      mapped_candidates: 1654289
+      missing_source_candidate_smiles: 2748
+      mapped_natural_positive_coverage: 1.0
+  cross_dataset_audit:
+    report: "<storage-root>/nplib1_evidence/nplib1_formula_deoverlap_overlap.json"
+    report_sha256: "40a2c9093420ec9585f91a63bb42dfa99a0a8a7bae1b4ea5986093f43bbf515f"
+    strict_filtered_test: "<storage-root>/nplib1_evidence/nplib1_formula_deoverlap_zero_shot_test.pkl"
+    strict_filtered_test_sha256: "8ba6a6cbab63a6e1433bd7c7fb5b129375a9f78cc790aed68883400b38f10c03"
+    within_nplib1_shared_2d_inchikeys: {train_vs_val: 0, train_vs_test: 0, val_vs_test: 0}
+    within_nplib1_shared_spectrum_signatures: {train_vs_val: 0, train_vs_test: 2, val_vs_test: 0}
+    nplib1_test_vs_massspecgym_train:
+      test_spectra: 879
+      shared_2d_inchikeys: 556
+      spectra_with_shared_2d_identity: 726
+      after_2d_identity_exclusion_spectra: 153
+      after_identity_and_exact_spectrum_exclusion_spectra: 153
+      remaining_unique_2d_inchikeys: 139
+      remaining_max_tanimoto_median: 0.5476190476190477
+      remaining_max_tanimoto_p95: 0.873406352683461
+    implication: "NPLIB1 可作为第二套 in-domain 派生协议；未经严格过滤的 test 不作为独立外部泛化证据，153 谱图子集仅作低功效敏感性分析。"
 
 preexisting_local_cache:
   filename: "inchikey_to_smiles.pkl"
