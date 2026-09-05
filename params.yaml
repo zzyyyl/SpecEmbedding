@@ -75,7 +75,7 @@ rerank:
     split: "train"
     data_path: null # null means data.data_path
     save_path: null
-    candidate_type: "mass"
+    candidate_type: "mass" # mass, formula, or supplied (NPLIB1 default via CLI)
     candidate_path: null
     pre_top_k: 256
     force_include_positive: false

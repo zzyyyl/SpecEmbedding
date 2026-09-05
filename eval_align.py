@@ -28,7 +28,13 @@ def main():
     parser.add_argument("--dataset_type", type=str, choices=["massbank", "massspecgym", "nplib1", "gnps", "mona"], default="massspecgym", help="Dataset type")
     parser.add_argument("--data_path", type=str, default=config.data.data_path, help="Base directory containing processed dataset folders")
     parser.add_argument("--device", type=str, default=config.general.device, help='Device to use, for example "cpu", "cuda", "cuda:0", or "cuda:1".')
-    parser.add_argument("--candidate_type", type=str, choices=["mass", "formula"], default="mass", help="Candidate set type to use.")
+    parser.add_argument(
+        "--candidate_type",
+        type=str,
+        choices=["mass", "formula", "supplied"],
+        default=None,
+        help="Candidate set type; defaults to supplied for NPLIB1 and mass otherwise.",
+    )
     parser.add_argument("--candidate_path", type=str, default=None, help="Path to a custom candidates pickle. Overrides --candidate_type when provided.")
     parser.add_argument("--mol_embedding_storage", type=str, choices=["cpu", "cuda"], default="cpu", help="Device used to store all molecule embeddings during retrieval.")
     parser.add_argument("--mol_embedding_dtype", type=str, choices=["float32", "float16"], default="float32", help="Dtype used to store all molecule embeddings.")
@@ -38,6 +44,8 @@ def main():
     parser.add_argument("--mol_norm_eps", type=float, default=getattr(config.model.mol_encoder, "norm_eps", 1e-5), help="Epsilon used by molecule encoder normalization. Must match the checkpoint.")
     parser.add_argument("--no-mces", action="store_true", help="Disable MCES structural similaritycalculation")
     args = parser.parse_args()
+    if args.candidate_type is None:
+        args.candidate_type = "supplied" if args.dataset_type == "nplib1" else "mass"
     if args.candidate_chunk_size < 0:
         raise ValueError("--candidate_chunk_size must be greater than or equal to 0")
     if not 0 < args.candidate_chunk_memory_fraction <= 1:
@@ -158,7 +166,9 @@ def main():
     
     hits = {k: 0 for k in config.eval.top_k}
     random_hits = {k: 0.0 for k in config.eval.top_k}
-    valid_queries = 0
+    total_queries = len(test_sequences)
+    ranked_queries = 0
+    positive_queries = 0
     mrr_sum = 0.0
     mces_pairs = []
 
@@ -185,14 +195,19 @@ def main():
                 if not cands:
                     continue
                     
-                cand_set = set(cands)
-                cand_set.add(true_smiles)
+                # Preserve supplied-pool membership. The target is never added here;
+                # absence from the supplied candidates is a coverage miss.
+                cand_indices_list = []
+                seen_indices = set()
+                for candidate_smiles in cands:
+                    candidate_idx = smiles_to_idx.get(candidate_smiles)
+                    if candidate_idx is None or candidate_idx in seen_indices:
+                        continue
+                    seen_indices.add(candidate_idx)
+                    cand_indices_list.append(candidate_idx)
                 
-                # Resolve unique SMILES to their integer indices in the embedding matrix
-                cand_indices_list = [smiles_to_idx[c] for c in cand_set if c in smiles_to_idx]
-                
-                if not cand_indices_list or smiles_to_idx.get(true_smiles) not in cand_indices_list:
-                    continue 
+                if not cand_indices_list:
+                    continue
 
                 candidate_size = len(cand_indices_list)
                 
@@ -225,8 +240,15 @@ def main():
                     c_counts, _ = np.histogram(cand_sims, bins=sim_bins)
                     candidate_sim_counts += c_counts
 
-                if target_sim is None or top1_idx_global is None:
+                if top1_idx_global is None:
                     continue
+
+                ranked_queries += 1
+                top1_smiles = unique_candidate_list[top1_idx_global]
+                mces_pairs.append((top1_smiles, true_smiles))
+                if target_sim is None:
+                    continue
+                positive_queries += 1
 
                 # Ranking is descending, so every candidate with a higher similarity precedes the target.
                 candidate_rank_offset = 0
@@ -255,28 +277,25 @@ def main():
                     random_hits[k] += min(k, candidate_size) / candidate_size
                 mrr_sum += 1.0 / rank
 
-                # Store Top-1 prediction for downstream structural similarity analysis
-                top1_smiles = unique_candidate_list[top1_idx_global]
-                mces_pairs.append((top1_smiles, true_smiles))
-
-                valid_queries += 1
-
-    if valid_queries == 0:
-        logging.error("No valid queries to evaluate (e.g., all candidates failed to parse).")
+    if ranked_queries == 0:
+        logging.error("No queries have a non-empty valid candidate pool.")
         return
 
     logging.info("="*40)
     logging.info("      EFFICIENT CROSS-MODAL EVALUATION RESULTS")
-    logging.info(f"      Total Valid Queries: {valid_queries}")
+    logging.info(f"      Total Queries: {total_queries}")
+    logging.info(f"      Queries With Valid Candidates: {ranked_queries}")
+    logging.info(f"      Queries With Supplied Positive: {positive_queries}")
+    logging.info(f"      Candidate Coverage: {positive_queries / max(total_queries, 1):.4%}")
     logging.info("="*40)
     
     for k in sorted(config.eval.top_k):
-        acc = hits[k] / valid_queries
-        logging.info(f"Top-{k:<2} Accuracy : {acc:.4%}  ({hits[k]}/{valid_queries})")
-        random_acc = random_hits[k] / valid_queries
+        acc = hits[k] / total_queries
+        logging.info(f"Top-{k:<2} Accuracy : {acc:.4%}  ({hits[k]}/{total_queries})")
+        random_acc = random_hits[k] / total_queries
         logging.info(f"Random Top-{k:<2} Baseline : {random_acc:.4%}")
         
-    mrr = mrr_sum / valid_queries
+    mrr = mrr_sum / total_queries
     logging.info(f"Mean Reciprocal Rank (MRR): {mrr:.4f}")
 
     # Plot Similarity Distribution
@@ -286,8 +305,18 @@ def main():
     plt.figure(figsize=(10, 6))
     bin_centers = (sim_bins[:-1] + sim_bins[1:]) / 2
     
-    target_sim_percent = target_sim_counts / target_sim_counts.sum()
-    candidate_sim_percent = candidate_sim_counts / candidate_sim_counts.sum()
+    target_total = target_sim_counts.sum()
+    candidate_total = candidate_sim_counts.sum()
+    target_sim_percent = (
+        target_sim_counts / target_total
+        if target_total
+        else np.zeros_like(target_sim_counts, dtype=float)
+    )
+    candidate_sim_percent = (
+        candidate_sim_counts / candidate_total
+        if candidate_total
+        else np.zeros_like(candidate_sim_counts, dtype=float)
+    )
 
     plt.bar(bin_centers, target_sim_percent, width=0.01, alpha=0.5, label='Targets', color='blue')
     plt.bar(bin_centers, candidate_sim_percent, width=0.01, alpha=0.3, label='Candidates', color='gray')

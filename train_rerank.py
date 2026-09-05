@@ -43,8 +43,18 @@ def build_data_summary(args, train_dataset) -> dict:
                 "split",
                 "dataset_type",
                 "candidate_type",
+                "candidate_label",
+                "candidate_sha256",
                 "pre_top_k",
                 "force_include_positive",
+                "num_input_spectra",
+                "num_candidate_mapped_spectra",
+                "num_selected_spectra",
+                "num_skipped_queries",
+                "candidate_mapping_coverage",
+                "source_candidate_coverage",
+                "candidate_pool_coverage",
+                "upper_bound",
             )
             if key in cache_meta
         },

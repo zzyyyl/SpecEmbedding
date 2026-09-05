@@ -196,7 +196,12 @@ def main():
         default="all",
         help="Execution mode. 'test' is an alias for 'eval'.",
     )
-    parser.add_argument("--candidate_type", choices=["mass", "formula"], default="mass")
+    parser.add_argument(
+        "--candidate_type",
+        choices=["mass", "formula", "supplied"],
+        default=None,
+        help="Candidate protocol; defaults to supplied for NPLIB1 and mass otherwise.",
+    )
     parser.add_argument("--candidate_path", help="Custom candidates pickle. Overrides provider candidates.")
     parser.add_argument("--checkpoint", help="Aligned model checkpoint. Overrides --align_save_dir.")
     parser.add_argument("--align_save_dir", help="Directory produced by run_pipeline.py.")
@@ -239,6 +244,9 @@ def main():
     parser.add_argument("--mces", action="store_true", help="Enable MCES@1 during final rerank evaluation.")
     parser.add_argument("--dry-run", action="store_true", help="Print commands without executing them.")
     args = parser.parse_args()
+
+    if args.candidate_type is None:
+        args.candidate_type = "supplied" if args.dataset_type == "nplib1" else "mass"
 
     if args.pre_top_k is not None and args.pre_top_k <= 0:
         parser.error("--pre_top_k/--topk must be greater than 0")

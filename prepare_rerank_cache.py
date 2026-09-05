@@ -32,7 +32,7 @@ def build_unique_candidate_list(sequences, candidates_dict, limit: int = 0):
     for seq in sequences:
         true_smiles = seq["smiles"]
         candidates = candidates_dict.get(true_smiles)
-        if not candidates:
+        if candidates is None:
             continue
         matched_sequences.append(seq)
         for smiles in [true_smiles, *candidates]:
@@ -123,25 +123,35 @@ def build_query_record(
     device,
 ):
     true_idx = smiles_to_idx.get(true_smiles)
-    if true_idx is None or not bool(valid_mol_mask[true_idx]):
-        return None
+    true_is_valid = true_idx is not None and bool(valid_mol_mask[true_idx])
+    candidates = list(candidates or [])
+    positive_in_source_candidates = true_smiles in candidates
 
     candidate_ids = []
     seen = set()
-    for smiles in [true_smiles, *candidates]:
+    candidate_smiles = candidates
+    if args.force_include_positive and not positive_in_source_candidates:
+        candidate_smiles = [true_smiles, *candidate_smiles]
+    for smiles in candidate_smiles:
         idx = smiles_to_idx.get(smiles)
         if idx is None or idx in seen or not bool(valid_mol_mask[idx]):
             continue
         seen.add(idx)
         candidate_ids.append(idx)
 
-    if not candidate_ids or true_idx not in seen:
+    if not candidate_ids:
         return None
 
     storage_device = mol_embs.device
     query_emb = spec_emb.to(device).unsqueeze(0)
-    true_emb = mol_embs[torch.tensor([true_idx], device=storage_device)].to(device=device, dtype=query_emb.dtype)
-    true_score = torch.mm(query_emb, true_emb.T).squeeze().item()
+    positive_in_candidate_pool = true_is_valid and true_idx in seen
+    true_score = None
+    if positive_in_candidate_pool:
+        true_emb = mol_embs[torch.tensor([true_idx], device=storage_device)].to(
+            device=device,
+            dtype=query_emb.dtype,
+        )
+        true_score = torch.mm(query_emb, true_emb.T).squeeze().item()
 
     top_scores = None
     top_indices = None
@@ -152,7 +162,8 @@ def build_query_record(
         chunk_indices = torch.tensor(chunk_ids, dtype=torch.long, device=storage_device)
         chunk_embs = mol_embs[chunk_indices].to(device=device, dtype=query_emb.dtype)
         chunk_scores = torch.mm(query_emb, chunk_embs.T).squeeze(0)
-        num_higher_than_true += int((chunk_scores > true_score).sum().item())
+        if true_score is not None:
+            num_higher_than_true += int((chunk_scores > true_score).sum().item())
         top_scores, top_indices = update_topk(
             top_scores=top_scores,
             top_indices=top_indices,
@@ -163,10 +174,21 @@ def build_query_record(
 
     top_indices_cpu = top_indices.cpu().long()
     top_scores_cpu = top_scores.cpu().float()
-    positive_positions = (top_indices_cpu == true_idx).nonzero(as_tuple=False).flatten()
-    positive_in_base_topk = positive_positions.numel() > 0
+    if true_is_valid:
+        positive_positions = (top_indices_cpu == true_idx).nonzero(as_tuple=False).flatten()
+    else:
+        positive_positions = torch.empty(0, dtype=torch.long)
+    positive_in_base_topk = positive_in_source_candidates and positive_positions.numel() > 0
+    positive_forced_into_candidate_pool = bool(
+        args.force_include_positive
+        and not positive_in_source_candidates
+        and positive_in_candidate_pool
+    )
+    positive_forced_into_topk = bool(
+        positive_forced_into_candidate_pool and positive_positions.numel() > 0
+    )
 
-    if not positive_in_base_topk and args.force_include_positive:
+    if positive_positions.numel() == 0 and args.force_include_positive and true_score is not None:
         true_rank = num_higher_than_true + 1
         forced_idx = torch.tensor([true_idx], dtype=torch.long)
         forced_score = torch.tensor([true_score], dtype=torch.float32)
@@ -182,10 +204,14 @@ def build_query_record(
         base_ranks = torch.arange(1, top_indices_cpu.numel() + 1, dtype=torch.long)
         forced_position = (top_indices_cpu == true_idx).nonzero(as_tuple=False).flatten()
         base_ranks[forced_position] = true_rank
+        positive_forced_into_topk = True
     else:
         base_ranks = torch.arange(1, top_indices_cpu.numel() + 1, dtype=torch.long)
 
-    positive_positions = (top_indices_cpu == true_idx).nonzero(as_tuple=False).flatten()
+    if true_is_valid:
+        positive_positions = (top_indices_cpu == true_idx).nonzero(as_tuple=False).flatten()
+    else:
+        positive_positions = torch.empty(0, dtype=torch.long)
     label = None if positive_positions.numel() == 0 else int(positive_positions[0].item())
 
     return {
@@ -195,7 +221,12 @@ def build_query_record(
         "base_scores": top_scores_cpu,
         "base_ranks": base_ranks,
         "label": label,
+        "positive_in_source_candidates": positive_in_source_candidates,
+        "positive_in_candidate_pool": positive_in_candidate_pool,
         "positive_in_base_topk": positive_in_base_topk,
+        "positive_forced_into_candidate_pool": positive_forced_into_candidate_pool,
+        "positive_forced_into_topk": positive_forced_into_topk,
+        "source_candidate_pool_size": len(candidates),
         "candidate_pool_size": len(candidate_ids),
     }
 
@@ -255,8 +286,12 @@ def parse_args():
     parser.add_argument(
         "--candidate_type",
         type=str,
-        choices=["mass", "formula"],
-        default=config.rerank.prepare.candidate_type,
+        choices=["mass", "formula", "supplied"],
+        default=None,
+        help=(
+            "Candidate protocol. Defaults to 'supplied' for NPLIB1 and to "
+            "rerank.prepare.candidate_type otherwise."
+        ),
     )
     parser.add_argument("--candidate_path", type=str, default=config.rerank.prepare.candidate_path)
     parser.add_argument(
@@ -293,6 +328,13 @@ def parse_args():
         help="Epsilon used by molecule encoder normalization. Must match the alignment checkpoint.",
     )
     args = parser.parse_args()
+
+    if args.candidate_type is None:
+        args.candidate_type = (
+            "supplied"
+            if args.dataset_type == "nplib1"
+            else config.rerank.prepare.candidate_type
+        )
 
     args.pre_top_k = int(args.pre_top_k)
     args.spec_batch_size = int(config.rerank.prepare.spec_batch_size)
@@ -362,6 +404,9 @@ def main():
         )
     )
     sequences = tokenizer.tokenize_sequence(raw_data)
+    mapped_sequence_count = sum(
+        candidates_dict.get(sequence["smiles"]) is not None for sequence in sequences
+    )
     matched_sequences, unique_smiles, smiles_to_idx = build_unique_candidate_list(
         sequences,
         candidates_dict,
@@ -403,11 +448,23 @@ def main():
 
     pruned_mol_embs, pruned_smiles = prune_molecule_embeddings(queries, mol_embs, unique_smiles)
     spec_embs = spec_embs.contiguous()
+    source_positives = sum(query["positive_in_source_candidates"] for query in queries)
+    candidate_pool_positives = sum(query["positive_in_candidate_pool"] for query in queries)
     base_positives = sum(query["positive_in_base_topk"] for query in queries)
     labeled_queries = sum(query["label"] is not None for query in queries)
     upper_bound = base_positives / len(queries)
     labeled_fraction = labeled_queries / len(queries)
+    source_coverage = source_positives / len(queries)
+    candidate_pool_coverage = candidate_pool_positives / len(queries)
     logging.info("Generated %s valid queries; skipped=%s.", len(queries), skipped)
+    logging.info(
+        "Candidate mapping coverage: %.4f (%s/%s spectra)",
+        mapped_sequence_count / max(len(sequences), 1),
+        mapped_sequence_count,
+        len(sequences),
+    )
+    logging.info("Supplied candidate positive coverage: %.4f", source_coverage)
+    logging.info("Valid candidate-pool positive coverage: %.4f", candidate_pool_coverage)
     logging.info("Pre-top-%s recall upper bound: %.4f", args.pre_top_k, upper_bound)
     logging.info("Labeled query fraction in saved cache: %.4f", labeled_fraction)
     logging.info("Unique molecules after top-k pruning: %s", len(pruned_smiles))
@@ -430,7 +487,14 @@ def main():
             "checkpoint": args.checkpoint,
             "checkpoint_sha256": checkpoint_sha256,
             "num_queries": len(queries),
+            "num_input_spectra": len(sequences),
+            "num_candidate_mapped_spectra": mapped_sequence_count,
+            "num_selected_spectra": len(matched_sequences),
+            "num_skipped_queries": skipped,
             "num_molecules": len(pruned_smiles),
+            "candidate_mapping_coverage": mapped_sequence_count / max(len(sequences), 1),
+            "source_candidate_coverage": source_coverage,
+            "candidate_pool_coverage": candidate_pool_coverage,
             "upper_bound": upper_bound,
             "labeled_fraction": labeled_fraction,
         },
