@@ -15,6 +15,7 @@ from matchms.filtering import default_filters
 from rdkit import Chem
 from tqdm import tqdm
 
+from data_processing.nplib1_candidates import unpack_candidate_inchikeys
 from SpecEmbedding.config import config
 from SpecEmbedding.utils.clean import (
     clean_metadata,
@@ -48,6 +49,28 @@ def two_dimensional_inchikey(value: str) -> str:
     return str(value).split("-", maxsplit=1)[0]
 
 
+def validate_split_identity_disjointness(split: dict) -> dict:
+    identities = {
+        source_fold: {
+            two_dimensional_inchikey(value)
+            for value in split.get(source_fold, [])
+        }
+        for source_fold in FOLD_MAP
+    }
+    overlaps = {
+        "train_vs_val": len(identities["train"] & identities["valid"]),
+        "train_vs_test": len(identities["train"] & identities["test"]),
+        "val_vs_test": len(identities["valid"] & identities["test"]),
+    }
+    if any(overlaps.values()):
+        details = ", ".join(f"{name}={count}" for name, count in overlaps.items())
+        raise ValueError(
+            "NPLIB1 source split is not two-dimensional-identity disjoint "
+            f"({details}). Freeze an explicit de-overlap policy before processing."
+        )
+    return overlaps
+
+
 def canonicalize_2d_smiles(value: str) -> str | None:
     """Return a canonical non-isomeric SMILES for the benchmark identity rule."""
 
@@ -70,6 +93,8 @@ def load_nplib1_inputs(raw_dir: str | Path) -> dict:
         path = raw_dir / filename
         with path.open("rb") as handle:
             inputs[filename] = pickle.load(handle)
+        if filename == "split.pkl":
+            validate_split_identity_disjointness(inputs[filename])
     return inputs
 
 
@@ -116,6 +141,7 @@ def build_candidate_mapping(cand_dict_large: dict, ik_to_smiles: dict) -> tuple[
     mapped_candidate_count = 0
     source_candidate_count = 0
     mapped_candidate_sizes = []
+    source_formats = {}
 
     for query_inchikey, candidate_inchikeys in cand_dict_large.items():
         source_query_smiles = ik_to_smiles.get(query_inchikey)
@@ -127,7 +153,10 @@ def build_candidate_mapping(cand_dict_large: dict, ik_to_smiles: dict) -> tuple[
             invalid_query_smiles += 1
             continue
 
-        candidate_inchikeys = list(candidate_inchikeys)
+        candidate_inchikeys, source_format = unpack_candidate_inchikeys(
+            candidate_inchikeys
+        )
+        source_formats[source_format] = source_formats.get(source_format, 0) + 1
         source_candidate_count += len(candidate_inchikeys)
         query_2d = two_dimensional_inchikey(query_inchikey)
         if query_inchikey in candidate_inchikeys:
@@ -195,24 +224,11 @@ def build_candidate_mapping(cand_dict_large: dict, ik_to_smiles: dict) -> tuple[
             ),
             "max": max(mapped_candidate_sizes, default=0),
         },
+        "source_formats": source_formats,
         "candidate_policy": "preserve_supplied_candidates_without_positive_insertion",
         "smiles_identity_policy": "rdkit_canonical_non_isomeric_smiles",
     }
     return candidates_smiles, summary
-
-
-def merge_candidate_mappings(*mappings: dict) -> dict:
-    merged = {}
-    for mapping in mappings:
-        for query_smiles, candidates in mapping.items():
-            previous = merged.get(query_smiles)
-            if previous is not None and previous != candidates:
-                raise ValueError(
-                    "Conflicting NPLIB1 candidate lists for normalized query SMILES: "
-                    f"{query_smiles}"
-                )
-            merged[query_smiles] = candidates
-    return merged
 
 
 def spectrum_from_entry(
@@ -331,6 +347,7 @@ def process_nplib1(
     logging.info("Loading NPLIB1 source files from %s", raw_dir)
     inputs = load_nplib1_inputs(raw_dir)
     split = inputs["split.pkl"]
+    split_identity_overlaps = validate_split_identity_disjointness(split)
     data_dict = inputs["data_dict.pkl"]
     ik_to_smiles, molecule_summary = build_inchikey_to_smiles(inputs["mol_dict.pkl"])
     cand_dict_large = inputs["cand_dict_large.pkl"]
@@ -340,40 +357,51 @@ def process_nplib1(
         cand_dict_large,
         ik_to_smiles,
     )
-    train_candidates, train_candidate_summary = build_candidate_mapping(
-        cand_dict_train,
-        ik_to_smiles,
-    )
-    candidates_smiles = merge_candidate_mappings(train_candidates, test_candidates)
-    source_candidate_keys = set(cand_dict_train).union(cand_dict_large)
-    candidate_summary = {
-        "sources": {
-            "train_updated": train_candidate_summary,
-            "test_large": test_candidate_summary,
-        },
-        "merged_candidate_sets": len(candidates_smiles),
-        "source_key_coverage_by_split": {
+    retrieval_candidate_keys = set(cand_dict_large)
+    regularization_candidate_keys = set(cand_dict_train)
+
+    def source_key_coverage(candidate_keys: set) -> dict:
+        return {
             output_fold: {
                 "covered_inchikeys": sum(
-                    inchikey in source_candidate_keys
+                    inchikey in candidate_keys
                     for inchikey in split.get(source_fold, [])
                 ),
                 "total_inchikeys": len(split.get(source_fold, [])),
-                "coverage": sum(
-                    inchikey in source_candidate_keys
-                    for inchikey in split.get(source_fold, [])
-                )
-                / max(len(split.get(source_fold, [])), 1),
             }
             for source_fold, output_fold in FOLD_MAP.items()
+        }
+
+    candidate_summary = {
+        "retrieval_test_supplied": {
+            "source_file": "cand_dict_large.pkl",
+            "summary": test_candidate_summary,
+            "source_key_coverage_by_split": source_key_coverage(
+                retrieval_candidate_keys
+            ),
         },
+        "regularization_negative_pools": {
+            "source_file": "cand_dict_train_updated.pkl",
+            "candidate_sets": len(cand_dict_train),
+            "source_key_coverage_by_split": source_key_coverage(
+                regularization_candidate_keys
+            ),
+            "processing_status": "not_converted_or_used_as_retrieval_candidates",
+        },
+        "query_key_overlap_between_sources": len(
+            retrieval_candidate_keys.intersection(regularization_candidate_keys)
+        ),
+        "protocol_decision": (
+            "cand_dict_train_updated.pkl contains JESTR regularization negative "
+            "pools and is not merged into retrieval candidates"
+        ),
     }
     candidate_path = output_dir / "candidates_supplied.pkl"
     with candidate_path.open("wb") as handle:
-        pickle.dump(candidates_smiles, handle)
+        pickle.dump(test_candidates, handle)
     logging.info(
-        "Saved %s supplied candidate sets without positive insertion to %s",
-        len(candidates_smiles),
+        "Saved %s test retrieval candidate sets without positive insertion to %s",
+        len(test_candidates),
         candidate_path,
     )
 
@@ -410,6 +438,7 @@ def process_nplib1(
         "source_dir": str(raw_dir.resolve()),
         "output_dir": str(output_dir.resolve()),
         "source_files": source_files,
+        "split_identity_overlaps": split_identity_overlaps,
         "candidate_file": {
             "path": str(candidate_path.resolve()),
             "bytes": candidate_path.stat().st_size,
@@ -435,7 +464,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--raw-dir",
         default=str(Path(config.data.raw_path) / "NPLIB1"),
-        help="Directory containing the four official NPLIB1 pickle files.",
+        help="Directory containing the five pinned JESTR NPLIB1 pickle files.",
     )
     parser.add_argument(
         "--output-dir",

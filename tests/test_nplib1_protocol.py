@@ -16,13 +16,18 @@ from analysis.audit_nplib1_overlap import (
     spectrum_signature,
     split_inventory,
 )
+from analysis.audit_nplib1_source_bundle import (
+    summarize_candidate_source,
+    summarize_split,
+)
 from data_processing.download_nplib1 import SourceFile, git_blob_sha1, validate_source_file
 from data_processing.nplib1 import (
     build_candidate_mapping,
     build_inchikey_to_smiles,
     canonicalize_2d_smiles,
-    merge_candidate_mappings,
     spectrum_from_entry,
+    unpack_candidate_inchikeys,
+    validate_split_identity_disjointness,
 )
 from prepare_rerank_cache import build_query_record
 from src.data.NPLIB1 import NPLIB1Provider
@@ -83,6 +88,62 @@ class NPLIB1ProcessingTest(unittest.TestCase):
             "rdkit_canonical_non_isomeric_smiles",
         )
 
+    def test_candidate_mapping_accepts_stateful_scored_train_candidates(self):
+        query = "AAAA-BBBB-CC"
+        candidate = "DDDD-EEEE-FF"
+
+        mapping, summary = build_candidate_mapping(
+            {query: [7, [(query, 1.0), (candidate, 0.75)]]},
+            {query: "CCO", candidate: "CCC"},
+        )
+
+        self.assertEqual(mapping["CCO"], ["CCO", "CCC"])
+        self.assertEqual(
+            summary["source_formats"],
+            {"state_and_scored_candidate_list": 1},
+        )
+
+    def test_candidate_unpacking_rejects_unknown_entry(self):
+        with self.assertRaisesRegex(TypeError, "Unsupported"):
+            unpack_candidate_inchikeys([object()])
+
+    def test_source_candidate_audit_reports_split_and_positive_coverage(self):
+        split = {
+            "train": ["AAAA-BBBB-CC"],
+            "valid": ["VVVV-WWWW-XX"],
+            "test": ["TTTT-UUUU-VV"],
+        }
+        summary = summarize_candidate_source(
+            {"AAAA-BBBB-CC": [4, [("AAAA-BBBB-CC", 1.0), ("DDDD-EEEE-FF", 0.5)]]},
+            split,
+        )
+
+        self.assertEqual(summary["candidate_sets"], 1)
+        self.assertEqual(summary["candidate_entries"], 2)
+        self.assertEqual(summary["exact_inchikey_positive_coverage"], 1.0)
+        self.assertEqual(
+            summary["query_key_coverage_by_split"]["val"]["coverage"],
+            0.0,
+        )
+
+    def test_source_split_audit_reports_train_validation_leakage(self):
+        summary = summarize_split(
+            {
+                "train": ["AAAA-BBBB-CC", "SHARED-AAAA-BB"],
+                "valid": ["SHARED-AAAA-BB"],
+                "test": ["TTTT-UUUU-VV"],
+            }
+        )
+
+        self.assertEqual(
+            summary["pairwise_overlap"]["train_vs_val"]["shared_full_inchikeys"],
+            1,
+        )
+        self.assertEqual(
+            summary["pairwise_overlap"]["train_vs_test"]["shared_2d_inchikeys"],
+            0,
+        )
+
     def test_canonicalize_2d_smiles_removes_stereochemistry(self):
         self.assertEqual(
             canonicalize_2d_smiles("C[C@H](O)F"),
@@ -90,13 +151,15 @@ class NPLIB1ProcessingTest(unittest.TestCase):
         )
         self.assertIsNone(canonicalize_2d_smiles("not-a-smiles"))
 
-    def test_merge_candidate_mappings_rejects_conflicting_sources(self):
-        self.assertEqual(
-            merge_candidate_mappings({"CCO": ["CCC"]}, {"CCN": ["CCCC"]}),
-            {"CCO": ["CCC"], "CCN": ["CCCC"]},
-        )
-        with self.assertRaisesRegex(ValueError, "Conflicting"):
-            merge_candidate_mappings({"CCO": ["CCC"]}, {"CCO": ["CCN"]})
+    def test_processing_rejects_identity_overlap_between_splits(self):
+        with self.assertRaisesRegex(ValueError, "train_vs_val=1"):
+            validate_split_identity_disjointness(
+                {
+                    "train": ["SHARED-AAAA-BB"],
+                    "valid": ["SHARED-CCCC-DD"],
+                    "test": ["TTTT-UUUU-VV"],
+                }
+            )
 
     def test_spectrum_conversion_does_not_mutate_source_entry(self):
         entry = {
@@ -189,6 +252,34 @@ class NPLIB1OverlapAuditTest(unittest.TestCase):
         self.assertEqual(summary["shared_2d_inchikeys"], 1)
         self.assertEqual(summary["shared_canonical_2d_smiles"], 1)
         self.assertEqual(summary["shared_spectrum_signatures"], 1)
+        self.assertEqual(
+            summary["left_spectra_with_shared_signature_but_different_2d_identity"],
+            0,
+        )
+
+    def test_overlap_flags_identical_spectrum_with_different_identity(self):
+        left = split_inventory([self._record("CCO", "AAAA-BBBB-CC", [[20, 1]])])
+        right = split_inventory([self._record("CCN", "DDDD-EEEE-FF", [[20, 2]])])
+
+        summary = overlap_summary(left, right)
+
+        self.assertEqual(summary["shared_2d_inchikeys"], 0)
+        self.assertEqual(
+            summary["left_spectra_with_shared_signature_but_different_2d_identity"],
+            1,
+        )
+        self.assertEqual(
+            summary["different_2d_identity_signature_examples"][0][
+                "left_2d_inchikey"
+            ],
+            "AAAA",
+        )
+        self.assertEqual(
+            summary["different_2d_identity_signature_examples"][0][
+                "right_2d_inchikeys"
+            ],
+            ["DDDD"],
+        )
 
 
 class NPLIB1RerankCacheProtocolTest(unittest.TestCase):

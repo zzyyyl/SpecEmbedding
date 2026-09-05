@@ -144,6 +144,30 @@ def overlap_summary(left: dict, right: dict) -> dict:
     right_smiles = {value for value in right["smiles"] if value}
     left_signatures = {value for value in left["signatures"] if value}
     right_signatures = {value for value in right["signatures"] if value}
+    right_identities_by_signature = {}
+    for identity, signature in zip(right["identities"], right["signatures"]):
+        if signature:
+            right_identities_by_signature.setdefault(signature, set()).add(identity)
+    different_identity_signature_examples = []
+    for left_index, (identity, signature) in enumerate(
+        zip(left["identities"], left["signatures"])
+    ):
+        if (
+            signature
+            and signature in right_identities_by_signature
+            and identity not in right_identities_by_signature[signature]
+        ):
+            different_identity_signature_examples.append(
+                {
+                    "left_record_index": left_index,
+                    "left_2d_inchikey": identity,
+                    "right_2d_inchikeys": sorted(
+                        right_identities_by_signature[signature],
+                        key=lambda value: "" if value is None else value,
+                    ),
+                    "spectrum_signature": signature,
+                }
+            )
     return {
         "shared_2d_inchikeys": len(left_identities & right_identities),
         "left_spectra_with_shared_2d_identity": sum(
@@ -156,6 +180,12 @@ def overlap_summary(left: dict, right: dict) -> dict:
         "shared_spectrum_signatures": len(left_signatures & right_signatures),
         "left_spectra_with_shared_signature": sum(
             value in right_signatures for value in left["signatures"] if value
+        ),
+        "left_spectra_with_shared_signature_but_different_2d_identity": (
+            len(different_identity_signature_examples)
+        ),
+        "different_2d_identity_signature_examples": (
+            different_identity_signature_examples
         ),
     }
 
@@ -260,10 +290,18 @@ def run_audit(
         },
     }
     if compute_near_neighbors:
-        report["nplib1_test_vs_massspecgym_train_near_neighbors"] = near_neighbor_summary(
-            [value for value in nplib_test["smiles"] if value],
-            [value for value in massspec_train["smiles"] if value],
-        )
+        reference_smiles = [value for value in massspec_train["smiles"] if value]
+        identity_filtered_inventory = split_inventory(identity_filtered_test)
+        report["nplib1_test_vs_massspecgym_train_near_neighbors"] = {
+            "all_nplib1_test": near_neighbor_summary(
+                [value for value in nplib_test["smiles"] if value],
+                reference_smiles,
+            ),
+            "after_2d_identity_exclusion": near_neighbor_summary(
+                [value for value in identity_filtered_inventory["smiles"] if value],
+                reference_smiles,
+            ),
+        }
     return report, strict_filtered_test
 
 

@@ -3,9 +3,15 @@ dataset: NPLIB1
 recorded_on: "2026-09-05"
 purpose: "第二数据集的 in-domain 与跨数据集检索/重排序评价"
 identity_policy: "二维 InChIKey；实现使用 RDKit canonical non-isomeric SMILES 作为模型输入键"
-candidate_policy: "JESTR 发布的 cand_dict_large supplied candidates；不插入正例"
+candidate_policy: "retrieval 仅使用 cand_dict_large test 候选；cand_dict_train_updated 是不含精确真值的正则化负池，禁止合并为 retrieval 候选；不插入正例"
 
 upstream:
+  publication:
+    title: "JESTR: Joint Embedding Space Technique for Ranking candidate molecules for the annotation of untargeted metabolomics data"
+    venue: "Bioinformatics 41(7), btaf354 (2025)"
+    doi: "10.1093/bioinformatics/btaf354"
+    url: "https://academic.oup.com/bioinformatics/article/41/7/btaf354/8165426"
+    role: "核验 NPLIB1 数据背景、同分子式 PubChem 候选语义与公开代码入口"
   repository:
     name: "HassounLab/JESTR1"
     url: "https://github.com/HassounLab/JESTR1"
@@ -38,7 +44,7 @@ files:
     license: "CC-BY-4.0"
     bytes: 3367180389
     source_checksum: "md5:99090d074351468937e06e291f8be2e9"
-    sha256: null
+    sha256: "23dec5ae10111c7724009a42e5ec5b9bd78cced49ede0d11248690949305fdaa"
   - filename: "cand_dict_large.pkl"
     title: "Candidates for test set of NPLIB1"
     doi: "10.5281/zenodo.11237561"
@@ -46,18 +52,20 @@ files:
     bytes: 49745029
     source_checksum: "md5:3e9f0caefffb3e855da3c7d5ab579409"
     sha256: "fad96e75ecb73c1019d2f7232dee866c874509257c091ca995741a727361544b"
+    role: "test retrieval supplied candidates；714/714 query 含精确真值"
   - filename: "cand_dict_train_updated.pkl"
     title: "Training candidates for NPLIB1 dataset"
     doi: "10.5281/zenodo.11237582"
     license: "CC-BY-4.0"
     bytes: 888629969
     source_checksum: "md5:c278b7e2966768de04aef525b66f10f4"
-    sha256: null
+    sha256: "bfcac4a9b29ccb3378b1923e89ba5aaa850a3ef01e7498fb182b68af94cd9926"
+    role: "JESTR training regularization negative pools；不得作为无 forcing reranker 的 retrieval 训练候选"
 
 local_layout:
   raw: "<storage-root>/raw/NPLIB1"
   processed: "<storage-root>/processed/NPLIB1"
-  note: "本次运行的 storage-root 为用户指定的 /data1/zyl/SpecEmbedding；绝对路径不进入匿名工件。"
+  note: "本次运行使用用户指定的仓库外 <storage-root>；绝对路径不进入版本库或匿名工件。"
 
 verification:
   downloader: "data_processing/download_nplib1.py"
@@ -65,3 +73,34 @@ verification:
     python data_processing/download_nplib1.py
     --output-dir <storage-root>/raw/NPLIB1
   post_download: "下载器校验官方 size/checksum，并在原始目录记录 SHA-256 acquisition manifest。"
+  acquisition_manifest_sha256: "720bfbb77875007f4fb9a2f7f4f51be9b406bdee93ae03000e37cde4edb1ddb6"
+  source_audit:
+    script: "analysis/audit_nplib1_source_bundle.py"
+    command: >-
+      python analysis/audit_nplib1_source_bundle.py
+      --raw-dir <storage-root>/raw/NPLIB1
+      --output <storage-root>/nplib1_evidence/nplib1_source_bundle_audit.json
+    observed:
+      split_inchikeys: {train: 6092, val: 399, test: 714}
+      split_shared_2d_inchikeys: {train_vs_val: 74, train_vs_test: 0, val_vs_test: 0}
+      train_regularization_candidate_sets: 7127
+      train_regularization_candidate_entries: 15861412
+      train_regularization_exact_positive_coverage: 0.0
+      test_retrieval_candidate_sets: 714
+      test_retrieval_candidate_entries: 1657037
+      test_retrieval_exact_positive_coverage: 1.0
+    report_sha256: "9e788310cd5b90e2437376e95e4d4244c24abc5ef27024889365977a90037541"
+    implication: "官方 train/val 有 74 个二维身份重叠，且官方包不足以在 no-forcing 条件下直接构造 train/val/test 一致的 reranker retrieval 协议。"
+
+preexisting_local_cache:
+  filename: "inchikey_to_smiles.pkl"
+  status: "来源未确认，不作为独立上游证据；待与官方 mol_dict.pkl 交叉核验"
+  bytes: 643063395
+  entries: 9358407
+  md5: "e6d73f3fc9954c26468e69f4cde096b3"
+  sha256: "5d8d27b978c7565de10e27576f18cf183a2357511ab6fa5bf8c3f37dc435c6e4"
+  observed_coverage:
+    official_spectrum_identities: "8553/8553"
+    official_test_candidate_queries: "714/714"
+    official_test_candidate_identities: "1508242/1508242"
+  policy: "只有通过官方 mol_dict 身份一致性核验后才可作为派生加速缓存使用。"
