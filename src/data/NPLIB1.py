@@ -27,19 +27,19 @@ class NPLIB1Provider(DataProvider):
         return data
 
     def load_candidates(self, type):
-        if type != "supplied":
+        if type not in {"formula", "supplied"}:
             raise ValueError(
-                "NPLIB1 provides the 'supplied' candidate protocol; "
+                "NPLIB1 provides the 'formula' and 'supplied' candidate protocols; "
                 "use a custom --candidate_path for any other protocol"
             )
-        file_path = Path(self.data_dir) / "candidates_supplied.pkl"
+        file_path = Path(self.data_dir) / f"candidates_{type}.pkl"
         if not file_path.is_file():
-            raise FileNotFoundError(f"NPLIB1 supplied candidates not found: {file_path}")
+            raise FileNotFoundError(f"NPLIB1 {type} candidates not found: {file_path}")
         with file_path.open("rb") as handle:
             candidates = pickle.load(handle)
         if not isinstance(candidates, dict):
             raise TypeError(
-                "NPLIB1 supplied candidates must be dict[str, list[str]], "
-                f"got {type(candidates).__name__}"
+                f"NPLIB1 {type} candidates must be dict[str, list[str]], "
+                f"got {candidates.__class__.__name__}"
             )
         return candidates

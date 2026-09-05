@@ -301,7 +301,7 @@ class NPLIB1ProcessingTest(unittest.TestCase):
 
 
 class NPLIB1ProviderTest(unittest.TestCase):
-    def test_provider_loads_supplied_protocol_and_fails_loudly(self):
+    def test_provider_loads_formula_and_supplied_protocols_and_fails_loudly(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             dataset_dir = root / "NPLIB1"
@@ -310,13 +310,19 @@ class NPLIB1ProviderTest(unittest.TestCase):
                 pickle.dump([{"smiles": "CCO"}], handle)
             with (dataset_dir / "candidates_supplied.pkl").open("wb") as handle:
                 pickle.dump({"CCO": ["CCC"]}, handle)
+            with (dataset_dir / "candidates_formula.pkl").open("wb") as handle:
+                pickle.dump({"CCO": ["CCO", "COC"]}, handle)
 
             provider = NPLIB1Provider(data_dir=root)
             self.assertEqual(provider.load_data("train"), [{"smiles": "CCO"}])
             self.assertEqual(provider.load_candidates("supplied"), {"CCO": ["CCC"]})
+            self.assertEqual(
+                provider.load_candidates("formula"),
+                {"CCO": ["CCO", "COC"]},
+            )
             with self.assertRaises(FileNotFoundError):
                 provider.load_data("test")
-            with self.assertRaisesRegex(ValueError, "supplied"):
+            with self.assertRaisesRegex(ValueError, "formula.*supplied"):
                 provider.load_candidates("mass")
 
 

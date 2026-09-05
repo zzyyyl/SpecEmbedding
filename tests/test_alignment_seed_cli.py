@@ -237,6 +237,23 @@ class RunPipelineSeedTest(unittest.TestCase):
                 "candidates/formula.pkl",
             )
 
+    def test_pipeline_accepts_nplib1_supplied_candidates(self):
+        commands = self.run_pipeline_commands(
+            "nplib1",
+            "--mode",
+            "eval",
+            "--candidate_type",
+            "supplied",
+        )
+
+        self.assertEqual(len(commands), 3)
+        for command in commands:
+            self.assertEqual(command[command.index("--dataset_type") + 1], "nplib1")
+            self.assertEqual(
+                command[command.index("--candidate_type") + 1],
+                "supplied",
+            )
+
     def test_subprocesses_run_from_repository_root(self):
         completed = subprocess.CompletedProcess(["python"], returncode=0)
         with mock.patch.object(

@@ -40,7 +40,11 @@ def main():
     parser.add_argument("--cache_path", default=config.data.cache_path, help="Reusable TokenSet cache root")
     parser.add_argument("--tokenset_cache", help="Exact TokenSet cache file for alignment training")
     parser.add_argument("--pretrained_spec", default="checkpoints/model.ckpt", help="Pretrained spectrum encoder checkpoint")
-    parser.add_argument("--candidate_type", choices=["mass", "formula"], default="mass")
+    parser.add_argument(
+        "--candidate_type",
+        choices=["mass", "formula", "supplied"],
+        default="mass",
+    )
     parser.add_argument("--candidate_path", help="Custom evaluation candidates pickle")
     parser.add_argument("--device", help='Device to use, for example "cpu", "cuda", "cuda:0", or "cuda:1"')
     parser.add_argument("--mol_norm_type", choices=["layernorm", "rmsnorm"], help="Normalization used in the molecule GINE encoder.")
