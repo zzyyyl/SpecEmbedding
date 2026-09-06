@@ -1,6 +1,6 @@
 # SpecEmbedding 项目记忆
 
-最后更新：2026-09-06
+最后更新：2026-09-07
 
 本文档是内部协作的当前状态摘要，不是实验原始记录，也不应放入匿名补充材料。数字、路径和结论以代码、`params.yaml`、原始日志及可校验工件为准。
 
@@ -65,6 +65,13 @@ python run_rerank_pipeline.py massspecgym \
 GPU 空闲显存和利用率；GPU 高负载或显存不足时等待，不切换到 CPU 训练。CPU 只用于 synthetic
 测试、数据处理、审计和明确标注为非论文结果的实现 smoke，不能产生正式 checkpoint、模型选择
 指标或论文结果。被中断的 CPU 训练工件必须隔离并明确排除。
+
+外部复现工件使用以下固定存储约定，不下载到本仓库工作树：
+
+- 外部代码仓库放在 `/data1/zyl/repos/<repo_name>/`；
+- 外部模型的数据、预训练权重及配套推理工件放在 `/data1/zyl/<model_name>/`；
+- 例如 GLACIER 的代码放在 `/data1/zyl/repos/ms-pred/`，数据与权重放在
+  `/data1/zyl/GLACIER/`。下载前记录来源 URL、版本或 commit、文件校验值和取得日期。
 
 ```bash
 conda activate specembedding
