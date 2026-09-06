@@ -139,6 +139,17 @@ rerank:
     top_k: [1, 5, 10, 20]
     compute_mces: true
 
+fulltrain:
+  candidate_types: [mass, formula]
+  model_types: [relative, pointwise]
+  seeds: [42, 43, 44]
+  expected_counts: {train: 194119, val: 19429, test: 17556}
+  exclude_val_query_indices: [7686, 7687, 7688, 8464, 8465, 8466]
+  min_free_mib: 20000
+  max_utilization: 10
+  poll_seconds: 30
+  hold_seconds: 120
+
 paths:
   pretrained_models:
     supcon_tanimoto_aug: "checkpoints/legacy/transformer-SupConWithTanimotoLoss-Augmentation/model.ckpt"

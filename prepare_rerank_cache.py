@@ -483,6 +483,7 @@ def main():
             "candidate_source_path": str(candidate_source_path.resolve()),
             "candidate_sha256": candidate_sha256,
             "pre_top_k": args.pre_top_k,
+            "limit": args.limit,
             "force_include_positive": args.force_include_positive,
             "checkpoint": args.checkpoint,
             "checkpoint_sha256": checkpoint_sha256,

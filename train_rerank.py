@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 from pathlib import Path
 
 import torch
@@ -14,6 +15,7 @@ from SpecEmbedding.data.datasets_rerank import (
     rerank_collate_fn,
 )
 from SpecEmbedding.trainer.trainer import set_seed
+from SpecEmbedding.utils.fulltrain import validate_training_data
 from SpecEmbedding.utils.rerank import (
     build_reranker,
     compute_rerank_loss,
@@ -118,6 +120,7 @@ def parse_args():
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--patience", type=int, default=None)
     parser.add_argument("--max-train-queries", type=int, default=None)
+    parser.add_argument("--formal-fulltrain", action="store_true", help="Require complete no-forcing top-256 caches; forbid any query cap")
     parser.add_argument(
         "--device",
         type=str,
@@ -342,6 +345,11 @@ def main():
     configure_runtime_cache()
     args = parse_args()
 
+    if args.formal_fulltrain and (args.max_train_queries is not None or args.train_k != 256):
+        raise ValueError("Formal full training forbids query caps and requires train-k=256")
+    if args.formal_fulltrain and os.environ.get("SPECEMBEDDING_REQUIRE_CUDA") != "1":
+        raise ValueError("Formal full training requires the strict GPU launch environment from the monitor")
+
     if args.train_k <= 0:
         raise ValueError("rerank.train.train_k must be greater than 0")
     if args.seed < 0:
@@ -402,6 +410,10 @@ def main():
         shuffle_candidates=False,
         require_label=False,
     )
+    fulltrain_summary = (
+        validate_training_data(args, train_dataset, val_dataset, config.fulltrain.expected_counts.to_dict())
+        if args.formal_fulltrain else None
+    )
     excluded_val_count = exclude_query_indices(
         val_dataset,
         args.exclude_val_query_indices,
@@ -432,6 +444,9 @@ def main():
     optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     model_config = reranker_model_config(args, embedding_dim=train_dataset.embedding_dim)
     data_summary = build_data_summary(args, train_dataset)
+    if fulltrain_summary is not None:
+        data_summary["fulltrain_audit"] = fulltrain_summary
+        logging.info("Formal full-training sample audit: %s", fulltrain_summary)
 
     best_metric = -float("inf")
     best_epoch = 0
@@ -441,6 +456,7 @@ def main():
         model.train()
         total_loss = 0.0
         num_steps = 0
+        examples_seen = 0
         pbar = tqdm(train_loader, desc=f"Epoch {epoch} Training", ascii=True)
         for batch in pbar:
             spec_emb = batch["spec_emb"].to(device)
@@ -460,6 +476,8 @@ def main():
                 margin=args.margin,
             )
             if loss is None:
+                if args.formal_fulltrain:
+                    raise RuntimeError("Formal training encountered a batch without a supervised loss")
                 continue
             if args.lambda_spec > 0:
                 spec_loss = spectrum_dependency_loss(
@@ -478,11 +496,16 @@ def main():
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=args.grad_clip)
             optimizer.step()
+            examples_seen += len(labels)
 
             total_loss += loss.item()
             num_steps += 1
             pbar.set_postfix({"loss": f"{loss.item():.4f}"})
 
+        if args.formal_fulltrain and examples_seen != len(train_dataset):
+            raise RuntimeError(f"Incomplete epoch: trained {examples_seen}/{len(train_dataset)} queries")
+        data_summary["last_epoch_train_queries"] = examples_seen
+        logging.info("Epoch %s actual trained queries: %s / %s", epoch, examples_seen, len(train_dataset))
         train_loss = total_loss / max(num_steps, 1)
         val_metrics = evaluate(model, val_loader, device, sorted(set(args.top_k)))
         current_metric = val_metrics[args.metric_for_best]

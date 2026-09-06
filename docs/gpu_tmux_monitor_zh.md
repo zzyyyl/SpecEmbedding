@@ -154,10 +154,39 @@ python /home/zyl/MYPROS/SpecEmbedding/watch_gpu_tmux.py \
 - 退出码：`0` 已发送或 dry-run 成功；`124` 等待超时；`130` Ctrl+C；`2` 参数错误；`1` 目标、锁或派发等错误。
 - Ctrl+C 只退出监测器、释放互斥锁，不终止目标 pane 的任何进程；若中断发生在发送阶段，记录保留且不自动重试。
 
+## 接入已批准的 MassSpecGym 全量重训
+
+`run_fulltrain_rerank.py` 是[全量重训计划](paper-change-plans/2026-09-07-MassSpecGym全量重训.md)
+的独立正式入口，不改变通用监测器语义。它要求新输出目录、干净的固定源码 worktree，读取
+`params.yaml` 的 `fulltrain` 配置：先重建并核验六个全量/no-forcing/top-256 缓存，再依次执行
+mass/formula × relative/pointwise × seeds 42/43/44 的训练与完整测试评价。每个 GPU 阶段再次等待。
+
+先把下面变量替换为已核验的**绝对路径**，运行只读检查；`MSG_DATA` 直接指向包含 `train.pkl`
+等文件的目录，checkpoint 旁须有匹配的 `alignment_selection.json`：
+
+```bash
+python run_fulltrain_rerank.py --gpu 1 --device cuda:1 \
+  --data-path "$MSG_DATA" --checkpoint "$ALIGN_CHECKPOINT" \
+  --output-root "$EXPERIMENT_ROOT" --dry-run
+```
+
+固定源码后，用 `--write-preflight` 代替 `--dry-run` 保存 `inputs_and_commands.json`。
+然后将相同训练命令（去掉上述两个检查开关）作为监测器的 `--command`，使用前文的独立
+detached 会话方式启动监测器。实际入口重新核对输入/config/commit/命令指纹，要求监测器设置的
+严格 CUDA 环境和 UUID 映射；不直接在未知 GPU 环境下运行。
+
+正式入口没有训练样本数上限参数。`train_rerank.py --formal-fulltrain` 拒绝任何 query cap、
+旧 forcing/不完整缓存，核验全部可训练 query 和每个 epoch 实际训练数量，并保存 cache SHA-256。
+无正例 query 不能监督训练，单独统计，不混同人为限量；完整测试仍包含无正例 query。
+每阶段记录 `status.json`，失败立即停止、不重试或覆盖旧工件；人工排查后使用新输出目录。
+`monitor.log` 的 SENT 只表示派发，训练/评价进度须查看 `status.json`、`runner.log` 和各阶段日志。
+三 seed 汇总、二维身份审计及论文更新仍是后续工作，不能将队列派发说成实验完成。
+
 ## 验证（不启动训练）
 
 ```bash
 python -m pytest -q tests/test_gpu_tmux_watch.py
+python -m pytest -q tests/test_fulltrain_runner.py
 RUN_TMUX_INTEGRATION=1 python -m pytest -q tests/test_gpu_tmux_watch.py
 ruff check .
 python -m compileall -q .
