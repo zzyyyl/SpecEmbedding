@@ -1,6 +1,6 @@
 # 当前 reranker 实现说明
 
-本文档只说明当前实现，不保留已废弃的 rank-aware 设计参数和历史预期结果。
+本文说明当前代码；实验协议与证据见 [分析索引](../analysis/README.md)，不从默认配置推断旧结果。
 
 ## 1. 目标与边界
 
@@ -33,7 +33,7 @@ MS/MS -> aligned spectrum embedding
 pair_preference(i, j) = g(i, j) - g(j, i)
 ```
 
-形成反对称偏好。候选顺序变化时，输出按同样顺序置换。relation branch 只在 coarse top-40 上运行，以限制 pairwise 计算规模。
+形成反对称偏好。确定性推理中，在 coarse 子集选择不受边界并列分数影响时，候选置换对应输出置换；训练 dropout、浮点误差与 top-k 并列处理不提供逐位相同保证。relation branch 默认只在 coarse top-40 上运行，以限制成对计算规模。
 
 模型配置中的 `pair_mode` 显式取 `antisymmetric` 或 `directed`。前者是当前默认方法；后者只用于普通 directed pair control。旧 checkpoint 若没有该字段，则由 `use_antisymmetric` 推断，不改变旧模型语义。
 
@@ -41,14 +41,16 @@ pair_preference(i, j) = g(i, j) - g(j, i)
 
 ## 3. Cache 与正例协议
 
-当前评价使用自然进入候选池的样本：
+默认生成自然候选 cache；复用历史缓存时须另查元数据：
 
 - train、val、test 默认均为 `force_include_positive=false`；
 - 正例未进入候选池时，验证/测试记为 coverage miss；
+- 训练 loss 只使用有标签 query；正式实验使用全部符合协议的可训练样本，不自行限量；
 - 所有 query 都纳入指标，并报告 pre-retrieval recall upper bound；
 - `--force-include-positive` 只用于复核 legacy 训练 cache，且只允许作用于 train。
 
-候选类型为 `mass` 或 `formula`。`formula` 是已知分子式条件下的检索，不是完全开放库检索。
+MassSpecGym 候选类型为 `mass` 或 `formula`，后者假设已知分子式。NPLIB1 另有 test-only
+`supplied` 候选；全 split 训练选择固定分子库重建的 `formula`，见 [运行指南](README_zh.md)。
 
 ## 4. 推荐运行方式
 
@@ -56,30 +58,19 @@ pair_preference(i, j) = g(i, j) - g(j, i)
 
 ```bash
 python run_rerank_pipeline.py massspecgym \
-  --align_save_dir checkpoints_align/<run> \
+  --align_save_dir checkpoints_align/my_run \
   --candidate_type mass \
   --pre_top_k 256 \
   --model_type relative \
   --device cuda:1
 ```
 
-分阶段运行：
+分阶段时在同一命令上添加 `--mode prepare`、`--mode train` 或 `--mode eval`，并保持相同
+候选类型、top-k、cache/save 路径。`--pre_top_k` 控制缓存截断，训练 `train_k` 来自
+`params.yaml`，不能假设两者自动同步；直接训练入口可显式传 `--train-k`。
 
-```bash
-python run_rerank_pipeline.py massspecgym --mode prepare \
-  --align_save_dir checkpoints_align/<run> --candidate_type mass \
-  --pre_top_k 256 --device cuda:1
-
-python run_rerank_pipeline.py massspecgym --mode train \
-  --align_save_dir checkpoints_align/<run> --candidate_type mass \
-  --pre_top_k 256 --model_type relative --device cuda:1
-
-python run_rerank_pipeline.py massspecgym --mode eval \
-  --align_save_dir checkpoints_align/<run> --candidate_type mass \
-  --pre_top_k 256 --model_type relative --device cuda:1
-```
-
-调试运行使用 `--limit N`，并检查输出目录后缀，避免覆盖正式工件。使用 `--dry-run` 检查实际命令。默认入口会打印并执行 train/val/test 的 no-forcing cache 命令。
+调试使用 `--limit N` 并核对目录后缀，`--dry-run` 检查实际命令。正式训练使用可用的显式
+CUDA 设备，GPU 繁忙时等待；完整运行约束见 [AGENTS.md](../AGENTS.md)。
 
 训练 checkpoint 的 `data_summary` 记录实际 labeled train query 数、`max_train_queries`、`train_k`、`pair_mode` 和 cache 的 forcing/top-k 摘要，便于区分 pilot 与 full-split 运行。
 
@@ -106,12 +97,7 @@ PYTHONPATH=. python analysis/benchmark_reranker_efficiency.py \
 - 入口：`prepare_rerank_cache.py`、`train_rerank.py`、`eval_rerank.py`、`run_rerank_pipeline.py`；
 - 回归测试：`tests/test_rerank_core.py`、`tests/test_rerank_tools.py`、`tests/test_rerank_pipeline_paths.py`。
 
-至少运行：
-
-```bash
-python -m pytest -q tests/test_rerank_core.py tests/test_rerank_pipeline_paths.py
-ruff check .
-```
+相关修改运行上述回归测试与仓库静态检查；通用检查命令见 [运行指南](README_zh.md)。
 
 ## 6. 评价边界
 

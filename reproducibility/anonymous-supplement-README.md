@@ -63,13 +63,14 @@ no-forcing. The legacy train-cache behavior can be selected explicitly with
 Real runs require separately supplied datasets, candidate files, and
 checkpoints; none are bundled in this anonymous archive.
 
-The study's current primary protocol uses MassSpecGym 1.3.1 retrieval JSON
-candidate order and a two-dimensional InChIKey identity rule evaluated from
-saved embeddings. This is an official-compatible candidate/identity audit, not
-a fresh official-loader re-encoding or alignment retraining. Local
-exact-target-SMILES results are retained only as a sensitivity view. The
-reranker remains closed-library, and the `formula` candidate protocol is
-formula-conditioned retrieval.
+The source defaults do not certify the protocol of an existing checkpoint.
+Reported top-40 runs used limited training queries and training-positive
+forcing; the separate top-256 no-forcing pilot has a different scope. Inspect
+the run's configuration and cache metadata before interpreting its metrics.
+Saved-embedding candidate/identity audits do not reproduce the full official
+loader. The reranker remains closed-library, and `formula` assumes a known
+molecular formula. Formal training uses all eligible training samples and an
+explicit CUDA device; the CPU path above is only a synthetic integration test.
 
 `ANONYMOUS_MANIFEST.json` records the byte size, SHA-256 digest, and mode of
 every archive member. `SOURCE_ALLOWLIST.txt` records the exact source-file

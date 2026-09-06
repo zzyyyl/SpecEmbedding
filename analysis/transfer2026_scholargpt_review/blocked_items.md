@@ -1,44 +1,15 @@
-# ScholarGPT follow-up feasibility record
+# 第二阶段 pilot 的证据缺口
 
-This record separates reviewer-suggested analyses completed with the local
-artifacts from comparisons that remain outside the current evidence boundary.
-It is not a scientific result table.
+本文件只描述 2026-08-23 pilot 的范围；已完成内容见
+[second_stage_report.md](second_stage_report.md)，当前工作安排见
+[投稿待办](../../paper/TRANSFER_2026_PLAN.md)。
 
-## Completed in the second-stage pilot
+以下工作未由该 pilot 完成：
 
-- Same-cache K=20/40/80 evaluation-only sensitivity was recorded from the
-  256-candidate test cache; it is not K-specific retraining.
-- Capacity-matched no-rank pointwise was trained with the same 5,000-query,
-  three-epoch pilot configuration and seeds 42--44.
-- Query-level paired predictions and deterministic bootstrap summaries were
-  saved for mass/formula relative and pointwise models.
-- Score-only, embedding-only, embedding+base, candidate-only,
-  no-spectrum-conditioning, no-molecular-relation, and no-antisymmetric controls
-  were trained once per pool and evaluated on the same test cache.
-- The new relative full-pool cache was audited under the MassSpecGym 1.3.1
-  2D-InChIKey transform; neither saved test cache contained multiple positives
-  or candidate identity collisions.
-- The local candidate sets were compared with the MassSpecGym 1.3.1 retrieval
-  JSON snapshot (set Jaccard 1.0 for every test target), and an official-order
-  cross-check was evaluated from saved alignment embeddings. The mass lists
-  had 0/17,556 exact order matches and formula lists 231/17,556; this is not a
-  fresh official-loader re-encoding or alignment retraining.
-- A seed-42 local query difficulty analysis was completed for candidate count,
-  base rank, Morgan similarity, score margin, and peak count. It is descriptive
-  and does not establish causal or generalization claims.
-- RTX 4090 forward-only latency and peak allocation were measured for the
-  primary relative/pointwise pair.
+- 独立外部 retriever 和统一候选构造下的 baseline 复现；reported-only JESTR/GLMR 不能替代。
+- fresh official-loader 谱图/分子重编码；既有候选顺序与二维身份审计只使用保存嵌入。
+- candidate-aware alignment 重训和独立 alignment 层级推断。
+- 不同候选规模的分别重训及端到端部署成本；已完成的 cutoff 为评价截断，效率为 forward-only。
 
-## Remaining outside scope
-
-- A retriever-agnostic external baseline requires a second retriever and matched
-  candidate construction; reported-only JESTR/GLMR numbers are not substitutes.
-- A full official-loader rerun requires the official data/loader environment;
-  the current identity result remains a cache-level audit, and the official
-  candidate-order cross-check uses saved embeddings rather than fresh loader
-  transforms.
-- Candidate-aware alignment retraining and alignment-level confidence estimates
-  were not added to this pilot.
-
-No external-baseline or full-loader claim is converted into a number in the
-manuscript.
+三 reranker seeds、query bootstrap、困难度分层和机制控制已在后续报告中记录，不再列为待完成。
+上述边界不预设 relative 优于 pointwise，也不构成新的实验结果。

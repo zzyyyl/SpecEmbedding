@@ -2,8 +2,6 @@
 
 本文件是仓库级工作规范，适用于整个仓库。若子目录新增更具体的 `AGENTS.md`，在对应范围内同时遵守其补充规则。`docs/` 记录当前项目状态，不能替代代码、配置、原始日志和可校验工件。
 
-## CodeGraph
-
 <!-- CODEGRAPH_START -->
 ## CodeGraph
 
@@ -56,7 +54,7 @@ MS/MS 谱图
 - 数据集为 MassSpecGym；官方 structure-disjoint split 不表述为 scaffold-disjoint；
 - `mass` 是质量候选协议，`formula` 假设已知分子式，必须称为 formula-conditioned retrieval；
 - reranker 是 closed-library 方法，只能重排输入候选，不能生成候选库外分子或救回未被 base top-$K$ 召回的真值；
-- 当前评价使用官方 retrieval JSON 候选顺序、二维 InChIKey 身份规则和保存的 alignment embeddings；没有 fresh loader 重编码或 alignment 重训时，只称 official-compatible candidate/identity audit；
+- 评价必须区分 cache-local exact-target-SMILES 结果和独立的官方候选顺序/二维身份审计；没有 fresh loader 重编码或 alignment 重训时，后者只称 official-compatible candidate/identity audit，不能把其结论继承给未审计的新 cache；
 - local exact-target-SMILES 只作为敏感性视图；正例 coverage、miss 和 forcing 语义必须以 cache 元数据为准；
 - JESTR/GLMR 是 reported-only 外部背景，未在本仓库统一复现，不与本地结果直接排序比较；
 - 静态检查、候选身份审计和 forward implementation audit 不是新实验；效率拆解也不是端到端部署 latency 结论。
@@ -67,7 +65,8 @@ MS/MS 谱图
 - 训练、评价和 rerank 超参数统一放在 `params.yaml`；缺失配置应尽早失败，不提供静默 fallback。
 - checkpoint 必须保存构建 reranker 所需的完整模型配置，包括模型类型、维度、归一化方式和特征开关。
 - 公共逻辑放在 `SpecEmbedding/utils/` 或 `SpecEmbedding/trainer/`；入口脚本负责参数解析和流程编排，不从入口脚本反向导入公共业务函数。
-- `.codegraph/` 存在时，理解或定位代码先使用 CodeGraph，再使用 `rg` 或直接读取文件。
+- 正式 alignment、reranker、对照和消融必须使用完整训练划分中符合协议的全部可训练样本；不得自行限量、抽样或截取前 N 条。验证/测试不并入训练，运行前后核验实际样本数。
+- 正式训练严格使用显式 `cuda:N`，启动前检查 GPU 空闲显存和利用率；繁忙或显存不足时等待，不回退到 CPU、不终止其他任务。CPU 仅用于 synthetic 测试、处理、审计和明确标注的非论文实现 smoke；中断的 CPU 训练工件隔离并排除。
 
 基础检查：
 
@@ -78,20 +77,7 @@ ruff check .
 python -m compileall -q .
 ```
 
-常用入口：
-
-```bash
-python run_pipeline.py --no-pretrain --device cuda:1
-
-python run_rerank_pipeline.py massspecgym \
-  --align_save_dir checkpoints_align/<run> \
-  --candidate_type formula \
-  --pre_top_k 256 \
-  --model_type relative \
-  --device cuda:1
-```
-
-统一 rerank 入口默认 train/val/test 均不 forcing。只有复核 legacy 训练 cache 时才显式使用 `--force-include-positive`，且该开关不能作用于验证或测试。调试使用 `--limit N` 和 `--dry-run`；输出目录必须带 `_topkN`/`_limitN` 后缀以避免覆盖正式工件。长任务使用 detached `tmux`。
+运行入口见 [中文指南](docs/README_zh.md)。统一 rerank 入口默认 train/val/test 均不 forcing；复用旧 cache 时仍须核对元数据。只有复核 legacy 训练 cache 时才显式使用 `--force-include-positive`，且该开关不能作用于验证或测试。`--limit N` 仅用于非正式调试，结果不替代正式实验；`--dry-run` 只打印命令。输出目录必须带 `_topkN`/`_limitN` 后缀，长任务使用 detached `tmux`。
 
 ## 4. 文档维护
 
@@ -100,8 +86,10 @@ python run_rerank_pipeline.py massspecgym \
 - `docs/README_zh.md`：运行入口和文档地图；
 - `docs/project_memory_zh.md`：当前工程、实验和证据边界摘要；
 - `docs/reranker_solution_zh.md`：当前 reranker 实现说明；
-- `docs/paper-change-plans/`：计划规则、模板和当前最终计划；
-- `paper/TRANSFER_2026_PLAN.md`、`paper/ADMA2026_TODO.md`：投稿待办。
+- `model_architecture.md`：谱图塔、分子塔与对齐实现；
+- `analysis/README.md`：实验系列、协议和冻结证据索引；
+- `docs/paper-change-plans/`：计划规则、模板、在途计划与历史追溯；
+- `paper/TRANSFER_2026_PLAN.md`：唯一投稿待办；`paper/BUILDING.md` 与 `reproducibility/README.md`：发布与复现入口。
 
 历史文档在信息迁移到当前 canonical 文档后可以删除；Git 历史保留追溯能力。不要在多个文档中复制同一组实验表、哈希或状态；详细结果应指向 `analysis/`、原始日志或 manifest。
 

@@ -1,6 +1,6 @@
 # Paper release build
 
-Run the release build from any working directory:
+Run from the repository root (or invoke the script by its absolute path):
 
 ```bash
 bash paper/build_release.sh
@@ -17,9 +17,20 @@ the auditable PDFs to:
 It also synchronizes the ignored `paper/build/main*.pdf` files so that the
 legacy local build directory does not retain stale PDFs.
 
-The verified 2026-08-20 toolchain uses TeX Live 2019/Debian, `latexmk` 4.67,
-pdfLaTeX for English, XeLaTeX for Chinese, BibTeX 0.99d, and the TeX Live Fandol
-fonts supplied with `ctex`. The known non-blocking messages are the English
-`amsmath` math-accent redefinition warning and Chinese Fandol `fontspec`
-warnings. See `paper/release/build-manifest.yaml` for the source commit, page
-counts, file hashes, and exact verification record of the tracked PDFs.
+The script prints page counts and hashes; it does not update the YAML manifest.
+After a release, record the committed manuscript source, toolchain, page counts,
+hashes and verification in [build-manifest.yaml](release/build-manifest.yaml).
+An old manifest must not be presented as verification of newly built PDFs.
+
+For local checks that keep all intermediate files in ignored `paper/build/`, run
+from `paper/`:
+
+```bash
+latexmk -gg -pdf -outdir=build -interaction=nonstopmode -halt-on-error main.tex
+latexmk -gg -xelatex -outdir=build -interaction=nonstopmode -halt-on-error main_cn.tex
+```
+
+The release script currently builds in `paper/` before copying PDFs to `build/`
+and `release/`; its auxiliary files are ignored. Known non-blocking messages are
+the English `amsmath` accent warning and Chinese Fandol `fontspec` warnings.
+Final submission checks are in the [checklist](TRANSFER_2026_PLAN.md).

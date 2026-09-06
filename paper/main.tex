@@ -54,12 +54,14 @@ reuses saved embeddings for the supplied pool of at most 256 candidates. It
 then performs pointwise coarse scoring followed by a spectrum-conditioned
 relative candidate module on the coarse top 40. The relative preference is
 constructed as an antisymmetric pair difference and is equivariant to
-candidate-list permutation; no retrieval-rank feature or training-time
-positive insertion is used. We compare the relative model with a near-
+candidate-list permutation, subject to coarse-selection ties. No retrieval-rank
+feature is used. We compare the relative model with a near-
 parameter-matched no-rank pointwise control. On MassSpecGym mass- and
 formula-conditioned candidate pools, both supervised rerankers improve the
-fixed cross-modal retriever in the saved-embedding, cache-local evaluation,
-while pointwise is slightly stronger in the main R@1/MRR summaries. We
+fixed cross-modal retriever in a saved-embedding top-40 evaluation. These runs
+use up to 20,000 training queries and training-only positive forcing; they do
+not validate full-training, no-forcing use of the 256-candidate configuration.
+The relative--pointwise ordering depends on the pool and metric. We
 therefore present the relative branch as a formally defined candidate-
 interaction mechanism and study its empirical boundary, rather than claiming
 a universal relation-module or external-baseline advantage. The method is
@@ -112,9 +114,9 @@ aligns it with a GINE molecular graph encoder. The second stage scores the full
 supplied pool with an absolute branch, then refines only a coarse top-$K_r$
 subset with spectrum-conditioned candidate relations. Pair preferences are
 formed by subtracting the score of the reversed ordered pair, which gives
-antisymmetry without a rank embedding. Training uses only naturally present
-positives; the implementation never repairs a truncated list by inserting its
-target. A pointwise model with the same absolute branch provides the primary
+antisymmetry without a rank embedding. The default pipeline uses naturally
+present positives; the reported top-40 matrix instead reuses historical
+training caches with positive forcing. A pointwise model with the same absolute branch provides the primary
 capacity-controlled comparison, while the earlier candidate-set Transformer is
 kept only as a historical reference.
 
@@ -126,8 +128,8 @@ Our contributions are:
   to-rank framework for hard candidates, using full-pool coarse scoring followed
   by spectrum-conditioned relative candidate comparison.
   \item We define a rank-free relative branch with antisymmetric pair
-  preferences, candidate-list permutation equivariance, and no training-time
-  positive forcing, together with a near-parameter-matched pointwise control.
+  preferences and candidate-list permutation equivariance, together with a
+  near-parameter-matched pointwise control.
   \item We systematically examine the framework on MassSpecGym mass- and
   formula-conditioned pools, three saved alignment checkpoints, and a 30-run
   relative-module ablation matrix: supervised reranking improves the base
@@ -274,13 +276,14 @@ and reused.
   \centering
   \input{figures/method_overview.tex}
   \methodoverview{0}
-  \caption{Overview of \method{}. Panel 1 aligns the spectrum Transformer and
+  \caption{Default top-256 configuration of \method{}. Panel 1 aligns the spectrum Transformer and
   molecular GINE\@. Panel 2 uses their frozen, cached embeddings to produce the
   full candidate pool. Panel 3 applies pointwise coarse scoring followed by
   spectrum-conditioned relative candidate preferences on the coarse top-40;
   the legacy Transformer is a historical reference. Dashed arrows denote
-  training-only operations. Positives are never forced into a truncated list,
-  and no molecule is generated.}
+  training-only operations. This default does not force positives or generate
+  molecules; the reported matrix uses historical top-40 training caches with
+  positive forcing.}
   \label{fig:overview}
 \end{figure}
 
@@ -334,22 +337,22 @@ $b_i=\zs^\top\mathbf{z}_{m_i}$ is the base score.
 \subsection{Candidate Construction and Training Protocol}
 
 MassSpecGym supplies target-molecule-keyed candidate lists; each query reuses the
-list keyed by its target molecule. The base retriever scores the complete pool
-of at most 256 molecules. The new coarse-to-fine reranker first scores this
-full pool pointwise and then applies a relation module to the coarse top
-$K_r=40$ candidates. Both 256 and 40 are fixed design and compute-budget
-choices for this revision; the evaluation script can truncate a saved pool
-without inserting a positive target.
+list keyed by its target molecule. The base retriever scores the supplied pool
+of at most 256 molecules. The default coarse-to-fine configuration retains this
+pool for pointwise scoring and applies the relation module to the coarse top
+$K_r=40$. The reported main and ablation matrices instead use saved base top-40
+lists, so their relation branch operates on at most 40 candidates.
 
-Training uses only queries whose target naturally occurs in the full
-256-candidate pool. Queries without a natural positive remain in coverage
-statistics but do not enter the reranker loss. Candidate order is shuffled
-during training while each candidate's embedding and base score move together.
-No rank embedding is used anywhere in the new model, and the cache-compatible
-\texttt{base\_ranks} field is ignored by its forward path. In particular, no positive
-is inserted into a truncated list. Missing positives at a smaller evaluation
-cutoff are therefore treated as coverage misses rather than repaired training
-examples.
+The default pipeline does not insert positives: unlabeled queries contribute
+to coverage statistics but not the training loss. In the reported top-40 runs,
+however, a missing training positive is inserted by replacing the last
+candidate. Validation and test never force positives; missing targets receive
+zero metric credit. These historical training caches must be distinguished
+from the default no-forcing configuration and the separate top-256 pilot.
+During training, candidate embeddings, scores and labels are shuffled together.
+Neither the relative model nor its no-rank control uses a retrieval-rank
+feature; the relative forward path ignores the cache-compatible
+\texttt{base\_ranks} field.
 
 \subsection{Spectrum-Conditioned Relative Candidate Reranker}
 
@@ -405,18 +408,15 @@ candidate operations impose the corresponding equivariance at the list level.
 These are function-class properties, not performance guarantees: pairwise
 antisymmetry alone does not rule out cycles across three or more candidates,
 prove better hard-negative discrimination, or imply an advantage over the
-pointwise control. Those are empirical questions for future, separately
-authorized experiments.
+pointwise control. Those require further controlled experiments.
 
 The implementation exposes an explicit \texttt{pair\_mode} control. The
 reported relative model uses \texttt{pair\_mode=antisymmetric}, which realizes
 Equation~\ref{eq:antisymmetry}; \texttt{pair\_mode=directed} keeps the same
 ordered preference network but omits the reverse-pair subtraction as a
-controlled implementation path. No directed training run is reported here, so
-this interface does not constitute a new performance result. The legacy
-\texttt{use\_antisymmetric} flag remains only for configuration compatibility,
-and missing fields in older checkpoints default to the former antisymmetric
-semantics.
+controlled implementation path, evaluated in Table~\ref{tab:relative_ablations}.
+Older checkpoints without \texttt{pair\_mode} retain the behavior specified by
+their legacy \texttt{use\_antisymmetric} flag.
 
 The near-parameter-matched pointwise control uses the same absolute branch and
 removes only the relative aggregation. At hidden width 512, the relative model
@@ -428,9 +428,9 @@ is retained as a historical reference, not as the proposed mechanism.
 
 For context, we retain the earlier rank-aware candidate-set Transformer as a
 historical reference. It uses a candidate-attached rank embedding and cross-
-candidate self-attention \cite{vaswani2017attention}, unlike the current rank-free relative model. Its
-historical training-time positive forcing and configuration are not part of the
-formal protocol of the proposed method; further details are given in
+candidate self-attention \cite{vaswani2017attention}, unlike the current rank-free relative model.
+Both historical series use training-only positive forcing, but their model
+configurations differ; further details are given in
 Appendix~B, but no numerical comparison to the current primary table is made.
 
 \subsection{Learning Objective}
@@ -513,12 +513,11 @@ The reranker is closed-set: it improves the ordering of supplied candidates but
 cannot recover a target absent from the pool or generate a new molecule.
 
 Our primary evaluation is the overlap-clean, alignment-42 cache-local matrix,
-which reuses the saved candidate order, embeddings, and reference
-two-dimensional InChIKey identity labels; it is not a fresh official-loader
-re-encoding or alignment retraining. A separate official-compatible
-candidate-order and identity audit is retained as a protocol check, not as a
-new primary result. A local exact-target-SMILES evaluation is retained as a
-sensitivity view. Further protocol details are given in Appendix~A.
+which reuses saved base top-40 lists, embeddings, and local exact-target-SMILES
+labels. A separate identity audit found agreement with two-dimensional
+InChIKey labels on these alignment-42 test lists. The official candidate-order
+audit concerns a separate pre-overlap-clean top-256 pilot; neither audit is
+fresh official-loader re-encoding or alignment retraining. See Appendix~A.
 
 \subsection{Implementation Details}
 
@@ -542,8 +541,9 @@ dropout; they do not turn the alignment checkpoints into independent draws
 from a known population.
 
 The proposed reranker has hidden width 512, relation width 32, pair chunks of
-16, and dropout 0.1. It scores the full candidate pool at $K=256$ and applies
-the relative branch to its coarse top-$K_r=40$. We use AdamW with learning rate
+16, and dropout 0.1. The reported matrix uses $K=40$ and $K_r=40$; $K=256$
+is the default full-pool configuration, not the input size of these runs.
+We use AdamW with learning rate
 $10^{-4}$, batch size 32, at most 30 epochs, and early stopping on validation
 MRR with patience 5. The pairwise and spectrum-dependency weights and margins
 are $\lambda_{\mathrm{pair}}=0.2$, $\lambda_{\mathrm{spec}}=0.1$,
@@ -551,18 +551,12 @@ $\gamma=0.1$, and $\delta=0.1$. The near-parameter-matched pointwise control use
 the same absolute branch and optimization but no relation aggregation. The
 legacy candidate-set Transformer is retained only as a historical reference.
 
-For each reported experiment, alignment checkpoints and reranker training
-seeds are listed with the result artifact. A reranker training seed controls
-initialization, data-loader order, candidate shuffling, and dropout; it is not
-an independent alignment replicate. Training uses only queries whose positive
-is naturally present in the full candidate pool. Queries without such a label
-are excluded from the reranker loss but retained in coverage statistics. No
-positive is inserted into any cache. All models are selected without test-set
-access. Each formal reranker run requests at most 20,000 training queries and
-uses three reranker seeds. The three alignment checkpoints and nine paired
-alignment--reranker combinations provide descriptive robustness evidence; they
-are not a confidence interval, significance test, or complete end-to-end seed
-analysis.
+Each of the 36 main runs and 30 ablation runs requests at most 20,000 training
+queries from the historical positive-forced top-40 cache. Validation and test
+caches remain unforced, and model selection uses validation MRR. These runs
+are not full-training or all-split no-forcing experiments. Alignment and
+reranker seeds are recorded separately; their paired combinations describe
+checkpoint sensitivity, not population-level uncertainty.
 
 \subsection{Code, Data, and Artifact Availability}
 
@@ -570,7 +564,7 @@ The anonymous supplement provides source inspection, locked environment files,
 automated tests, and a tiny synthetic CPU smoke test. It does not provide the
 MassSpecGym spectra, candidate pools, trained checkpoints, or caches. The
 repository's reproducibility index lists the local checkpoints, resolved
-configurations, logs, hashes, and selected ranking outputs used for the formal
+configurations, logs, hashes, and selected ranking outputs used for the reported
 results. The real-data entry point is
 \texttt{run\_rerank\_pipeline.py}; additional implementation and
 reproducibility notes are given in Appendix~D. The repository source also
@@ -595,8 +589,8 @@ reproduced here.
 
 We report Recall@1, Recall@5, Recall@10, Recall@20, and mean reciprocal rank
 (MRR) over all 17,556 test queries. The primary table is a cache-local,
-overlap-clean no-forcing evaluation at alignment seed 42, using the saved
-candidate order and two-dimensional InChIKey identity labels. It uses three
+evaluation at overlap-clean alignment seed 42, using saved top-40 candidate
+order and exact-target-SMILES labels, without test-time forcing. It uses three
 reranker training seeds (42--44) and at most 20,000 training queries. A separate
 table reports the same pointwise/relative comparison for alignment seeds
 42--44. A tracked official-compatible candidate-order and identity audit is
@@ -610,11 +604,11 @@ statistical significance, or end-to-end deployment performance.
 
 \begin{table}[t]
   \centering
-  \caption{Primary cache-local no-forcing evaluation at the overlap-clean
+  \caption{Primary cache-local top-40 evaluation at the overlap-clean
   alignment-42 checkpoint. Values are percentages; learned rows are means
   $\pm$ sample SD over reranker training seeds 42--44. All methods rank the
-  same saved candidate pool and use the same two-dimensional InChIKey labels;
-  this is not a fresh official-loader re-encoding. The expanded alignment
+  same saved test pool and exact-target-SMILES labels, with no test forcing.
+  Training uses positive-forced caches and a 20,000-query cap. The expanded alignment
   sensitivity is reported in Table~\ref{tab:alignment_sensitivity}.}
   \label{tab:main_results}
   \tiny
@@ -624,14 +618,14 @@ statistical significance, or end-to-end deployment performance.
     Pool & Method & R@1 & R@5 & R@10 & R@20 & MRR \\
     \midrule
     \multirow{3}{*}{Mass}
-      & \base{} (256-candidate pool) & 47.46 & 63.51 & 71.02 & 77.76 & 55.03 \\
+      & \base{} (saved top-40 pool) & 47.46 & 63.51 & 71.02 & 77.76 & 55.03 \\
       & Pointwise control
       & 58.12$\pm$0.54 & 73.61$\pm$0.54 & 78.63$\pm$0.48 & 82.24$\pm$0.10 & 64.91$\pm$0.47 \\
       & Relative candidate model
       & 57.88$\pm$0.59 & 73.55$\pm$0.58 & 78.72$\pm$0.29 & 82.15$\pm$0.13 & 64.78$\pm$0.52 \\
     \midrule
     \multirow{3}{*}{Formula}
-      & \base{} (256-candidate pool) & 63.10 & 75.79 & 80.87 & 84.93 & 68.86 \\
+      & \base{} (saved top-40 pool) & 63.10 & 75.79 & 80.87 & 84.93 & 68.86 \\
       & Pointwise control
       & 70.76$\pm$0.59 & 80.07$\pm$0.35 & 84.33$\pm$0.08 & 86.86$\pm$0.08 & 75.17$\pm$0.41 \\
       & Relative candidate model
@@ -654,14 +648,11 @@ the relative interaction is not required for the observed improvement and is
 not uniformly better than the matched pointwise scorer. The latter result is a
 boundary of the proposed mechanism, not a failed comparison to be hidden.
 
-The local exact-target-SMILES sensitivity view is summarized in Appendix~A and
-does not change the displayed conclusion.
-
 \begin{table}[t]
   \centering
   \caption{Descriptive alignment-checkpoint sensitivity under the expanded
-  no-forcing top-40 reranker cache. Each learned value is the mean $\pm$ sample
-  SD over reranker seeds 42--44; the cache-local matrix is not a fresh
+  top-40 protocol: training forcing, unforced validation/test. Learned values
+  are means over reranker seeds 42--44; the cache-local matrix is not a fresh
   official-loader re-encoding.}
   \label{tab:alignment_sensitivity}
   \scriptsize
@@ -681,7 +672,7 @@ does not change the displayed conclusion.
   \end{tabular}
 \end{table}
 
-Across the nine alignment--candidate--seed paired comparisons, relative minus
+Across nine alignment--reranker-seed pairs per candidate protocol, relative minus
 pointwise has mean R@1 differences of $-0.11$ and $-0.14$ percentage points
 for mass and formula, respectively; the corresponding mean MRR differences
 are $-0.0005$ and $+0.0005$. Relative wins five of nine R@1 pairs in each
@@ -694,17 +685,17 @@ stable than any independent relative-module advantage.
 Table~\ref{tab:relative_ablations} reports the complete 30-run relative-module
 ablation matrix: five relative configurations, two candidate protocols, and
 three reranker seeds at the alignment-42 checkpoint. The full configuration is
-the antisymmetric, spectrum-conditioned model. Directed pairs, removal of the
-pair loss, removal of the spectrum loss, and removal of spectrum conditioning
-each change the two protocols in different directions; no variant uniformly
-dominates the full model. The results therefore identify a behavioral boundary
-for the module, rather than a causal ranking of its components.
+the antisymmetric, spectrum-conditioned model. Removing spectrum conditioning
+raises mean R@1 and MRR in both pools; other changes have metric- and
+pool-dependent directions. These aggregate results do not establish a benefit
+for spectrum conditioning or a causal ranking of the components.
 \end{sloppypar}
 
 \begin{table}[t]
   \centering
-  \caption{Relative-module ablations under the cache-local no-forcing top-40
-  protocol. Values are R@1/MRR percentages and decimals, respectively; each
+  \caption{Relative-module ablations under the cache-local top-40 protocol,
+  with training forcing and unforced validation/test. R@1/MRR use percentages
+  and decimals, respectively; each
   entry is a mean $\pm$ sample SD over reranker seeds 42--44.}
   \label{tab:relative_ablations}
   \scriptsize
@@ -737,21 +728,20 @@ these strata are descriptive and do not establish a causal relation-module
 effect.
 
 \paragraph{Historical baseline boundary.}
-Earlier rank-aware Transformer results used the former top-40 cache and
+Earlier rank-aware Transformer results also used top-40 caches and
 training-only positive replacement. They are retained only as historical
-context, not as measurements of the present rank-free, no-forcing method or
+context, not as measurements of the present rank-free model or
 evidence for the relative module introduced here; further details appear in
 Appendix~B.
 
 \section{Discussion}
 
 The expanded cache-local matrix separates candidate coverage from list ordering.
-The full-pool upper bound is 100\% by construction of the saved cache, whereas
-evaluation-time top-40 truncation gives mass and formula upper bounds of 83.88\%
-and 89.26\%, respectively. Across three alignment checkpoints and three
+At alignment-42, the saved top-40 test lists give mass and formula upper bounds
+of 83.88\% and 89.26\%, respectively. Across three alignment checkpoints and three
 reranker seeds per checkpoint, both learned variants improve their
-corresponding base rows. Pointwise is slightly stronger in the aggregate
-R@1/MRR comparison, while relative is not uniformly better at any cutoff. The
+corresponding base rows. The relative--pointwise ordering varies by pool,
+metric and checkpoint. The
 result supports supervised second-stage reranking as a framework component,
 but does not isolate an independent relative-module benefit.
 
@@ -768,7 +758,7 @@ throughput, or deployment claims in this paper.
 
 The primary matrix reuses a cache-local candidate order and saved alignment
 embeddings. A separate official-compatible audit uses the published candidate
-JSON and the same saved embeddings, but does not re-encode spectra/molecules
+JSON and the pilot's saved embeddings, but does not re-encode spectra/molecules
 through a fresh official loader or retrain the first stage. External methods
 and other candidate constructions are outside the comparison.
 
@@ -776,7 +766,10 @@ and other candidate constructions are outside the comparison.
 
 The expanded reranker matrix requests up to 20,000 training queries, evaluates
 three alignment checkpoints, and repeats each principal configuration with
-three reranker seeds. This provides descriptive checkpoint sensitivity, not a
+three reranker seeds. It uses top-40 training caches with positive forcing;
+validation/test are unforced. It therefore does not establish the effect of
+full-training, top-256, all-split no-forcing operation.
+This provides descriptive checkpoint sensitivity, not a
 confidence interval, significance test, or complete end-to-end seed analysis.
 The evaluation also reuses saved embeddings and supplied candidate pools; it
 does not claim fresh official-loader re-encoding, external-baseline
@@ -797,16 +790,17 @@ Further protocol and reproducibility notes appear in Appendices~A and~D.
 \section{Conclusion}
 
 \begin{sloppypar}
-We introduced \method{}, a rank-free, no-forcing second-stage reranker that
+We introduced \method{}, a rank-free second-stage reranker that
 combines full-pool coarse scoring with spectrum-conditioned relative candidate
 preferences. Across three alignment checkpoints with three reranker seeds per
 checkpoint, the expanded cache-local matrix showed that both the relative model
 and its near-parameter-matched pointwise control improved their corresponding
 base in mass- and formula-conditioned retrieval. The primary table uses the
-overlap-clean alignment-42 saved-embedding cache, while a separate audit checks
-the published candidate order and two-dimensional identity rule. Pointwise was
-slightly stronger in the main R@1/MRR summaries, and the 30-run ablation matrix
-found no uniformly superior relative configuration. The evidence therefore
+overlap-clean alignment-42 top-40 cache and models trained with a 20,000-query
+cap and training-only positive forcing. Separate audits check candidate order
+and identity within their respective saved-cache scopes.
+The relative--pointwise ordering depends on the pool and metric, and the 30-run ablation matrix
+did not establish consistent benefits for the tested components. The evidence therefore
 supports a carefully scoped supervised reranking framework and makes the
 relative interaction's boundary explicit: it is a principled candidate-
 relation mechanism, but the current evidence does not establish an independent
@@ -818,103 +812,60 @@ to the fixed saved-embedding candidate protocol.
 
 \section{Evaluation Protocol and Candidate Identity}
 
-The primary multi-seed matrix is cache-local: it reuses the saved candidate
-order, embeddings, and reference two-dimensional InChIKey identity labels for
-the overlap-clean alignment-42 checkpoint. A separate official-compatible audit
-uses the MassSpecGym 1.3.1 retrieval candidate order with the same saved
-embeddings; it does not perform fresh official-loader re-encoding or alignment
-retraining. The two scopes are kept distinct so that the primary table is not
-presented as a fresh official evaluation.
+The primary matrix uses local exact-target-SMILES labels and saved base top-40
+lists. On the overlap-clean alignment-42 test caches, a separate two-dimensional
+InChIKey audit found no extra positives or candidate-identity collisions:
+14,726 mass and 15,670 formula queries have a positive among 17,556 queries
+per pool. Thus the tested identity rules agree on those lists; missing positives
+remain coverage misses. This audit is not automatically transferable to other
+alignment checkpoints or candidate cutoffs.
 
-The tracked full-pool identity check found one identity-equivalent positive for
-each of the 17,556 test queries and no multiple-positive or candidate-identity
-collision in either candidate protocol. Exact-target-SMILES labels consequently
-agree with the reference identity labels on these saved pools. The local
-exact-target-SMILES evaluation is retained as a sensitivity view rather than a
-second main protocol. Formula candidates assume a known formula; both settings
-remain closed-set and the reranker cannot recover a target that is absent from a
-requested candidate cutoff.
+The official-order audit instead uses a separate pre-overlap-clean alignment
+and top-256 no-forcing pilot (5,000 training queries, three epochs, reranker
+seeds 42--44). Its candidate sets match the MassSpecGym 1.3.1 retrieval JSON;
+a full-pool identity check found one equivalent positive per test query.
+Reordering those lists and rescoring saved embeddings does not rerun official
+loader transforms or retrain alignment, and does not validate the main top-40
+matrix as an official evaluation.
 
-The dataset audit also recorded six validation and three test spectrum-record
-matches with training records, with different target molecules. The affected
-validation records are excluded from the overlap-clean alignment validation
-configuration. The three alignment checkpoints used for sensitivity analysis
-are internal descriptive estimates, not a claim of population-level stability.
-Evaluation-only candidate-cutoff sensitivities use the same saved 256-candidate
-cache and are not separately trained cutoff-specific models; the retained files
-are supporting implementation artifacts rather than an additional primary table.
+The spectrum-record audit found six validation and three test records matching
+training inputs with different molecular labels. The affected validation records
+are excluded from overlap-clean alignment validation; this does not imply that
+every later reranker run applies the same exclusions. Candidate-cutoff analyses
+are evaluation-only: the pilot truncates top-256 caches, while the expanded
+matrix truncates its own top-40 caches. Neither is cutoff-specific retraining.
 
 \section{Implementation and Historical Baselines}
 
-The alignment model produces 512-dimensional normalized embeddings. The
-spectrum tower has four Transformer layers, 16 heads and width 512; the
-molecular tower is a four-layer GINE with hidden width 128. The reranker uses
-hidden width 512, relation width 32, pair chunks of 16, dropout 0.1,
-$K=256$, and $K_r=40$. AdamW is used for both stages; the reranker uses a
-learning rate of $10^{-4}$, batch size 32, early stopping on validation MRR,
-and the objective weights and margins reported in the method section.
+The current training entry point writes \texttt{data\_summary} into new
+reranker checkpoints: actual labeled training-query count, requested cap,
+\texttt{train\_k}, model type, pair mode, seed, and available cache metadata.
+These fields distinguish training scope and forcing semantics; they do not
+change the forward path or substitute for experiments.
 
-A reranker seed controls initialization, data-loader order, candidate shuffling
-and dropout. The reported means and sample standard deviations over seeds 42--44
-therefore describe reranker-level variation, not independent alignment
-replicates. Training queries without a naturally present positive remain in
-coverage statistics but do not enter the reranker loss. No positive is inserted
-into a current-method cache.
-
-The current training entry point writes a lightweight \texttt{data\_summary} into
-new reranker checkpoints. It records the actual labeled training-query count,
-the requested maximum count, \texttt{train\_k}, model type, pair mode, seed, and
-available cache-protocol fields such as split, candidate type, pre-retrieval
-cutoff, and positive-forcing status. This metadata helps distinguish pilot
-artifacts from other training scopes, but it does not change the forward path
-or replace full-split, alignment-level, or uncertainty experiments.
-
-The historical Candidate-Set Transformer uses a rank embedding and generic
-candidate self-attention. Its earlier training-time positive forcing and
-rank-aware configuration are not part of the current relative/pointwise
-protocol. It is retained only to connect this paper with the earlier design;
-its larger parameter count and different training protocol prevent it from
-serving as the near-parameter-matched comparison.
+The historical Candidate-Set Transformer uses rank embeddings and generic
+candidate self-attention. It shares the historical training-forcing convention
+with the reported top-40 matrix, but differs in architecture and capacity.
+It is not the near-parameter-matched pointwise control. The default top-256
+no-forcing configuration and these historical measurements remain separate.
 
 \section{Additional Mechanism Analyses}
 
-The 30-run ablation matrix in Table~\ref{tab:relative_ablations} covers the full
-antisymmetric model, directed pairs, no spectrum conditioning, no pair loss,
-and no spectrum loss across both candidate protocols and reranker seeds 42--44.
-No ablation is uniformly best, so the table is evidence about the module's
-behavior and sensitivity rather than a causal component estimate.
-
-Difficulty analysis shows the largest relative-over-base improvements for
-queries whose base rank is 2--5 or 6--20, while base-rank-1 and high-similarity
-queries can decline. This pattern motivates the candidate-relation hypothesis
-but does not establish that the relation branch is universally beneficial.
-
-The difficulty strata above are repeated here as an audit of where the fixed
-candidate pool leaves headroom: gains are largest for base ranks 2--5 and
-6--20, while rank-1 queries can decline. Evaluation-only cutoff results and
-forward-only cost measurements remain implementation references rather than
-end-to-end deployment benchmarks.
+The 30-run matrix in Table~\ref{tab:relative_ablations} contains five
+configurations across two candidate protocols and three reranker seeds.
+The difficulty strata in the main text describe where the saved pool leaves
+ranking headroom; they do not identify a causal relation-module effect.
+Evaluation cutoffs and fixed-hardware forward measurements are implementation
+references, not retraining or end-to-end deployment benchmarks.
 
 \section{Reproducibility and Responsible-Evaluation Notes}
 
-The formal matrix requests up to 20,000 of 194,119 available training queries,
-uses alignment checkpoints 42--44, and repeats the reranker configurations with
-seeds 42--44. The reproducibility index records the source commit, resolved
-configuration, cache metadata, checkpoint and log hashes, and selected ranking
-outputs. The anonymous supplement contains source inspection, locked
-environment files, tests and a synthetic CPU smoke test, but not the real
-spectra, candidate pools, caches, or trained checkpoints. The smoke test is
-therefore not a reproduction of the scientific metrics; the local artifact
-boundary is stated explicitly in Appendix~D.
-
-\begin{sloppypar}
-The local saved-embedding cosine control is a reimplemented JESTR-style scoring
-control, not an official JESTR encoder or checkpoint reproduction; GLMR remains
-reported-only. The paper does not claim SOTA, statistical significance,
-complete alignment-level stability, cross-dataset generalization or end-to-end
-deployment latency. These boundaries define the scope of the method result
-rather than additional experimental claims.
-\end{sloppypar}
+The reproducibility index records source commits, resolved configurations,
+cache metadata, checkpoint/log hashes and selected ranking outputs for the
+reported matrix. The anonymous supplement provides source inspection, locked
+environment files, tests and a synthetic CPU smoke test. It excludes real
+spectra, candidate pools, caches, checkpoints and internal artifact inventories;
+the smoke therefore validates execution, not the scientific metrics.
 
 \bibliographystyle{splncs04}
 \bibliography{references}

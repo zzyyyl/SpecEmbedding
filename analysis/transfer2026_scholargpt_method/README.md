@@ -1,26 +1,13 @@
-# ScholarGPT 方法重构分析
+# ScholarGPT 方法重构 pilot
 
-本目录保存 2026-08-23 外部评审后新方法的配置、训练/评价汇总和形式性质核验。核心模型为 `model_type=relative`：先对完整的最多 256 个候选进行 pointwise coarse scoring，再将 coarse top-40 送入谱图条件的成对相对判别分支。
+本目录保存 2026-08-23 方法重构的历史单 seed pilot，不能作为当前正式运行指南。
 
-## 证据边界
+- [pilot-results.md](pilot-results.md)：5,000-query、3-epoch、seed-42、top-256、no-forcing
+  实验的配置、缓存/模型指纹与结果；使用 pre-overlap-clean alignment。
+- [第二阶段复核](../transfer2026_scholargpt_review/second_stage_report.md)：后续三 reranker
+  seeds、官方候选顺序/二维身份、逐 query、困难分层和 forward 审计。
+- [证据总索引](../README.md)：与旧 top-40 矩阵及待完成全量训练的区别。
+- [当前实现与命令](../../docs/reranker_solution_zh.md)：正式实验不得限量，不能直接复用 pilot 命令。
 
-- 新训练缓存必须使用 `force_include_positive=false`；训练 query 的正例只在自然进入 256 候选池时参与 reranker loss。
-- `base_ranks` 在新模型中只作为缓存兼容字段，不进入任何模型参数路径。
-- `p_ij` 由 `g(r_ij)-g(r_ji)` 构造；模型测试覆盖候选置换等变性和有限值。
-- 主指标仍需在实际生成的结果 JSON 中标注 local exact-target-SMILES 协议；二维 InChIKey 结果若运行成功，另存为 reference-identity audit，不能直接称 official evaluator。
-- 未有真实运行证据的 external baseline、query bootstrap、跨编码器和完整效率对照不得写入论文主结果。
-
-## 推荐运行入口
-
-缓存生成（长任务使用 detached `tmux`）：
-
-```bash
-conda run -n specembedding python prepare_rerank_cache.py \
-  --checkpoint checkpoints_align/d4c1f70_massspecgym_nopretrain/best_model_stage2.pth \
-  --dataset_type massspecgym --data_path /path/to/processed \
-  --candidate_type mass --split train --device cuda:0 --topk 256 \
-  --no-force_include_positive \
-  --save_path rerank_cache/scholargpt_relative_fullpool_mass/massspecgym_mass_train.pt
-```
-
-训练和评价命令应把 `--model_type relative`、`--train-k 256`、`--relation-top-k 40`、`--no-rank-embedding`、`--lambda-spec 0.1` 和 seed 显式记录到结果 manifest；初始 smoke/预算受限运行可使用 `--max-train-queries`，但不得冒充全训练集结果。
+初期“尚无 bootstrap、困难分层和效率记录”的待办已被第二阶段工件替代，后续未完成工作统一见
+[投稿待办](../../paper/TRANSFER_2026_PLAN.md)。

@@ -1,91 +1,75 @@
-# SpecEmbedding 文档入口
+# SpecEmbedding 运行指南与文档地图
 
-SpecEmbedding 是一个 MS/MS-to-molecule retrieval 系统：先用谱图--分子双塔召回候选，再在固定候选池内进行非生成式监督重排序。
+流程为谱图 Transformer 与 GINE 分子塔对齐、基础候选召回、固定候选池内的监督式非生成重排序。
+旧谱图到谱图流程仍保留在 notebook 中；当前研究状态见 [项目记忆](project_memory_zh.md)。
 
-本文档只记录当前可运行流程。历史实验、旧方案和逐次修改记录不再放在这里；可核验工件见 `analysis/`、`paper/release/` 和 `reproducibility/`。
+## 环境与数据
 
-## 1. 环境与检查
-
-首选环境为 `specembedding`。环境定义在 `environment.yml`，开发工具在 `requirements-dev.txt`。
+从仓库根目录执行：
 
 ```bash
 conda env create -f environment.yml
 conda activate specembedding
+python -m pip install -r requirements-dev.txt
 python -m pytest -q
 ruff check .
 python -m compileall -q .
 ```
 
-当前运行环境和匿名补充包验收记录分别见 `reproducibility/runtime-snapshot.yaml` 与
-`reproducibility/anonymous-supplement-validation.yaml`；三组 alignment 的 36 个主运行和 30 个
-relative 消融的索引见 `reproducibility/mentor2026_experiment_index.json`。快照是验收证据，不代表所有历史实验逐包使用同一环境。
+[params.yaml](../params.yaml) 集中配置路径和超参数；配置选择顺序为显式 `load_config(path)`、
+`SPECEMBEDDING_CONFIG`、仓库 YAML。配置相对路径按 YAML 所在目录解析，CLI 路径参数优先。
+[复现说明](../reproducibility/README.md) 提供验收环境锁和工件边界。
 
-## 2. 代码分工
+默认数据目录为 `data/processed/<Dataset>/`。`train.pkl`、`val.pkl`、`test.pkl` 包含
+`list[matchms.Spectrum]`，每条须有 `smiles`、`precursor_mz` 和两列 m/z/intensity 谱峰。
+候选 pickle 为 `dict[str, list[str]]`，将目标 SMILES 映射到候选 SMILES 列表。
 
-| 路径 | 用途 |
-| --- | --- |
-| `SpecEmbedding/models.py` | 峰序列、m/z embedding 和谱图 Transformer |
-| `SpecEmbedding/models_align.py` | GINE 分子编码器与谱图--分子对齐 |
-| `train.py` / `eval.py` | 谱图表征学习与谱图检索 |
-| `train_align.py` / `eval_align.py` | 跨模态对齐与基础候选检索 |
-| `prepare_rerank_cache.py` | 保存谱图、候选分子 embedding 和 base 分数 |
-| `train_rerank.py` / `eval_rerank.py` | 二阶段 reranker 训练与评价 |
-| `run_rerank_pipeline.py` | cache、训练和评价的统一编排入口 |
-| `SpecEmbedding/utils/` | 模型加载、设备、候选、评价和 rerank 公共逻辑 |
+- MassSpecGym：`candidates_mass.pkl` / `candidates_formula.pkl`；后者假设已知分子式。
+- NPLIB1：`candidates_supplied.pkl` 只含 test retrieval 候选；全 split 的
+  `candidates_formula.pkl` 来自固定分子库重建。默认 `supplied` 不能直接用于全流程训练，
+  训练须显式选择 `formula`，遵守 [NPLIB1 计划](paper-change-plans/2026-09-05-NPLIB1跨数据集增强.md)。
+- `--candidate_path` 可覆盖 provider 候选文件；不能通过逐 query 插入真值补齐缺失候选。
 
-## 3. 当前主流程
+## 运行入口
 
-```text
-MS/MS 谱图
-  -> 谱图 Transformer
-  -> GINE 分子塔与跨模态对齐
-  -> base candidate retrieval
-  -> 最多 256 个候选的 coarse-to-fine reranking
-```
-
-当前 rerank 主线是无 rank 的 `relative` 模型：先做 pointwise coarse scoring，再对 coarse top-40 做谱图条件的候选相对判别。`pointwise` 是容量匹配对照；旧的 rank-aware Transformer 只用于历史结果复核。
-
-推荐使用统一入口：
+先提供真实数据、可用 GPU 和独立输出目录。正式训练使用完整可训练划分、显式 `cuda:N`；
+长任务使用 detached `tmux`，其余约束见 [AGENTS.md](../AGENTS.md)。
 
 ```bash
+python train_align.py --dataset_type massspecgym \
+  --data_path data/processed --save_dir checkpoints_align/my_run --device cuda:1
+
+python eval_align.py --dataset_type massspecgym \
+  --checkpoint checkpoints_align/my_run/best_model_stage2.pth \
+  --candidate_type mass --device cuda:1 --no-mces
+
 python run_rerank_pipeline.py massspecgym \
-  --align_save_dir checkpoints_align/<run> \
-  --candidate_type formula \
-  --pre_top_k 256 \
-  --model_type relative \
-  --device cuda:1
+  --align_save_dir checkpoints_align/my_run --candidate_type mass \
+  --pre_top_k 256 --model_type relative --device cuda:1
 ```
 
-调试时加 `--limit N`，并确认输出目录带有 `_limitN` 后缀。只打印命令不执行时加 `--dry-run`。
+对齐示例从零训练谱图塔；复用预训练塔时显式提供 `--pretrained_spec` 并核验加载日志。
+rerank 默认 train/val/test 均不 forcing：`relative` 对最多 256 个自然候选逐点打分，再在
+coarse top-40 上做关系精排；`pointwise` 为容量匹配对照。分阶段命令与元数据见
+[reranker 说明](reranker_solution_zh.md)。
 
-统一入口默认不强制插入正例。只有复核 legacy 训练 cache 时才使用
-`--force-include-positive`；该选项不会作用于验证或测试 cache。
+`--dry-run` 只打印命令，`--limit N` 仅用于非正式调试并使用 `_limitN` 输出目录。代码默认值
+不能代替历史工件协议；已发布的限量 top-40 矩阵与 top-256 no-forcing pilot 的区别见
+[证据索引](../analysis/README.md)。
 
-## 4. 评价协议
+## 文档地图
 
-- 数据集：MassSpecGym；官方 structure-disjoint split 不表述为 scaffold-disjoint。
-- 候选协议：`mass` 或已知分子式的 `formula`；后者称为 formula-conditioned retrieval。
-- reranker 是 closed-library 方法，只能重排输入候选，不能恢复未被 base retrieval 召回的真值。
-- 当前主评价使用官方 retrieval JSON 的候选顺序、二维 InChIKey 身份规则和保存的 alignment embedding；这是 official-compatible candidate-order/identity evaluation，不是 fresh loader 重编码或 alignment 重训。
-- 训练、验证、测试的 no-forcing 语义和候选覆盖上界必须与 cache 元数据一起核对。
-- JESTR/GLMR 是 reported-only 外部背景，未在本仓库统一复现，不与本地数字直接排序比较。
+| 文档 | 维护内容 |
+| --- | --- |
+| [项目记忆](project_memory_zh.md) | 当前任务、运行约束入口、证据缺口 |
+| [编码器结构](../model_architecture.md) | Tokenizer、谱图塔、GINE 与对齐损失 |
+| [reranker 实现](reranker_solution_zh.md) | 第二阶段模型、cache、训练与评价接口 |
+| [分析索引](../analysis/README.md) | 实验系列、协议、报告和 manifest |
+| [论文计划](paper-change-plans/README.md) | 在途计划、模板和历史追溯 |
+| [投稿待办](../paper/TRANSFER_2026_PLAN.md) | 科学证据与最终提交检查 |
+| [论文构建](../paper/BUILDING.md) | 双语 PDF、页数和 release manifest |
+| [复现说明](../reproducibility/README.md) | 环境锁、匿名包与历史验收 |
+| [GLACIER 交接](glacier_reproduction_handoff_zh.md) | 已下载外部工件、缺口与后续推理步骤 |
 
-## 5. 论文与发布
-
-```bash
-bash paper/build_release.sh
-```
-
-发布 PDF、工具链、页数和哈希见 `paper/release/`。当前英文 18 页、中文 15 页。论文正文以方法叙事为主，协议、历史对照和复现边界集中在正文后的附录；双语稿和参考文献以 `paper/` 为准，本文不重复实验表格。
-
-论文的核心发现分为两层：监督式第二阶段重排序改善固定候选池内的排序；relative interaction 的结构性质已形式化，但当前结果尚未证明其独立优于容量匹配的 pointwise 对照。
-
-匿名补充包由显式 allowlist 构建，当前发布包为 `dist/specembedding-anonymous-supplement.zip`，排除 Git 历史、数据、checkpoint、cache、日志和内部 artifact manifest。构建与独立验收记录见 `reproducibility/`。
-
-## 6. 文档地图
-
-- `docs/project_memory_zh.md`：当前工程、实验和证据边界的短版记忆。
-- `docs/reranker_solution_zh.md`：当前 reranker 的实现说明与运行方式。
-- `docs/glacier_reproduction_handoff_zh.md`：GLACIER checkpoint 推理复现的资源与交接边界。
-- `docs/paper-change-plans/`：计划模板和当前最终计划；已完成的历史计划不在工作树中重复保存。
-- `paper/TRANSFER_2026_PLAN.md`、`paper/ADMA2026_TODO.md`：投稿待办与 venue-specific 检查。
+代码按阶段分布在 `SpecEmbedding/models*.py`、`train*.py`、`eval*.py`；公共逻辑位于
+`SpecEmbedding/utils/` 和 `SpecEmbedding/trainer/`。修改规范见仓库 AGENTS。

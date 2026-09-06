@@ -17,5 +17,6 @@ from the stored top-40 list; it is therefore a coverage observation, not proof
 of equivalence to the official loader or full candidate pool.
 
 Source: `identity_inventory.py` and `identity_inventory.json`, generated from
-the two tracked canonical cache paths. Full reranker identity metrics, if
-completed, are stored separately in `official_identity_eval.json`.
+the two canonical cache paths recorded in the repository. The completed
+reranker identity audit is stored separately in `official_identity_eval.json`
+and summarized in [report.md](report.md).
