@@ -1,14 +1,19 @@
 schema_version: 1
 artifact_kind: manuscript_release_build
 status: release_build
-built_at: "2026-09-02T00:52:03+08:00"
+built_at: "2026-09-07T03:02:57+08:00"
 
 source:
-  git_commit: 9f3c2fe8f488ea21eaac2be4ce22da8bdb326524
-  branch: codex/transfer-2026-0831
+  git_commit: 0c0b6df6b8e36b6f47e5298e48209bb2f52a1629
+  branch: codex/massspecgym-fulltrain
   tracked_worktree_clean: true
   command: bash paper/build_release.sh
   instructions: paper/BUILDING.md
+  build_origin: >-
+    Run in an isolated copy under ignored paper/build/docs_cleanup_release;
+    all manuscript, bibliography, figure, class, style and script inputs were
+    byte-compared with the committed source before copying release outputs.
+    The source worktree was clean before the release copies were installed.
 
 environment:
   operating_system: Ubuntu 20.04
@@ -30,22 +35,26 @@ verification:
   known_nonblocking_warnings:
     - English amsmath math-accent command redefinitions
     - Chinese Fandol fontspec messages from the TeX Live ctex font set
-  pdf_string_private_path_hits: 0
+  pdf_text_private_path_hits: 0
+  source_private_path_hits: 0
+  bilingual_citation_keys: 20
+  unused_bibliography_entries: 0
+  result_table_metrics_unchanged_from: a2780dd
 
 outputs:
   english:
     path: paper/release/specembedding-adma2026-en.pdf
     role: English submission draft
-    pages: 18
-    bytes: 470124
-    sha256: b942f9e2cd280d7e70dcdad9cb120be6e8d722b35cb40076ca1951f725b06a68
+    pages: 17
+    bytes: 467245
+    sha256: ae8596f597ba5a7f40182b86aff358faec52491b0b8845e1c8da74bdfc286588
     pdfinfo_author: empty
   chinese:
     path: paper/release/specembedding-adma2026-zh.pdf
     role: Chinese internal discussion draft
-    pages: 15
-    bytes: 417875
-    sha256: 95a44036e6c6efb47d182dc828f8e27d9a51015d5770ee2295a043a15cfe8f44
+    pages: 14
+    bytes: 411416
+    sha256: 2c8cd347d448305f0d868cf7bc9aa6d1750f411a108fa3cbd0556f943c86bdf0
     pdfinfo_author: absent
 
 scope_note: >-
