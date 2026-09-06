@@ -17,10 +17,19 @@ def configure_runtime_cache():
 
 def resolve_device(device: str | torch.device | None = None) -> torch.device:
     requested_device = torch.device(device or config.general.device)
+    require_cuda = os.environ.get("SPECEMBEDDING_REQUIRE_CUDA") == "1"
+    expected = os.environ.get("SPECEMBEDDING_EXPECTED_CUDA_DEVICE")
+    if require_cuda:
+        if requested_device.type != "cuda" or requested_device.index is None:
+            raise RuntimeError("Strict GPU launch requires an explicit cuda:N device; CPU fallback is disabled")
+        if expected is not None and str(requested_device) != expected:
+            raise RuntimeError(f"Strict GPU launch expects {expected}, but training requested {requested_device}")
     if requested_device.type != "cuda":
         return requested_device
 
     if not torch.cuda.is_available():
+        if require_cuda:
+            raise RuntimeError(f"CUDA unavailable for {requested_device}; strict GPU launch forbids CPU fallback")
         logging.warning("CUDA device %s was requested, but CUDA is unavailable. Falling back to CPU.", requested_device)
         return torch.device("cpu")
 

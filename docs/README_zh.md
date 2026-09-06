@@ -35,6 +35,9 @@ python -m compileall -q .
 先提供真实数据、可用 GPU 和独立输出目录。正式训练使用完整可训练划分、显式 `cuda:N`；
 长任务使用 detached `tmux`，其余约束见 [AGENTS.md](../AGENTS.md)。
 
+需要等 GPU 空闲后向已有训练 pane 单次派发命令时，使用
+[GPU/tmux 监测器](gpu_tmux_monitor_zh.md)；它不会自动恢复暂停的实验计划，也不是资源调度器。
+
 ```bash
 python train_align.py --dataset_type massspecgym \
   --data_path data/processed --save_dir checkpoints_align/my_run --device cuda:1
@@ -64,6 +67,7 @@ coarse top-40 上做关系精排；`pointwise` 为容量匹配对照。分阶段
 | [项目记忆](project_memory_zh.md) | 当前任务、运行约束入口、证据缺口 |
 | [编码器结构](../model_architecture.md) | Tokenizer、谱图塔、GINE 与对齐损失 |
 | [reranker 实现](reranker_solution_zh.md) | 第二阶段模型、cache、训练与评价接口 |
+| [GPU/tmux 监测器](gpu_tmux_monitor_zh.md) | 空闲门禁、单次派发、CUDA 映射、锁与安全边界 |
 | [分析索引](../analysis/README.md) | 实验系列、协议、报告和 manifest |
 | [论文计划](paper-change-plans/README.md) | 在途计划、模板和历史追溯 |
 | [投稿待办](../paper/TRANSFER_2026_PLAN.md) | 科学证据与最终提交检查 |

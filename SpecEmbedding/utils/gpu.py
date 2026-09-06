@@ -12,7 +12,9 @@ def parse_cuda_device(device: str) -> int:
     return int(match.group(1))
 
 
-def gpu_snapshot(device: str) -> tuple[dict, str]:
+def gpu_snapshot(
+    device: str, *, timeout: float | None = None, include_table: bool = True
+) -> tuple[dict, str]:
     gpu_index = parse_cuda_device(device)
     query_command = [
         "nvidia-smi",
@@ -21,10 +23,10 @@ def gpu_snapshot(device: str) -> tuple[dict, str]:
         "--query-gpu=index,uuid,name,memory.total,memory.used,memory.free,utilization.gpu,temperature.gpu",
         "--format=csv,noheader,nounits",
     ]
-    query_result = subprocess.run(query_command, capture_output=True, text=True, check=True)
+    query_result = subprocess.run(query_command, capture_output=True, text=True, check=True, timeout=timeout)
     rows = list(csv.reader([query_result.stdout.strip()]))
     if len(rows) != 1 or len(rows[0]) != 8:
-        raise RuntimeError(f"Unexpected nvidia-smi output for {device}: {query_result.stdout!r}")
+        raise ValueError(f"Unexpected nvidia-smi output for {device}: {query_result.stdout!r}")
 
     row = [item.strip() for item in rows[0]]
     state = {
@@ -37,19 +39,48 @@ def gpu_snapshot(device: str) -> tuple[dict, str]:
         "utilization_gpu_pct": int(row[6]),
         "temperature_c": int(row[7]),
     }
-    table_result = subprocess.run(
-        ["nvidia-smi", "-i", str(gpu_index)],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+    if (
+        state["index"] != gpu_index
+        or not 0 <= state["utilization_gpu_pct"] <= 100
+        or not 0 <= state["memory_free_mib"] <= state["memory_total_mib"]
+        or not state["uuid"].startswith("GPU-")
+    ):
+        raise ValueError(f"Invalid nvidia-smi state: {state}")
+    table = ""
+    if include_table:
+        table = subprocess.run(
+            ["nvidia-smi", "-i", str(gpu_index)],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=timeout,
+        ).stdout
     snapshot_text = (
         f"timestamp: {datetime.now().astimezone().isoformat(timespec='seconds')}\n"
         f"device: {device}\n"
         f"query: {query_result.stdout.strip()}\n\n"
-        f"{table_result.stdout}"
+        f"{table}"
     )
     return state, snapshot_text
+
+
+def gpu_inventory(*, timeout: float = 10) -> dict[int, str]:
+    """Physical nvidia-smi indices -> UUIDs, independent of CUDA_VISIBLE_DEVICES."""
+    result = subprocess.run(
+        ["nvidia-smi", "--query-gpu=index,uuid", "--format=csv,noheader,nounits"],
+        capture_output=True, text=True, check=True, timeout=timeout,
+    )
+    devices = {}
+    for row in csv.reader(result.stdout.splitlines()):
+        if len(row) != 2:
+            raise ValueError("Invalid nvidia-smi inventory")
+        index, uuid = int(row[0].strip()), row[1].strip()
+        if index < 0 or index in devices or not re.fullmatch(r"GPU-[a-fA-F0-9-]+", uuid):
+            raise ValueError("Invalid nvidia-smi GPU index/UUID")
+        devices[index] = uuid
+    if not devices or len(set(devices.values())) != len(devices):
+        raise ValueError("Empty or duplicate nvidia-smi inventory")
+    return devices
 
 
 def require_available_gpu(
