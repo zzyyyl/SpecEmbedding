@@ -1,12 +1,12 @@
 # 论文修改计划：MassSpecGym 全量重训与重新评价
 
-- 状态：`暂停`
+- 状态：`执行中`
 - 创建日期：2026-09-07
 - 最后更新：2026-09-07
 - 负责人：Codex / 作者核验
 - 关联论文：`paper/main.tex` / `paper/main_cn.tex`
 - 计划约束：用户已授权取消正式训练的 query 数量限制并重新训练、推理；GPU-only，繁忙时等待。
-  用户随后要求制定好计划后暂时休息，本次只提交计划，不启动后台队列或 GPU 计算，待用户明确继续。
+  用户曾要求暂时休息；2026-09-07 明确授权在 GPU 监测工具完成测试后，使用该工具等待并启动本任务。
 
 ## 1. 修改目标与动机
 
@@ -31,9 +31,9 @@
 
 ### 3.1 涉及文件与章节
 
-- [ ] `params.yaml`：独立正式全量运行配置、路径、GPU 等待阈值与 seed 范围。
-- [ ] 正式编排入口与公共校验：缓存重建、完整性/无 forcing 校验、全量训练、GPU-only 等待、推理和状态记录。
-- [ ] 相关测试：拒绝限量/旧 forcing 缓存、CUDA 不可用不回退、完整样本数核验、命令和队列状态。
+- [x] `params.yaml`：独立正式全量运行配置、路径、GPU 等待阈值与 seed 范围。
+- [x] 正式编排入口与公共校验：缓存重建、完整性/无 forcing 校验、全量训练、GPU-only 等待、推理和状态记录。
+- [x] 相关测试：拒绝限量/旧 forcing 缓存、CUDA 不可用不回退、完整样本数核验、命令和队列状态。
 - [ ] 本计划：记录运行路径、来源 commit、验证、进展与结果边界。
 - [ ] 新实验全部完成并审计后，才决定如何更新双语稿主结果、协议描述与训练规模说明。
 
@@ -78,8 +78,8 @@
 ## 7. 分步执行清单
 
 - [x] 步骤 1：读取项目要求、检查工作树，建立独立分支和本计划。
-- [ ] 步骤 2：实现正式入口与约束，完成针对性测试、Ruff、compileall 和 dry-run。
-- [ ] 步骤 3：提交/推送实现，固定源码 worktree 与输入指纹，启动 detached GPU 等待队列。
+- [x] 步骤 2：实现正式入口与约束，完成针对性测试、Ruff、compileall 和 dry-run。
+- [x] 步骤 3：提交/推送实现，固定源码 worktree 与输入指纹，启动 detached GPU 等待队列。
 - [ ] 步骤 4：新建并逐一核验 6 个缓存，拒绝限量或 forcing 工件。
 - [ ] 步骤 5：完成 12 个全量训练与测试推理，核验 checkpoint 数量/类型/seed/样本数。
 - [ ] 步骤 6：汇总结果与协议审计；发现改变主张或需要扩大实验的问题时标为 `已偏离待确认`。
@@ -96,15 +96,37 @@
 
 ## 9. 验证方案
 
-- [ ] GPU 严格模式、等待、全量保护与缓存拒绝条件的单元测试。
-- [ ] `python -m pytest -q`、`ruff check .`、`python -m compileall -q .`、`git diff --check`。
-- [ ] dry-run 确认 6 个缓存、12 个训练/推理组合且无 query cap。
+- [x] GPU 严格模式、等待、全量保护与缓存拒绝条件的单元测试。
+- [x] 执行 `python -m pytest -q`（196 通过、1 跳过、1 个既有路径审计失败）；Ruff、compileall、diff 检查通过。
+- [x] dry-run 确认 6 个缓存、12 个训练/推理组合且无 query cap。
 - [ ] 原始日志与 checkpoint 的实际训练样本数、候选上限、forcing、CUDA 设备和 seed 一致。
 - [ ] 全部结果完成后检查模型身份与评价协议、三 seed 汇总、失败/不完整项不进入正式表。
 - [ ] 若更新论文，运行 `bash paper/build_release.sh` 并核对双语内容、页数、引用和 release manifest。
 
 ## 10. 执行记录
 
+- 2026-09-07：正式入口 `run_fulltrain_rerank.py` 及公共检查 `SpecEmbedding/utils/fulltrain.py`
+  已提交并推送为 `509fbeb`。固定 detached 源码在 `/data1/zyl/repos/SpecEmbedding-fulltrain-20260907/`；
+  已核验输入 train/val/test 为 194,119/19,429/17,556，alignment-42 checkpoint 与 selection 记录的
+  SHA-256 相符。来源指纹和全部命令只维护于运行根目录的 `inputs_and_commands.json`。
+- 2026-09-07：已启动后台自动等待流程，不需要前台会话存活；独立 tmux server socket 为
+  `/tmp/specembedding-fulltrain-20260907-1010/tmux.sock`，训练 session `fulltrain` / pane `%0`，
+  监测 session `gpu-monitor` / pane `%1`。监测物理 GPU 1，按 UUID 顺序显露所有 GPU，训练
+  显式 `cuda:1`；利用率 ≤10%、空闲 ≥20,000 MiB，30 秒轮询、连续 120 秒，不设最长等待时间。
+  初次核验利用率 87%、空闲 1,687 MiB，仍在等待，未发送训练命令；训练 pane 为专用空白 bash。
+  从未向原有工作会话派发测试或训练命令。各阶段再次等待，失败停止，不自动重试或覆盖工件。
+- 运行根目录：`/data1/zyl/SpecEmbedding/experiments/massspecgym_align42_fulltrain_20260907/`。
+  `monitor.log` 是 GPU 等待/派发日志；进入正式入口后生成 `runner.log` 和 `status.json`。
+  **SENT 仅表示命令派发，不代表训练启动/完成；新实验数字、三 seed 汇总与论文更新尚未完成。**
+  查看监测器：`tmux -S /tmp/specembedding-fulltrain-20260907-1010/tmux.sock attach -t gpu-monitor`。
+  如需取消等待，只在监测 session 中 Ctrl+C，不向训练 pane 发送中断。
+- 独立 tmux 进程能跨终端/当前任务关闭继续运行，但不保证主机重启后恢复，也不是 GPU 资源调度器。
+  低占用不证明设备无人使用，最终复查仍无法消除竞争；源码/输入指纹变化或新证据影响协议时停止核对。
+- 2026-09-07：用户明确恢复本计划。GPU/tmux 监测器已实现，30 项专项测试（含独立 tmux
+  server 的真实传递测试）通过，提交 `67dadfb` 已推送。将先补齐正式全量入口及校验，再固定
+  源码、创建专用空白训练 pane，并由监测器等待派发；不向现有工作 pane 发送测试或训练命令。
+  全仓测试发现既有路径审计失败（GLACIER 交接和项目记忆中的内部路径），其余 180 项通过、1 项跳过；
+  不以修复该无关测试为由改动既有交接信息。
 - 2026-09-07：用户要求继续全量重训；创建 `codex/massspecgym-fulltrain` 分支。
   主机环境已核验 PyTorch/PyG/RDKit/matchms 与 CUDA 可用；两张 RTX 4090 正在高负载，未启动新 GPU 计算。
 - 2026-09-07：用户要求计划制定后暂时休息；计划标记为 `暂停`。尚未修改训练代码或配置，
@@ -114,8 +136,8 @@
 ## 11. 最终结果
 
 - 完成日期：尚未完成
-- 最终状态：暂停，尚无新训练或测试结果
-- 验证结果：计划文档检查；代码测试、dry-run、实验及论文构建均未执行
+- 最终状态：执行中，后台 GPU 等待已启动；尚无新训练或测试结果
+- 验证结果：代码与模拟/独立 tmux 测试、dry-run、输入指纹预检完成；正式实验与论文构建未完成
 - 论文修改 commit：尚未提交
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：无

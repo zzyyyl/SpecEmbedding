@@ -23,8 +23,9 @@ JESTR-style cosine 只是本地保存嵌入上的重实现打分控制，JESTR/G
 
 ## 在途任务
 
-- [MassSpecGym 全量重训](paper-change-plans/2026-09-07-MassSpecGym全量重训.md)：**暂停**。
-  用户要求先制定计划后休息；未启动源码 worktree、缓存重建、后台队列、训练或推理。
+- [MassSpecGym 全量重训](paper-change-plans/2026-09-07-MassSpecGym全量重训.md)：**执行中，后台 GPU 等待**。
+  用户已明确恢复；监测工具、正式入口和测试完成，固定源码及输入指纹后启动独立 detached tmux
+  等待流程，无需前台持续等待。启动时 GPU 未达门槛，尚未派发训练；运行路径与状态入口见计划。
   首批计划固定 alignment-42，运行 12 个全量 reranker 组合，不能称为完成三 alignment 全量矩阵。
 - [NPLIB1 增强](paper-change-plans/2026-09-05-NPLIB1跨数据集增强.md)：计划状态为执行中，
   数据处理、重叠审计与实现 pilot 已记录，正式 GPU 矩阵尚未完成。该数据与 MassSpecGym
