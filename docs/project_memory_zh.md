@@ -94,6 +94,9 @@ bash paper/build_release.sh
 - 当前正文与 BibTeX 引用闭包为 24 个键；未使用的 `kretschmer2025coverage` 已删除。
 - 当前 release 源稿提交为 `6f27a5f`，英文 PDF 18 页、中文 PDF 15 页；当前代码 HEAD 为 `67cf29f`。仍需按目标 venue 完成最终页数、作者/COI、预印本政策和联合匿名检查。
 - 外部强 baseline、candidate-aware alignment、跨数据集验证和完整 official-loader 端到端重跑不在当前证据范围内。
+- GLACIER 官方仓库、MassSpecGym checkpoint 和开放评价输入已于 2026-09-07 下载到约定的
+  `/data1` 路径，但尚未安装环境或运行推理；来源、SHA-256、已知缺口和后续步骤见
+  `analysis/glacier_reproduction_manifest.json` 与 `docs/glacier_reproduction_handoff_zh.md`。
 
 文档修改计划的规则见 `docs/paper-change-plans/README.md`，当前执行计划见
 `docs/paper-change-plans/2026-08-23-ChatGPT导师修改执行计划.md`。

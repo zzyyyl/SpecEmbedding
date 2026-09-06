@@ -1,0 +1,103 @@
+{
+  "created_at": "2026-09-07T01:55:48+08:00",
+  "purpose": "Prepare immutable source inputs for a later GLACIER MassSpecGym checkpoint-inference reproduction; no GLACIER inference or training has been run.",
+  "repository": {
+    "name": "coleygroup/ms-pred",
+    "url": "https://github.com/coleygroup/ms-pred.git",
+    "local_path": "/data1/zyl/repos/ms-pred",
+    "branch": "main",
+    "commit": "ed8311f22958cb37f055b663b5f56c5c77a2ee33",
+    "working_tree_clean_after_clone": true
+  },
+  "model": {
+    "name": "GLACIER",
+    "source_url": "https://www.dropbox.com/scl/fo/ta99j0mp1w7qzek5zvy3w/AFCLQNO8W2EP7ZDMOj9nxWI?rlkey=563zxtyvvhwfu1uyz6n10n2ui&dl=0",
+    "archive": {
+      "path": "/data1/zyl/GLACIER/downloads/GLACIER_checkpoint.zip",
+      "size_bytes": 181602669,
+      "sha256_local": "7e0fa24a19163513fe7cbeea3bf51a48cdd33bf2dbe8ac7a0457cbbf28d1258b"
+    },
+    "checkpoint": {
+      "path": "/data1/zyl/GLACIER/checkpoints/best.ckpt",
+      "size_bytes": 181602423,
+      "sha256_local": "5a47cecca707d3abd5a49c7dbac99d100aa2a586d5d4f848f1e8e35140d7db11",
+      "epoch": 23,
+      "global_step": 74352,
+      "pytorch_lightning_version": "1.6.5",
+      "state_elements": 15108154,
+      "selected_hyperparameters": {
+        "contr_weight": 1.0,
+        "contr_threshold": 0.5,
+        "contr_loss_fn": "entropy",
+        "hidden_size": 256,
+        "graphormer_layers": 5,
+        "num_bins": 150000
+      }
+    }
+  },
+  "massspecgym_1_5": [
+    {
+      "path": "/data1/zyl/GLACIER/data/MassSpecGym1.5.tsv",
+      "url": "https://huggingface.co/datasets/roman-bushuiev/MassSpecGym/resolve/main/data/MassSpecGym1.5.tsv",
+      "size_bytes": 261197365,
+      "sha256": "50cfdd1d22f79543c59555f9ce43c6893bd788a19a42b21fb4e2e3a54673c06a",
+      "verified_against_huggingface_lfs_oid": true
+    },
+    {
+      "path": "/data1/zyl/GLACIER/data/MassSpecGym1.5.mgf",
+      "url": "https://huggingface.co/datasets/roman-bushuiev/MassSpecGym/resolve/main/data/auxiliary/MassSpecGym1.5.mgf",
+      "size_bytes": 308001317,
+      "sha256": "4ddd2c12bb7e43cc08695ee6ff5051be250279d98a62bbdb0693b5345f568b7b",
+      "verified_against_huggingface_lfs_oid": true
+    },
+    {
+      "path": "/data1/zyl/GLACIER/data/MassSpecGym1.5_retrieval_candidates_mass.json",
+      "url": "https://huggingface.co/datasets/roman-bushuiev/MassSpecGym/resolve/main/data/molecules/MassSpecGym1.5_retrieval_candidates_mass.json",
+      "size_bytes": 454362310,
+      "sha256": "9536a330cba24c399271364889119f90124579400dba14e9f78630c75c13c73a",
+      "verified_against_huggingface_lfs_oid": true
+    },
+    {
+      "path": "/data1/zyl/GLACIER/data/MassSpecGym1.5_retrieval_candidates_formula.json",
+      "url": "https://huggingface.co/datasets/roman-bushuiev/MassSpecGym/resolve/main/data/molecules/MassSpecGym1.5_retrieval_candidates_formula.json",
+      "size_bytes": 370306399,
+      "sha256": "454636d2346aebb3cd87edc2efc3fa1bf91eb8e0219edff5880f02aa537ac954",
+      "verified_against_huggingface_lfs_oid": true
+    }
+  ],
+  "upstream_candidate_bundle": {
+    "source_url": "https://www.dropbox.com/scl/fo/d73o0o4u5ymr9ubtp3m7j/AL4r7e3p9ElV0ewBwDCScbM?rlkey=tr99zkzy208ol8aw0pfsdsf5v&dl=0",
+    "archive_path": "/data1/zyl/GLACIER/downloads/MassSpecGym_full_deduplicated_candidates.zip",
+    "archive_size_bytes": 763325589,
+    "archive_sha256_local": "4baa0acf7561b93c8068780beb13a22be8ed5f63ba0cd7f0361bb91e17466bb0",
+    "extracted_formula_candidates": [
+      {
+        "path": "/data1/zyl/GLACIER/data/msg/retrieval/cands_df_test_formula_256.tsv",
+        "size_bytes": 401331104,
+        "sha256_local": "94775649e50f0e3715a62b9ed18184a963d8fd90ac6d31d4a2968037fc98fefa"
+      },
+      {
+        "path": "/data1/zyl/GLACIER/data/msg/retrieval/cands_df_test_formula_256_no_stereo_clean_tauts.tsv",
+        "size_bytes": 279879571,
+        "sha256_local": "61a4fded8ea85271d05242547a3e5b45f64e00b854aa33f8a0492f74bbfd3c87"
+      }
+    ],
+    "unexpected_contents": [
+      "iceberg_dag_gen_msg_best.ckpt",
+      "iceberg_dag_inten_msg_best.ckpt"
+    ],
+    "missing_expected_file": "retrieval/cands_df_test_mass_256.tsv"
+  },
+  "known_gaps_before_full_metric_reproduction": [
+    "Create the ms-pred-format mass candidate TSV from the verified MassSpecGym 1.5 JSON and query metadata.",
+    "Create or obtain data/spec_datasets/msg/spec_files.hdf5 for the true experimental spectra; the verified TSV and MGF source data are present.",
+    "Do not run run_scripts/glacier/03_run_retrieval.py unchanged: its active entries target NIST20 and its MassSpecGym entries are commented out.",
+    "Audit candidate identity, stereochemistry, tautomer handling, target coverage, and evaluator choice before comparing against SpecEmbedding.",
+    "Create an isolated ms-pred CUDA environment before checkpoint smoke testing."
+  ],
+  "glmr_status": {
+    "public_official_code_found": false,
+    "public_official_checkpoint_found": false,
+    "action": "Keep GLMR reported-only unless the authors release artifacts or provide them directly."
+  }
+}

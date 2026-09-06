@@ -86,5 +86,6 @@ bash paper/build_release.sh
 
 - `docs/project_memory_zh.md`：当前工程、实验和证据边界的短版记忆。
 - `docs/reranker_solution_zh.md`：当前 reranker 的实现说明与运行方式。
+- `docs/glacier_reproduction_handoff_zh.md`：GLACIER checkpoint 推理复现的资源与交接边界。
 - `docs/paper-change-plans/`：计划模板和当前最终计划；已完成的历史计划不在工作树中重复保存。
 - `paper/TRANSFER_2026_PLAN.md`、`paper/ADMA2026_TODO.md`：投稿待办与 venue-specific 检查。
