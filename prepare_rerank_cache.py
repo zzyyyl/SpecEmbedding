@@ -1,5 +1,6 @@
 import argparse
 import hashlib
+import json
 import logging
 from pathlib import Path
 
@@ -419,6 +420,11 @@ def main():
     logging.info("Unique molecules before top-k pruning: %s", len(unique_smiles))
 
     mol_embs, valid_mol_mask = encode_molecules(model, unique_smiles, args, device)
+    graph_ineligible_smiles = [unique_smiles[i] for i in torch.nonzero(~valid_mol_mask).flatten().tolist()]
+    logging.info("Graph encoding eligibility: total=%s rejected=%s", len(unique_smiles), len(graph_ineligible_smiles))
+    if config.model.mol_encoder.graph_policy == "rdkit_sanitized":
+        if any(not bool(valid_mol_mask[smiles_to_idx[s["smiles"]]]) for s in matched_sequences):
+            raise RuntimeError("Sanitized graph encoding lost an exact target; refusing the cache")
     spec_embs, true_smiles_list = encode_spectra(model, matched_sequences, args, device)
 
     queries = []
@@ -469,6 +475,12 @@ def main():
     logging.info("Labeled query fraction in saved cache: %.4f", labeled_fraction)
     logging.info("Unique molecules after top-k pruning: %s", len(pruned_smiles))
 
+    dataset_manifest_path = provider.data_dir / "dataset_manifest.json"
+    dataset_version = "unversioned"
+    dataset_manifest_sha256 = None
+    if dataset_manifest_path.exists():
+        dataset_version = json.loads(dataset_manifest_path.read_text())["dataset_version"]
+        dataset_manifest_sha256 = sha256_file(dataset_manifest_path)
     cache = {
         "spec_embs": spec_embs,
         "mol_embs": pruned_mol_embs,
@@ -476,6 +488,8 @@ def main():
         "queries": queries,
         "meta": {
             "dataset_type": args.dataset_type,
+            "dataset_version": dataset_version,
+            "dataset_manifest_sha256": dataset_manifest_sha256,
             "split": args.split,
             "candidate_label": candidate_label,
             "candidate_type": args.candidate_type,
@@ -494,6 +508,9 @@ def main():
             "num_selected_spectra": len(matched_sequences),
             "num_skipped_queries": skipped,
             "num_molecules": len(pruned_smiles),
+            "num_source_molecules": len(unique_smiles),
+            "num_graph_ineligible_molecules": len(graph_ineligible_smiles),
+            "graph_ineligible_smiles": graph_ineligible_smiles,
             "candidate_mapping_coverage": mapped_sequence_count / max(len(sequences), 1),
             "source_candidate_coverage": source_coverage,
             "candidate_pool_coverage": candidate_pool_coverage,

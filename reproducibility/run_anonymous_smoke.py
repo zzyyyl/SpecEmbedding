@@ -193,7 +193,8 @@ def write_synthetic_inputs(data_root: Path, candidate_path: Path) -> None:
             pickle.dump(spectra, handle)
 
     candidates = {
-        smiles: [SMILES[(index + 1) % len(SMILES)], SMILES[(index + 2) % len(SMILES)]]
+        # Supply the synthetic positive naturally; preparation explicitly forbids forcing.
+        smiles: [smiles, SMILES[(index + 1) % len(SMILES)], SMILES[(index + 2) % len(SMILES)]]
         for index, smiles in enumerate(SMILES)
     }
     with candidate_path.open("wb") as handle:

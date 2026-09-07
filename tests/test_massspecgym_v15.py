@@ -58,6 +58,19 @@ def test_candidate_audit_counts_identity_duplicates_without_mutation():
         audit_candidate_list(("CCO", ["CCN"]))
 
 
+def test_candidate_audit_records_unencodable_decoys_but_never_drops_target():
+    values = ["CCO", "CCCC[Sn](CCCC)(CCCC)c1ccc(CO)c(C[SiH2+](C)C(C)(C)C)n1", "OCC"]
+    summary = audit_candidate_list(("CCO", values))
+    assert summary["entries"] == 3
+    assert summary["graph_eligible_entries"] == 2
+    assert summary["invalid_graph_entries"] == 1
+    assert summary["duplicate_2d_identities"] == 1
+    assert summary["invalid_graph_records"] == [{"candidate_index": 1, "smiles": values[1]}]
+    assert len(values) == 3
+    with pytest.raises(ValueError, match="Invalid molecule"):
+        audit_candidate_list((values[1], values))
+
+
 def sequence(value, smiles="CCO"):
     return {"mz": np.array([value, 2], dtype=np.float32), "intensity": np.array([1, 1], dtype=np.float32),
             "mask": np.array([False, False]), "smiles": smiles}
@@ -152,7 +165,7 @@ def test_real_synthetic_preparation_spawn_pool_and_fresh_full_tokenization(tmp_p
     frame.to_csv(source_tsv, sep="\t", index=False)
     legacy = tmp_path / "legacy.tsv"
     frame.to_csv(legacy, sep="\t", index=False)
-    values = {s: [s, "CO"] for s in frame.smiles.unique()}
+    values = {s: [s, "CO", "C(C)(C)(C)(C)C"] for s in frame.smiles.unique()}
     for kind in ("mass", "formula"):
         (source / f"MassSpecGym1.5_retrieval_candidates_{kind}.json").write_text(json.dumps(values))
     settings = ConfigObject({"sources": {p.name: sha256_file(p) for p in source.iterdir()},
@@ -162,6 +175,11 @@ def test_real_synthetic_preparation_spawn_pool_and_fresh_full_tokenization(tmp_p
     prepared = prepare_dataset(source, legacy, output, settings, expected, [1])
     assert prepared["state"] == "complete"
     assert prepared["target_audit"]["excluded_val_identifiers"] == ["ID4"]
+    for kind in ("mass", "formula"):
+        audit = prepared["candidate_audits"][kind]
+        assert audit["invalid_graph_entries"] == 3
+        rejected = [json.loads(line) for line in (output / audit["graph_rejections"]["file"]).read_text().splitlines()]
+        assert {row["target"] for row in rejected} == set(values)
     for kind in ("mass", "formula"):
         with (output / f"candidates_{kind}.pkl").open("rb") as handle:
             assert pickle.load(handle) == values

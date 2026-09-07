@@ -35,16 +35,37 @@ def audit_candidate_list(item):
     """Inspect every source candidate; preserve the original list and order."""
     target, values = item
     key = identity(target)
-    keys = [identity(value) for value in values]
+    keys = []
+    invalid_graph_records = []
+    invalid_graph_entries = 0
+    for index, value in enumerate(values):
+        # The existing embedding loader rejects invalid graphs. Audit that eligibility
+        # explicitly without editing the official candidate strings or their order.
+        with rdBase.BlockLogs():
+            mol = Chem.MolFromSmiles(value)
+        if mol is None or mol.GetNumAtoms() == 0:
+            invalid_graph_entries += 1
+            invalid_graph_records.append({"candidate_index": index, "smiles": value})
+            continue
+        candidate_key = Chem.MolToInchiKey(mol)
+        if not candidate_key or len(candidate_key.split("-")[0]) != 14:
+            raise ValueError(f"Valid candidate graph has no auditable 2D identity: {value}")
+        keys.append(candidate_key.split("-")[0])
     if not values or target not in values or key not in keys:
         raise ValueError(f"Official candidate list does not cover target: {target}")
     return {
         "lists": 1,
+        "target": target,
+        "exact_target_graph_eligible_lists": 1,
         "entries": len(values),
         "duplicate_strings": len(values) - len(set(values)),
+        "graph_eligible_entries": len(keys),
+        "invalid_graph_entries": invalid_graph_entries,
+        "lists_with_invalid_graph_entries": int(invalid_graph_entries > 0),
         "duplicate_2d_identities": len(keys) - len(set(keys)),
         "lists_with_duplicate_2d_identities": int(len(keys) != len(set(keys))),
         "lists_with_multiple_2d_positives": int(keys.count(key) > 1),
+        "invalid_graph_records": invalid_graph_records,
     }
 
 
@@ -158,12 +179,20 @@ def prepare_dataset(source_dir, legacy_tsv, output_dir, settings, expected_count
             if set(keys) - set(candidates):
                 raise ValueError("Official candidate mapping misses target SMILES")
             summary = Counter()
+            invalid_examples = []
+            rejection_path = output_dir / f"invalid_graph_{candidate}.jsonl"
             # Fixed bounded CPU workers; no CUDA and no filtering/subsampling of the source lists.
             context = multiprocessing.get_context("spawn")
-            with context.Pool(settings.audit_workers) as pool:
+            with rejection_path.open("x") as rejections, context.Pool(settings.audit_workers) as pool:
                 for count, counts in enumerate(pool.imap_unordered(audit_candidate_list, candidates.items(), chunksize=8), 1):
+                    rejected = counts.pop("invalid_graph_records")
+                    target = counts.pop("target")
+                    if rejected:
+                        rejections.write(json.dumps({"target": target, "rejected": rejected}) + "\n")
+                        invalid_examples.extend([x["smiles"] for x in rejected[:max(0, 20 - len(invalid_examples))]])
                     summary.update(counts)
                     if count % 256 == 0 or count == len(candidates):
+                        rejections.flush()
                         report["candidate_audits"][candidate] = {**summary, "expected_lists": len(candidates), "state": "running"}
                         write_json(output_dir / "dataset_manifest.json", report)
                         logging.info("%s candidate identity audit %s/%s lists, %s entries", candidate, count, len(candidates), summary["entries"])
@@ -173,6 +202,9 @@ def prepare_dataset(source_dir, legacy_tsv, output_dir, settings, expected_count
             report["outputs"][path.name] = {"sha256": sha256_file(path), "lists": len(candidates)}
             report["candidate_audits"][candidate] = {**summary, "expected_lists": len(candidates), "state": "complete",
                                                        "source_order_preserved": True, "forcing": False,
+                                                       "graph_eligibility_policy": "Preserve raw lists; existing sanitized embedding loader rejects invalid graphs; no query or exact target may be lost",
+                                                       "invalid_graph_examples": invalid_examples,
+                                                       "graph_rejections": {"file": rejection_path.name, "sha256": sha256_file(rejection_path)},
                                                        "unused_source_keys": len(set(candidates) - set(keys))}
             del candidates
             write_json(output_dir / "dataset_manifest.json", report)
@@ -209,6 +241,12 @@ def verify_dataset(directory, expected_counts, exclusions):
         audit = report["candidate_audits"][candidate]
         if audit["state"] != "complete" or audit["lists"] != audit["expected_lists"] or not audit["source_order_preserved"] or audit["forcing"]:
             raise ValueError("Incomplete candidate audit")
+        if (audit["graph_eligible_entries"] + audit["invalid_graph_entries"] != audit["entries"]
+                or audit["exact_target_graph_eligible_lists"] != audit["lists"]):
+            raise ValueError("Candidate graph eligibility audit lost entries or targets")
+        rejected = audit["graph_rejections"]
+        if rejected["file"] != f"invalid_graph_{candidate}.jsonl" or sha256_file(directory / rejected["file"]) != rejected["sha256"]:
+            raise ValueError("Candidate graph rejection record changed")
     return report
 
 

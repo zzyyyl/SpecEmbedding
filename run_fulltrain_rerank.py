@@ -153,6 +153,8 @@ def audit_stage(stage, manifest, cache_audits):
                                      "checkpoint_sha256": manifest["inputs"]["alignment"]["sha256"],
                                      "candidate_sha256": manifest["inputs"][f"candidates_{stage['candidate']}"]["sha256"],
                                      "graph_policy": config.model.mol_encoder.graph_policy,
+                                     **({"dataset_version": "1.5", "dataset_manifest_sha256": manifest["inputs"]["dataset_manifest"]["sha256"]}
+                                        if "dataset_manifest" in manifest["inputs"] else {}),
                                  })
         summary["sha256"] = sha256_file(output)
         cache_audits[f"{stage['candidate']}/{stage['split']}"] = summary

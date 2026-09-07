@@ -175,7 +175,9 @@ python run_massspecgym_v15.py --gpu 1 --device cuda:1 \
 执行顺序：
 
 1. CPU 读取并校验全部谱图及候选，保留官方候选内容和顺序，记录二维身份重复/正例数量；
-   任一非法候选、缺失目标、意外跨 split 身份交集或输入变化均失败停止。每 256 个候选列表记录进度。
+   无效分子图按既有编码器规则排除，原始列表不修改；全部排除逐项写入 JSONL（目标与源位置），
+   统计二维身份时单列这些无法编码的条目。缺失/无法编码的目标、意外跨 split 身份交集、
+   有效图无法确定二维身份或输入变化均失败停止。每 256 个候选列表记录进度。
 2. 审计通过后，满足既定 GPU 门槛才从随机初始化训练 alignment seed=42。新运行配置显式使用
    `rdkit_sanitized` 构图；训练每轮遍历 194,119 条谱图，验证保留既定六条排除，实际 19,423 条。
    同二维身份使用 multi-positive 标签；验证采用一次固定 seed 排列，跨 epoch 不重抽谱。
@@ -190,6 +192,8 @@ python run_massspecgym_v15.py --gpu 1 --device cuda:1 \
 状态入口为运行根的 `status.json`、`runner.log`、`logs/prepare_v15.log`、
 `data/MassSpecGym/dataset_manifest.json`。alignment 日志在 `logs/alignment42.log`，子矩阵状态在
 `rerank_topk256/status.json`。顶层完成只代表配置的训练/测试阶段完成，结果身份审计和论文状态另记。
+缓存另外保存数据版本、数据 manifest 哈希、实际无法编码的分子列表与数量；任何目标编码丢失均
+拒绝生成缓存。源候选身份审计与有效图候选池必须区分，不能把图排除后的结果称为未经处理的完整官方评价。
 
 ### 历史固定 alignment 入口
 

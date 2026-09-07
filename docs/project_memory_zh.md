@@ -25,9 +25,14 @@ JESTR-style cosine 只是本地保存嵌入上的重实现打分控制，JESTR/G
 
 - [MassSpecGym 全量重训](paper-change-plans/2026-09-07-MassSpecGym全量重训.md)：**执行中，v1.5 迁移**。
   当前 processed 数据已核验为 v1。用户已授权采用 v1.5，并在审计证明必要时重训 alignment。
-  旧监测器于 19:48 停止，未派发训练，原锁、日志和固定源码保留；不存在新的 GPU 队列。
+  旧监测器于 19:48 停止，未派发训练，原锁、日志和固定源码保留。
   旧构图的芳香性/键类型依赖 SMILES 表示，迁移需规范构图并重训一个 alignment-42；
-  正式 alignment 还需改为每轮全谱遍历。随后运行 12 个全量 reranker 组合，不能称为三 alignment 矩阵。
+  正式 alignment 已增加每轮全谱遍历与数量校验。首个 v1.5 队列于 20:17 在候选审计阶段停止：
+  官方源含 RDKit 无法构图的候选，未启动 GPU，失败工件及 `6843e12` 固定源码保留。
+  修正为显式记录现有候选编码器的无效图排除（保留源候选顺序/内容，正例和 query 不得丢失）；
+  修复通过验证后使用新目录和新源码重新执行。完整 CPU 审计通过后才等待 GPU，重训一个
+  alignment-42，再运行 12 个全量 reranker 组合；不能称为三 alignment 矩阵。
+  运行路径、独立 socket、状态入口及验证记录集中于计划。尚无新 GPU 训练结果。
 - [NPLIB1 增强](paper-change-plans/2026-09-05-NPLIB1跨数据集增强.md)：计划状态为执行中，
   数据处理、重叠审计与实现 pilot 已记录，正式 GPU 矩阵尚未完成。该数据与 MassSpecGym
   有明显训练身份重叠，定位为第二套 in-domain 派生协议；去重 zero-shot 仅作小样本敏感性分析。
