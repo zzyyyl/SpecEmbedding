@@ -127,6 +127,20 @@
 
 ## 10. 执行记录
 
+- **当前正式队列，2026-09-08 00:05（北京时间）启动**：r3 固定源码为
+  `/data1/zyl/repos/SpecEmbedding-v15-fulltrain-20260908-r3/`，detached `15b1b5d`、工作树干净；
+  Python 代码和 `params.yaml` 与已通过完整 CPU 验证的 `aecdfee` 一致，仅更新恢复状态文档。
+  运行根为 `/data1/zyl/SpecEmbedding/experiments/massspecgym_v15_fulltrain_20260908_r3_topk256/`，
+  独立 socket 为 `/tmp/specembedding-v15-fulltrain-20260908-r3-1010/tmux.sock`，
+  session `v15` / pane `%0`，入口 PID 2990241，初始 CPU 预处理 PID 2990250。
+  先保存并复核 `inputs_and_commands.json`，再单次启动；实测 `status.json` 为
+  `prepare_v15/running`，数据 manifest 已记录 v1.5 与修复后的身份策略，尚无 alignment 日志。
+  子进程已核验 UUID 全卡顺序、严格 `cuda:1` 环境及本运行 `runtime_params.yaml`；
+  后续物理 GPU 1 门槛仍为利用率 ≤10%、空闲 ≥20,000 MiB、30 秒轮询并连续满足 120 秒，
+  无最长等待时间。启动前读数为利用率 96%、空闲 4,019 MiB，不代表后续实时状态。
+  本入口自带逐阶段等待，没有新增外部监测器；旧队列、审计目录和固定源码均保留。
+  状态入口为运行根的 `status.json`、`runner.log`、`logs/prepare_v15.log` 和
+  `data/MassSpecGym/dataset_manifest.json`；此启动记录不代表正式数据审计、训练或评价完成。
 - 2026-09-08：用户明确恢复目标，计划设为 `执行中`。重新核验旧队列与独立 CPU 审计均已退出，
   完整审计 manifest 及其输出通过哈希复查；当前没有运行中的正式训练。
   继续使用已验证的 InChI 修复和现有正式入口，在新 worktree、新运行根和独立 socket 中启动。
@@ -238,7 +252,7 @@
 ## 11. 最终结果
 
 - 完成日期：尚未完成
-- 最终状态：执行中；用户已明确恢复目标，身份转换修复及完整 CPU 验证通过，正在准备新的正式队列；尚无新 GPU 训练或测试结果
+- 最终状态：执行中；r3 正式队列已启动，当前进行新运行目录的 CPU 准备与审计，之后按门槛等待 GPU；尚无新 GPU 训练或测试结果
 - 验证结果：代码与模拟/独立 tmux 测试、dry-run、输入指纹预检完成；正式实验与论文构建未完成
 - 论文修改 commit：尚未提交
 - 计划归档 commit：无需在本文件中自我引用
