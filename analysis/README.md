@@ -5,7 +5,7 @@
 
 | 系列 | 协议与用途 | 来源 |
 | --- | --- | --- |
-| v1.5 全量迁移 | 训练暂停；目标为一个从头训练的 alignment-42、六缓存与十二个 reranker 组合，尚无新模型结果 | [执行计划](../docs/paper-change-plans/2026-09-07-MassSpecGym全量重训.md)、[身份转换修复](massspecgym_v15_inchi_fix.md)、[队列和审计入口](../docs/gpu_tmux_monitor_zh.md) |
+| v1.5 全量迁移 | 已获准恢复执行；目标为一个从头训练的 alignment-42、六缓存与十二个 reranker 组合，尚无新模型结果 | [执行计划](../docs/paper-change-plans/2026-09-07-MassSpecGym全量重训.md)、[身份转换修复](massspecgym_v15_inchi_fix.md)、[队列和审计入口](../docs/gpu_tmux_monitor_zh.md) |
 | Mentor 主矩阵与 relative 消融 | 36 个主运行、30 个消融；alignment 42--44，reranker 42--44；训练 cap=20,000、top-40，训练 forcing=true，val/test=false | [运行/哈希索引](../reproducibility/mentor2026_experiment_index.json)、[主矩阵](mentor2026_experiments/alignment_summary/manifest.json)、[消融](mentor2026_experiments/ablation_summary/manifest.json) |
 | 无 forcing 方法 pilot | pre-overlap-clean alignment；5,000 query、3 epochs、top-256；先单 seed，再三 reranker seeds | [单 seed](transfer2026_scholargpt_method/pilot-results.md)、[第二阶段报告](transfer2026_scholargpt_review/second_stage_report.md)、[manifest](transfer2026_scholargpt_review/second_stage_manifest.json) |
 | 旧 Transformer 跨 alignment | 固定旧 top-40 协议，Pointwise/Transformer 描述性对比 | [报告](transfer2026_alignment_multiseed/report.md)、[manifest](transfer2026_alignment_multiseed/analysis_manifest.json) |

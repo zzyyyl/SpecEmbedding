@@ -1,7 +1,7 @@
 # MassSpecGym v1.5 InChI 转换故障修复
 
 2026-09-07；这是 CPU 数据审计与实现修复记录，不是训练或检索性能结果。
-正式训练按用户要求保持停止，状态见[全量重训计划](../docs/paper-change-plans/2026-09-07-MassSpecGym全量重训.md)。
+本次修复完成时正式训练按用户要求保持停止；后续执行状态见[全量重训计划](../docs/paper-change-plans/2026-09-07-MassSpecGym全量重训.md)。
 
 ## 原因与复现
 
@@ -60,5 +60,5 @@ r2 源码 `d15510b` 在生成候选 InChIKey 时直接使用默认 RDKit 调用�
 独立表示生成了相同二维身份。三个 split 的记录哈希也与 r2 一致。
 
 运行目录、固定 worktree、独立 socket 与回执入口集中于计划；`dataset_manifest.json`
-及 `independent_verification.json` 均为 `complete`。CPU 审计进程已退出，训练仍暂停。
+及 `independent_verification.json` 均为 `complete`。本次 CPU 审计进程退出时，训练尚未恢复。
 本次没有 alignment/reranker checkpoint、新 top-256 模型缓存或测试指标，也未更新论文。
