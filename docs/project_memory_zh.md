@@ -23,7 +23,7 @@ JESTR-style cosine 只是本地保存嵌入上的重实现打分控制，JESTR/G
 
 ## 在途任务
 
-- [MassSpecGym 全量重训](paper-change-plans/2026-09-07-MassSpecGym全量重训.md)：**执行中，v1.5 迁移**。
+- [MassSpecGym 全量重训](paper-change-plans/2026-09-07-MassSpecGym全量重训.md)：**暂停，v1.5 故障修复**。
   当前 processed 数据已核验为 v1。用户已授权采用 v1.5，并在审计证明必要时重训 alignment。
   旧监测器于 19:48 停止，未派发训练，原锁、日志和固定源码保留。
   旧构图的芳香性/键类型依赖 SMILES 表示，迁移需规范构图并重训一个 alignment-42；
@@ -33,7 +33,9 @@ JESTR-style cosine 只是本地保存嵌入上的重实现打分控制，JESTR/G
   修复 `d15510b` 已推送并冻结新 worktree；r2 队列于 20:29 启动，但于 20:33 再次失败退出。
   本次候选已通过 SMILES 解析，随后生成 InChIKey 时触发 `KekulizeException`，不能直接归为
   既有无效图排除。21:54 核验进程已退出、未进入 GPU 阶段，日志与失败工件保留，未重启。
-  完整 CPU 审计通过后才等待 GPU，重训一个
+  用户随后要求停止任务、排查并修复。已定位 RDKit 解析与 InChI 转换的 Kekulé 搜索顺序差异；
+  修复仅转换分子副本并保留身份转换记录，不改候选或编码器图。当前仅进行 CPU 验证，
+  训练队列保持停止；恢复需用户明确指示。恢复后须完整 CPU 审计通过才等待 GPU，重训一个
   alignment-42，再运行 12 个全量 reranker 组合；不能称为三 alignment 矩阵。
   运行路径、独立 socket、状态入口及验证记录集中于计划。尚无新 GPU 训练结果。
 - [NPLIB1 增强](paper-change-plans/2026-09-05-NPLIB1跨数据集增强.md)：计划状态为执行中，

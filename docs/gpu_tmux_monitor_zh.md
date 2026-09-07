@@ -178,6 +178,12 @@ python run_massspecgym_v15.py --gpu 1 --device cuda:1 \
    无效分子图按既有编码器规则排除，原始列表不修改；全部排除逐项写入 JSONL（目标与源位置），
    统计二维身份时单列这些无法编码的条目。缺失/无法编码的目标、意外跨 split 身份交集、
    有效图无法确定二维身份或输入变化均失败停止。每 256 个候选列表记录进度。
+   RDKit 默认 InChI 转换抛出 `KekulizeException` 时，仅在分子副本上以 `canonical=False`
+   完成 Kekulé 搜索后再生成标准 InChIKey，保留原始候选与编码器图；成功记录写入
+   `identity_retry_mass.jsonl` / `identity_retry_formula.jsonl`，并保存数量、策略版本与文件哈希。
+   目标身份转换使用同一策略，记录于 manifest 的 `target_audit.identity_retry_targets`。
+   此操作不把身份转换失败归入无效图，也不更改 InChI 选项；再次失败仍停止并输出目标、
+   候选源位置与 SMILES。失败时子审计状态也同步标为失败，保留最后完整进度。
 2. 审计通过后，满足既定 GPU 门槛才从随机初始化训练 alignment seed=42。新运行配置显式使用
    `rdkit_sanitized` 构图；训练每轮遍历 194,119 条谱图，验证保留既定六条排除，实际 19,423 条。
    同二维身份使用 multi-positive 标签；验证采用一次固定 seed 排列，跨 epoch 不重抽谱。

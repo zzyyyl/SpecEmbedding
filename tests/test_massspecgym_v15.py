@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
+from rdkit import Chem
 from torch.utils.data import DataLoader
 from torch_geometric.data import Batch
 
@@ -24,9 +25,53 @@ from SpecEmbedding.utils.massspecgym_v15 import (
     audit_candidate_list,
     audit_targets,
     classified_full_spectra,
+    molecule_identity,
     prepare_dataset,
     verify_dataset,
 )
+
+# Real v1.5 Mass list 4163, candidate 180 (zero-based): sanitization succeeds,
+# but RDKit 2026.03.1's canonical Kekule search during InChI conversion fails.
+FUSED_RING_CANDIDATE = (
+    "CN1C(=O)c2ccc3c4cc5c6ccccc6c6cc7c8ccc9c%10c(ccc(c%11cc%12c%13ccccc%13c%13cc"
+    "(c%14ccc(c2c3%14)C1=O)c4c1c5c6c(c7%11)c%12c%131)c%108)C(=O)N(C)C9=O"
+)
+
+
+def test_real_fused_ring_identity_keeps_graph_and_source_candidate():
+    mol = Chem.MolFromSmiles(FUSED_RING_CANDIDATE)
+    before = mol.ToBinary()
+    key, retried = molecule_identity(mol)
+    assert key == "XPHPEGPJWUASIV"
+    assert mol.ToBinary() == before
+    # Standard InChI identity must survive atom reordering; the embedding graph
+    # retains its sanitized aromatic features and is never replaced by the copy.
+    reverse = Chem.RenumberAtoms(mol, list(reversed(range(mol.GetNumAtoms()))))
+    assert molecule_identity(reverse)[0] == key
+    values = ["CCO", FUSED_RING_CANDIDATE]
+    summary = audit_candidate_list(("CCO", values))
+    assert values == ["CCO", FUSED_RING_CANDIDATE]
+    assert summary["graph_eligible_entries"] == 2
+    assert summary["invalid_graph_entries"] == 0
+    assert summary["identity_retry_entries"] == int(retried)
+    if retried:
+        assert summary["identity_retry_records"] == [{"candidate_index": 1, "smiles": values[1], "identity_2d": key}]
+
+
+def test_identity_conversion_still_fails_closed_with_candidate_context():
+    with patch("SpecEmbedding.utils.massspecgym_v15.Chem.MolToInchiKey", return_value=""):
+        with pytest.raises(ValueError, match="Missing 2D InChIKey"):
+            molecule_identity(Chem.MolFromSmiles("CCO"))
+    original = Chem.MolToInchiKey
+
+    def fail_candidate(mol):
+        if mol.GetNumAtoms() > 3:
+            raise Chem.KekulizeException("synthetic search failure")
+        return original(mol)
+
+    with patch("SpecEmbedding.utils.massspecgym_v15.Chem.MolToInchiKey", side_effect=fail_candidate):
+        with pytest.raises(ValueError, match="candidate_index=1.*CCCC"):
+            audit_candidate_list(("CCO", ["CCO", "CCCC"]))
 
 
 def test_sanitized_graphs_remove_kekule_shortcut_in_gine_forward():
@@ -165,7 +210,7 @@ def test_real_synthetic_preparation_spawn_pool_and_fresh_full_tokenization(tmp_p
     frame.to_csv(source_tsv, sep="\t", index=False)
     legacy = tmp_path / "legacy.tsv"
     frame.to_csv(legacy, sep="\t", index=False)
-    values = {s: [s, "CO", "C(C)(C)(C)(C)C"] for s in frame.smiles.unique()}
+    values = {s: [s, "CO", "C(C)(C)(C)(C)C", FUSED_RING_CANDIDATE] for s in frame.smiles.unique()}
     for kind in ("mass", "formula"):
         (source / f"MassSpecGym1.5_retrieval_candidates_{kind}.json").write_text(json.dumps(values))
     settings = ConfigObject({"sources": {p.name: sha256_file(p) for p in source.iterdir()},
@@ -180,6 +225,9 @@ def test_real_synthetic_preparation_spawn_pool_and_fresh_full_tokenization(tmp_p
         assert audit["invalid_graph_entries"] == 3
         rejected = [json.loads(line) for line in (output / audit["graph_rejections"]["file"]).read_text().splitlines()]
         assert {row["target"] for row in rejected} == set(values)
+        retries_path = output / audit["identity_retries"]["file"]
+        retries = [json.loads(line) for line in retries_path.read_text().splitlines()]
+        assert sum(len(row["retried"]) for row in retries) == audit["identity_retry_entries"]
     for kind in ("mass", "formula"):
         with (output / f"candidates_{kind}.pkl").open("rb") as handle:
             assert pickle.load(handle) == values
@@ -187,6 +235,12 @@ def test_real_synthetic_preparation_spawn_pool_and_fresh_full_tokenization(tmp_p
     assert sum(map(len, classified["train_data"].values())) == 3
     assert sum(map(len, classified["val_data"].values())) == 1
     assert audit["expected_epoch_counts"] == {"train": 3, "val": 1}
+    retries_path = output / "identity_retry_mass.jsonl"
+    original_retries = retries_path.read_bytes()
+    retries_path.write_text("tampered")
+    with pytest.raises(ValueError, match="identity retry record changed"):
+        verify_dataset(output, expected, [1])
+    retries_path.write_bytes(original_retries)
     with pytest.raises(FileExistsError):
         prepare_dataset(source, legacy, output, settings, expected, [1])
     (output / "train.pkl").write_bytes(b"changed")

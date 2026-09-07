@@ -13,6 +13,8 @@ from rdkit import Chem, rdBase
 
 from SpecEmbedding.utils.fulltrain import sha256_file
 
+IDENTITY_POLICY = "standard_inchi_with_recorded_noncanonical_kekule_retry_v1"
+
 
 def write_json(path, value):
     path = Path(path)
@@ -21,14 +23,39 @@ def write_json(path, value):
     temporary.replace(path)
 
 
-def identity(smiles):
+def molecule_identity(mol):
+    """Return a standard 2D InChIKey and whether the Kekule search needed a retry.
+
+    RDKit 2026.03 sanitization uses canonical=False, while InChI conversion
+    uses canonical=True. Some valid fused rings fail only the latter search.
+    Retry on a copy using sanitization's search order, without altering the
+    source molecule, graph eligibility, or InChI options/identity definition.
+    """
+    retried = False
+    try:
+        with rdBase.BlockLogs():
+            key = Chem.MolToInchiKey(mol)
+    except Chem.KekulizeException:
+        kekule = Chem.Mol(mol)
+        Chem.Kekulize(kekule, clearAromaticFlags=True, canonical=False)
+        key = Chem.MolToInchiKey(kekule)
+        retried = True
+    if not key or len(key.split("-")[0]) != 14:
+        raise ValueError("Missing 2D InChIKey")
+    return key.split("-")[0], retried
+
+
+def identity(smiles, *, retry_records=None):
     mol = Chem.MolFromSmiles(smiles)
     if mol is None or mol.GetNumAtoms() == 0:
         raise ValueError(f"Invalid molecule: {smiles}")
-    key = Chem.MolToInchiKey(mol)
-    if not key or len(key.split("-")[0]) != 14:
-        raise ValueError(f"Missing 2D InChIKey: {smiles}")
-    return key.split("-")[0]
+    try:
+        key, retried = molecule_identity(mol)
+        if retried and retry_records is not None:
+            retry_records.append({"smiles": smiles, "identity_2d": key})
+        return key
+    except (ValueError, RuntimeError) as error:
+        raise ValueError(f"Cannot determine 2D identity for {smiles!r}: {error}") from error
 
 
 def audit_candidate_list(item):
@@ -37,6 +64,7 @@ def audit_candidate_list(item):
     key = identity(target)
     keys = []
     invalid_graph_records = []
+    identity_retry_records = []
     invalid_graph_entries = 0
     for index, value in enumerate(values):
         # The existing embedding loader rejects invalid graphs. Audit that eligibility
@@ -47,10 +75,14 @@ def audit_candidate_list(item):
             invalid_graph_entries += 1
             invalid_graph_records.append({"candidate_index": index, "smiles": value})
             continue
-        candidate_key = Chem.MolToInchiKey(mol)
-        if not candidate_key or len(candidate_key.split("-")[0]) != 14:
-            raise ValueError(f"Valid candidate graph has no auditable 2D identity: {value}")
-        keys.append(candidate_key.split("-")[0])
+        try:
+            candidate_key, retried = molecule_identity(mol)
+        except (ValueError, RuntimeError) as error:
+            raise ValueError(f"Candidate identity failed: target={target!r}, candidate_index={index}, "
+                             f"smiles={value!r}: {error}") from error
+        if retried:
+            identity_retry_records.append({"candidate_index": index, "smiles": value, "identity_2d": candidate_key})
+        keys.append(candidate_key)
     if not values or target not in values or key not in keys:
         raise ValueError(f"Official candidate list does not cover target: {target}")
     return {
@@ -66,6 +98,8 @@ def audit_candidate_list(item):
         "lists_with_duplicate_2d_identities": int(len(keys) != len(set(keys))),
         "lists_with_multiple_2d_positives": int(keys.count(key) > 1),
         "invalid_graph_records": invalid_graph_records,
+        "identity_retry_entries": len(identity_retry_records),
+        "identity_retry_records": identity_retry_records,
     }
 
 
@@ -75,11 +109,12 @@ def audit_targets(frame, legacy, exclusions):
     if not frame.identifier.is_unique:
         raise ValueError("Duplicate spectrum identifiers")
     pairs = dict.fromkeys(zip(legacy.smiles, frame.smiles))
-    keys = {smiles: identity(smiles) for smiles in frame.smiles.unique()}
+    identity_retries = {"v1": [], "v15": []}
+    keys = {smiles: identity(smiles, retry_records=identity_retries["v15"]) for smiles in frame.smiles.unique()}
     graph_changes = 0
     stereo_changes = []
     for old, new in pairs:
-        if identity(old) != keys[new]:
+        if identity(old, retry_records=identity_retries["v1"]) != keys[new]:
             raise ValueError("v1 to v1.5 target connectivity changed")
         old_mol, new_mol = Chem.MolFromSmiles(old), Chem.MolFromSmiles(new)
         if Chem.MolToSmiles(old_mol) != Chem.MolToSmiles(new_mol):
@@ -104,6 +139,7 @@ def audit_targets(frame, legacy, exclusions):
         "smiles_changed_records": int((legacy.smiles != frame.smiles).sum()),
         "raw_graph_feature_changed_unique_targets": graph_changes,
         "canonical_stereo_differences_with_same_2d_identity": stereo_changes,
+        "identity_retry_targets": identity_retries,
         "split_counts": dict(Counter(frame.fold)), "train_test_2d_overlap": len(train_test),
         "train_val_2d_overlap": len(train_val), "observed_val_test_2d_overlap_indices": val_test_indices,
         "excluded_val_query_indices": exclusions,
@@ -128,7 +164,7 @@ def prepare_dataset(source_dir, legacy_tsv, output_dir, settings, expected_count
                          ("data/" if name.endswith(".tsv") else "data/molecules/") + name}
     output_dir.mkdir(parents=True, exist_ok=False)
     report = {"state": "running", "dataset_version": "1.5", "rdkit_version": rdBase.rdkitVersion,
-              "graph_policy": settings.graph_policy, "sources": sources,
+              "graph_policy": settings.graph_policy, "identity_policy": IDENTITY_POLICY, "sources": sources,
               "legacy_tsv": {"path": str(legacy_tsv), "sha256": sha256_file(legacy_tsv)},
               "candidate_audits": {}, "outputs": {}}
     write_json(output_dir / "dataset_manifest.json", report)
@@ -181,18 +217,23 @@ def prepare_dataset(source_dir, legacy_tsv, output_dir, settings, expected_count
             summary = Counter()
             invalid_examples = []
             rejection_path = output_dir / f"invalid_graph_{candidate}.jsonl"
+            retry_path = output_dir / f"identity_retry_{candidate}.jsonl"
             # Fixed bounded CPU workers; no CUDA and no filtering/subsampling of the source lists.
             context = multiprocessing.get_context("spawn")
-            with rejection_path.open("x") as rejections, context.Pool(settings.audit_workers) as pool:
+            with rejection_path.open("x") as rejections, retry_path.open("x") as retries, context.Pool(settings.audit_workers) as pool:
                 for count, counts in enumerate(pool.imap_unordered(audit_candidate_list, candidates.items(), chunksize=8), 1):
                     rejected = counts.pop("invalid_graph_records")
                     target = counts.pop("target")
+                    retried = counts.pop("identity_retry_records")
+                    if retried:
+                        retries.write(json.dumps({"target": target, "retried": retried}) + "\n")
                     if rejected:
                         rejections.write(json.dumps({"target": target, "rejected": rejected}) + "\n")
                         invalid_examples.extend([x["smiles"] for x in rejected[:max(0, 20 - len(invalid_examples))]])
                     summary.update(counts)
                     if count % 256 == 0 or count == len(candidates):
                         rejections.flush()
+                        retries.flush()
                         report["candidate_audits"][candidate] = {**summary, "expected_lists": len(candidates), "state": "running"}
                         write_json(output_dir / "dataset_manifest.json", report)
                         logging.info("%s candidate identity audit %s/%s lists, %s entries", candidate, count, len(candidates), summary["entries"])
@@ -205,6 +246,7 @@ def prepare_dataset(source_dir, legacy_tsv, output_dir, settings, expected_count
                                                        "graph_eligibility_policy": "Preserve raw lists; existing sanitized embedding loader rejects invalid graphs; no query or exact target may be lost",
                                                        "invalid_graph_examples": invalid_examples,
                                                        "graph_rejections": {"file": rejection_path.name, "sha256": sha256_file(rejection_path)},
+                                                       "identity_retries": {"file": retry_path.name, "sha256": sha256_file(retry_path)},
                                                        "unused_source_keys": len(set(candidates) - set(keys))}
             del candidates
             write_json(output_dir / "dataset_manifest.json", report)
@@ -215,6 +257,9 @@ def prepare_dataset(source_dir, legacy_tsv, output_dir, settings, expected_count
         report["state"] = "complete"
     except BaseException as error:
         report.update(state="failed_or_interrupted", error=repr(error))
+        for audit in report["candidate_audits"].values():
+            if audit["state"] == "running":
+                audit["state"] = "failed_or_interrupted"
         raise
     finally:
         write_json(output_dir / "dataset_manifest.json", report)
@@ -229,6 +274,8 @@ def verify_dataset(directory, expected_counts, exclusions):
         raise ValueError("v1.5 preparation is incomplete or uses the wrong graph policy")
     if report["rdkit_version"] != rdBase.rdkitVersion:
         raise ValueError("RDKit version differs from the audited preprocessing environment")
+    if report.get("identity_policy") != IDENTITY_POLICY:
+        raise ValueError("v1.5 identity audit policy mismatch")
     if report["target_audit"]["split_counts"] != expected_counts or report["target_audit"]["excluded_val_query_indices"] != exclusions:
         raise ValueError("v1.5 split/exclusion audit mismatch")
     required = {f"{s}.pkl" for s in ("train", "val", "test", "candidates_mass", "candidates_formula")}
@@ -247,6 +294,11 @@ def verify_dataset(directory, expected_counts, exclusions):
         rejected = audit["graph_rejections"]
         if rejected["file"] != f"invalid_graph_{candidate}.jsonl" or sha256_file(directory / rejected["file"]) != rejected["sha256"]:
             raise ValueError("Candidate graph rejection record changed")
+        retried = audit["identity_retries"]
+        if retried["file"] != f"identity_retry_{candidate}.jsonl" or sha256_file(directory / retried["file"]) != retried["sha256"]:
+            raise ValueError("Candidate identity retry record changed")
+        if not 0 <= audit["identity_retry_entries"] <= audit["graph_eligible_entries"]:
+            raise ValueError("Invalid candidate identity retry count")
     return report
 
 
