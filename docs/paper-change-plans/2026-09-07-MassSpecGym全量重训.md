@@ -127,7 +127,16 @@
 
 ## 10. 执行记录
 
-- **当前正式队列，2026-09-08 00:05（北京时间）启动**：r3 固定源码为
+- **当前状态，2026-09-08 00:38:30（北京时间）**：r3 的 `prepare_v15` 已完成，
+  `data/MassSpecGym/dataset_manifest.json` 为 `complete`，入口已完成输出文件校验并进入
+  `alignment42/waiting_gpu`。Mass/Formula 的完整条目数量、图资格统计及身份转换重试结果
+  与前次独立 CPU 审计一致；两协议均保留源顺序、forcing=false，全部源列表保留 exact target，
+  三个 split 数量与既定验证排除项一致。原始记录仍在本运行目录，不继承旧运行的完成状态。
+  用户要求前台监测至开始等待 GPU；本轮监测没有新故障，无需修复或重启。
+  初始等待日志为 GPU 1 利用率 31%、空闲 4,019 MiB，未满足门槛；预处理 PID 2990250
+  已退出，入口 PID 2990241 与指定 pane 仍存活，尚无 alignment 日志。
+  前台监测结束，原后台队列继续等待，不派发第二个任务。
+- 2026-09-08 00:05（北京时间，r3 启动记录）：固定源码为
   `/data1/zyl/repos/SpecEmbedding-v15-fulltrain-20260908-r3/`，detached `15b1b5d`、工作树干净；
   Python 代码和 `params.yaml` 与已通过完整 CPU 验证的 `aecdfee` 一致，仅更新恢复状态文档。
   运行根为 `/data1/zyl/SpecEmbedding/experiments/massspecgym_v15_fulltrain_20260908_r3_topk256/`，
@@ -252,7 +261,7 @@
 ## 11. 最终结果
 
 - 完成日期：尚未完成
-- 最终状态：执行中；r3 正式队列已启动，当前进行新运行目录的 CPU 准备与审计，之后按门槛等待 GPU；尚无新 GPU 训练或测试结果
+- 最终状态：执行中；r3 的 CPU 准备与完整审计通过，已进入 alignment42/waiting_gpu；本轮前台监测完成，原队列在后台继续等待，尚无新 GPU 训练或测试结果
 - 验证结果：代码与模拟/独立 tmux 测试、dry-run、输入指纹预检完成；正式实验与论文构建未完成
 - 论文修改 commit：尚未提交
 - 计划归档 commit：无需在本文件中自我引用

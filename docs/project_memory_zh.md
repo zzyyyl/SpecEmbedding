@@ -38,8 +38,9 @@ JESTR-style cosine 只是本地保存嵌入上的重实现打分控制，JESTR/G
   完整 CPU 数据审计与独立文件比对已通过，验证进程已退出；详情见
   [修复记录](../analysis/massspecgym_v15_inchi_fix.md)。未启动新训练。
   2026-09-08 用户明确要求继续推进，r3 正式队列已于 00:05 在新独立 tmux 中启动，
-  固定源码为 `15b1b5d`，与已验证修复的 Python 代码及配置一致；实测为 `prepare_v15/running`。
-  现有入口重新生成并审计完整数据，通过后才等待 GPU，重训一个
+  固定源码为 `15b1b5d`，与已验证修复的 Python 代码及配置一致；CPU 准备与审计已于
+  00:38:30 完成，实测进入 `alignment42/waiting_gpu`，预处理子进程已退出。
+  本轮前台监测未发现新故障、未重启队列；后台继续按既定门槛等待 GPU，之后重训一个
   alignment-42，再运行 12 个全量 reranker 组合；不能称为三 alignment 矩阵。
   运行路径、独立 socket、状态入口及验证记录集中于计划。尚无新 GPU 训练结果。
 - [NPLIB1 增强](paper-change-plans/2026-09-05-NPLIB1跨数据集增强.md)：计划状态为执行中，
