@@ -127,6 +127,16 @@
 
 ## 10. 执行记录
 
+- 2026-09-07 22:53：修复 `aecdfee` 的独立完整 CPU 验证通过；正式队列继续暂停。
+  固定源码为 `/data1/zyl/repos/SpecEmbedding-v15-inchi-audit-20260907/`（detached、干净），
+  验证根为 `/data1/zyl/SpecEmbedding/audits/massspecgym_v15_inchi_fix_20260907_topk256/`。
+  独立 socket `/tmp/specembedding-v15-inchi-audit-20260907/tmux.sock` 中仅运行
+  `prepare_massspecgym_v15.py`，CUDA 显式不可见，没有训练或监测后续阶段；该进程现已退出。
+  `verification_receipt.json` 保存固定提交与完整命令，`prepare.log` 为原始日志；
+  `data/dataset_manifest.json` 与 `independent_verification.json` 均为 `complete`。
+  两候选协议所有源列表审计完成；独立读取检查了全部 split 数量、文件哈希、候选内容/顺序、
+  图排除与身份转换的源位置和身份结果。数量汇总只维护于[修复记录](../../analysis/massspecgym_v15_inchi_fix.md)。
+  这是修复验证，不复用为自动恢复的正式队列，不改变旧运行工件或论文结论。
 - 2026-09-07 22 时：用户要求停止任务并排查修复。核验三个指定 server：旧 v1 只剩空闲 shell，
   两个 v1.5 pane 均已退出，没有训练或监测进程；不删除锁、日志、失败工件或固定源码。
   已定位 RDKit 2026.03.1 的默认 InChI 与 sanitization 使用不同 Kekulé 搜索顺序。
@@ -223,7 +233,7 @@
 ## 11. 最终结果
 
 - 完成日期：尚未完成
-- 最终状态：暂停；用户要求停止并修复，旧队列均已停止、工件保留；身份转换修复通过专项测试，完整 CPU 验证待完成，尚无新 GPU 训练或测试结果
+- 最终状态：暂停；身份转换故障已修复，专项测试、完整 CPU 数据审计及独立文件核验通过；训练和监测队列保持停止，旧工件保留，尚无新 GPU 训练或测试结果
 - 验证结果：代码与模拟/独立 tmux 测试、dry-run、输入指纹预检完成；正式实验与论文构建未完成
 - 论文修改 commit：尚未提交
 - 计划归档 commit：无需在本文件中自我引用

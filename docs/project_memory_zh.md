@@ -34,7 +34,9 @@ JESTR-style cosine 只是本地保存嵌入上的重实现打分控制，JESTR/G
   本次候选已通过 SMILES 解析，随后生成 InChIKey 时触发 `KekulizeException`，不能直接归为
   既有无效图排除。21:54 核验进程已退出、未进入 GPU 阶段，日志与失败工件保留，未重启。
   用户随后要求停止任务、排查并修复。已定位 RDKit 解析与 InChI 转换的 Kekulé 搜索顺序差异；
-  修复仅转换分子副本并保留身份转换记录，不改候选或编码器图。当前仅进行 CPU 验证，
+  修复 `aecdfee` 仅转换分子副本并保留身份转换记录，不改候选或编码器图。
+  完整 CPU 数据审计与独立文件比对已通过，验证进程已退出；详情见
+  [修复记录](../analysis/massspecgym_v15_inchi_fix.md)。未启动新训练。
   训练队列保持停止；恢复需用户明确指示。恢复后须完整 CPU 审计通过才等待 GPU，重训一个
   alignment-42，再运行 12 个全量 reranker 组合；不能称为三 alignment 矩阵。
   运行路径、独立 socket、状态入口及验证记录集中于计划。尚无新 GPU 训练结果。
