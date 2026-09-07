@@ -5,6 +5,7 @@
 
 | 系列 | 协议与用途 | 来源 |
 | --- | --- | --- |
+| v1.5 全量迁移 | 一个从头训练的 alignment-42；规范分子图、全谱遍历；六缓存与十二个 reranker 组合，尚无新模型结果 | [执行计划](../docs/paper-change-plans/2026-09-07-MassSpecGym全量重训.md)、[队列和审计入口](../docs/gpu_tmux_monitor_zh.md) |
 | Mentor 主矩阵与 relative 消融 | 36 个主运行、30 个消融；alignment 42--44，reranker 42--44；训练 cap=20,000、top-40，训练 forcing=true，val/test=false | [运行/哈希索引](../reproducibility/mentor2026_experiment_index.json)、[主矩阵](mentor2026_experiments/alignment_summary/manifest.json)、[消融](mentor2026_experiments/ablation_summary/manifest.json) |
 | 无 forcing 方法 pilot | pre-overlap-clean alignment；5,000 query、3 epochs、top-256；先单 seed，再三 reranker seeds | [单 seed](transfer2026_scholargpt_method/pilot-results.md)、[第二阶段报告](transfer2026_scholargpt_review/second_stage_report.md)、[manifest](transfer2026_scholargpt_review/second_stage_manifest.json) |
 | 旧 Transformer 跨 alignment | 固定旧 top-40 协议，Pointwise/Transformer 描述性对比 | [报告](transfer2026_alignment_multiseed/report.md)、[manifest](transfer2026_alignment_multiseed/analysis_manifest.json) |
@@ -16,7 +17,7 @@
 
 - 2026-09-07 只读复核了 Mentor 索引的 66 条训练命令及 18 个唯一 cache：全部 top-40，
   6 个 train cache forcing=true、12 个 val/test cache=false。测试每池 17,556 query。
-  全量重训仍按 [暂停计划](../docs/paper-change-plans/2026-09-07-MassSpecGym全量重训.md) 管理。
+  全量重训已获准迁移至 v1.5，按 [执行计划](../docs/paper-change-plans/2026-09-07-MassSpecGym全量重训.md) 管理。
 - 官方候选 JSON 顺序与二维身份的 full-pool 评价属于独立 pilot 的保存嵌入审计；
   不能继承给其它 alignment、top-K 或新缓存。主矩阵入口使用 local exact-target-SMILES 标签。
 - manifest 冻结的报告保留原始字节，供数字与哈希追溯。旧报告称身份差异“未量化”时，是生成

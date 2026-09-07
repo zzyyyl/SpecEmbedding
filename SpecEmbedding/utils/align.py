@@ -1,10 +1,14 @@
+import json
 import logging
+from pathlib import Path
 
 import torch
+from rdkit import rdBase
 
 from SpecEmbedding.config import config
 from SpecEmbedding.models import SiameseModel
 from SpecEmbedding.models_align import GINEEncoder, SpecMolAlignModel
+from SpecEmbedding.utils.fulltrain import sha256_file
 
 
 def create_align_model(
@@ -47,6 +51,20 @@ def load_align_model(
     mol_norm_type: str,
     mol_norm_eps: float,
 ) -> SpecMolAlignModel:
+    selection_path = Path(checkpoint).parent / "alignment_selection.json"
+    if selection_path.exists():
+        selection = json.loads(selection_path.read_text())
+        # Missing policy is the explicitly identified historical format, never v1.5.
+        policy = selection.get("graph_policy", "legacy_raw")
+        if policy != config.model.mol_encoder.graph_policy:
+            raise ValueError("Alignment checkpoint graph policy differs from the active configuration")
+        if policy == "rdkit_sanitized":
+            if selection["checkpoint_sha256"] != sha256_file(checkpoint) or selection["model_config"] != config.model.to_dict():
+                raise ValueError("Sanitized alignment checkpoint/config fingerprint mismatch")
+            if selection["rdkit_version"] != rdBase.rdkitVersion:
+                raise ValueError("Sanitized alignment RDKit version differs from training")
+    elif config.model.mol_encoder.graph_policy != "legacy_raw":
+        raise ValueError("Sanitized alignment loading requires alignment_selection.json provenance")
     model = create_align_model(mol_norm_type=mol_norm_type, mol_norm_eps=mol_norm_eps)
     state_dict = torch.load(checkpoint, map_location=device, weights_only=True)
     if "logit_scale" not in state_dict:

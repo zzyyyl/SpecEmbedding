@@ -156,6 +156,43 @@ python /home/zyl/MYPROS/SpecEmbedding/watch_gpu_tmux.py \
 
 ## 接入已批准的 MassSpecGym 全量重训
 
+### 当前 v1.5 迁移队列
+
+2026-09-07 晚间用户授权迁移至 v1.5。旧 v1 外部监测器已停止且没有派发训练；不重新启动它，
+不复用其 pane/锁作为新版派发目标。新的 `run_massspecgym_v15.py` 自带逐阶段 GPU 等待，
+整个入口放在一个新的独立 detached tmux server 中，**不再叠加外部监测器**。
+
+```bash
+python run_massspecgym_v15.py --gpu 1 --device cuda:1 \
+  --source-dir "$V15_RAW_DIR" --legacy-tsv "$V1_TSV" \
+  --output-root "$NEW_V15_ROOT_topk256" --dry-run
+```
+
+输入目录须包含官方 v1.5 TSV 和两份候选 JSON，SHA-256 必须匹配 `params.yaml` 中的固定值。
+`--legacy-tsv` 只用于 CPU 版本比较。`--dry-run` 仅读取；`--write-preflight` 只保存来源、配置和
+阶段命令。正式执行不能复用已有 `status.json`、数据、alignment、rerank 或阶段日志目录。
+
+执行顺序：
+
+1. CPU 读取并校验全部谱图及候选，保留官方候选内容和顺序，记录二维身份重复/正例数量；
+   任一非法候选、缺失目标、意外跨 split 身份交集或输入变化均失败停止。每 256 个候选列表记录进度。
+2. 审计通过后，满足既定 GPU 门槛才从随机初始化训练 alignment seed=42。新运行配置显式使用
+   `rdkit_sanitized` 构图；训练每轮遍历 194,119 条谱图，验证保留既定六条排除，实际 19,423 条。
+   同二维身份使用 multi-positive 标签；验证采用一次固定 seed 排列，跨 epoch 不重抽谱。
+3. 验证新 checkpoint 的数据、构图、配置、设备及每轮数量后，运行六个 top-256/no-forcing 缓存
+   和十二组 reranker 训练/完整测试。后续每个 GPU 阶段仍重新等待。
+
+`model.mol_encoder.graph_policy` 默认 `legacy_raw`，用于旧工件复核；v1.5 入口从 `params.yaml`
+生成独立 `runtime_params.yaml`，显式切换构图策略。新 alignment 的 selection 文件保存完整模型配置、
+构图策略、RDKit 版本、数据指纹和逐轮数量；加载拒绝不匹配的权重或配置。不得把旧权重配上新图
+策略后称为 v1.5 重训。原始来源的 CPU 审计也不替代新模型输出的官方候选顺序/二维身份结果审计。
+
+状态入口为运行根的 `status.json`、`runner.log`、`logs/prepare_v15.log`、
+`data/MassSpecGym/dataset_manifest.json`。alignment 日志在 `logs/alignment42.log`，子矩阵状态在
+`rerank_topk256/status.json`。顶层完成只代表配置的训练/测试阶段完成，结果身份审计和论文状态另记。
+
+### 历史固定 alignment 入口
+
 `run_fulltrain_rerank.py` 是[全量重训计划](paper-change-plans/2026-09-07-MassSpecGym全量重训.md)
 的独立正式入口，不改变通用监测器语义。它要求新输出目录、干净的固定源码 worktree，读取
 `params.yaml` 的 `fulltrain` 配置：先重建并核验六个全量/no-forcing/top-256 缓存，再依次执行

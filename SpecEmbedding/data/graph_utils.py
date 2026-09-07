@@ -4,6 +4,8 @@ import torch
 from rdkit import Chem
 from torch_geometric.data import Data
 
+from SpecEmbedding.config import config
+
 # 原子特征
 ATOM_FEATURES = {
     'symbol': [
@@ -78,9 +80,14 @@ def get_bond_features(bond):
         int(bond.IsInRing())
     ]
 
-def smiles_to_graph(smiles: str):
+def smiles_to_graph(smiles: str, *, graph_policy: str | None = None):
     """将 SMILES 转换为 PyG 图数据对象"""
-    mol = Chem.MolFromSmiles(smiles, sanitize=False)
+    policy = config.model.mol_encoder.graph_policy if graph_policy is None else graph_policy
+    if policy not in {"legacy_raw", "rdkit_sanitized"}:
+        raise ValueError(f"Unknown molecule graph policy: {policy}")
+    mol = Chem.MolFromSmiles(smiles, sanitize=policy == "rdkit_sanitized")
+    if mol is None or mol.GetNumAtoms() == 0:
+        raise ValueError(f"Invalid molecule for {policy}: {smiles}")
     mol.UpdatePropertyCache(strict=False)
     
     # 提取节点特征

@@ -16,6 +16,7 @@ from SpecEmbedding.config import DEFAULT_CONFIG_PATH, config
 from SpecEmbedding.data.datasets_rerank import load_rerank_cache
 from SpecEmbedding.utils.fulltrain import sha256_file, validate_cache, wait_for_gpu
 from SpecEmbedding.utils.gpu import gpu_inventory, parse_cuda_device
+from SpecEmbedding.utils.massspecgym_v15 import verify_dataset
 from SpecEmbedding.utils.rerank import parse_rerank_eval_metrics
 from SpecEmbedding.utils.runtime import resolve_device
 
@@ -115,6 +116,15 @@ def input_manifest(args):
     if (selection["seed"] != 42 or selection["checkpoint_sha256"] != inputs["alignment"]["sha256"]
             or selection["exclude_val_query_indices"] != config.fulltrain.exclude_val_query_indices):
         raise ValueError("Alignment-42 selection/checkpoint/exclusion provenance mismatch")
+    if config.model.mol_encoder.graph_policy == "rdkit_sanitized":
+        report = verify_dataset(args.data_path, config.fulltrain.expected_counts.to_dict(), config.fulltrain.exclude_val_query_indices)
+        audit = selection["fulltrain_audit"]
+        if (selection["graph_policy"] != "rdkit_sanitized" or not audit["formal_fulltrain"]
+                or audit["dataset_version"] != "1.5"
+                or audit["input_outputs"] != report["outputs"]
+                or audit["dataset_manifest_sha256"] != sha256_file(args.data_path / "dataset_manifest.json")):
+            raise ValueError("v1.5 alignment was not trained with these audited data and graph semantics")
+        inputs["dataset_manifest"] = {"path": str(args.data_path / "dataset_manifest.json"), "sha256": audit["dataset_manifest_sha256"]}
     inputs["alignment_selection"] = {"path": str(selection_path), "sha256": sha256_file(selection_path)}
     config_path = Path(os.environ.get("SPECEMBEDDING_CONFIG", DEFAULT_CONFIG_PATH)).resolve()
     return {"git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
@@ -142,6 +152,7 @@ def audit_stage(stage, manifest, cache_audits):
                                  expected_count=config.fulltrain.expected_counts[stage["split"]], fingerprints={
                                      "checkpoint_sha256": manifest["inputs"]["alignment"]["sha256"],
                                      "candidate_sha256": manifest["inputs"][f"candidates_{stage['candidate']}"]["sha256"],
+                                     "graph_policy": config.model.mol_encoder.graph_policy,
                                  })
         summary["sha256"] = sha256_file(output)
         cache_audits[f"{stage['candidate']}/{stage['split']}"] = summary

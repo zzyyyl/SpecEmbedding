@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 from copy import deepcopy
 
@@ -27,12 +28,15 @@ class TrainerAlign:
         self.save_dir = save_dir
         self.criterion = ContrastiveAlignmentLoss().to(device)
         self.stage_summaries = {}
+        self.expected_epoch_counts = None
+        self.epoch_counts = []
         
         os.makedirs(self.save_dir, exist_ok=True)
 
     def train_epoch(self, optimizer, epoch, stage_name):
         self.model.train()
         total_loss = 0
+        seen = 0
         pbar = tqdm(self.train_loader, desc=f"[{stage_name}] Epoch {epoch} Training", ascii=True)
         
         for mzs, ints, masks, mols, labels in pbar:
@@ -45,20 +49,29 @@ class TrainerAlign:
             
             f_spec, f_mol, scale = self.model(spec_mz, spec_intensity, spec_mask, mol_graph)
             loss = self.criterion(f_spec, f_mol, scale, labels)
+            if self.expected_epoch_counts is not None and not torch.isfinite(loss):
+                raise RuntimeError("Non-finite formal alignment training loss")
             
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
             optimizer.step()
             
             total_loss += loss.item()
+            seen += mzs.shape[0]
             pbar.set_postfix({'loss': f"{loss.item():.4f}"})
             
+        if self.expected_epoch_counts is not None:
+            if seen != self.expected_epoch_counts["train"]:
+                raise RuntimeError(f"Incomplete alignment epoch: trained {seen} spectra")
+            self.epoch_counts.append({"stage": stage_name, "epoch": epoch, "train": seen})
+            logging.info("Formal alignment epoch %s trained all %s spectra", epoch, seen)
         return total_loss / len(self.train_loader)
 
     @torch.no_grad()
     def validate(self, epoch, stage_name):
         self.model.eval()
         total_loss = 0
+        seen = 0
         pbar = tqdm(self.val_loader, desc=f"[{stage_name}] Epoch {epoch} Validation", ascii=True)
         
         for mzs, ints, masks, mols, labels in pbar:
@@ -69,10 +82,18 @@ class TrainerAlign:
             
             f_spec, f_mol, scale = self.model(spec_mz, spec_intensity, spec_mask, mol_graph)
             loss = self.criterion(f_spec, f_mol, scale, labels)
+            if self.expected_epoch_counts is not None and not torch.isfinite(loss):
+                raise RuntimeError("Non-finite formal alignment validation loss")
             
             total_loss += loss.item()
+            seen += mzs.shape[0]
             pbar.set_postfix({'loss': f"{loss.item():.4f}"})
             
+        if self.expected_epoch_counts is not None:
+            if seen != self.expected_epoch_counts["val"]:
+                raise RuntimeError(f"Incomplete alignment validation: evaluated {seen} spectra")
+            self.epoch_counts[-1]["val"] = seen
+            logging.info("Formal alignment epoch %s validated all %s spectra", epoch, seen)
         return total_loss / len(self.val_loader)
 
     def fit(self, epochs: int, optimizer: torch.optim.Optimizer, scheduler=None, stage_name="Stage", patience=5):
@@ -87,6 +108,8 @@ class TrainerAlign:
             stop_epoch = epoch
             train_loss = self.train_epoch(optimizer, epoch, stage_name)
             val_loss = self.validate(epoch, stage_name)
+            if not math.isfinite(train_loss) or not math.isfinite(val_loss):
+                raise RuntimeError("Non-finite alignment epoch loss; refusing checkpoint selection")
             
             logging.info(f"[{stage_name}] Epoch {epoch}: Train Loss = {train_loss:.4f}, Val Loss = {val_loss:.4f}")
             

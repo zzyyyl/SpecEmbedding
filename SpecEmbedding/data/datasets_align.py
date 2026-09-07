@@ -13,24 +13,36 @@ class AlignGraphDataset(TrainDataset):
     质谱-分子图对齐数据集。
     将 SMILES 转换为 PyG 的 Data 对象，用于 GNN (如 GINE) 训练。
     """
-    def __init__(self, *args, graph_cache_size: int = 0, **kwargs):
+    def __init__(self, *args, graph_cache_size: int = 0, full_spectra: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
         if graph_cache_size < -1:
             raise ValueError("graph_cache_size must be -1, 0, or a positive integer")
         self.graph_cache_size = graph_cache_size
         self._mol_cache = OrderedDict()
+        self.full_spectra = full_spectra
+        self._spectrum_indices = []
+        if full_spectra:
+            if self._n_views != 1:
+                raise ValueError("Full-spectrum alignment requires exactly one view per spectrum")
+            if len(set(self._keys)) != len(self._keys) or set(self._keys) != set(self._data):
+                raise ValueError("Full-spectrum alignment keys must cover every molecule exactly once")
+            self._spectrum_indices = [(key, offset) for key in self._keys for offset in range(len(self._data[key]))]
 
-    def get_mol_graph(self, label):
-        if self.graph_cache_size != 0 and label in self._mol_cache:
-            mol = self._mol_cache.pop(label)
-            self._mol_cache[label] = mol
+    def __len__(self):
+        return len(self._spectrum_indices) if self.full_spectra else super().__len__()
+
+    def get_mol_graph(self, label, smiles=None):
+        cache_key = label if smiles is None else (label, smiles)
+        if self.graph_cache_size != 0 and cache_key in self._mol_cache:
+            mol = self._mol_cache.pop(cache_key)
+            self._mol_cache[cache_key] = mol
             return mol
 
-        smiles = self._data[label][0]["smiles"]
+        smiles = self._data[label][0]["smiles"] if smiles is None else smiles
         mol = smiles_to_graph(smiles)
 
         if self.graph_cache_size != 0:
-            self._mol_cache[label] = mol
+            self._mol_cache[cache_key] = mol
             if self.graph_cache_size > 0 and len(self._mol_cache) > self.graph_cache_size:
                 self._mol_cache.popitem(last=False)
 
@@ -85,8 +97,15 @@ class AlignGraphDataset(TrainDataset):
         return mol_graph
 
     def __getitem__(self, index):
-        spec_views, label = super().__getitem__(index)
-        mol = self.get_mol_graph(label)
+        if self.full_spectra:
+            label, offset = self._spectrum_indices[index]
+            sequence = self._data[label][offset]
+            if self.is_augment and np.random.random() < self.augment_config["prob"]:
+                sequence = self.aug(sequence)
+            spec_views = [[sequence["mz"], sequence["intensity"], sequence["mask"]]]
+        else:
+            spec_views, label = super().__getitem__(index)
+        mol = self.get_mol_graph(label, sequence["smiles"] if self.full_spectra else None)
 
         mzs, ints, masks, mols = [], [], [], []
 

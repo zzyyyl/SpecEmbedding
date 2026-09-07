@@ -487,6 +487,7 @@ def main():
             "force_include_positive": args.force_include_positive,
             "checkpoint": args.checkpoint,
             "checkpoint_sha256": checkpoint_sha256,
+            "graph_policy": config.model.mol_encoder.graph_policy,
             "num_queries": len(queries),
             "num_input_spectra": len(sequences),
             "num_candidate_mapped_spectra": mapped_sequence_count,

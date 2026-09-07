@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.optim as optim
+from rdkit import rdBase
 from torch.utils.data import DataLoader
 
 from SpecEmbedding.config import config
@@ -17,6 +18,7 @@ from SpecEmbedding.data.overlap import filter_classified_validation
 from SpecEmbedding.models_align import GINEEncoder, SpecMolAlignModel
 from SpecEmbedding.trainer.trainer import set_seed
 from SpecEmbedding.trainer.trainer_align import TrainerAlign
+from SpecEmbedding.utils.massspecgym_v15 import classified_full_spectra
 from SpecEmbedding.utils.model import SiameseModel
 from SpecEmbedding.utils.providers import get_provider
 from SpecEmbedding.utils.runtime import resolve_device, setup_logging, startup_logging
@@ -44,6 +46,7 @@ def train_align(
     device: str | torch.device | None = None,
     selection_metadata: dict | None = None,
     seed: int = config.general.seed,
+    formal_fulltrain: bool = False,
 ):
     if seed < 0:
         raise ValueError("seed must be a non-negative integer")
@@ -59,6 +62,8 @@ def train_align(
         n_views=1,
         is_augment=True,
         graph_cache_size=graph_cache_size,
+        full_spectra=formal_fulltrain,
+        **({"augment_config": config.augmentation.to_dict()} if formal_fulltrain else {}),
     )
     val_dataset = AlignGraphDataset(
         data=val_data,
@@ -66,7 +71,16 @@ def train_align(
         n_views=1,
         is_augment=False,
         graph_cache_size=graph_cache_size,
+        full_spectra=formal_fulltrain,
+        **({"augment_config": config.augmentation.to_dict()} if formal_fulltrain else {}),
     )
+    if formal_fulltrain:
+        expected = selection_metadata["fulltrain_audit"]["expected_epoch_counts"]
+        if len(train_dataset) != expected["train"] or len(val_dataset) != expected["val"]:
+            raise ValueError("Formal alignment Dataset does not cover every eligible spectrum")
+        # Fixed validation ordering mixes identities without resampling spectra each epoch.
+        random.Random(seed).shuffle(val_dataset._spectrum_indices)
+        logging.info("Formal alignment spectra: train=%s val=%s; validation permutation seed=%s", len(train_dataset), len(val_dataset), seed)
 
     # 为了确保可复现性，设置 Generator 和 worker_init_fn
     g = torch.Generator()
@@ -78,7 +92,7 @@ def train_align(
         batch_size=batch_size, 
         shuffle=True, 
         collate_fn=align_collate_fn, 
-        num_workers=4,
+        num_workers=config.train.align.num_workers,
         worker_init_fn=seed_worker,
         generator=g
     )
@@ -87,7 +101,7 @@ def train_align(
         batch_size=batch_size, 
         shuffle=False, 
         collate_fn=align_collate_fn, 
-        num_workers=4,
+        num_workers=config.train.align.num_workers,
         worker_init_fn=seed_worker,
         generator=g
     )
@@ -132,6 +146,8 @@ def train_align(
         device,
         save_dir=save_dir
     )
+    if formal_fulltrain:
+        trainer.expected_epoch_counts = expected
 
     # ==========================================
     # 阶段一：冻结质谱特征，仅训练分子编码器与投影头
@@ -192,7 +208,16 @@ def train_align(
         "checkpoint": str(best_checkpoint.resolve()),
         "checkpoint_sha256": checkpoint_digest.hexdigest(),
         "stages": trainer.stage_summaries,
+        "model_config": config.model.to_dict(),
+        "training_config": config.train.align.to_dict(),
+        "config_snapshot": config.to_dict(),
+        "graph_policy": config.model.mol_encoder.graph_policy,
+        "rdkit_version": rdBase.rdkitVersion,
+        "device": str(device),
     }
+    if formal_fulltrain:
+        selection_summary["fulltrain_audit"]["epochs"] = trainer.epoch_counts
+        selection_summary["fulltrain_audit"]["validation_permutation_seed"] = seed
     (Path(save_dir) / "alignment_selection.json").write_text(
         json.dumps(selection_summary, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
@@ -211,6 +236,7 @@ def main():
     parser.add_argument("--mol_norm_eps", type=float, default=getattr(config.model.mol_encoder, "norm_eps", 1e-5), help="Epsilon used by molecule encoder normalization.")
     parser.add_argument("--seed", type=int, default=config.general.seed, help="Random seed for alignment training")
     parser.add_argument("--pretrained_spec", type=str, help="Path to your pre-trained SpecEmbedding model weights")
+    parser.add_argument("--formal-fulltrain", action="store_true", help="Audited v1.5, fresh all-spectrum tokenization, strict CUDA, no old weights or caches")
     parser.add_argument(
         "--tokenset_cache",
         "--tokenset-cache",
@@ -234,6 +260,23 @@ def main():
         parser.error("--exclude-val-query-indices must contain non-negative integers")
     if args.seed < 0:
         parser.error("--seed must be a non-negative integer")
+    if args.formal_fulltrain:
+        if args.pretrained_spec or args.tokenset_cache or args.dataset_type != "massspecgym":
+            parser.error("Formal v1.5 alignment forbids inherited weights/TokenSet caches and requires MassSpecGym")
+        if config.model.mol_encoder.graph_policy != "rdkit_sanitized":
+            parser.error("Formal v1.5 alignment requires rdkit_sanitized graphs")
+        if (args.batch_size != config.train.align.batch_size or args.lr != config.train.align.lr
+                or args.graph_cache_size != config.train.align.graph_cache_size
+                or args.mol_norm_type != config.model.mol_encoder.norm_type
+                or args.mol_norm_eps != config.model.mol_encoder.norm_eps
+                or args.seed != config.fulltrain.v15.alignment_seed):
+            parser.error("Formal alignment hyperparameters must match the pinned configuration")
+        if args.exclude_val_query_indices != config.fulltrain.exclude_val_query_indices:
+            parser.error("Formal alignment validation exclusions differ from the audited protocol")
+        if not args.device.startswith("cuda:") or os.environ.get("SPECEMBEDDING_REQUIRE_CUDA") != "1":
+            parser.error("Formal alignment requires the strict GPU runner with explicit cuda:N")
+        if Path(args.save_dir).exists():
+            parser.error("Formal alignment requires a new output directory")
 
     save_path = Path(args.save_dir)
     save_path.mkdir(parents=True, exist_ok=True)
@@ -242,18 +285,28 @@ def main():
     set_seed(args.seed)
     device = resolve_device(args.device)
 
-    classified_data = get_classified_data(
-        dataset_type=args.dataset_type,
-        data_path=args.data_path,
-        cache_path=args.cache_path,
-        cache_file=args.tokenset_cache,
-    )
+    fulltrain_audit = None
+    if args.formal_fulltrain:
+        from SpecEmbedding.data.tokenizer import Tokenizer
+        classified_data, fulltrain_audit = classified_full_spectra(
+            args.data_path, config.fulltrain.expected_counts.to_dict(), args.exclude_val_query_indices,
+            Tokenizer(**config.data.tokenizer.to_dict()),
+        )
+    else:
+        classified_data = get_classified_data(
+            dataset_type=args.dataset_type,
+            data_path=args.data_path,
+            cache_path=args.cache_path,
+            cache_file=args.tokenset_cache,
+        )
     exclusion_report = {
         "query_indices": [],
         "smiles": [],
         "keys": [],
     }
-    if args.exclude_val_query_indices:
+    if args.formal_fulltrain:
+        exclusion_report = fulltrain_audit["validation_exclusion_report"]
+    if args.exclude_val_query_indices and not args.formal_fulltrain:
         provider = get_provider(args.dataset_type, args.data_path)
         val_raw = provider.load_data(mode="val")
         classified_data, exclusion_report = filter_classified_validation(
@@ -307,6 +360,7 @@ def main():
         mol_norm_eps=args.mol_norm_eps,
         device=device,
         seed=args.seed,
+        formal_fulltrain=args.formal_fulltrain,
         selection_metadata={
             "dataset_type": args.dataset_type,
             "data_path": str(Path(args.data_path).resolve()),
@@ -318,6 +372,7 @@ def main():
             "seed": args.seed,
             "exclude_val_query_indices": args.exclude_val_query_indices,
             "validation_exclusion_report": exclusion_report,
+            "fulltrain_audit": fulltrain_audit,
         },
     )
 
