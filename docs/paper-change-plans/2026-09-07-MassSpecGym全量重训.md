@@ -125,6 +125,16 @@
 
 ## 10. 执行记录
 
+- **当前队列，2026-09-07 20:29（北京时间）**：修复提交 `d15510b` 已推送；新的固定源码为
+  `/data1/zyl/repos/SpecEmbedding-v15-fulltrain-20260907-r2/`，detached HEAD、工作树干净。
+  新运行根为 `/data1/zyl/SpecEmbedding/experiments/massspecgym_v15_fulltrain_20260907_r2_topk256/`；
+  新 socket 为 `/tmp/specembedding-v15-fulltrain-20260907-r2-1010/tmux.sock`，session `v15` / pane `%0`，
+  主进程 PID 2977661。已先保存并复核预检指纹，再启动；`status.json` 实测为 `prepare_v15/running`。
+  候选审计通过后自动等待物理 GPU 1，以 UUID 顺序映射的 `cuda:1` 训练；其后仍逐阶段等待。
+  不存在附加外部监测器。旧 v1 监测器和首个 v1.5 队列均已退出，没有向任何旧 pane 再派发。
+  本目录的 `data/MassSpecGym/dataset_manifest.json`、`logs/prepare_v15.log` 记录 CPU 审计进度，
+  `invalid_graph_mass.jsonl` / `invalid_graph_formula.jsonl` 位于数据目录，完整记录源列表的图排除。
+  此状态不代表数据审计、alignment、十二组训练/测试、结果身份审计或论文更新已完成。
 - 2026-09-07 20:17：首个 v1.5 队列在 CPU 候选审计阶段失败停止，未进入 GPU 阶段。
   三个 split 已生成并核验完整，失败原因是官方候选包含 RDKit 无法解析的过价 Si 分子；
   日志和原始失败目录均保留。现有 `MolSmilesDataset` / `mol_collate_fn` 本来就排除无法构图的分子，
@@ -193,7 +203,7 @@
 ## 11. 最终结果
 
 - 完成日期：尚未完成
-- 最终状态：执行中，旧 v1 监测器已停止，首个 v1.5 CPU 审计失败工件保留，修复验证中；尚无新 GPU 训练或测试结果
+- 最终状态：执行中，旧 v1 监测器已停止，首个 v1.5 CPU 审计失败工件保留，修复后的 r2 队列正在 CPU 审计；尚无新 GPU 训练或测试结果
 - 验证结果：代码与模拟/独立 tmux 测试、dry-run、输入指纹预检完成；正式实验与论文构建未完成
 - 论文修改 commit：尚未提交
 - 计划归档 commit：无需在本文件中自我引用
