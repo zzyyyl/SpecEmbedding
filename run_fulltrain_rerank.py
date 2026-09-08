@@ -16,6 +16,13 @@ from SpecEmbedding.config import DEFAULT_CONFIG_PATH, config
 from SpecEmbedding.data.datasets_rerank import load_rerank_cache
 from SpecEmbedding.utils.fulltrain import sha256_file, validate_cache, wait_for_gpu
 from SpecEmbedding.utils.gpu import gpu_inventory, parse_cuda_device
+from SpecEmbedding.utils.gpu_pool import (
+    add_gpu_arguments,
+    pin_pool,
+    pool_environment,
+    validate_gpu_arguments,
+    wait_for_any_gpu,
+)
 from SpecEmbedding.utils.massspecgym_v15 import verify_dataset
 from SpecEmbedding.utils.rerank import parse_rerank_eval_metrics
 from SpecEmbedding.utils.runtime import resolve_device
@@ -36,7 +43,7 @@ def write_json(path, payload):
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--device", required=True)
-    parser.add_argument("--gpu", type=int, required=True, help="Physical nvidia-smi index, independent of CUDA mapping")
+    add_gpu_arguments(parser)
     parser.add_argument("--data-path", type=Path, required=True, help="Directory containing train/val/test and candidate pickles")
     parser.add_argument("--checkpoint", type=Path, required=True, help="Frozen alignment-42 stage2 checkpoint")
     parser.add_argument("--output-root", type=Path, required=True, help="New output root; no reuse/overwrite of partial runs")
@@ -44,9 +51,7 @@ def parse_args(argv=None):
     parser.add_argument("--write-preflight", action="store_true", help="Save input fingerprints and commands only; no GPU work")
     args = parser.parse_args(argv)
     try:
-        parse_cuda_device(args.device)
-        if args.gpu < 0:
-            raise ValueError("Physical GPU index must be nonnegative")
+        validate_gpu_arguments(args)
     except ValueError as error:
         parser.error(str(error))
     for name in ("data_path", "checkpoint", "output_root"):
@@ -127,7 +132,8 @@ def input_manifest(args):
         inputs["dataset_manifest"] = {"path": str(args.data_path / "dataset_manifest.json"), "sha256": audit["dataset_manifest_sha256"]}
     inputs["alignment_selection"] = {"path": str(selection_path), "sha256": sha256_file(selection_path)}
     config_path = Path(os.environ.get("SPECEMBEDDING_CONFIG", DEFAULT_CONFIG_PATH)).resolve()
-    return {"git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+    extra = {"gpu_pool": pin_pool(args.gpus)} if getattr(args, "gpus", None) is not None else {}
+    return {**extra, "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
             "config_path": str(config_path), "config_sha256": sha256_file(config_path),
             "config": config.to_dict(), "inputs": inputs, "device": args.device, "physical_gpu": args.gpu,
             "stages": stages(args), "evaluation_protocol": "local exact-target-SMILES; new identity audit pending"}
@@ -191,20 +197,30 @@ def run(args, manifest):
     for name in ("cache", "checkpoints", "status.json"):
         if (args.output_root / name).exists():
             raise FileExistsError(f"Refusing to reuse/overwrite existing run artifacts: {args.output_root / name}")
-    verify_cuda_mapping(args)
+    pool = getattr(args, "gpus", None)
+    if pool is None:
+        verify_cuda_mapping(args)
+    elif pin_pool(pool) != manifest["gpu_pool"]:
+        raise ValueError("GPU pool differs from preflight")
     status = {"started_at": now(), "state": "running", "stages": [], "cache_audits": {}}
     try:
         for stage in manifest["stages"]:
             progress = {**stage, "state": "waiting_gpu", "queued_at": now()}
             status["stages"].append(progress)
             write_json(args.output_root / "status.json", status)
-            wait_for_gpu(args.gpu, config.fulltrain)
-            verify_cuda_mapping(args)
+            child_options = {}
+            if pool is None:
+                wait_for_gpu(args.gpu, config.fulltrain)
+                verify_cuda_mapping(args)
+            else:
+                selected = wait_for_any_gpu(pool, config.fulltrain, manifest["gpu_pool"])
+                progress["gpu_selection"] = {**selected, "device": args.device}
+                child_options["env"] = pool_environment(selected)
             # Each child is foreground/sequential; no peer tasks are signalled on error.
             progress.update(state="running", started_at=now())
             write_json(args.output_root / "status.json", status)
             logging.info("START %s: %s", stage["kind"], shlex.join(stage["command"]))
-            subprocess.run(stage["command"], cwd=ROOT, check=True)
+            subprocess.run(stage["command"], cwd=ROOT, check=True, **child_options)
             progress["audit"] = audit_stage(stage, manifest, status["cache_audits"])
             progress.update(state="complete", completed_at=now())
             write_json(args.output_root / "status.json", status)

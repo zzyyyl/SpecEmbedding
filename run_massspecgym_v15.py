@@ -17,7 +17,14 @@ import yaml
 from SpecEmbedding.config import DEFAULT_CONFIG_PATH, config
 from SpecEmbedding.utils.fulltrain import sha256_file, wait_for_gpu
 from SpecEmbedding.utils.gpu import gpu_inventory, parse_cuda_device
-from SpecEmbedding.utils.massspecgym_v15 import verify_dataset, write_json
+from SpecEmbedding.utils.gpu_pool import (
+    add_gpu_arguments,
+    pin_pool,
+    pool_environment,
+    validate_gpu_arguments,
+    wait_for_any_gpu,
+)
+from SpecEmbedding.utils.massspecgym_v15 import import_prepared_dataset, prepared_source, verify_dataset, write_json
 
 ROOT = Path(__file__).resolve().parent
 
@@ -29,7 +36,9 @@ def now():
 def commands(args):
     data = args.output_root / "data" / "MassSpecGym"
     alignment = args.output_root / "alignment42_topk256"
-    return [
+    pool = getattr(args, "gpus", None)
+    gpu_args = ["--gpus", *map(str, pool)] if pool is not None else ["--gpu", str(args.gpu)]
+    result = [
         {"name": "prepare_v15", "gpu": False, "command": [sys.executable, str(ROOT / "prepare_massspecgym_v15.py"),
          "--source-dir", str(args.source_dir), "--legacy-tsv", str(args.legacy_tsv), "--output-dir", str(data)]},
         {"name": "alignment42", "gpu": True, "command": [sys.executable, str(ROOT / "train_align.py"),
@@ -37,9 +46,12 @@ def commands(args):
          "--device", args.device, "--seed", str(config.fulltrain.v15.alignment_seed), "--formal-fulltrain",
          "--exclude-val-query-indices", *map(str, config.fulltrain.exclude_val_query_indices)]},
         {"name": "rerank_matrix", "gpu": False, "command": [sys.executable, str(ROOT / "run_fulltrain_rerank.py"),
-         "--gpu", str(args.gpu), "--device", args.device, "--data-path", str(data),
+         *gpu_args, "--device", args.device, "--data-path", str(data),
          "--checkpoint", str(alignment / "best_model_stage2.pth"), "--output-root", str(args.output_root / "rerank_topk256")]},
     ]
+    if getattr(args, "prepared_data", None) is not None:
+        result[0] = {"name": "import_v15", "gpu": False, "source": str(args.prepared_data), "output": str(data)}
+    return result
 
 
 def preflight(args):
@@ -61,7 +73,14 @@ def preflight(args):
     runtime_config["model"]["mol_encoder"]["graph_policy"] = config.fulltrain.v15.graph_policy
     runtime_config["general"]["device"] = args.device
     source_config = Path(os.environ.get("SPECEMBEDDING_CONFIG", DEFAULT_CONFIG_PATH)).resolve()
-    return {"git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+    extra = {}
+    if getattr(args, "gpus", None) is not None:
+        extra["gpu_pool"] = pin_pool(args.gpus)
+    if getattr(args, "prepared_data", None) is not None:
+        extra["prepared_input"] = prepared_source(args.prepared_data, args.source_dir, args.legacy_tsv,
+                                                 config.fulltrain.v15, config.fulltrain.expected_counts.to_dict(),
+                                                 config.fulltrain.exclude_val_query_indices)
+    return {**extra, "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
             "runtime_versions": {"python": sys.version, **{name: version(name) for name in ("torch", "torch-geometric", "rdkit", "matchms")}},
             "source_config": str(source_config), "source_config_sha256": sha256_file(source_config),
             "runtime_config": runtime_config, "inputs": inputs, "device": args.device, "gpu": args.gpu,
@@ -102,12 +121,13 @@ def execute(args, manifest):
     environment = os.environ.copy()
     environment["SPECEMBEDDING_CONFIG"] = str(runtime_path)
     inventory = gpu_inventory()
-    if args.gpu not in inventory or parse_cuda_device(args.device) != args.gpu:
+    pool = getattr(args, "gpus", None)
+    if pool is None and (args.gpu not in inventory or parse_cuda_device(args.device) != args.gpu):
         raise ValueError("v1.5 all-GPU UUID mapping requires cuda:N to match physical GPU N")
     ordered = [inventory[index] for index in sorted(inventory)]
     if sorted(inventory) != list(range(len(inventory))):
         raise ValueError("Unexpected noncontiguous physical GPU inventory")
-    environment.update(CUDA_VISIBLE_DEVICES=",".join(ordered), SPECEMBEDDING_REQUIRE_CUDA="1",
+    environment.update(CUDA_VISIBLE_DEVICES="" if pool is not None else ",".join(ordered), SPECEMBEDDING_REQUIRE_CUDA="1",
                        SPECEMBEDDING_EXPECTED_CUDA_DEVICE=args.device,
                        NUMBA_CACHE_DIR="/tmp/specembedding-v15-numba", MPLCONFIGDIR="/tmp/specembedding-v15-mpl",
                        OMP_NUM_THREADS="1", MKL_NUM_THREADS="1")
@@ -115,23 +135,42 @@ def execute(args, manifest):
     logs.mkdir()
     status = {"state": "running", "started_at": now(), "stages": [], "gpu_uuid_order": ordered,
               "runtime_config_sha256": sha256_file(runtime_path)}
+    if pool is not None:
+        status["gpu_pool"] = manifest["gpu_pool"]
+
+    def check_preflight():
+        if sha256_file(runtime_path) != status["runtime_config_sha256"] or preflight(args) != manifest:
+            raise ValueError("Inputs/source/configuration changed during queue wait")
+
     try:
         for stage in manifest["stages"]:
             progress = {**stage, "state": "waiting_gpu" if stage["gpu"] else "running", "queued_at": now()}
             status["stages"].append(progress)
             write_json(args.output_root / "status.json", status)
+            child_environment = environment.copy()
             if stage["gpu"]:
-                wait_for_gpu(args.gpu, config.fulltrain)
-                if gpu_inventory() != inventory:
+                if pool is None:
+                    wait_for_gpu(args.gpu, config.fulltrain)
+                else:
+                    selected = wait_for_any_gpu(pool, config.fulltrain, manifest["gpu_pool"], before_select=check_preflight)
+                    child_environment = pool_environment(selected, environment)
+                    progress["gpu_selection"] = {**selected, "device": args.device}
+                if pool is None and gpu_inventory() != inventory:
                     raise ValueError("GPU UUID mapping changed")
-            if sha256_file(runtime_path) != status["runtime_config_sha256"] or preflight(args) != manifest:
-                raise ValueError("Inputs/source/configuration changed during queue wait")
+            if pool is None or not stage["gpu"]:
+                check_preflight()
             progress.update(state="running", started_at=now())
             write_json(args.output_root / "status.json", status)
-            logging.info("START %s: %s", stage["name"], shlex.join(stage["command"]))
-            with (logs / f"{stage['name']}.log").open("x") as handle:
-                subprocess.run(stage["command"], cwd=ROOT, env=environment, stdout=handle, stderr=subprocess.STDOUT, check=True)
-            if stage["name"] == "prepare_v15":
+            logging.info("START %s: %s", stage["name"], shlex.join(stage.get("command", [])))
+            if stage["name"] == "import_v15":
+                import_prepared_dataset(args.prepared_data, args.output_root / "data" / "MassSpecGym",
+                                        manifest["prepared_input"], config.fulltrain.expected_counts.to_dict(),
+                                        config.fulltrain.exclude_val_query_indices)
+                progress["prepared_input"] = manifest["prepared_input"]
+            else:
+                with (logs / f"{stage['name']}.log").open("x") as handle:
+                    subprocess.run(stage["command"], cwd=ROOT, env=child_environment, stdout=handle, stderr=subprocess.STDOUT, check=True)
+            if stage["name"] in ("prepare_v15", "import_v15"):
                 data_report = verify_dataset(args.output_root / "data" / "MassSpecGym", config.fulltrain.expected_counts.to_dict(), config.fulltrain.exclude_val_query_indices)
                 progress["audit"] = data_report["target_audit"]
             elif stage["name"] == "alignment42":
@@ -156,15 +195,20 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("source-dir", "legacy-tsv", "output-root"):
         parser.add_argument(f"--{name}", required=True, type=Path)
-    parser.add_argument("--gpu", required=True, type=int)
+    add_gpu_arguments(parser)
     parser.add_argument("--device", required=True)
+    parser.add_argument("--prepared-data", type=Path, help="Import a complete, fingerprint-verified CPU dataset into a new run")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--write-preflight", action="store_true")
     args = parser.parse_args(argv)
-    if args.gpu < 0 or parse_cuda_device(args.device) != args.gpu:
-        parser.error("Requires matching physical GPU N and explicit cuda:N")
+    try:
+        validate_gpu_arguments(args, matching_single=True)
+    except ValueError as error:
+        parser.error(str(error))
     for name in ("source_dir", "legacy_tsv", "output_root"):
         setattr(args, name, getattr(args, name).expanduser().resolve())
+    if args.prepared_data is not None:
+        args.prepared_data = args.prepared_data.expanduser().resolve()
     manifest = preflight(args)
     if args.dry_run:
         print(json.dumps(manifest, ensure_ascii=False, indent=2))

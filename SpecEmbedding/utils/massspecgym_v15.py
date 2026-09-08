@@ -4,6 +4,7 @@ import json
 import logging
 import multiprocessing
 import pickle
+import shutil
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -332,3 +333,34 @@ def classified_full_spectra(directory, expected_counts, exclusions, tokenizer):
                             "identifiers": report["target_audit"]["excluded_val_identifiers"],
                             "policy": "frozen raw validation indices, applied before 2D identity grouping"},
                         "label_identity": "2D InChIKey connectivity", "formal_fulltrain": True}
+
+
+def prepared_source(directory, source_dir, legacy_tsv, settings, expected_counts, exclusions):
+    """Fingerprint a complete prepared input, never a partial training run."""
+    report = verify_dataset(directory, expected_counts, exclusions)
+    expected = settings.sources.to_dict()
+    if set(report["sources"]) != set(expected):
+        raise ValueError("Prepared dataset has different raw sources")
+    for name, digest in expected.items():
+        if report["sources"][name]["sha256"] != digest or sha256_file(Path(source_dir) / name) != digest:
+            raise ValueError("Prepared dataset raw source fingerprint mismatch")
+    if report["legacy_tsv"]["sha256"] != sha256_file(legacy_tsv):
+        raise ValueError("Prepared dataset legacy source fingerprint mismatch")
+    return {"directory": str(Path(directory).resolve()),
+            "manifest_sha256": sha256_file(Path(directory) / "dataset_manifest.json")}
+
+
+def import_prepared_dataset(source, destination, expected, expected_counts, exclusions):
+    """Copy verified CPU data into a new run, retaining the original manifest."""
+    source, destination = Path(source), Path(destination)
+    if source.resolve() != Path(expected["directory"]).resolve():
+        raise ValueError("Prepared input path changed since preflight")
+    verify_dataset(source, expected_counts, exclusions)
+    if sha256_file(source / "dataset_manifest.json") != expected["manifest_sha256"]:
+        raise ValueError("Prepared input manifest changed since preflight")
+    shutil.copytree(source, destination)  # Existing destinations always fail.
+    report = verify_dataset(destination, expected_counts, exclusions)
+    if (sha256_file(destination / "dataset_manifest.json") != expected["manifest_sha256"]
+            or sha256_file(source / "dataset_manifest.json") != expected["manifest_sha256"]):
+        raise ValueError("Prepared input changed during import")
+    return report

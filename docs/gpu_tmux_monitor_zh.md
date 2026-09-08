@@ -158,6 +158,35 @@ python /home/zyl/MYPROS/SpecEmbedding/watch_gpu_tmux.py \
 
 ### 当前 v1.5 迁移队列
 
+正式入口 `run_massspecgym_v15.py` 与 `run_fulltrain_rerank.py` 现在也支持 GPU 池择一：
+
+```bash
+python run_massspecgym_v15.py --gpus 0 1 --device cuda:0 \
+  --source-dir "$V15_RAW_DIR" --legacy-tsv "$V1_TSV" \
+  --prepared-data "$COMPLETE_V15_DATA" \
+  --output-root "$NEW_V15_ROOT_topk256" --write-preflight
+```
+
+`--gpus` 可指定两个或更多物理编号，与 `--gpu` 互斥；列表不允许重复、负数或不存在的 GPU。
+每张卡独立累计持续合格时间；查询并发且每次有超时，一张卡繁忙或查询失败只重置该卡计时。
+满足既定显存/利用率与持续时间门槛后择一；同轮多卡合格按参数顺序优先，选择前再复查。
+指纹复查放在最后一次 GPU 查询之前；GPU UUID 变化则停止，不能悄悄换卡。
+
+GPU 池模式必须显式 `--device cuda:0`：每个计算子进程只显露选中 GPU 的 UUID，物理卡 0
+或 1 在该子进程中都映射为逻辑 0。父入口不初始化 CUDA 或改写自己的设备环境。
+`status.json` 的 `gpu_selection` 保存物理编号、UUID、显存/利用率和逻辑设备。
+alignment、缓存、训练、评价各阶段重新择卡，仍顺序执行一个任务；不是多卡并行训练，
+不中途移动正在训练的模型。现有 `--gpu N --device cuda:N` 用法保留，通用
+`watch_gpu_tmux.py` 仍是独立的单卡/tmux 派发器，不应叠加到这些正式入口上。
+
+可选 `--prepared-data` 指向已经完成审计的 v1.5 CPU 数据目录。预检核对策略、RDKit 版本、
+全部文件哈希、原始输入指纹、划分数量与排除项，再将独立副本导入**新的**运行目录并再次校验；
+原 manifest 与原始目录保留，来源目录和 manifest 哈希写入预检及导入阶段记录。
+不复用失败数据，不覆盖已有运行根，也不继承缓存、checkpoint 或训练完成状态。
+未提供该参数时仍重新准备全部数据。此选项适合在确认尚未开始训练后迁移等待队列。
+先停止旧等待入口并确认退出，再用新固定源码、新 socket、新运行根派发，不能同时保留两个
+会启动同一实验的等待入口。池查询仍不是资源预约，无法消除与其他任务的竞争。
+
 2026-09-07 晚间用户授权迁移至 v1.5。旧 v1 外部监测器已停止且没有派发训练；不重新启动它，
 不复用其 pane/锁作为新版派发目标。新的 `run_massspecgym_v15.py` 自带逐阶段 GPU 等待，
 整个入口放在一个新的独立 detached tmux server 中，**不再叠加外部监测器**。

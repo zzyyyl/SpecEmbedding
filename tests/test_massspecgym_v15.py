@@ -25,8 +25,10 @@ from SpecEmbedding.utils.massspecgym_v15 import (
     audit_candidate_list,
     audit_targets,
     classified_full_spectra,
+    import_prepared_dataset,
     molecule_identity,
     prepare_dataset,
+    prepared_source,
     verify_dataset,
 )
 
@@ -235,6 +237,17 @@ def test_real_synthetic_preparation_spawn_pool_and_fresh_full_tokenization(tmp_p
     assert sum(map(len, classified["train_data"].values())) == 3
     assert sum(map(len, classified["val_data"].values())) == 1
     assert audit["expected_epoch_counts"] == {"train": 3, "val": 1}
+    fingerprint = prepared_source(output, source, legacy, settings, expected, [1])
+    imported = tmp_path / "imported"
+    assert import_prepared_dataset(output, imported, fingerprint, expected, [1]) == prepared
+    assert (imported / "dataset_manifest.json").read_bytes() == (output / "dataset_manifest.json").read_bytes()
+    with pytest.raises(FileExistsError):
+        import_prepared_dataset(output, imported, fingerprint, expected, [1])
+    with pytest.raises(ValueError, match="manifest changed"):
+        import_prepared_dataset(output, tmp_path / "refused", {**fingerprint, "manifest_sha256": "changed"}, expected, [1])
+    altered = ConfigObject({**settings.to_dict(), "sources": {**settings.sources.to_dict(), source_tsv.name: "wrong"}})
+    with pytest.raises(ValueError, match="raw source fingerprint"):
+        prepared_source(output, source, legacy, altered, expected, [1])
     retries_path = output / "identity_retry_mass.jsonl"
     original_retries = retries_path.read_bytes()
     retries_path.write_text("tampered")
