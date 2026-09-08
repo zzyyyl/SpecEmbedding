@@ -128,6 +128,25 @@
 
 ## 10. 执行记录
 
+- **当前状态，2026-09-08 23:58（北京时间）**：按用户条件授权，确认 r3 仍在等待、
+  没有 alignment 日志/目录或训练子进程后，于 23:55:48 中断旧入口 PID 2990241。
+  旧状态记录 `failed_or_interrupted / KeyboardInterrupt()`，这是主动迁移取消，原日志、锁与工件保留。
+  新 r4 固定源码为 `/data1/zyl/repos/SpecEmbedding-v15-fulltrain-20260908-r4/`，
+  detached `ad81b61`、工作树干净；运行根为
+  `/data1/zyl/SpecEmbedding/experiments/massspecgym_v15_fulltrain_20260908_r4_topk256/`。
+  独立 socket 为 `/tmp/specembedding-v15-fulltrain-20260908-r4-1010/tmux.sock`，
+  session `v15` / pane `%0`，入口 PID 3110729，于 23:55:52 启动。
+  `import_v15` 已完成：r3 完整 CPU 数据经源指纹和输出哈希核验后复制到新目录，
+  不复用旧训练状态、cache 或 checkpoint。输入与命令见 `inputs_and_commands.json`，
+  主动停止证据见 `migration_receipt.json`，实时状态见 `status.json` / `runner.log`。
+  实测进入 `alignment42/waiting_gpu`，同时等待物理 GPU 0、1，各卡独立保持原有门槛，
+  单阶段择一绑定到逻辑 `cuda:0`；初始 GPU 0 为 0% / 24,206 MiB，GPU 1 为 91% / 4,505 MiB。
+  连续 120 秒及输入指纹/最终设备复查后，于 23:58:03 选择物理 GPU 0，启动 alignment
+  子进程 PID 3111216；`status.json` 为 `alignment42/running`，训练日志确认 RTX 4090、
+  `cuda:0`、seed 42、`formal_fulltrain=True` 与原六条验证排除，开始完整 194,119 条训练谱图 tokenization。
+  后续复查已进入第 1 轮训练（1,517 batches）；子进程环境只显露选中 GPU 0 的 UUID，
+  严格 CUDA 标志及本运行配置路径一致，`nvidia-smi` 确认同一 PID 在该 UUID 上使用 2,300 MiB。
+  没有新增外部监测器；后续各 GPU 阶段仍重新择卡，全部训练和评价尚未完成。
 - 2026-09-08 晚间：按用户授权实现 `--gpus 0 1`（也支持更多编号）的逐阶段择卡。
   各卡独立计时、查询超时单卡重置、最终复查、UUID 固定、逐个派发；选中卡在子进程内
   显式绑定为 `cuda:0`，实际物理编号与 UUID 另记，不修改训练样本、模型超参数或评价协议。
@@ -135,8 +154,8 @@
   验证：全仓 227 通过、1 跳过、1 个相同的既有路径审计失败；Ruff、compileall、diff 检查通过。
   新测试覆盖独立计时、失败卡不阻塞其他卡、候选优先级、最终检查、UUID 变更、真实 CPU
   子进程的 UUID 环境、跨阶段重新择卡及导入失败阻止 GPU 阶段。
-  现有 r3 源码与工件保持原样；迁移前再次确认尚未训练并停止其等待入口，实际操作另行回填。
-- **当前状态，2026-09-08 00:38:30（北京时间）**：r3 的 `prepare_v15` 已完成，
+  实现提交 `ad81b61` 已推送；r3 固定源码与既有数据保持原样，实际迁移记录见上。
+- 2026-09-08 00:38:30（北京时间，历史等待记录）：r3 的 `prepare_v15` 已完成，
   `data/MassSpecGym/dataset_manifest.json` 为 `complete`，入口已完成输出文件校验并进入
   `alignment42/waiting_gpu`。Mass/Formula 的完整条目数量、图资格统计及身份转换重试结果
   与前次独立 CPU 审计一致；两协议均保留源顺序、forcing=false，全部源列表保留 exact target，
@@ -270,7 +289,7 @@
 ## 11. 最终结果
 
 - 完成日期：尚未完成
-- 最终状态：执行中；r3 的 CPU 准备与完整审计通过，已进入 alignment42/waiting_gpu；本轮前台监测完成，原队列在后台继续等待，尚无新 GPU 训练或测试结果
+- 最终状态：执行中；r3 等待队列已主动停止，r4 导入完整已审计数据并在双卡等待后选择 GPU 0，alignment42 正在运行；十二组训练/测试、结果身份审计及论文更新尚未完成
 - 验证结果：代码与模拟/独立 tmux 测试、dry-run、输入指纹预检完成；正式实验与论文构建未完成
 - 论文修改 commit：尚未提交
 - 计划归档 commit：无需在本文件中自我引用
