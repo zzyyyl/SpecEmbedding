@@ -79,7 +79,8 @@ class ConfigPathTest(unittest.TestCase):
                 check=True,
             )
 
-        self.assertEqual(Path(result.stdout.strip()), REPO_ROOT / "data/processed")
+        default_root = load_config().storage.root
+        self.assertEqual(Path(result.stdout.strip()), (Path(default_root) if default_root else REPO_ROOT) / "processed")
 
 
 class ImportPurityTest(unittest.TestCase):

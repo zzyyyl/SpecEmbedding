@@ -1,3 +1,6 @@
+storage:
+  root: null # Set an absolute external root in the launch config or SPECEMBEDDING_STORAGE_ROOT.
+
 general:
   seed: 42
   device: "cuda" # or "cpu", "cuda:0", "cuda:1"
@@ -5,12 +8,12 @@ general:
 
 data:
   dataset_type: "massspecgym" # or "local"
-  data_path: "data/processed"
-  cache_path: "data/train_cache"
-  raw_path: "data/raw"
-  candidates_path: "data/candidates"
-  cid_smiles_path: "data/candidates/CID-SMILES"
-  pubchem_cache_path: "data/pubchem_similarity_cache"
+  data_path: "processed"
+  cache_path: "train_cache"
+  raw_path: "raw"
+  candidates_path: "candidates"
+  cid_smiles_path: "candidates/CID-SMILES"
+  pubchem_cache_path: "pubchem_similarity_cache"
   tokenizer:
     max_len: 100
     show_progress_bar: true

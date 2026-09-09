@@ -4,6 +4,8 @@ from typing import Any
 
 import yaml
 
+from SpecEmbedding.utils.storage import expanded_path, external_storage_root, storage_path
+
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "params.yaml"
 PATH_FIELDS = (
     ("general", "save_dir"),
@@ -47,7 +49,7 @@ class ConfigObject:
         return getattr(self, key)
 
 def _resolve_path_value(value: str, config_dir: Path) -> str:
-    path = Path(os.path.expandvars(value)).expanduser()
+    path = expanded_path(value)
     if not path.is_absolute():
         path = config_dir / path
     return str(path.resolve())
@@ -86,7 +88,25 @@ def load_config(config_path: str | Path | None = None) -> ConfigObject:
 
     if not isinstance(data, dict):
         raise ValueError(f"Config file must contain a mapping: {path}")
-    _resolve_known_paths(data, path.parent)
+    storage = data.get("storage", {})
+    if not isinstance(storage, dict):
+        raise ValueError("storage must be a mapping")
+    root_value = os.environ.get("SPECEMBEDDING_STORAGE_ROOT", storage.get("root"))
+    root = external_storage_root(root_value) if root_value is not None else None
+    if root is not None:
+        data["storage"] = {**storage, "root": str(root)}
+    _resolve_known_paths(data, root or path.parent)
+    if root is not None:
+        for keys in (("general", "save_dir"), ("rerank", "prepare", "save_path"),
+                     ("rerank", "train", "save_dir"), ("rerank", "eval", "save_dir")):
+            parent = data
+            for key in keys[:-1]:
+                parent = parent.get(key, {})
+            if parent.get(keys[-1]):
+                storage_path(parent[keys[-1]], root)
+        for key, value in data.get("data", {}).items():
+            if key.endswith("_path") and isinstance(value, str) and value:
+                storage_path(value, root)
     return ConfigObject(data)
 
 

@@ -17,10 +17,12 @@ python -m compileall -q .
 ```
 
 [params.yaml](../params.yaml) 集中配置路径和超参数；配置选择顺序为显式 `load_config(path)`、
-`SPECEMBEDDING_CONFIG`、仓库 YAML。配置相对路径按 YAML 所在目录解析，CLI 路径参数优先。
+`SPECEMBEDDING_CONFIG`、仓库 YAML。设置`storage.root`或`SPECEMBEDDING_STORAGE_ROOT`后，
+配置相对路径按外部存储根目录解析；没有存储设置的历史配置仍按YAML所在目录解析。
+CLI路径参数优先，正式队列通过外部存储入口启动时还会检查输出是否在指定根目录内。
 [复现说明](../reproducibility/README.md) 提供验收环境锁和工件边界。
 
-默认数据目录为 `data/processed/<Dataset>/`。`train.pkl`、`val.pkl`、`test.pkl` 包含
+默认数据目录为外部存储根下的`processed/<Dataset>/`。`train.pkl`、`val.pkl`、`test.pkl` 包含
 `list[matchms.Spectrum]`，每条须有 `smiles`、`precursor_mz` 和两列 m/z/intensity 谱峰。
 候选 pickle 为 `dict[str, list[str]]`，将目标 SMILES 映射到候选 SMILES 列表。
 
@@ -35,18 +37,27 @@ python -m compileall -q .
 先提供真实数据、可用 GPU 和独立输出目录。正式训练使用完整可训练划分、显式 `cuda:N`；
 长任务使用 detached `tmux`，其余约束见 [AGENTS.md](../AGENTS.md)。
 
+从下一轮起，通过`run_with_storage.py`启动正式任务；本机启动配置使用
+`/data1/${USER}/SpecEmbedding`，可显式指定`--storage-root`或环境变量
+`SPECEMBEDDING_STORAGE_ROOT`；通用YAML不绑定本机路径，入口缺少根目录时拒绝启动。
+训练数据、输入缓存、下载缓存、临时数据及新checkpoint
+放在该根目录下，拒绝home目录和越界符号链接。该入口在导入训练/下载依赖前设置
+Hugging Face、Torch、Numba、CUDA等缓存变量，并传给所有子进程；不修改`HOME`。
+仅影响新进程，当前训练及它引用的旧文件不移动、不删除。具体规则见[存储说明](storage_zh.md)。
+
 需要等 GPU 空闲后向已有训练 pane 单次派发命令时，使用
 [GPU/tmux 监测器](gpu_tmux_monitor_zh.md)；它不会自动恢复暂停的实验计划，也不是资源调度器。
 
 ```bash
-python train_align.py --dataset_type massspecgym \
-  --data_path data/processed --save_dir checkpoints_align/my_run --device cuda:1
+export SPECEMBEDDING_STORAGE_ROOT="/data1/${USER}/SpecEmbedding"
+python run_with_storage.py -- python "$PWD/train_align.py" --dataset_type massspecgym \
+  --data_path processed --save_dir checkpoints_align/my_run --device cuda:1
 
-python eval_align.py --dataset_type massspecgym \
+python run_with_storage.py -- python "$PWD/eval_align.py" --dataset_type massspecgym \
   --checkpoint checkpoints_align/my_run/best_model_stage2.pth \
   --candidate_type mass --device cuda:1 --no-mces
 
-python run_rerank_pipeline.py massspecgym \
+python run_with_storage.py -- python "$PWD/run_rerank_pipeline.py" massspecgym \
   --align_save_dir checkpoints_align/my_run --candidate_type mass \
   --pre_top_k 256 --model_type relative --device cuda:1
 ```

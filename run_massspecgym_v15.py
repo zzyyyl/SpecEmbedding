@@ -42,6 +42,7 @@ from SpecEmbedding.utils.retrieval_validation import (
     load_validation_index,
     prepared_validation_input,
 )
+from SpecEmbedding.utils.storage import storage_receipt
 
 ROOT = Path(__file__).resolve().parent
 
@@ -90,6 +91,7 @@ def commands(args):
 
 
 def preflight(args):
+    storage = storage_receipt(args.output_root)
     if config.fulltrain.v15.graph_policy != "rdkit_sanitized" or config.fulltrain.v15.alignment_seed != 42:
         raise ValueError("Approved v1.5 protocol requires sanitized graphs and alignment seed 42")
     if config.fulltrain.v15.audit_workers < 1:
@@ -143,7 +145,7 @@ def preflight(args):
                 or selection["fulltrain_audit"]["dataset_version"] != "1.5"):
             raise ValueError("Optimization baseline checkpoint/configuration provenance mismatch")
     source_config = Path(os.environ.get("SPECEMBEDDING_CONFIG", DEFAULT_CONFIG_PATH)).resolve()
-    extra = {}
+    extra = {"storage": storage} if storage is not None else {}
     validation_path = getattr(args, "prepared_validation_index", None)
     if validation_path is not None:
         if not getattr(args, "optimize_alignment", False) or getattr(args, "prepared_data", None) is None:
