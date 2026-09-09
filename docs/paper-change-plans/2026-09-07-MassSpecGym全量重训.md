@@ -52,8 +52,8 @@ checkpoint/版本、来源表格、分母和评价设置。各项的最好值可
   差异只维护于[准确率排查](../../analysis/massspecgym_v15_regression_audit.md)及其原始工件。
 - Base 排序在进入 reranker 前已经较弱。新缓存并未复用旧 alignment 权重或旧磁盘 TokenSet。
   旧候选格式捷径已量化，但尚不能把旧模型的全部性能差额归因于单一因素。
-- 新 alignment 按每轮全部谱图训练，以验证对比损失选择 checkpoint；reranker 目前按验证 MRR
-  选择。两者均未实现本计划的 Top-k 优化验收逻辑。应先建立真实完整验证候选检索，再判断结构、
+- r4 alignment 按每轮全部谱图训练，以验证对比损失选择 checkpoint；reranker 目前按验证 MRR
+  选择。A01 已实现完整验证候选检索与 alignment 检索选优，正式运行待核验，再判断结构、
   loss、预训练或参数变化的价值，不能只观察训练 loss。
 - 原模型、旧 query cap/top-40/forcing 结果只保留追溯，不能当成 v1.5 的可靠目标线。
   reranker 无法救回其候选池外的真值，必须同时记录 Base、coarse 与最终排序的 coverage。
@@ -184,7 +184,7 @@ GLACIER 附录不同配置的 Top-10 不能无说明拼到主表 checkpoint。
 - [x] 初步检索一手来源，建立本计划和本地 PDF 资料库。
 - [ ] 补齐各指标 SOTA 来源/协议/分母对照，冻结版本化参考向量和缺失项。
 - [ ] 完成完整验证集官方候选/二维身份 evaluator；从现有 seed42 工件冻结 baseline 验证报告。
-- [ ] 实现检索指标选 checkpoint、Pareto 记录及优化入口默认不跑测试；核验全量和设备保护。
+- [x] 实现检索指标选 checkpoint、Pareto 记录及优化分支不跑测试；测试覆盖全量/设备保护，正式运行待核验。
 - [ ] 按第 4 节顺序启动一个实验，持续完成“训练—验证—审计—保留/舍弃—下一假设”闭环。
 - [ ] 核验预训练来源，保证其结构保持不变，再决定是否启用权重。
 - [ ] 验证指标接近目标后冻结一个方案，在完整测试集评价并完成新缓存/身份审计。
@@ -205,8 +205,8 @@ GLACIER 附录不同配置的 Top-10 不能无说明拼到主表 checkpoint。
 
 ## 9. 验证方案
 
-- [x] 本轮单 baseline 与 GPU/数据审计专项：51 通过。
-- [x] 全仓测试：231 通过、1 跳过、1 个既有内部路径审计失败。
+- [x] 本轮检索验证、alignment 与 GPU/数据审计专项：53 通过。
+- [x] 全仓测试：239 通过、1 跳过、1 个既有内部路径审计失败。
   当前失败涉及 GLACIER manifest、GLACIER 交接、项目记忆和已提交的 v1.5 准确率审计文档；
   与本轮范围修改无关，不改写这些原始来源以隐藏失败。
 - [x] Ruff、compileall、git diff --check；后续新增代码必须重新执行相应验证。
@@ -219,6 +219,15 @@ GLACIER 附录不同配置的 Top-10 不能无说明拼到主表 checkpoint。
 - [ ] 论文修改后执行双语编译、引用/匿名扫描、发布 manifest 和仓库要求的复现检查。
 
 ## 10. 执行记录
+
+- 2026-09-09 A01：已实现完整验证检索选优，实验卡见
+  [单 baseline 索引](../../analysis/massspecgym_optimization.md)。主排名使用已核验的
+  `torchmetrics 1.8.2` 逐 query CPU argsort，稳定排序作为同分敏感性视图；此前的 stable-only
+  设计由官方实现核验细化，不更改候选身份或分母。官方代码来源为
+  [retrieval/base.py](https://github.com/pluskal-lab/MassSpecGym/blob/main/massspecgym/models/retrieval/base.py)
+  和 [torchmetrics hit_rate.py](https://github.com/Lightning-AI/torchmetrics/blob/v1.8.2/src/torchmetrics/functional/retrieval/hit_rate.py)。
+  本机新增 torchmetrics1.8.2、lightning-utilities0.15.3；没有更改 PyTorch/CUDA。
+  53 项专项通过，全仓 239 通过、1 跳过、1 个既有路径审计失败；实现未改两塔/预训练结构。
 
 - 2026-09-09：用户先授权“Top-1 优先、MRR 为辅”，后将目标更新为 Top-k 整体及各项指标接近
   SOTA。已重写本计划的当前部分；原全量迁移过程保留如下。当前没有派发新的优化训练。
@@ -407,7 +416,7 @@ GLACIER 附录不同配置的 Top-10 不能无说明拼到主表 checkpoint。
 
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
-- 验证结果：本轮 51 项专项通过；全仓 231 通过、1 跳过、1 个既有路径审计失败；静态检查通过
+- 验证结果：本轮 53 项专项通过；全仓 239 通过、1 跳过、1 个既有路径审计失败；静态检查通过
 - 当前训练状态：r4 旧矩阵已主动停止，新优化训练尚未派发；详见停止回执和实验日志
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用

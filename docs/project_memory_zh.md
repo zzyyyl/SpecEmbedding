@@ -61,8 +61,10 @@ JESTR-style cosine 只是本地保存嵌入上的重实现打分控制，JESTR/G
   工件保留，seed43 的部分 checkpoint 不作为完成结果。外层状态为中断，内层仍残留 running；
   已确认进程组退出、专用 pane dead，不能据残留状态重启。下一轮固定 Mass/relative/seed42，
   保持 v1.5、全量、无 forcing 和双 GPU 择一等待；入口已收窄范围，尚未派发新训练。
-  先针对 alignment 的真实验证检索选优做单项改进，当前仍按验证对比损失选 alignment；
-  Top-k 检索选优实现尚待完成，不能写成已实现或已提升。调参仅看验证集，矩阵后置。
+  A01 已实现完整验证候选重编码与检索选优，Top-1/MRR 选 checkpoint 并保存 Top-k 的 Pareto
+  候选；优化分支不运行 test 或 reranker。正式运行尚待核验，不能写成已提升。
+  主排名匹配 torchmetrics1.8.2 逐 query CPU argsort，稳定排序另列敏感性视图；
+  实验卡与最新测试见[优化索引](../analysis/massspecgym_optimization.md)。调参仅看验证集，矩阵后置。
   用户授权互联网研究及预训练权重使用、下游质谱塔/分子塔/rerank 结构与参数的逐项迭代，
   要求模型不过度复杂、能在本机训练；SpecEmbedding 质谱侧预训练模型结构不得改动。
   参考论文放入用户指定的论文目录；对标来源、可比性、近似达标阈值、下载位置与执行路线

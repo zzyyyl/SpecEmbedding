@@ -55,6 +55,7 @@ train:
       base_temperature: 0.05
     early_stop: 20
   align:
+    metric_for_best: validation_contrastive_loss # optimization runner selects validation_top1_then_mrr
     batch_size: 128
     epochs_stage1: 50
     epochs_stage2: 100
@@ -63,6 +64,12 @@ train:
     weight_decay: 0.0001 # 1e-4
     patience: 5
     num_workers: 4
+
+retrieval_validation:
+  mol_batch_size: 512
+  spec_batch_size: 128
+  num_workers: 4
+  top_k: [1, 5, 10, 20]
 
 eval:
   replications: 10

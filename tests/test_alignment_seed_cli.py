@@ -24,7 +24,7 @@ class _FakeAlignModel(torch.nn.Module):
 
 
 class _FakeTrainer:
-    def __init__(self, model, train_loader, val_loader, device, save_dir):
+    def __init__(self, model, train_loader, val_loader, device, save_dir, retrieval_validator=None):
         self.model = model
         self.stage_summaries = {}
         self.save_dir = Path(save_dir)

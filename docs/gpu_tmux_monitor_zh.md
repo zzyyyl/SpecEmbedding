@@ -259,8 +259,26 @@ detached 会话方式启动监测器。实际入口重新核对输入/config/com
 每阶段记录 `status.json`，失败立即停止、不重试或覆盖旧工件；人工排查后使用新输出目录。
 `monitor.log` 的 SENT 只表示派发，训练/评价进度须查看 `status.json`、`runner.log` 和各阶段日志。
 单 baseline 优化使用验证集 Top-k（1/5/10/20）整体表现、MRR 为辅作决策，测试集不用于反复调参。
-当前训练器仍按既有验证损失/alignment、验证 MRR/reranker 选 checkpoint；更改选优逻辑须单独
-实现、验证并记录为实验变量，不能把目标写成已实现行为。表现改善后再恢复矩阵，身份审计与论文更新仍待完成。
+默认入口仍按验证损失/alignment、验证 MRR/reranker 选 checkpoint。新增 alignment 优化分支
+显式按完整验证检索 Top-1、MRR 顺序选择，并保存其它 Top-k 的 Pareto 候选 checkpoint：
+
+```bash
+python run_massspecgym_v15.py --gpus 0 1 --device cuda:0 \
+  --source-dir "$V15_SOURCE" --legacy-tsv "$V1_TSV" \
+  --prepared-data "$AUDITED_V15_DATA" --output-root "$NEW_OPTIMIZATION_ROOT" \
+  --optimize-alignment --baseline-checkpoint "$V15_BASELINE_CHECKPOINT" --dry-run
+```
+
+该分支只执行已审计数据导入、CPU 验证索引准备、固定 checkpoint 的完整验证，以及一轮
+seed42 全量 alignment 训练；不派发测试或 reranker。去掉 `--dry-run` 前固定干净源码并使用
+独立 detached tmux。GPU 阶段各自等待，不复用旧目录。
+
+索引位于 `validation/mass_val_topk256.pt`，相邻 JSON 保存 SHA-256 和样本统计。保留官方
+候选源顺序及二维多正例，只沿用已审计的无效图排除；每轮重新编码候选，采用 float32 CPU
+嵌入存储。主指标匹配 `torchmetrics 1.8.2` 的逐 query CPU `argsort`，稳定排序另列敏感性视图；
+不把主指标误称为 `torch.topk`。模型/数据/分母/候选身份的完整最终审计仍是独立验收事项。
+`validation_retrieval/` 保存每轮分数和排名，selection JSON 记录选优轨迹及 Pareto 文件名。
+训练完成只代表这一个优化候选完成，不代表已接近 SOTA。表现改善后再恢复矩阵。
 
 ## 验证（不启动训练）
 

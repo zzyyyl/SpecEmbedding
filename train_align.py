@@ -18,9 +18,11 @@ from SpecEmbedding.data.overlap import filter_classified_validation
 from SpecEmbedding.models_align import GINEEncoder, SpecMolAlignModel
 from SpecEmbedding.trainer.trainer import set_seed
 from SpecEmbedding.trainer.trainer_align import TrainerAlign
+from SpecEmbedding.utils.fulltrain import sha256_file
 from SpecEmbedding.utils.massspecgym_v15 import classified_full_spectra
 from SpecEmbedding.utils.model import SiameseModel
 from SpecEmbedding.utils.providers import get_provider
+from SpecEmbedding.utils.retrieval_validation import AlignmentRetrievalValidator, load_validation_index
 from SpecEmbedding.utils.runtime import resolve_device, setup_logging, startup_logging
 from train import add_base_argument, get_classified_data
 
@@ -47,6 +49,7 @@ def train_align(
     selection_metadata: dict | None = None,
     seed: int = config.general.seed,
     formal_fulltrain: bool = False,
+    retrieval_validator=None,
 ):
     if seed < 0:
         raise ValueError("seed must be a non-negative integer")
@@ -144,7 +147,8 @@ def train_align(
         train_loader,
         val_loader,
         device,
-        save_dir=save_dir
+        save_dir=save_dir,
+        retrieval_validator=retrieval_validator,
     )
     if formal_fulltrain:
         trainer.expected_epoch_counts = expected
@@ -237,6 +241,7 @@ def main():
     parser.add_argument("--seed", type=int, default=config.general.seed, help="Random seed for alignment training")
     parser.add_argument("--pretrained_spec", type=str, help="Path to your pre-trained SpecEmbedding model weights")
     parser.add_argument("--formal-fulltrain", action="store_true", help="Audited v1.5, fresh all-spectrum tokenization, strict CUDA, no old weights or caches")
+    parser.add_argument("--validation-index", type=Path, help="Audited full Mass validation candidate/identity index for retrieval checkpoint selection")
     parser.add_argument(
         "--tokenset_cache",
         "--tokenset-cache",
@@ -255,6 +260,12 @@ def main():
     )
 
     args = parser.parse_args()
+    if config.train.align.metric_for_best not in ("validation_contrastive_loss", "validation_top1_then_mrr"):
+        parser.error("Unknown alignment checkpoint-selection metric")
+    if (config.train.align.metric_for_best == "validation_top1_then_mrr") != bool(args.validation_index):
+        parser.error("Retrieval selection requires --validation-index and the matching pinned metric configuration")
+    if args.validation_index and not args.formal_fulltrain:
+        parser.error("Retrieval selection requires audited formal full-training data")
     args.exclude_val_query_indices = sorted(set(args.exclude_val_query_indices))
     if any(index < 0 for index in args.exclude_val_query_indices):
         parser.error("--exclude-val-query-indices must contain non-negative integers")
@@ -284,6 +295,11 @@ def main():
     startup_logging(args)
     set_seed(args.seed)
     device = resolve_device(args.device)
+    retrieval_validator = None
+    if args.validation_index:
+        index = load_validation_index(args.validation_index, args.data_path, config.fulltrain.expected_counts.to_dict(),
+                                      args.exclude_val_query_indices, config.data.tokenizer.to_dict())
+        retrieval_validator = AlignmentRetrievalValidator(index, config.retrieval_validation, save_path / "validation_retrieval")
 
     fulltrain_audit = None
     if args.formal_fulltrain:
@@ -361,8 +377,12 @@ def main():
         device=device,
         seed=args.seed,
         formal_fulltrain=args.formal_fulltrain,
+        retrieval_validator=retrieval_validator,
         selection_metadata={
             "dataset_type": args.dataset_type,
+            "validation_index": ({"path": str(args.validation_index.resolve()),
+                                  "sha256": sha256_file(args.validation_index)}
+                                 if args.validation_index else None),
             "data_path": str(Path(args.data_path).resolve()),
             "tokenset_cache": (
                 str(Path(args.tokenset_cache).resolve())

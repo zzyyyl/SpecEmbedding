@@ -56,6 +56,16 @@ def commands(args):
     ]
     if getattr(args, "prepared_data", None) is not None:
         result[0] = {"name": "import_v15", "gpu": False, "source": str(args.prepared_data), "output": str(data)}
+    if getattr(args, "optimize_alignment", False):
+        index = args.output_root / "validation" / "mass_val_topk256.pt"
+        result[1]["command"] += ["--validation-index", str(index)]
+        result = [result[0],
+                  {"name": "prepare_validation", "gpu": False, "command": [sys.executable, str(ROOT / "alignment_validation.py"),
+                   "--data-path", str(data), "--index", str(index), "--prepare-only"]},
+                  {"name": "baseline_validation", "gpu": True, "command": [sys.executable, str(ROOT / "alignment_validation.py"),
+                   "--data-path", str(data), "--index", str(index), "--checkpoint", str(args.baseline_checkpoint),
+                   "--output", str(args.output_root / "baseline_validation"), "--device", args.device]},
+                  result[1]]
     return result
 
 
@@ -78,6 +88,20 @@ def preflight(args):
     runtime_config = config.to_dict()
     runtime_config["model"]["mol_encoder"]["graph_policy"] = config.fulltrain.v15.graph_policy
     runtime_config["general"]["device"] = args.device
+    if getattr(args, "optimize_alignment", False):
+        if args.baseline_checkpoint is None:
+            raise ValueError("Alignment optimization requires the frozen baseline checkpoint")
+        runtime_config["train"]["align"]["metric_for_best"] = "validation_top1_then_mrr"
+        for name, path in (("baseline_checkpoint", args.baseline_checkpoint),
+                           ("baseline_selection", args.baseline_checkpoint.parent / "alignment_selection.json")):
+            inputs[name] = {"path": str(path), "sha256": sha256_file(path)}
+        selection = json.loads((args.baseline_checkpoint.parent / "alignment_selection.json").read_text())
+        if (selection["checkpoint_sha256"] != inputs["baseline_checkpoint"]["sha256"]
+                or selection["seed"] != 42 or selection["model_config"] != runtime_config["model"]
+                or selection["graph_policy"] != "rdkit_sanitized"
+                or not selection["fulltrain_audit"]["formal_fulltrain"]
+                or selection["fulltrain_audit"]["dataset_version"] != "1.5"):
+            raise ValueError("Optimization baseline checkpoint/configuration provenance mismatch")
     source_config = Path(os.environ.get("SPECEMBEDDING_CONFIG", DEFAULT_CONFIG_PATH)).resolve()
     extra = {}
     if getattr(args, "gpus", None) is not None:
@@ -119,7 +143,7 @@ def audit_alignment(args):
 
 
 def execute(args, manifest):
-    for name in ("status.json", "data", "alignment42_topk256", "rerank_topk256", "logs"):
+    for name in ("status.json", "data", "alignment42_topk256", "rerank_topk256", "logs", "validation", "baseline_validation"):
         if (args.output_root / name).exists():
             raise FileExistsError(f"Refusing existing v1.5 run artifact: {name}")
     runtime_path = args.output_root / "runtime_params.yaml"
@@ -147,6 +171,10 @@ def execute(args, manifest):
     def check_preflight():
         if sha256_file(runtime_path) != status["runtime_config_sha256"] or preflight(args) != manifest:
             raise ValueError("Inputs/source/configuration changed during queue wait")
+        for item in status["stages"]:
+            if item["name"] == "prepare_validation" and item["state"] == "complete":
+                if sha256_file(args.output_root / "validation" / "mass_val_topk256.pt") != item["audit"]["sha256"]:
+                    raise ValueError("Prepared validation index changed during queue wait")
 
     try:
         for stage in manifest["stages"]:
@@ -181,12 +209,31 @@ def execute(args, manifest):
                 progress["audit"] = data_report["target_audit"]
             elif stage["name"] == "alignment42":
                 progress["audit"] = audit_alignment(args)
+                if getattr(args, "optimize_alignment", False):
+                    selection = json.loads((args.output_root / "alignment42_topk256" / "alignment_selection.json").read_text())
+                    summary = selection["stages"]["stage2"]
+                    if (summary["metric_for_best"] != "validation_top1_then_mrr"
+                            or summary["best_retrieval"]["queries"] != config.fulltrain.expected_counts.val - len(config.fulltrain.exclude_val_query_indices)):
+                        raise ValueError("Alignment retrieval checkpoint-selection audit failed")
+                    progress["retrieval_selection"] = summary
+            elif stage["name"] == "prepare_validation":
+                receipt = json.loads((args.output_root / "validation" / "mass_val_topk256.json").read_text())
+                if (receipt["sha256"] != sha256_file(args.output_root / "validation" / "mass_val_topk256.pt")
+                        or receipt["queries"] != config.fulltrain.expected_counts.val - len(config.fulltrain.exclude_val_query_indices)):
+                    raise ValueError("Validation index preparation audit failed")
+                progress["audit"] = receipt
+            elif stage["name"] == "baseline_validation":
+                progress["audit"] = json.loads((args.output_root / "baseline_validation" / "metrics.json").read_text())
+                if progress["audit"]["checkpoint_sha256"] != manifest["inputs"]["baseline_checkpoint"]["sha256"]:
+                    raise ValueError("Baseline checkpoint changed")
             else:
                 rerank = json.loads((args.output_root / "rerank_topk256" / "status.json").read_text())
                 validate_baseline_completion(rerank)
             progress.update(state="complete", completed_at=now())
             write_json(args.output_root / "status.json", status)
-        status.update(state="complete", completed_at=now(), result_identity_audit="pending", paper_update="pending")
+        status.update(state="complete", completed_at=now(), result_identity_audit="pending", paper_update="pending",
+                      scope="alignment_validation_only" if getattr(args, "optimize_alignment", False) else "rerank_baseline",
+                      sota_goal="not_achieved")
     except BaseException as error:
         status.update(state="failed_or_interrupted", error=repr(error), stopped_at=now())
         if status["stages"]:
@@ -203,6 +250,8 @@ def main(argv=None):
     add_gpu_arguments(parser)
     parser.add_argument("--device", required=True)
     parser.add_argument("--prepared-data", type=Path, help="Import a complete, fingerprint-verified CPU dataset into a new run")
+    parser.add_argument("--optimize-alignment", action="store_true", help="Full validation baseline then one alignment seed42 selected by retrieval; no test/rerank matrix")
+    parser.add_argument("--baseline-checkpoint", type=Path, help="Frozen v1.5 seed42 baseline for the alignment optimization branch")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--write-preflight", action="store_true")
     args = parser.parse_args(argv)
@@ -214,6 +263,10 @@ def main(argv=None):
         setattr(args, name, getattr(args, name).expanduser().resolve())
     if args.prepared_data is not None:
         args.prepared_data = args.prepared_data.expanduser().resolve()
+    if args.baseline_checkpoint is not None:
+        args.baseline_checkpoint = args.baseline_checkpoint.expanduser().resolve()
+    if args.optimize_alignment != (args.baseline_checkpoint is not None):
+        parser.error("--optimize-alignment and --baseline-checkpoint must be provided together")
     manifest = preflight(args)
     if args.dry_run:
         print(json.dumps(manifest, ensure_ascii=False, indent=2))
