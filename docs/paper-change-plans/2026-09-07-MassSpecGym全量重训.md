@@ -255,6 +255,17 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-09 17:45：全量训练自然候选元数据准备及独立源文件复核完成，详见优化索引 D06。
+  工件根为 `/data1/zyl/SpecEmbedding/audits/train_candidate_feasibility_20260909/`；
+  `receipt.json` SHA-256 `a1f971378d667d8e44bd7f32165cb813638f044326de9f6354c7439d23ddfad4`，
+  `verification.json` SHA-256 `5e6d81afb569ddc812680e13d5cd777ce6eb6d44fb21c57531ce3b694e6d3987`。
+  全部194119条query及6350650条候选条目通过独立读回核验，正例/源位置/图排除一致；
+  原始候选保留，无forcing，无训练或模型推理。重复二维负例、held-out无标签结构交集及
+  存储规模已记录；该诊断元数据未被训练入口使用，不改变A02/A03配置。
+  A03 固定源码 worktree 已创建为 `/data1/zyl/repos/SpecEmbedding-opt-a03-20260909`，
+  detached `c50ddf04d2be4fedc007365e511a95f36e298c08`、干净，入口帮助及环境导入通过；
+  与已测试实现一致，未创建训练运行或派发命令。正式parent/batching与新预检待A02完整审计。
+  A02 原进程仍存活，已完成21轮完整检索验证，当前各指标与Pareto取舍只维护于优化索引。
 - 2026-09-09 17:22：完整验证候选的 CPU 指纹可区分性诊断完成，未做模型推理。
   工件根 `/data1/zyl/SpecEmbedding/audits/fingerprint_collisions_20260909/` 保存全候选指纹载荷
   摘要、完整query计数、全部歧义对与可重跑脚本。`receipt.json` SHA-256 为
@@ -579,7 +590,7 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
 - 验证结果：65 项相关测试通过；最新全仓 292 通过、1 跳过、1 个既有路径审计失败；静态检查通过
-- 当前训练状态：r4 旧矩阵停止；A01 未替换 r4；A02 alignment 训练中；A03 实现与预检完成，未派发
+- 当前训练状态：r4 旧矩阵停止；A01 未替换 r4；A02 alignment 训练中；A03 源码已固定，正式配置预检待A02审计，未派发
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；
