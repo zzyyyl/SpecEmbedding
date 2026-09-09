@@ -1,4 +1,4 @@
-"""Approved MassSpecGym alignment-42 full-training matrix, sequential and GPU-only."""
+"""MassSpecGym single baseline: Mass/relative/seed42, full-training and GPU-only."""
 
 import argparse
 import fcntl
@@ -14,7 +14,7 @@ from pathlib import Path
 
 from SpecEmbedding.config import DEFAULT_CONFIG_PATH, config
 from SpecEmbedding.data.datasets_rerank import load_rerank_cache
-from SpecEmbedding.utils.fulltrain import sha256_file, validate_cache, wait_for_gpu
+from SpecEmbedding.utils.fulltrain import sha256_file, validate_baseline_scope, validate_cache, wait_for_gpu
 from SpecEmbedding.utils.gpu import gpu_inventory, parse_cuda_device
 from SpecEmbedding.utils.gpu_pool import (
     add_gpu_arguments,
@@ -68,8 +68,7 @@ def validate_config():
         raise ValueError("Approved model requires no rank embedding and coarse top-40")
     if config.rerank.train.metric_for_best != "mrr" or config.rerank.train.epochs != 30 or config.rerank.train.patience != 5:
         raise ValueError("Approved model selection requires validation MRR, 30 epochs, patience=5")
-    if config.fulltrain.candidate_types != ["mass", "formula"] or config.fulltrain.model_types != ["relative", "pointwise"] or config.fulltrain.seeds != [42, 43, 44]:
-        raise ValueError("Approved first batch is 2 candidate protocols x 2 models x 3 seeds")
+    validate_baseline_scope(config.fulltrain)
 
 
 def stages(args):
@@ -99,7 +98,7 @@ def stages(args):
                     "--checkpoint", str(output / "best_reranker.pth"), "--save_dir", str(output),
                     "--device", args.device, "--no-mces",
                 ]})
-    # Audit all six caches before any training; no inherited legacy caches.
+    # Audit all selected caches before any training; no inherited legacy caches.
     return [stage for stage in result if stage["kind"] == "prepare"] + [stage for stage in result if stage["kind"] != "prepare"]
 
 

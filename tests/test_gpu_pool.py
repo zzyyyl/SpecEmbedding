@@ -118,7 +118,7 @@ def test_rerank_pool_reselects_each_stage_and_binds_real_child_environment(tmp_p
     assert [s["gpu_selection"]["index"] for s in status["stages"]] == [1, 0]
 
 
-def test_v15_pool_binds_alignment_and_forwards_pool_to_matrix(tmp_path):
+def test_v15_pool_binds_alignment_and_forwards_pool_to_baseline(tmp_path):
     original_visible = os.environ.get("CUDA_VISIBLE_DEVICES")
     args = SimpleNamespace(gpu=None, gpus=[0, 1], device="cuda:0", output_root=tmp_path,
                            source_dir=tmp_path / "raw", legacy_tsv=tmp_path / "old", prepared_data=None)
@@ -131,7 +131,11 @@ def test_v15_pool_binds_alignment_and_forwards_pool_to_matrix(tmp_path):
         environments.append(kwargs["env"])
         if "run_fulltrain_rerank.py" in command[1]:
             (tmp_path / "rerank_topk256").mkdir()
-            (tmp_path / "rerank_topk256/status.json").write_text(json.dumps({"state": "complete", "stages": [{}] * 30}))
+            completed = [{"kind": "prepare", "split": split, "candidate": "mass", "state": "complete"}
+                         for split in ("train", "val", "test")]
+            completed += [{"kind": kind, "candidate": "mass", "model": "relative", "seed": 42, "state": "complete"}
+                          for kind in ("train", "eval")]
+            (tmp_path / "rerank_topk256/status.json").write_text(json.dumps({"state": "complete", "stages": completed}))
 
     with patch.object(v15, "gpu_inventory", return_value={0: "GPU-0", 1: "GPU-1"}), \
          patch.object(v15, "preflight", return_value=manifest), \

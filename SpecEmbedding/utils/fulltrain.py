@@ -1,4 +1,4 @@
-"""Fail-closed protocol checks for the approved full-training reranker matrix."""
+"""Fail-closed protocol checks for full-training reranker experiments."""
 
 import hashlib
 import logging
@@ -7,6 +7,21 @@ import time
 from pathlib import Path
 
 from SpecEmbedding.utils.gpu import gpu_snapshot
+
+
+def validate_baseline_scope(settings):
+    if settings.candidate_types != ["mass"] or settings.model_types != ["relative"] or settings.seeds != [42]:
+        raise ValueError("Current optimization requires one baseline: mass/relative/seed42; matrix expansion is deferred")
+
+
+def validate_baseline_completion(status):
+    expected = [("prepare", split) for split in ("train", "val", "test")] + [("train", None), ("eval", None)]
+    stages = status["stages"]
+    actual = [(item["kind"], item.get("split")) for item in stages]
+    if (status["state"] != "complete" or actual != expected
+            or any(item["state"] != "complete" or item["candidate"] != "mass" for item in stages)
+            or any(item.get("model") != "relative" or item.get("seed") != 42 for item in stages[3:])):
+        raise ValueError("Incomplete or unexpected rerank baseline")
 
 
 def sha256_file(path):

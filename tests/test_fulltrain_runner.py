@@ -86,11 +86,11 @@ def args_for(root):
     return SimpleNamespace(device="cuda:1", gpu=1, data_path=root / "data", checkpoint=root / "align.pth", output_root=root / "output")
 
 
-def test_matrix_has_six_caches_then_twelve_full_train_eval_pairs():
+def test_baseline_has_three_caches_then_one_full_train_eval_pair():
     stages = runner.stages(args_for(Path("/tmp/synthetic-fulltrain")))
-    assert len(stages) == 30
-    assert [stage["kind"] for stage in stages[:6]] == ["prepare"] * 6
-    assert len([stage for stage in stages if stage["kind"] == "train"]) == 12
+    assert [stage["kind"] for stage in stages] == ["prepare"] * 3 + ["train", "eval"]
+    assert {stage["candidate"] for stage in stages} == {"mass"}
+    assert {(stage["model"], stage["seed"]) for stage in stages[3:]} == {("relative", 42)}
     for stage in stages:
         command = stage["command"]
         assert command[command.index("--device") + 1] == "cuda:1"
@@ -109,6 +109,32 @@ def test_config_rejects_formal_limit():
     runner.validate_config()
     with patch.object(runner.config.rerank.prepare, "limit", 20000), pytest.raises(ValueError):
         runner.validate_config()
+
+
+@pytest.mark.parametrize("name,value", [("candidate_types", ["mass", "formula"]),
+                                       ("model_types", ["relative", "pointwise"]),
+                                       ("seeds", [42, 43, 44])])
+def test_config_rejects_accidental_matrix_expansion(name, value):
+    with patch.object(runner.config.fulltrain, name, value), pytest.raises(ValueError, match="one baseline"):
+        runner.validate_config()
+
+
+def test_baseline_completion_rejects_missing_wrong_or_unfinished_runs():
+    stages = runner.stages(args_for(Path("/tmp/synthetic-fulltrain")))
+    status = {"state": "complete", "stages": [{**item, "state": "complete"} for item in stages]}
+    fulltrain.validate_baseline_completion(status)
+    for change in ("missing_eval", "extra_run", "wrong_seed", "wrong_model", "wrong_candidate", "unfinished"):
+        invalid = copy.deepcopy(status)
+        if change == "missing_eval":
+            invalid["stages"].pop()
+        elif change == "extra_run":
+            invalid["stages"].append(invalid["stages"][-1])
+        else:
+            key, value = {"wrong_seed": ("seed", 43), "wrong_model": ("model", "pointwise"),
+                          "wrong_candidate": ("candidate", "formula"), "unfinished": ("state", "running")}[change]
+            invalid["stages"][-1][key] = value
+        with pytest.raises(ValueError, match="baseline"):
+            fulltrain.validate_baseline_completion(invalid)
 
 
 def test_stage_gpu_gate_resets_on_busy_and_failed_queries():

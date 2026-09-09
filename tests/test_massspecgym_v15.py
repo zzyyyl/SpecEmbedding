@@ -277,7 +277,7 @@ def test_target_audit_keeps_frozen_exclusions_without_inventing_overlap():
 def test_v15_queue_commands_separate_cpu_audit_from_gpu_full_training(tmp_path):
     args = SimpleNamespace(output_root=tmp_path, source_dir=tmp_path / "sources", legacy_tsv=tmp_path / "old.tsv", gpu=1, device="cuda:1")
     stages = runner.commands(args)
-    assert [s["name"] for s in stages] == ["prepare_v15", "alignment42", "rerank_matrix"]
+    assert [s["name"] for s in stages] == ["prepare_v15", "alignment42", "rerank_baseline"]
     assert stages[0]["gpu"] is False
     assert stages[1]["gpu"] is True
     assert "--formal-fulltrain" in stages[1]["command"]

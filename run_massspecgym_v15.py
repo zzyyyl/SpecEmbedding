@@ -1,4 +1,4 @@
-"""One isolated v1.5 queue: full CPU audit, GPU alignment-42, six caches and 12 rerank runs."""
+"""One isolated v1.5 baseline: CPU audit, GPU alignment-42, Mass/relative/seed42."""
 
 import argparse
 import fcntl
@@ -15,7 +15,12 @@ from pathlib import Path
 import yaml
 
 from SpecEmbedding.config import DEFAULT_CONFIG_PATH, config
-from SpecEmbedding.utils.fulltrain import sha256_file, wait_for_gpu
+from SpecEmbedding.utils.fulltrain import (
+    sha256_file,
+    validate_baseline_completion,
+    validate_baseline_scope,
+    wait_for_gpu,
+)
 from SpecEmbedding.utils.gpu import gpu_inventory, parse_cuda_device
 from SpecEmbedding.utils.gpu_pool import (
     add_gpu_arguments,
@@ -45,7 +50,7 @@ def commands(args):
          "--dataset_type", "massspecgym", "--data_path", str(data), "--save_dir", str(alignment),
          "--device", args.device, "--seed", str(config.fulltrain.v15.alignment_seed), "--formal-fulltrain",
          "--exclude-val-query-indices", *map(str, config.fulltrain.exclude_val_query_indices)]},
-        {"name": "rerank_matrix", "gpu": False, "command": [sys.executable, str(ROOT / "run_fulltrain_rerank.py"),
+        {"name": "rerank_baseline", "gpu": False, "command": [sys.executable, str(ROOT / "run_fulltrain_rerank.py"),
          *gpu_args, "--device", args.device, "--data-path", str(data),
          "--checkpoint", str(alignment / "best_model_stage2.pth"), "--output-root", str(args.output_root / "rerank_topk256")]},
     ]
@@ -59,6 +64,7 @@ def preflight(args):
         raise ValueError("Approved v1.5 protocol requires sanitized graphs and alignment seed 42")
     if config.fulltrain.v15.audit_workers < 1:
         raise ValueError("Candidate audit requires at least one CPU worker")
+    validate_baseline_scope(config.fulltrain)
     if subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip():
         raise ValueError("v1.5 queue requires a clean, fixed source worktree")
     inputs = {}
@@ -177,8 +183,7 @@ def execute(args, manifest):
                 progress["audit"] = audit_alignment(args)
             else:
                 rerank = json.loads((args.output_root / "rerank_topk256" / "status.json").read_text())
-                if rerank["state"] != "complete" or len(rerank["stages"]) != 30:
-                    raise ValueError("Incomplete rerank matrix")
+                validate_baseline_completion(rerank)
             progress.update(state="complete", completed_at=now())
             write_json(args.output_root / "status.json", status)
         status.update(state="complete", completed_at=now(), result_identity_audit="pending", paper_update="pending")

@@ -150,9 +150,10 @@ fulltrain:
       MassSpecGym1.5.tsv: 50cfdd1d22f79543c59555f9ce43c6893bd788a19a42b21fb4e2e3a54673c06a
       MassSpecGym1.5_retrieval_candidates_mass.json: 9536a330cba24c399271364889119f90124579400dba14e9f78630c75c13c73a
       MassSpecGym1.5_retrieval_candidates_formula.json: 454636d2346aebb3cd87edc2efc3fa1bf91eb8e0219edff5880f02aa537ac954
-  candidate_types: [mass, formula]
-  model_types: [relative, pointwise]
-  seeds: [42, 43, 44]
+  # Single baseline optimization; expand the matrix only after validation improves.
+  candidate_types: [mass]
+  model_types: [relative]
+  seeds: [42]
   expected_counts: {train: 194119, val: 19429, test: 17556}
   exclude_val_query_indices: [7686, 7687, 7688, 8464, 8465, 8466]
   min_free_mib: 20000
