@@ -70,7 +70,8 @@ def read_candidate_training_input(path, data_path, settings, expected_counts, ex
     return index, receipt, {"path": str(path.resolve()), "sha256": before}
 
 
-def audit_candidate_training(directory, stage, input_path, settings, seed, batch_size, data_path, counts, exclusions):
+def audit_candidate_training(directory, stage, input_path, settings, seed, batch_size, data_path, counts, exclusions,
+                             *, fingerprint_cache=None):
     """Replay every observed query's negative sample; never run a model or use test labels."""
     record = stage.get("candidate_training")
     if settings is not None:
@@ -86,6 +87,17 @@ def audit_candidate_training(directory, stage, input_path, settings, seed, batch
                            "graph_cache_size": settings["graph_cache_size"],
                            "dataset_to_raw_query_sha256": input_receipt["dataset_to_raw_query_sha256"],
                            "negative_graph_augmentation": GRAPH_AUGMENTATION}
+    if fingerprint_cache is not None:
+        from SpecEmbedding.utils.fingerprint_alignment_inputs import fingerprint_training_provenance
+        from SpecEmbedding.utils.fingerprint_cache import fingerprint_provenance, load_fingerprint_cache
+        source = fingerprint_cache['provenance']
+        expected_source = fingerprint_provenance(index.metadata['mol_smiles'], index_sha256=index.provenance['sha256'],
+                                                 dataset_manifest_sha256=index.provenance['dataset_manifest_sha256'],
+                                                 radius=source['options']['radius'], bits=source['options']['bits'])
+        _, verified = load_fingerprint_cache(index.metadata['mol_smiles'], fingerprint_cache['directory'], expected_source)
+        if verified != fingerprint_cache:
+            raise ValueError('Candidate fingerprint source differs from the declared model inputs')
+        expected_provenance = fingerprint_training_provenance(expected_provenance, verified)
     if (record["loss"] != LOSS_NAME or record["candidate_loss_weight"] != settings["loss_weight"]
             or record["data"] != expected_provenance or len(record["epochs"]) != stage["stop_epoch"]):
         raise ValueError("Candidate loss, input or trajectory differs from the pinned experiment")

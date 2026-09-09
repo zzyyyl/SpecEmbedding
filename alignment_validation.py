@@ -9,6 +9,9 @@ import torch
 
 from SpecEmbedding.config import config
 from SpecEmbedding.utils.align import load_align_model
+from SpecEmbedding.utils.fingerprint_alignment_inputs import load_alignment_fingerprints
+from SpecEmbedding.utils.fingerprint_validation import FingerprintRetrievalValidator
+from SpecEmbedding.utils.formal_alignment import load_formal_alignment
 from SpecEmbedding.utils.fulltrain import sha256_file
 from SpecEmbedding.utils.massspecgym_v15 import write_json
 from SpecEmbedding.utils.optimization_audit import audit_snapshot
@@ -32,11 +35,18 @@ def main(argv=None):
     parser.add_argument("--output", type=Path)
     parser.add_argument("--device")
     parser.add_argument("--graph-cache", type=Path, help="Audited fixed molecule inputs, never model embeddings")
+    parser.add_argument('--fingerprint-cache', type=Path, help='The fingerprint checkpoint\'s own audited validation inputs')
+    parser.add_argument("--checkpoint-model-config", action="store_true",
+                        help="Construct the baseline from its own verified selection metadata; preserve shared data/tokenizer protocol")
     parser.add_argument("--spectrum-control", choices=("permuted", "constant"),
                         help="Full validation input intervention; separate output, never checkpoint selection")
     args = parser.parse_args(argv)
     if args.graph_cache and args.prepare_only:
         parser.error("--graph-cache requires checkpoint evaluation")
+    if args.checkpoint_model_config and args.prepare_only:
+        parser.error("--checkpoint-model-config requires checkpoint evaluation")
+    if args.fingerprint_cache and (args.prepare_only or args.graph_cache or not args.checkpoint_model_config):
+        parser.error('Fingerprint validation requires independent checkpoint construction and excludes graph-cache input')
     if args.spectrum_control is not None and args.prepare_only:
         parser.error("Spectrum controls require checkpoint evaluation, not index preparation")
     if args.prepare_only:
@@ -74,19 +84,57 @@ def main(argv=None):
         or selection["exclude_val_query_indices"] != config.fulltrain.exclude_val_query_indices
     ):
         raise ValueError("Spectrum control checkpoint/configuration provenance mismatch")
-    validator = AlignmentRetrievalValidator(index, config.retrieval_validation, args.output, graph_cache=graph_cache,
-                                            spectrum_control=args.spectrum_control,
-                                            control_settings=config.retrieval_validation.spectrum_controls
-                                            if args.spectrum_control is not None else None)
+    control = {'spectrum_control': args.spectrum_control,
+               'control_settings': config.retrieval_validation.spectrum_controls if args.spectrum_control is not None else None}
+    fingerprint_input = None
+    if args.fingerprint_cache:
+        expected_cache = selection.get('validation_fingerprint_cache')
+        if not expected_cache:
+            raise ValueError('Fingerprint checkpoint is missing its validation input receipt')
+        _, fingerprint_input = load_alignment_fingerprints(
+            args.data_path, args.index, 'validation', args.fingerprint_cache,
+            counts=config.fulltrain.expected_counts.to_dict(), exclusions=config.fulltrain.exclude_val_query_indices,
+            tokenizer_config=config.data.tokenizer.to_dict(), settings=expected_cache['provenance']['options'],
+            pool_cache_size=config.train.align.candidate_supervision.pool_cache_size)
+        if fingerprint_input['cache'] != expected_cache:
+            raise ValueError('Validation inputs differ from the fingerprint checkpoint\'s own inputs')
+        validator = FingerprintRetrievalValidator(
+            index, config.retrieval_validation, args.output, fingerprint_root=args.fingerprint_cache,
+            fingerprint_provenance=expected_cache['provenance'], index_sha256=sha256_file(args.index), **control)
+    else:
+        validator = AlignmentRetrievalValidator(index, config.retrieval_validation, args.output, graph_cache=graph_cache, **control)
     args.output.mkdir(parents=True)
     setup_logging(args.output / "validation.log")
-    model = load_align_model(args.checkpoint, device, config.model.mol_encoder.norm_type, config.model.mol_encoder.norm_eps)
+    model_receipt = None
+    if args.checkpoint_model_config:
+        model, _, model_receipt = load_formal_alignment(
+            args.checkpoint, device, dataset_outputs=index['dataset_outputs'],
+            dataset_manifest_sha256=index['dataset_manifest_sha256'], tokenizer_config=config.data.tokenizer.to_dict(),
+            expected_counts={'train': config.fulltrain.expected_counts.train,
+                             'val': config.fulltrain.expected_counts.val - len(config.fulltrain.exclude_val_query_indices)},
+            exclusions=config.fulltrain.exclude_val_query_indices,
+        )
+        if (model_receipt['model_type'] == 'fingerprint') != bool(args.fingerprint_cache):
+            raise ValueError('Baseline model type and molecular inputs disagree')
+        if args.fingerprint_cache and (model_receipt['model_config']['mol_encoder']['input_bits']
+                                        != fingerprint_input['cache']['provenance']['options']['bits']):
+            raise ValueError('Fingerprint model width differs from its fixed inputs')
+    else:
+        model = load_align_model(args.checkpoint, device, config.model.mol_encoder.norm_type, config.model.mol_encoder.norm_eps)
     stage = f"control_{args.spectrum_control}" if args.spectrum_control is not None else "baseline"
     metrics = validator(model, device, 0, stage)
     if args.graph_cache:
         _, final_graph_receipt = load_validation_graph_cache(args.index, index, args.graph_cache)
         if final_graph_receipt != graph_receipt:
             raise ValueError("Validation graph cache changed during encoding")
+    if fingerprint_input is not None:
+        _, after = load_alignment_fingerprints(
+            args.data_path, args.index, 'validation', args.fingerprint_cache,
+            counts=config.fulltrain.expected_counts.to_dict(), exclusions=config.fulltrain.exclude_val_query_indices,
+            tokenizer_config=config.data.tokenizer.to_dict(), settings=expected_cache['provenance']['options'],
+            pool_cache_size=config.train.align.candidate_supervision.pool_cache_size)
+        if after != fingerprint_input:
+            raise ValueError('Fingerprint validation inputs changed during encoding')
     extra = {"spectrum_control": validator.control_metadata, "used_for_checkpoint_selection": False,
              "selection_sha256": sha256_file(args.checkpoint.parent / "alignment_selection.json")}
     if args.spectrum_control is None:
@@ -94,8 +142,13 @@ def main(argv=None):
     else:
         snapshot = args.output / f"{stage}_epoch000.pt"
         audit_snapshot(snapshot, index, expected_spectrum_control=validator.control_metadata,
-                       expected_graph_cache=validator.graph_cache_fingerprint)
+                       expected_graph_cache=validator.graph_cache_fingerprint,
+                       expected_fingerprint_cache=fingerprint_input['cache'] if fingerprint_input else None)
         extra.update(saved_score_audit="passed", snapshot_sha256=sha256_file(snapshot))
+    if model_receipt is not None:
+        extra['checkpoint_model'] = model_receipt
+    if fingerprint_input is not None:
+        extra['validation_fingerprint_cache'] = fingerprint_input['cache']
     write_json(args.output / "metrics.json", {"metrics": metrics, "checkpoint_sha256": sha256_file(args.checkpoint),
                                               "index_sha256": sha256_file(args.index), "protocol": index["protocol"],
                                               "device": str(device), "split": "val", "test_evaluated": False,

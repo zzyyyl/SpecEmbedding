@@ -69,7 +69,7 @@ def audit_snapshot(path, index, *, expected_spectrum_control=None, expected_grap
     return metrics
 
 
-def audit_trajectory(directory, index, stage, baseline, *, expected_graph_cache=None):
+def audit_trajectory(directory, index, stage, baseline, *, expected_graph_cache=None, expected_fingerprint_cache=None):
     history = stage["retrieval_history"]
     require([row["epoch"] for row in history] == list(range(1, stage["stop_epoch"] + 1)), "Incomplete epoch trajectory")
     require(bool(history) and stage["metric_for_best"] == "validation_top1_then_mrr", "Wrong selection protocol")
@@ -80,7 +80,8 @@ def audit_trajectory(directory, index, stage, baseline, *, expected_graph_cache=
     for record in history:
         epoch = record["epoch"]
         path = directory / "validation_retrieval" / f"stage2_epoch{epoch:03d}.pt"
-        metrics = audit_snapshot(path, index, expected_graph_cache=expected_graph_cache)
+        metrics = audit_snapshot(path, index, expected_graph_cache=expected_graph_cache,
+                                 expected_fingerprint_cache=expected_fingerprint_cache)
         hashes[str(path)] = sha256_file(path)
         for key, value in metrics.items():
             require(math.isclose(value, record[key], rel_tol=0, abs_tol=1e-12), f"Trajectory metric mismatch: epoch {epoch} {key}")
@@ -213,6 +214,13 @@ def audit_optimization_run(run):
             require(batching == "random" and "batching" not in record, "Unexpected training batch audit")
     from SpecEmbedding.utils.candidate_training import audit_candidate_training, candidate_source_inputs
     candidate_path = run / "candidate_training_input.json"
+    from SpecEmbedding.utils.fingerprint_alignment_inputs import (
+        audit_model_fingerprint_inputs,
+        audit_pinned_fingerprint_input,
+    )
+    fingerprint_report, fingerprint_hashes = audit_model_fingerprint_inputs(
+        manifest, selection, run / 'data/MassSpecGym', index_path)
+    hashes.update(fingerprint_hashes)
     candidate_input = candidate_path if candidate_path.exists() else None
     candidate_fingerprint = ({"path": str(candidate_path), "sha256": fingerprint(candidate_path)}
                              if candidate_input is not None else None)
@@ -231,14 +239,45 @@ def audit_optimization_run(run):
     candidate_report, candidate_hashes = audit_candidate_training(
         directory, stage, candidate_input, settings.get("candidate_supervision"), selection["seed"],
         settings["batch_size"], run / "data" / "MassSpecGym", counts, exclusions,
+        fingerprint_cache=selection.get('training_fingerprint_cache'),
     )
     hashes.update(candidate_hashes)
     baseline_receipt = read_json(run / "baseline_validation" / "metrics.json")
+    checkpoint_model = manifest.get('checkpoint_model')
+    if fingerprint_report is not None:
+        require(checkpoint_model is not None, 'Fingerprint optimization requires independently bound baseline construction')
+        from SpecEmbedding.utils.formal_alignment import load_formal_alignment
+        load_formal_alignment(directory / 'best_model_stage2.pth', torch.device('cpu'),
+                              dataset_outputs=index['dataset_outputs'], dataset_manifest_sha256=index['dataset_manifest_sha256'],
+                              tokenizer_config=runtime['data']['tokenizer'], expected_counts=expected, exclusions=exclusions)
+    require(baseline_receipt.get('checkpoint_model') == checkpoint_model,
+            'Baseline model construction differs from preflight')
+    if checkpoint_model is not None:
+        from SpecEmbedding.utils.formal_alignment import read_formal_alignment_checkpoint
+        parent_selection, verified_model = read_formal_alignment_checkpoint(
+            manifest['inputs']['baseline_checkpoint']['path'], dataset_outputs=index['dataset_outputs'],
+            dataset_manifest_sha256=index['dataset_manifest_sha256'], tokenizer_config=runtime['data']['tokenizer'],
+            expected_counts=expected, exclusions=exclusions,
+        )
+        require(verified_model == checkpoint_model, 'Baseline model or shared protocol changed since preflight')
+    baseline_fingerprint = manifest.get('baseline_fingerprint_input')
+    baseline_fingerprint_cache = baseline_fingerprint['cache'] if baseline_fingerprint is not None else None
+    require(baseline_receipt.get('validation_fingerprint_cache') == baseline_fingerprint_cache,
+            'Baseline fingerprint cache differs from preflight')
+    if baseline_fingerprint is not None:
+        require(checkpoint_model is not None and checkpoint_model['model_type'] == 'fingerprint'
+                and parent_selection.get('validation_fingerprint_cache') == baseline_fingerprint_cache,
+                'Baseline fingerprint inputs differ from its own selected model')
+        hashes.update(audit_pinned_fingerprint_input(
+            baseline_fingerprint, 'baseline_fingerprint', manifest, run / 'data/MassSpecGym', runtime,
+            settings=baseline_fingerprint_cache['provenance']['options']))
     require(baseline_receipt["index_sha256"] == index_sha and baseline_receipt["protocol"] == PROTOCOL
             and baseline_receipt["checkpoint_sha256"] == manifest["inputs"]["baseline_checkpoint"]["sha256"], "Baseline provenance mismatch")
     baseline_path = run / "baseline_validation" / "baseline_epoch000.pt"
     graph_receipt = manifest.get('validation_graph_cache')
-    require(selection.get('validation_graph_cache') == baseline_receipt.get('validation_graph_cache') == graph_receipt,
+    fingerprint_model = fingerprint_report is not None
+    require(selection.get('validation_graph_cache') == (None if fingerprint_model else graph_receipt)
+            and baseline_receipt.get('validation_graph_cache') == graph_receipt,
             'Validation graph cache differs between preflight, training and baseline')
     graph_fingerprint = None
     if graph_receipt is not None:
@@ -252,15 +291,20 @@ def audit_optimization_run(run):
             require(manifest['inputs'].get(f'validation_graph_{name}') == {'path': str(path), 'sha256': digest},
                     'Graph cache file was not pinned in preflight')
             fingerprint(path, digest)
-    baseline = audit_snapshot(baseline_path, index, expected_graph_cache=graph_fingerprint)
+    baseline = audit_snapshot(baseline_path, index, expected_graph_cache=graph_fingerprint,
+                              expected_fingerprint_cache=baseline_fingerprint_cache)
     fingerprint(baseline_path)
     require(all(math.isclose(baseline[key], baseline_receipt["metrics"][key], rel_tol=0, abs_tol=1e-12) for key in baseline),
             "Baseline receipt metrics mismatch")
-    report = audit_trajectory(directory, index, stage, baseline, expected_graph_cache=graph_fingerprint)
+    report = audit_trajectory(directory, index, stage, baseline,
+                              expected_graph_cache=None if fingerprint_model else graph_fingerprint,
+                              expected_fingerprint_cache=selection.get('validation_fingerprint_cache'))
     report['validation_graph_cache'] = graph_receipt
     resource_report, resource_hashes = audit_resource_profiles(directory, stage, expected, selection["device"])
     report["resource_measurements"] = resource_report
     report["candidate_training"] = candidate_report
+    if fingerprint_report is not None:
+        report['fingerprint_inputs'] = fingerprint_report
     hashes.update(resource_hashes)
     report["artifact_sha256"].update(hashes)
     report.update(run=str(run), source_commit=manifest["git_commit"], protocol=PROTOCOL,
