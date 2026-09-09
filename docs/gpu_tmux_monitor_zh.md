@@ -273,6 +273,12 @@ python run_massspecgym_v15.py --gpus 0 1 --device cuda:0 \
 seed42 全量 alignment 训练；不派发测试或 reranker。去掉 `--dry-run` 前固定干净源码并使用
 独立 detached tmux。GPU 阶段各自等待，不复用旧目录。
 
+可在上述命令追加 `--prepared-validation-index "$VERIFIED_VAL_INDEX"`，导入另一已审计运行
+的完整CPU验证索引；同时要求`--optimize-alignment`与`--prepared-data`。预检固定索引和
+相邻JSON的SHA-256，检查数据来源、tokenizer、验证排除项及完整候选统计，执行时逐字节
+复制到新run并重新核验；已有目标或源文件变化时停止，不能覆盖重试。此选项只省去CPU
+索引重建，不缓存模型embedding，baseline及训练各轮仍完整重新编码。
+
 索引位于 `validation/mass_val_topk256.pt`，相邻 JSON 保存 SHA-256 和样本统计。保留官方
 候选源顺序及二维多正例，只沿用已审计的无效图排除；每轮重新编码候选，采用 float32 CPU
 嵌入存储。主指标匹配 `torchmetrics 1.8.2` 的逐 query CPU `argsort`，稳定排序另列敏感性视图；
