@@ -301,7 +301,7 @@ selection 的逐轮审计记录质量与排列指纹、query 唯一覆盖数，�
 扰动率；该选项不能用于默认队列。完成检查与独立审计均核对 selection 的实际
 `config_snapshot.augmentation` 是否与运行前指纹配置一致，避免只核对预期命令。
 
-自然候选监督已有输入、损失与训练组件，尚未接入正式训练入口或改变现有运行的 loss。
+自然候选监督已有输入、损失、正式入口与完成审计，默认不启用，不改变现有运行的loss。
 `SpecEmbedding/utils/training_candidates.py` 的加载器要求准备与独立复核回执，重新比较全部
 训练query、候选源顺序、二维标签和图排除，并在读取结束时复查输入指纹。
 采样按不同负例二维身份均匀、不放回进行，再在该身份的原始条目中均匀选择表示；
@@ -321,8 +321,13 @@ selection 的逐轮审计记录质量与排列指纹、query 唯一覆盖数，�
 分母和原in-batch监督中。验证沿用原路径，模型结构和余弦检索分数不变。
 该组件记录逐轮负例数量、query覆盖与抽样顺序指纹；当前完整负图batch保留反向图，
 实际显存和时间尚未测量，不能把分子输入缓存称为激活内存优化。
-正式启用前仍需完成 `params.yaml`/入口/输入指纹与完成审计集成，并依据上一实验结果
-固定唯一实验卡及参数；目前不提供可绕过这些检查的正式训练命令。
+优化入口可显式添加 `--alignment-training-candidates "$VERIFIED_TRAIN_CANDIDATE_METADATA"`，
+同时要求 `--optimize-alignment` 和 `--prepared-data`；正式参数来自
+`params.yaml` 的 `train.align.candidate_supervision`。省略候选参数时必须保持 `enabled: false`，
+提供参数时在独立运行配置中启用；预检重新核验完整来源并固定 `candidate_training_input.json`。
+训练入口只接受匹配该回执的配置和完整验证选优，记录每轮 `candidate_training/stage2_epochNNN.npy`
+实际原始query顺序及相邻JSON统计；完成检查和独立审计重放全部query的负例采样、批次边界
+与来源，输入不符、重复/缺失query或采样指纹异常均失败。模型实验仍须先固定唯一实验卡和parent。
 
 单次优化完成后，使用独立 CPU 审计生成新回执：
 
