@@ -231,6 +231,14 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-09：完成固定 baseline 的全部有效验证错误诊断；输入与输出哈希、可重跑脚本、
+  每 query 排名和分组结果保存在 `/data1/zyl/SpecEmbedding/audits/validation_errors_20260909/`
+  的 `receipt.json`、`audit.py` 和 `queries.tsv`，结论只维护于优化索引 D01。
+  保存分数的独立 CPU 重排与原排名逐条一致，未进行新推理/训练或输入修复。
+  质量硬过滤会丢失真值，未实施；元数据分组不能解释为因果收益，A02 仍保持单项 batch 改动。
+  A01 第 5 轮完整训练/验证已完成，继续原定训练；最终还需比较同一轨迹的 loss 最优与检索最优轮，
+  不将 r4/A01 的训练数值波动全部归因于 checkpoint 选择。
+
 - A02 实现提交 `fc42b27` 已推送；真实输入 dry-run 核验 CPU 导入/验证索引/基线验证/单 alignment
   四阶段、GPU 0/1 池、batch128/block32 与其余固定配置，未创建训练运行目录或进程。
   原始预检位于 `mass_batching_20260909/preflight_fc42b27.json`（审计根见下一条记录）。
