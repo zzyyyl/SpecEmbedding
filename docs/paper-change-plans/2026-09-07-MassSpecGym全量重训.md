@@ -231,10 +231,16 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- A02 实现提交 `fc42b27` 已推送；真实输入 dry-run 核验 CPU 导入/验证索引/基线验证/单 alignment
+  四阶段、GPU 0/1 池、batch128/block32 与其余固定配置，未创建训练运行目录或进程。
+  原始预检位于 `mass_batching_20260909/preflight_fc42b27.json`（审计根见下一条记录）。
+  A01 首轮完整训练及检索验证已于 14:41 完成，实际计数与每轮排名保存于原运行根，继续后续训练；
+  当前没有 A01 最终选优结论，不依据早期 epoch 决定切换或停止。
+
 - 2026-09-09 14:36:53：A01 在物理 GPU 0、UUID 绑定的 `cuda:0` 上启动 alignment，
   PID 3192041，cwd 仍为固定 `cba38a4` worktree。前置固定 baseline 于 14:34 完成，
   指标与耗时只维护于优化索引及运行根 `baseline_validation/metrics.json`，不把新验证基线
-  写成模型提升。第一轮训练已进入完整检索验证，checkpoint 选择尚未完成。
+  写成模型提升。已核验进入完整检索验证，checkpoint 最终选择尚未完成。
 - A02 质量邻近 batch 实现与完整 CPU 顺序检查通过，未派发；原始证据与实现 SHA 位于
   `/data1/zyl/SpecEmbedding/audits/mass_batching_20260909/receipt.json` 及相邻脚本。
   60 项专项通过；全仓 257 通过、1 跳过、1 个相同既有路径审计失败，之后新增两项队列完成
