@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "verified_date": "2026-09-10",
+  "status": "reported_only_unified_protocol_pending",
+  "scope": "Strong reported MassSpecGym Mass test references; not a unified ranking or an acceptance vector",
+  "metric_units": "raw fractions, including MRR",
+  "papers": {
+    "glacier_v1": {
+      "url": "https://arxiv.org/html/2606.29161v1",
+      "pdf_filename": "2606.29161v1_GLACIER.pdf",
+      "pdf_sha256": "6f02ebba898df22acc2ea42a385a53c1b167986b8a5dcfcdf2d439127ccda7a0"
+    },
+    "glmr_aaai2026": {
+      "url": "https://ojs.aaai.org/index.php/AAAI/article/view/37132",
+      "pdf_url": "https://ojs.aaai.org/index.php/AAAI/article/download/37132/41094",
+      "pdf_filename": "AAAI_2026_40_2_1561_GLMR.pdf",
+      "pdf_sha256": "73160f5d07478e43242418dd751164d5ac40afe43a4a1cb2bcd9128386a45e17"
+    }
+  },
+  "variants": [
+    {
+      "id": "glacier_cf_table1",
+      "paper": "glacier_v1",
+      "location": "Table 1, Mass, with contrastive finetuning",
+      "metrics": {"top1": 0.6995, "top5": 0.8647, "top10": null, "top20": 0.9352, "mrr": null},
+      "unified_eligible": null
+    },
+    {
+      "id": "glacier_no_cf_table1",
+      "paper": "glacier_v1",
+      "location": "Table 1, Mass, without contrastive finetuning",
+      "metrics": {"top1": 0.6969, "top5": 0.8658, "top10": null, "top20": 0.9334, "mrr": null},
+      "unified_eligible": null
+    },
+    {
+      "id": "glacier_delta05_d3_table10",
+      "paper": "glacier_v1",
+      "location": "Appendix E, Table 10, Mass, delta=0.5, d=3",
+      "metrics": {"top1": 0.698, "top5": 0.864, "top10": 0.905, "top20": null, "mrr": null},
+      "unified_eligible": null
+    },
+    {
+      "id": "glacier_delta06_d3_table10",
+      "paper": "glacier_v1",
+      "location": "Appendix E, Table 10, Mass, delta=0.6, d=3",
+      "metrics": {"top1": 0.699, "top5": 0.865, "top10": 0.905, "top20": null, "mrr": null},
+      "unified_eligible": null
+    },
+    {
+      "id": "glmr_full_table1",
+      "paper": "glmr_aaai2026",
+      "location": "Table 1, weight-based library, full two-stage model",
+      "metrics": {"top1": 0.64172, "top5": 0.72961, "top10": null, "top20": 0.78782, "mrr": 0.67817},
+      "unified_eligible": null
+    }
+  ],
+  "available_reported_envelope": {
+    "top1": {"value": 0.6995, "variants": ["glacier_cf_table1"]},
+    "top5": {"value": 0.8658, "variants": ["glacier_no_cf_table1"]},
+    "top10": {"value": 0.905, "variants": ["glacier_delta05_d3_table10", "glacier_delta06_d3_table10"]},
+    "top20": {"value": 0.9352, "variants": ["glacier_cf_table1"]},
+    "mrr": {"value": 0.67817, "variants": ["glmr_full_table1"]}
+  },
+  "mathematical_constraint": {
+    "statement": "For identical query denominators and positive-rank definitions, MRR >= Top-1 because 1/r >= indicator(r=1).",
+    "implication": "GLACIER's reported Top-1 already exceeds the available GLMR MRR number; missing GLACIER MRR cannot be treated as zero or assumed below GLMR.",
+    "measured_mrr_for_glacier": null
+  },
+  "frozen_S_j": {"top1": null, "top5": null, "top10": null, "top20": null, "mrr": null},
+  "unresolved_acceptance_requirements": [
+    "Bind paper variants to checkpoints, source revisions and v1.5 input fingerprints.",
+    "Verify complete query denominators, missing-query treatment, candidate processing, 2D identity and tie handling.",
+    "Verify extra inputs, external data and training exposure under the shared protocol.",
+    "Obtain same-protocol full rankings for missing metrics, especially GLACIER MRR.",
+    "Refresh the broader reference collection before final acceptance."
+  ],
+  "limits": [
+    "Available reported maxima are not S_j and cannot establish goal completion.",
+    "Table 10 values belong to explicit variants; they are not spliced into a Table 1 checkpoint.",
+    "Null denotes missing or unresolved evidence, never zero.",
+    "Current local validation results cannot be directly ranked against external test results."
+  ]
+}
