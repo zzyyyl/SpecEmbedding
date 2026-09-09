@@ -73,6 +73,12 @@ train:
       pool_cache_size: 128
       graph_cache_size: 10000 # bounded CPU cache of unaugmented candidate graphs
 
+molecule_fingerprints: # CPU input preparation only; not automatically used by alignment models
+  radius: 2
+  bits: 2048
+  workers: 8
+  chunk_size: 1024
+
 retrieval_validation:
   graph_cache_preparation:
     workers: 8
