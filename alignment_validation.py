@@ -11,6 +11,7 @@ from SpecEmbedding.config import config
 from SpecEmbedding.utils.align import load_align_model
 from SpecEmbedding.utils.fulltrain import sha256_file
 from SpecEmbedding.utils.massspecgym_v15 import write_json
+from SpecEmbedding.utils.optimization_audit import audit_snapshot
 from SpecEmbedding.utils.retrieval_validation import (
     AlignmentRetrievalValidator,
     load_validation_index,
@@ -28,7 +29,11 @@ def main(argv=None):
     mode.add_argument("--checkpoint", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--device")
+    parser.add_argument("--spectrum-control", choices=("permuted", "constant"),
+                        help="Full validation input intervention; separate output, never checkpoint selection")
     args = parser.parse_args(argv)
+    if args.spectrum_control is not None and args.prepare_only:
+        parser.error("Spectrum controls require checkpoint evaluation, not index preparation")
     if args.prepare_only:
         if args.index.exists() or args.index.with_suffix(".json").exists():
             parser.error("Refusing existing validation index artifacts")
@@ -60,13 +65,33 @@ def main(argv=None):
     if (selection["seed"] != 42 or selection["fulltrain_audit"]["dataset_version"] != "1.5"
             or selection["fulltrain_audit"]["input_outputs"] != index["dataset_outputs"]):
         raise ValueError("Baseline checkpoint has different data provenance")
+    if args.spectrum_control is not None and (
+        selection["checkpoint_sha256"] != sha256_file(args.checkpoint)
+        or selection["model_config"] != config.model.to_dict()
+        or not selection["fulltrain_audit"]["formal_fulltrain"]
+        or selection["exclude_val_query_indices"] != config.fulltrain.exclude_val_query_indices
+    ):
+        raise ValueError("Spectrum control checkpoint/configuration provenance mismatch")
+    validator = AlignmentRetrievalValidator(index, config.retrieval_validation, args.output,
+                                            spectrum_control=args.spectrum_control,
+                                            control_settings=config.retrieval_validation.spectrum_controls
+                                            if args.spectrum_control is not None else None)
     args.output.mkdir(parents=True)
     setup_logging(args.output / "validation.log")
     model = load_align_model(args.checkpoint, device, config.model.mol_encoder.norm_type, config.model.mol_encoder.norm_eps)
-    metrics = AlignmentRetrievalValidator(index, config.retrieval_validation, args.output)(model, device, 0, "baseline")
+    stage = f"control_{args.spectrum_control}" if args.spectrum_control is not None else "baseline"
+    metrics = validator(model, device, 0, stage)
+    extra = {"spectrum_control": validator.control_metadata, "used_for_checkpoint_selection": False,
+             "selection_sha256": sha256_file(args.checkpoint.parent / "alignment_selection.json")}
+    if args.spectrum_control is None:
+        extra = {}
+    else:
+        snapshot = args.output / f"{stage}_epoch000.pt"
+        audit_snapshot(snapshot, index, expected_spectrum_control=validator.control_metadata)
+        extra.update(saved_score_audit="passed", snapshot_sha256=sha256_file(snapshot))
     write_json(args.output / "metrics.json", {"metrics": metrics, "checkpoint_sha256": sha256_file(args.checkpoint),
                                               "index_sha256": sha256_file(args.index), "protocol": index["protocol"],
-                                              "device": str(device), "split": "val", "test_evaluated": False})
+                                              "device": str(device), "split": "val", "test_evaluated": False, **extra})
 
 
 if __name__ == "__main__":

@@ -302,6 +302,35 @@ python audit_alignment_optimization.py --run "$COMPLETED_OPTIMIZATION_ROOT" \
 报告所有改善与退步项，不自动换 checkpoint、重启训练或修改论文。
 它是保存分数的完整 CPU 审计，不是新的模型推理、官方 loader 测试或 SOTA 验收。
 
+冻结候选前的谱图输入敏感性检查使用同一验证索引与选中的 checkpoint，显式添加
+`--spectrum-control permuted` 或 `--spectrum-control constant`。下列是供 GPU 等待入口派发的命令，
+需先固定源码、独立配置和新输出目录，并由等待入口选卡及注入严格 CUDA 环境；不直接跳过 GPU 门槛：
+
+```bash
+SPECEMBEDDING_CONFIG="$FROZEN_CONTROL_CONFIG" python alignment_validation.py \
+  --data-path "$AUDITED_V15_DATA" --index "$FULL_VALIDATION_INDEX" \
+  --checkpoint "$FROZEN_ALIGNMENT_CHECKPOINT" --output "$NEW_CONTROL_OUTPUT" \
+  --device cuda:0 --spectrum-control permuted
+```
+
+常量模式使用另一个新输出目录；一次只运行一个已排队阶段。独立配置必须显式包含
+`retrieval_validation.spectrum_controls`，并使 `model` 与 checkpoint selection 完全一致，包含
+`rdkit_sanitized`。A01/A02 的旧运行配置没有控制参数，不直接用作控制配置，也不修改原文件。
+参数集中在新版 `params.yaml`：置换 seed42；常量输入为 m/z `[100, 50]`、强度 `[2, 1]`，
+其余位置为 padding。这些设置在观察控制结果前固定，不用 test 选择参数。
+
+- `permuted` 对全部有效验证 query 构造一个随机循环，每条谱图恰好作为一次输入，且不分配给
+  原 query；置换包含实测 precursor、强度与 mask。二维身份仅用于事后统计偶然同身份 donor，
+  不参与选择排列；保存完整 donor 原始索引、排列哈希和同身份数量。
+- `constant` 给所有 query 相同的固定 token 与 mask，不保留各自的 precursor 或峰数。
+- 每个 query 的候选、顺序、正例、原始索引和分母均不变；无正例与空候选 query 仍纳入分母。
+  使用新目录与 `control_*_epoch000.pt`，保存分数后独立 CPU 重算全部排名；正常训练完成审计
+  拒绝将控制 snapshot 当成普通验证结果，控制不参与 checkpoint 选择。
+
+这两项检查改变了整个谱图输入，包括 precursor；性能下降本身不能独立证明碎片峰贡献，
+常量下非零成绩也不自动证明数据泄漏。单个固定置换不是统计显著性或官方 test 结论。
+当前正式优化队列不自动派发这些检查，需在候选冻结及独立 GPU 阶段安排后执行。
+
 ## 验证（不启动训练）
 
 ```bash

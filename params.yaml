@@ -68,6 +68,10 @@ train:
     num_workers: 4
 
 retrieval_validation:
+  spectrum_controls:
+    permutation_seed: 42
+    constant_mz: [100.0, 50.0]
+    constant_intensity: [2.0, 1.0]
   mol_batch_size: 512
   spec_batch_size: 128
   num_workers: 4

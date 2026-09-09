@@ -15,6 +15,7 @@ from SpecEmbedding.data.graph_utils import smiles_to_graph
 from SpecEmbedding.data.tokenizer import Tokenizer
 from SpecEmbedding.utils.fulltrain import sha256_file
 from SpecEmbedding.utils.massspecgym_v15 import IDENTITY_POLICY, identity, verify_dataset
+from SpecEmbedding.utils.spectrum_controls import ControlledValidationSpectra
 
 PROTOCOL = "v1.5 source candidate order; 2D InChIKey; audited graph exclusions; torchmetrics 1.8.2 CPU argsort descending"
 SCHEMA_VERSION = 1
@@ -174,10 +175,20 @@ def retrieval_metrics(scores, positive, valid, top_k=(1, 5, 10, 20)):
 
 
 class AlignmentRetrievalValidator:
-    def __init__(self, index, settings, output_dir=None):
+    def __init__(self, index, settings, output_dir=None, *, spectrum_control=None, control_settings=None):
         self.index = index
         self.settings = settings
         self.output_dir = Path(output_dir) if output_dir is not None else None
+        if spectrum_control is None:
+            if control_settings is not None:
+                raise ValueError("Control settings require an explicit spectrum control")
+            self.spectra = SpecSequenceDataset(index["sequences"])
+            self.control_metadata = None
+        else:
+            if control_settings is None:
+                raise ValueError("Spectrum controls require explicit settings")
+            self.spectra = ControlledValidationSpectra(index, spectrum_control, control_settings)
+            self.control_metadata = self.spectra.metadata
 
     @torch.inference_mode()
     def __call__(self, model, device, epoch, stage):
@@ -205,7 +216,7 @@ class AlignmentRetrievalValidator:
         if not seen.all() or embeddings is None:
             raise ValueError("Incomplete validation molecule encoding")
         logging.info("Encoded all %s validation molecules afresh", len(seen))
-        spec_loader = DataLoader(SpecSequenceDataset(index["sequences"]), batch_size=settings.spec_batch_size,
+        spec_loader = DataLoader(self.spectra, batch_size=settings.spec_batch_size,
                                  shuffle=False, num_workers=0, generator=generator)
         all_scores = torch.empty(index["candidate_indices"].shape, dtype=torch.float32)
         offset = 0
@@ -227,8 +238,9 @@ class AlignmentRetrievalValidator:
         if self.output_dir is not None:
             self.output_dir.mkdir(parents=True, exist_ok=True)
             path = self.output_dir / f"{stage}_epoch{epoch:03d}.pt"
+            extra = {"spectrum_control": self.control_metadata} if self.control_metadata is not None else {}
             with path.open("xb") as handle:
                 torch.save({"metrics": metrics, "ranks": ranks, "scores": all_scores,
-                            "raw_query_indices": index["raw_query_indices"], "protocol": PROTOCOL}, handle)
+                            "raw_query_indices": index["raw_query_indices"], "protocol": PROTOCOL, **extra}, handle)
         logging.info("[%s] epoch=%s full validation retrieval: %s", stage, epoch, metrics)
         return metrics

@@ -253,6 +253,23 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-09：实现第 4 节预定的完整验证谱图输入敏感性检查，入口为
+  `alignment_validation.py --spectrum-control permuted|constant`，说明见 GPU/tmux 指南。
+  仅在独立新输出中运行，不参与普通选优；固定 checkpoint 指纹、完整候选/分母保持不变，
+  输出分数经过独立 CPU 重排。14 项新增测试通过，全仓 287 通过、1 跳过、1 个相同既有
+  路径审计失败，Ruff、compileall、diff 检查通过。真实全索引 CPU 构造回执和脚本位于
+  `/data1/zyl/SpecEmbedding/audits/spectrum_controls_20260909/preflight.json`、`preflight.py`。
+  这不是正式控制推理，未插入 A02，详细指标与解释边界见优化索引 D03。
+  A01/A02 的重复 r4 基线分数亦完成独立 CPU 核验，回执与脚本位于
+  `/data1/zyl/SpecEmbedding/audits/baseline_repeat_20260909/receipt.json`、`audit.py`，差异见 D02。
+
+- 2026-09-09 16:17：A02 前置基线验证于 16:10:39 完成，训练阶段重新等待 GPU，
+  16:12:44 绑定物理 GPU 0 的 UUID 并以 `cuda:0` 启动 alignment。
+  训练子进程 PID 3221482，父进程仍为 3219277；已核验子进程严格 CUDA 与本运行配置环境一致。
+  原始日志确认 seed42、随机初始化、无 TokenSet cache、mass_blocks/batch128/block32，
+  首轮完整训练/验证计数通过并完成检索排名，继续后续 epochs。源码仍固定 `fc42b27`，
+  没有修改运行配置、增加并行模型或启动 test；首轮结果只维护于优化索引。
+
 - 2026-09-09 16:01：A01 完整审计与基线决策后，单次启动 A02 质量邻近 batch 队列。
   干净 detached 源码为 `/data1/zyl/repos/SpecEmbedding-opt-a02-20260909/`，固定提交
   `fc42b271ba355306f8ba6fad604e81053da78904`；运行根为
@@ -533,8 +550,8 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
-- 验证结果：新增 14 项完成审计测试通过；最新全仓 273 通过、1 跳过、1 个既有路径审计失败；静态检查通过
-- 当前训练状态：r4 旧矩阵停止；A01 完成并审计通过、未替换 r4；A02 CPU 准备完成，等待 GPU 基线验证
+- 验证结果：新增 14 项谱图控制测试通过；最新全仓 287 通过、1 跳过、1 个既有路径审计失败；静态检查通过
+- 当前训练状态：r4 旧矩阵停止；A01 完成并审计通过、未替换 r4；A02 alignment 训练中，尚无最终结论
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；
