@@ -160,6 +160,8 @@ checkpoint/版本、来源表格、分母和评价设置。各项的最好值可
 | [GLMR，2511.06259v1](https://arxiv.org/html/2511.06259v1) | Table 1 报 Mass Top-1 64.172%、MRR 67.817% | reported-only；旧版表示、数据与评估实现审计后才判断是否进入 S_j，不把高分先当有效或先排除 |
 | [GLACIER，2606.29161v1](https://arxiv.org/html/2606.29161v1) | Table 1：Mass w/ CF Top-1/5/20 = 69.95/86.47/93.52%；w/o CF Top-5 = 86.58% | 强参考；完整 query 覆盖、候选标准化和评价条件待对齐。不能因其方法复杂而从比较集合中排除 |
 | [SpecBridge，2601.17204v3 撤回记录](https://arxiv.org/abs/2601.17204v3) | 作者于 2026-03-03 撤回，说明预处理/评价流程存在问题；v2 为历史全文 | 不将撤回成绩纳入有效 S_j；可研究其冻结分子表征的思路，但不能引用旧高分证明方法有效 |
+| [MS-MOLE，2602.16507v1](https://arxiv.org/html/2602.16507v1) | 指纹相似度目标与候选检索目标的取舍 | 设计线索；当前官方源码标签按指纹相等，未证明二维检索同协议，详见优化索引R02 |
+| [FLARE，bioRxiv 2026.01.27.702086v1](https://pmc.ncbi.nlm.nih.gov/articles/PMC12873900/) | §4.2使用已知母体分子式与加合物构造峰表示 | Mass候选名称不代表无真值分子式输入；保留为额外输入条件下的参考，不直接纳入当前S_j |
 
 **当前不得声称已找到并冻结所有指标的 SOTA。** 特别是 Top-10、MRR 缺少完整同协议对比，
 GLACIER 附录不同配置的 Top-10 不能无说明拼到主表 checkpoint。
@@ -260,6 +262,19 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-09 22:44：A04原进程继续第六轮，前五轮原始成绩/资源见A04卡；没有改变固定源码、
+  运行配置或派发A05。独立CPU中途审计于22:34:57完成，固定baseline与epoch1–4的完整保存
+  分数、query顺序和输入指纹，原进程内核退出码0；不包含模型forward、最终选优或完整负例重放。
+  回执为`/data1/zyl/SpecEmbedding/audits/optimization_a04_interim_e004_20260909/receipt.json`，
+  SHA-256 `c930e92ea2159bdeb571e6a3c43b5feb56c3e47229b4c176cd37ab886b4e0e1a`；相邻`audit.py`
+  与`paired_ranks_and_top1.npz`保留可复核结果。该审计未覆盖随后完成的epoch5，不决定晋升。
+  MS-MOLE原文下载为`/data1/zyl/papers/2602.16507v1_MS_MOLE.pdf`，SHA-256
+  `c298ff38ce146a885bf6bb769ab9ac03758eb2e233b8ad5a25b2af3576d17ed1`；官方代码只读快照为
+  `/data1/zyl/repos/ms-mole/`的`f81558c4cb37ca2f3d4300eff8e3785eea53c9e3`，下载清单
+  `/data1/zyl/papers/specembedding_retrieval_20260909_msmole_manifest.json` SHA-256为
+  `862d312cb6a1102fb2f91c58db74d38cfc01779940c59cec94488859e2c8761a`。
+  新增源码标签与FLARE原文输入条件核验见R02，不据此断言论文实际评价受影响的程度；
+  没有安装依赖、运行外部模型或提前替换A05主假设。计划继续执行中，论文未修改。
 - 2026-09-09 22:16：完整CPU图加载三组测量及张量指纹核验已完成，结果集中于D09；
   `/data1/zyl/SpecEmbedding/audits/validation_graph_loading_20260909/receipt.json` SHA-256为
   `24c03117b8a1d0e0fc01f232177dc0ca439516c95ddea48365dd1ea428ee834b`。没有模型/GPU计算，
@@ -741,7 +756,7 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
 - 验证结果：新增固定图缓存与正式接入检查通过；最新全仓411通过、1跳过、1个既有路径审计失败；静态检查、真实完整缓存审计、A05全量CPU采样预检及条件dry-run均通过
-- 当前训练状态：r4旧矩阵停止；A01未替换r4；A02完成审计并晋升；A03完整审计通过但未晋升；A04在GPU1完成前三轮全量训练/验证；A05源码/输入/草案已准备，等待A04完整审计后确定唯一parent，未派发
+- 当前训练状态：r4旧矩阵停止；A01未替换r4；A02完成审计并晋升；A03完整审计通过但未晋升；A04在GPU1完成前五轮全量训练/验证，中途独立审计固定至第四轮；A05源码/输入/草案已准备，等待A04完整审计后确定唯一parent，未派发
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；
