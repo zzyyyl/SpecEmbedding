@@ -63,6 +63,7 @@ def completed_run(tmp_path, monkeypatch):
     write_json(baseline_dir / "metrics.json", {"protocol": PROTOCOL, "index_sha256": sha256_file(index_path),
                                                "checkpoint_sha256": sha256_file(baseline_ckpt), "metrics": baseline})
     runtime = {"train": {"align": {"batching": "random", "batch_size": 128}}, "model": {"synthetic": True},
+               "augmentation": {"prob": .5, "node_drop_rate": .1, "edge_mask_rate": .1},
                "fulltrain": {"v15": {"alignment_seed": 42}, "expected_counts": {"train": 7, "val": 7, "test": 2},
                              "exclude_val_query_indices": [2, 5]}, "data": {"tokenizer": {}}}
     runtime_path = run / "runtime_params.yaml"
@@ -82,6 +83,7 @@ def completed_run(tmp_path, monkeypatch):
              "pareto_frontier": [{"epoch": row["epoch"], "checkpoint": row["candidate_checkpoint"],
                                   "metrics": {key: row[key] for key in audit.METRICS}} for row in history]}
     selection = {"training_config": runtime["train"]["align"], "model_config": runtime["model"], "seed": 42,
+                 "config_snapshot": copy.deepcopy(runtime),
                  "device": "cuda:0", "exclude_val_query_indices": [2, 5],
                  "checkpoint_sha256": sha256_file(directory / "best_model_stage2.pth"),
                  "validation_index": {"sha256": sha256_file(index_path)}, "stages": {"stage2": stage},
@@ -102,6 +104,14 @@ def test_complete_audit_preserves_full_denominator_and_reports_topk_tradeoff(com
     assert report["selected_vs_baseline"]["outcome"] == "tradeoff"
     assert "top5" in report["selected_vs_baseline"]["material_regressions"]
     assert len(report["pareto_candidates"]) == 2 and not report["test_evaluated_by_this_audit"]
+
+
+def test_completion_rejects_changed_effective_training_augmentation(completed_run):
+    run, _, selection = completed_run
+    selection["config_snapshot"]["augmentation"]["node_drop_rate"] = 0.0
+    write_json(run / "alignment42_topk256" / "alignment_selection.json", selection)
+    with pytest.raises(ValueError, match="augmentation configuration"):
+        audit.audit_optimization_run(run)
 
 
 @pytest.mark.parametrize("damage", ["rank", "score", "query", "metric"])

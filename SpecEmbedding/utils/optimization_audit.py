@@ -162,6 +162,8 @@ def audit_optimization_run(run):
     fingerprint(run / "data" / "MassSpecGym" / "dataset_manifest.json", index["dataset_manifest_sha256"])
     audit, stage = selection["fulltrain_audit"], selection["stages"]["stage2"]
     require(selection["training_config"] == settings and selection["model_config"] == runtime["model"], "Selected model/config mismatch")
+    require(selection.get("config_snapshot", {}).get("augmentation") == runtime["augmentation"],
+            "Training augmentation configuration differs from preflight")
     require(selection["seed"] == fulltrain["v15"]["alignment_seed"] == 42 and selection["device"] == manifest["device"]
             and selection["device"].startswith("cuda:") and selection["exclude_val_query_indices"] == exclusions,
             "Selected seed/device/exclusions mismatch")

@@ -68,7 +68,8 @@ def test_molecular_masses_are_representation_invariant_and_invalid_graphs_fail()
         molecular_exact_masses(["invalid"])
 
 
-def test_optimization_preflight_pins_batching_without_changing_other_hyperparameters(tmp_path):
+@pytest.mark.parametrize('mol_augmentation', [None, True, False])
+def test_optimization_preflight_pins_batching_without_changing_other_hyperparameters(tmp_path, mol_augmentation):
     source = tmp_path / 'source'
     source.mkdir()
     (source / 'fixture.tsv').write_text('source')
@@ -83,7 +84,7 @@ def test_optimization_preflight_pins_batching_without_changing_other_hyperparame
         'graph_policy': 'rdkit_sanitized', 'fulltrain_audit': {'formal_fulltrain': True, 'dataset_version': '1.5'}}))
     args = SimpleNamespace(source_dir=source, legacy_tsv=legacy, output_root=tmp_path/'run',
         device='cuda:0', gpu=0, gpus=None, optimize_alignment=True, baseline_checkpoint=checkpoint,
-        prepared_data=None, alignment_batching='mass_blocks')
+        prepared_data=None, alignment_batching='mass_blocks', alignment_mol_augmentation=mol_augmentation)
     with patch.object(config.fulltrain.v15, 'sources', ConfigObject({'fixture.tsv': sha256_file(source/'fixture.tsv')})), \
          patch.object(runner.subprocess, 'check_output', side_effect=lambda command, **kwargs: '' if 'status' in command else 'test-commit'):
         manifest = runner.preflight(args)
@@ -91,6 +92,11 @@ def test_optimization_preflight_pins_batching_without_changing_other_hyperparame
     expected = config.train.align.to_dict()
     expected.update(batching='mass_blocks', metric_for_best='validation_top1_then_mrr')
     assert actual == expected
+    augmentation = config.augmentation.to_dict()
+    if mol_augmentation is False:
+        augmentation.update(node_drop_rate=0.0, edge_mask_rate=0.0)
+    assert manifest['runtime_config']['augmentation'] == augmentation
+    assert config.augmentation.node_drop_rate == config.augmentation.edge_mask_rate == 0.1
     assert config.train.align.batching == 'random'
     assert [s['name'] for s in manifest['stages']] == ['prepare_v15','prepare_validation','baseline_validation','alignment42']
 
@@ -113,7 +119,8 @@ def test_queue_completion_audits_actual_batching_and_unique_coverage(tmp_path, s
         epoch['batching'] = sampler.last_audit
     selection = {'graph_policy': 'rdkit_sanitized', 'seed': 42, 'device': 'cuda:0',
         'checkpoint_sha256': sha256_file(checkpoint), 'exclude_val_query_indices': [],
-        'training_config': settings, 'stages': {'stage2': {'stop_epoch': 1, 'best_epoch': 1}},
+        'training_config': settings, 'config_snapshot': {'augmentation': config.augmentation.to_dict()},
+        'stages': {'stage2': {'stop_epoch': 1, 'best_epoch': 1}},
         'fulltrain_audit': {'formal_fulltrain': True, 'dataset_version': '1.5',
             'expected_epoch_counts': {'train': 3, 'val': 3}, 'epochs': [epoch],
             'dataset_manifest_sha256': sha256_file(data/'dataset_manifest.json'), 'training_batching': scheme}}
@@ -123,14 +130,52 @@ def test_queue_completion_audits_actual_batching_and_unique_coverage(tmp_path, s
     with patch.object(runner, 'verify_dataset'), \
          patch.object(config.fulltrain, 'expected_counts', ConfigObject({'train':3,'val':3,'test':1})), \
          patch.object(config.fulltrain, 'exclude_val_query_indices', []):
-        assert runner.audit_alignment(args, settings)['epochs'] == 1
+        assert runner.audit_alignment(args, settings, config.augmentation.to_dict())['epochs'] == 1
         wrong_settings = {**settings, 'batching': 'mass_blocks' if scheme == 'random' else 'random'}
         with pytest.raises(ValueError, match='completion audit'):
-            runner.audit_alignment(args, wrong_settings)
+            runner.audit_alignment(args, wrong_settings, config.augmentation.to_dict())
+        with pytest.raises(ValueError, match='completion audit'):
+            runner.audit_alignment(args, settings, {**config.augmentation.to_dict(), 'node_drop_rate': 0.0})
         if scheme == 'mass_blocks':
             epoch['batching']['unique_queries'] = 2
         else:
             epoch['train'] = 2
         path.write_text(json.dumps(selection))
         with pytest.raises(ValueError, match='(batching coverage|all train/validation)'):
-            runner.audit_alignment(args, settings)
+            runner.audit_alignment(args, settings, config.augmentation.to_dict())
+
+
+def test_molecular_augmentation_override_cannot_enter_default_queue(tmp_path):
+    with patch.object(runner, 'preflight') as preflight:
+        with pytest.raises(SystemExit):
+            runner.main(['--source-dir', str(tmp_path), '--legacy-tsv', str(tmp_path/'legacy'),
+                         '--output-root', str(tmp_path/'new'), '--gpus', '0', '1', '--device', 'cuda:0',
+                         '--no-alignment-mol-augmentation', '--dry-run'])
+        preflight.assert_not_called()
+    assert not (tmp_path/'new').exists()
+
+
+def test_zero_graph_rates_keep_complete_graph_and_spectrum_augmentation(monkeypatch):
+    from SpecEmbedding.data.datasets_align import AlignGraphDataset
+    from SpecEmbedding.data.graph_utils import smiles_to_graph
+
+    values = config.augmentation.to_dict()
+    values.update(prob=1.0, node_drop_rate=0.0, edge_mask_rate=0.0)
+    sequence = {'mz': np.array([100., 40., 0.]), 'intensity': np.array([2., 1., 0.]),
+                'mask': np.array([False, False, True]), 'smiles': 'CCO'}
+    dataset = AlignGraphDataset(data={'CCO': [sequence]}, keys=['CCO'], n_views=1, is_augment=True,
+                                augment_config=values, full_spectra=True)
+    calls = []
+    def spectrum_augmentation(item):
+        calls.append(item)
+        output = copy.deepcopy(item)
+        output['intensity'][1] = .5
+        return output
+    monkeypatch.setattr(dataset, 'aug', spectrum_augmentation)
+    monkeypatch.setattr(config.model.mol_encoder, 'graph_policy', 'rdkit_sanitized')
+    graph = smiles_to_graph('CCO', graph_policy='rdkit_sanitized')
+    mz, intensity, mask, graphs, labels = dataset[0]
+    assert len(calls) == 1 and intensity[0, 1] == .5
+    assert labels == ['CCO'] and mz.shape == mask.shape == (1, 3)
+    for key in ('x', 'edge_index', 'edge_attr', 'graph_size_features'):
+        assert torch.equal(getattr(graphs[0], key), getattr(graph, key))

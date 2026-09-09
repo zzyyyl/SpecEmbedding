@@ -88,6 +88,14 @@ def preflight(args):
     runtime_config = config.to_dict()
     runtime_config["model"]["mol_encoder"]["graph_policy"] = config.fulltrain.v15.graph_policy
     runtime_config["general"]["device"] = args.device
+    mol_augmentation = getattr(args, "alignment_mol_augmentation", None)
+    if mol_augmentation is not None:
+        if not getattr(args, "optimize_alignment", False) or not isinstance(mol_augmentation, bool):
+            raise ValueError("Molecular augmentation override requires the optimization branch and a boolean")
+        if not mol_augmentation:
+            # Keep spectrum augmentation and its probability unchanged; disable only graph perturbations.
+            runtime_config["augmentation"]["node_drop_rate"] = 0.0
+            runtime_config["augmentation"]["edge_mask_rate"] = 0.0
     batching = getattr(args, "alignment_batching", None)
     if batching is not None:
         if not getattr(args, "optimize_alignment", False) or batching not in {"random", "mass_blocks"}:
@@ -129,7 +137,7 @@ def preflight(args):
             "stages": commands(args), "protocol": "v1.5 source order, sanitized graphs; cache-local exact-target-SMILES sensitivity; independent 2D result audit pending"}
 
 
-def audit_alignment(args, alignment_settings):
+def audit_alignment(args, alignment_settings, augmentation_settings):
     data = args.output_root / "data" / "MassSpecGym"
     verify_dataset(data, config.fulltrain.expected_counts.to_dict(), config.fulltrain.exclude_val_query_indices)
     directory = args.output_root / "alignment42_topk256"
@@ -145,6 +153,7 @@ def audit_alignment(args, alignment_settings):
             or selection["checkpoint_sha256"] != sha256_file(directory / "best_model_stage2.pth")
             or selection["exclude_val_query_indices"] != config.fulltrain.exclude_val_query_indices
             or selection["training_config"] != alignment_settings
+            or selection.get("config_snapshot", {}).get("augmentation") != augmentation_settings
             or audit["training_batching"] != alignment_settings["batching"]
             or len(audit["epochs"]) != stage["stop_epoch"] or stage["best_epoch"] is None
             or stage["stop_epoch"] <= 0):
@@ -234,7 +243,8 @@ def execute(args, manifest):
                 data_report = verify_dataset(args.output_root / "data" / "MassSpecGym", config.fulltrain.expected_counts.to_dict(), config.fulltrain.exclude_val_query_indices)
                 progress["audit"] = data_report["target_audit"]
             elif stage["name"] == "alignment42":
-                progress["audit"] = audit_alignment(args, manifest["runtime_config"]["train"]["align"])
+                progress["audit"] = audit_alignment(args, manifest["runtime_config"]["train"]["align"],
+                                                    manifest["runtime_config"]["augmentation"])
                 if getattr(args, "optimize_alignment", False):
                     selection = json.loads((args.output_root / "alignment42_topk256" / "alignment_selection.json").read_text())
                     summary = selection["stages"]["stage2"]
@@ -280,6 +290,8 @@ def main(argv=None):
     parser.add_argument("--baseline-checkpoint", type=Path, help="Frozen v1.5 seed42 baseline for the alignment optimization branch")
     parser.add_argument("--alignment-batching", choices=["random", "mass_blocks"],
                         help="Optimization trial: override only the training batch assembly; block size comes from params.yaml")
+    parser.add_argument("--alignment-mol-augmentation", action=argparse.BooleanOptionalAction, default=None,
+                        help="Optimization trial: --no-alignment-mol-augmentation disables graph perturbations only")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--write-preflight", action="store_true")
     args = parser.parse_args(argv)
@@ -297,6 +309,8 @@ def main(argv=None):
         parser.error("--optimize-alignment and --baseline-checkpoint must be provided together")
     if args.alignment_batching is not None and not args.optimize_alignment:
         parser.error("--alignment-batching requires --optimize-alignment")
+    if args.alignment_mol_augmentation is not None and not args.optimize_alignment:
+        parser.error("--alignment-mol-augmentation requires --optimize-alignment")
     manifest = preflight(args)
     if args.dry_run:
         print(json.dumps(manifest, ensure_ascii=False, indent=2))
