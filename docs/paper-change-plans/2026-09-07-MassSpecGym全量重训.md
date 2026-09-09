@@ -53,7 +53,8 @@ checkpoint/版本、来源表格、分母和评价设置。各项的最好值可
 - Base 排序在进入 reranker 前已经较弱。新缓存并未复用旧 alignment 权重或旧磁盘 TokenSet。
   旧候选格式捷径已量化，但尚不能把旧模型的全部性能差额归因于单一因素。
 - r4 alignment 按每轮全部谱图训练，以验证对比损失选择 checkpoint；reranker 目前按验证 MRR
-  选择。A01 已完成固定 baseline 重编码、训练和审计，保留 r4；后续按完整验证轨迹判断结构、
+  选择。A01 完成后未替换 r4；A02 完整训练与审计后整体改善，已成为下一轮比较基线。
+  后续按完整验证轨迹判断结构、
   loss、预训练或参数变化的价值，不能只观察训练 loss。
 - 原模型、旧 query cap/top-40/forcing 结果只保留追溯，不能当成 v1.5 的可靠目标线。
   reranker 无法救回其候选池外的真值，必须同时记录 Base、coarse 与最终排序的 coverage。
@@ -254,6 +255,34 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 - [ ] 论文修改后执行双语编译、引用/匿名扫描、发布 manifest 和仓库要求的复现检查。
 
 ## 10. 执行记录
+
+- 2026-09-09 18:40：A03 baseline验证于18:38:41通过连续120秒GPU门槛，选择物理GPU0。
+  子进程PID3266643的UUID单卡显露、严格CUDA标志、显式cuda:0与独立运行配置均已核验，
+  正在重新编码完整验证候选。alignment尚未启动，后续该阶段仍须重新等待GPU。
+- 2026-09-09 18:38：A03于18:36:36完成全部CPU准备，验证索引SHA与A01/A02相同，
+  baseline验证进入GPU等待；指定pane存活，入口PID3265298在运行，未创建第二个监测器。
+  两张卡瞬时满足门槛仍执行连续120秒规则；训练阶段后续再次等待，等待不等于已完成训练。
+  新候选工具的真实全量CPU采样预检完成，详细计数见优化索引D06；回执位于
+  `/data1/zyl/SpecEmbedding/audits/train_candidate_sampling_20260909/receipt.json`，SHA-256
+  `21f649c223450536c06931cb8951b1c959471e33aacef569f9bc63002f51c1ba`。
+  同目录保存全部抽样索引、源位置、计数及`preflight.py`；全部query保留，未接入训练或改变A03。
+- 2026-09-09 18:34：A02于18:09:37完成，27轮早停、进程退出、pane exit0；独立完成审计
+  逐轮重算全部有效验证排名及指标通过。最终epoch22是唯一Pareto候选，符合预先声明的整体
+  改善规则，已晋升为下一轮比较baseline；指标与解释边界集中于优化索引A02。
+  回执 `/data1/zyl/SpecEmbedding/audits/optimization_a02_20260909/receipt.json`，SHA-256
+  `deb8fa650502204387d6ab4b724073796f41344be33bb9fcb508985f05f19d5d`；相邻`decision.json`
+  保存选中权重、原baseline、差值和A03范围，原始A02/r4工件均保留。
+  A03已在固定`c50ddf0`重新完成真实输入预检，使用A02 epoch22作比较、mass_blocks/block32，
+  只关闭分子图增强，继续随机初始化和完整train/val，不运行test/reranker。
+  18:32:27单次启动；运行根
+  `/data1/zyl/SpecEmbedding/experiments/massspecgym_v15_opt_a03_20260909_topk256`，独立socket
+  `/tmp/specembedding-opt-a03-20260909-1010/tmux.sock`，session`opt`/pane`%0`，入口PID3265298。
+  `launch_receipt.json`、`launch.py`、`parent_decision.json`和`inputs_and_commands.json`保存
+  派发及输入指纹。18:34核验数据导入完成、CPU验证候选准备中；GPU阶段继续0/1择一逐次等待。
+- 2026-09-09：全量自然训练候选读取与不同二维负例采样工具已提交推送为`01024f5`，
+  23项新增测试通过；全仓325通过、1跳过、1个相同既有路径审计失败，Ruff/compileall/diff通过。
+  工具尚未接入模型或训练入口，真实全量CPU采样预检进行中，详见优化索引D06。
+  不修改固定A02/A03源码，不把输入工具或准备工件写成候选监督模型已完成。
 
 - 2026-09-09 17:45：全量训练自然候选元数据准备及独立源文件复核完成，详见优化索引 D06。
   工件根为 `/data1/zyl/SpecEmbedding/audits/train_candidate_feasibility_20260909/`；
@@ -589,8 +618,8 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
-- 验证结果：65 项相关测试通过；最新全仓 292 通过、1 跳过、1 个既有路径审计失败；静态检查通过
-- 当前训练状态：r4 旧矩阵停止；A01 未替换 r4；A02 alignment 训练中；A03 源码已固定，正式配置预检待A02审计，未派发
+- 验证结果：候选输入工具新增23项测试通过；最新全仓325通过、1跳过、1个既有路径审计失败；静态检查通过
+- 当前训练状态：r4旧矩阵停止；A01未替换r4；A02完成审计并晋升；A03进行GPU基线验证，alignment尚未启动
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；
