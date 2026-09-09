@@ -260,6 +260,39 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-09 22:16：完整CPU图加载三组测量及张量指纹核验已完成，结果集中于D09；
+  `/data1/zyl/SpecEmbedding/audits/validation_graph_loading_20260909/receipt.json` SHA-256为
+  `24c03117b8a1d0e0fc01f232177dc0ca439516c95ddea48365dd1ea428ee834b`。没有模型/GPU计算，
+  不把CPU图加载改善外推为整轮训练速度。A05准备汇总与后续必需步骤保存于准备根目录
+  `ready.json`，SHA-256 `cf07a911dcbdda36b3499878f3358b0bb6301bff7df5b198815e7ead6087baf8`；
+  A02条件parent的完整预检SHA-256为`c676a1af54b1b63118328c6b2020ae5727fa2817cd429da0abe8454ca54a0f52`。
+  状态为准备完成、等待A04完整审计；没有自动衔接监测器或A05训练进程。
+- 2026-09-09 22:08：固定图缓存实现`881cdfa2fc75d3f7b4f00977cc1b4bff145ba332`已提交推送，
+  新独立源码`/data1/zyl/repos/SpecEmbedding-opt-a05-20260909/`保持干净；A04源码未修改。
+  缓存准备于21:57:21单次派发，仅CPU，于22:01:19完整构建及独立逐图审计结束、pane exit0。
+  缓存位于`/data1/zyl/SpecEmbedding/graph_cache/massspecgym_v15_validation_20260909_topk256/`；
+  `manifest.json` SHA-256 `75f6f4e2c4fdc5fab30f4d423a6fc02d868941c15fd76b5488e8f9ec1c69cde4`，
+  `audit.json` SHA-256 `4630182c4f48b800cd3d3cbf84489b60efe5b06c6547d42762ca85f301e9c813`，
+  `preparation.json` SHA-256 `74d4b55b2176faf7b4c56dd1c0aefd213fc21c07961ee00870aa94f8c312e8bc`。
+  启动来源与原始日志保存于`/data1/zyl/SpecEmbedding/audits/validation_graph_cache_20260909/`。
+  专用CPU server为`/tmp/specembedding-validation-graphs-20260909-1010/tmux.sock`；`prepare/%0`
+  已退出；同server内`a05-inputs/%1`完成CPU配置/采样准备并exit0；`graph-loading/%2`仅测量
+  完整CPU图DataLoader，结果保存在`/data1/zyl/SpecEmbedding/audits/validation_graph_loading_20260909/`，
+  仍进行中，没有模型/GPU计算，也不是另一个训练或GPU监测器。
+  A05配置草案、完整100轮batch采样核验及命令保存于
+  `/data1/zyl/SpecEmbedding/audits/optimization_a05_preparation_20260909/`；`receipt.json` SHA-256
+  `1b12db9411b49d94193f2a45c5c6bed59ff62125b8b2669eb672d0da932f455e`，`drafts.json` SHA-256
+  `dc62d2bfcf3fbf5a2b157a497f58a4210c9f94d2c5950262b0cc331b9f5adbab`。A02条件parent的完整
+  dry-run保存为`preflight_from_a02.json`，新图缓存全指纹核验通过；未创建A05运行目录。
+  两份配置只是待A04完整审计后择一的草案，不能视为两个已排队方案；A04当前完成3轮，
+  最终parent、真实GPU运行和性能结果仍待后续。
+- 2026-09-09 21:54：用户明确要求A04训练期间设计下一轮并增加缓存，从下一轮应用。
+  无损固定验证图缓存、CPU完整构建/独立逐图张量审计、正式入口及完成审计接入已实现；
+  新增29项检查通过，全仓411通过、1跳过、1个相同既有路径审计失败，静态检查通过。
+  详细机制与证据见优化索引D09；真实缓存将在独立源码冻结后构建，尚未宣称提速。
+  A05实验卡已准备：仅训练batch128→256，学习率保持1e-4；缓存另记工程改动；parent等待
+  A04完整审计后确定。A04仍使用原`82c20dd`，在GPU1上完成前两轮全量训练/验证，进程正常；
+  两轮资源和中途成绩见A04卡。未停止/修改A04，没有派发A05或新GPU任务。
 - 2026-09-09 21:13：D08三组完整编码与独立分数核验于21:03:50完成，入口退出、pane exit0，
   回执为`/data1/zyl/SpecEmbedding/audits/validation_batch_benchmark_20260909/receipt.json`，SHA-256
   `7bb8fc7e07f7a7788b42ee89ca90ee0f4395a5cb76ebd81f13b80afe0ef14d8c`。完整结果及限制只维护
@@ -707,8 +740,8 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
-- 验证结果：候选监督正式集成、真实全量绑定及CPU验证索引导入预检通过；最新全仓382通过、1跳过、1个既有路径审计失败；静态检查通过
-- 当前训练状态：r4旧矩阵停止；A01未替换r4；A02完成审计并晋升；A03完整审计通过但未晋升；A04已单次派发并完成CPU准备，21:13正在GPU0上做baseline完整验证
+- 验证结果：新增固定图缓存与正式接入检查通过；最新全仓411通过、1跳过、1个既有路径审计失败；静态检查、真实完整缓存审计、A05全量CPU采样预检及条件dry-run均通过
+- 当前训练状态：r4旧矩阵停止；A01未替换r4；A02完成审计并晋升；A03完整审计通过但未晋升；A04在GPU1完成前三轮全量训练/验证；A05源码/输入/草案已准备，等待A04完整审计后确定唯一parent，未派发
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；
