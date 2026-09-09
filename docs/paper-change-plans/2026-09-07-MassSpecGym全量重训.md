@@ -150,6 +150,7 @@ checkpoint/版本、来源表格、分母和评价设置。各项的最好值可
 | [JESTR，2411.14464v1](https://arxiv.org/abs/2411.14464v1) | 双塔及候选正则化路线 | 保存预印本版本；正式发表元数据如入稿另核验，不能混用版本数字 |
 | [GLMR，2511.06259v1](https://arxiv.org/html/2511.06259v1) | Table 1 报 Mass Top-1 64.172%、MRR 67.817% | reported-only；旧版表示、数据与评估实现审计后才判断是否进入 S_j，不把高分先当有效或先排除 |
 | [GLACIER，2606.29161v1](https://arxiv.org/html/2606.29161v1) | Table 1：Mass w/ CF Top-1/5/20 = 69.95/86.47/93.52%；w/o CF Top-5 = 86.58% | 强参考；完整 query 覆盖、候选标准化和评价条件待对齐。不能因其方法复杂而从比较集合中排除 |
+| [SpecBridge，2601.17204v3 撤回记录](https://arxiv.org/abs/2601.17204v3) | 作者于 2026-03-03 撤回，说明预处理/评价流程存在问题；v2 为历史全文 | 不将撤回成绩纳入有效 S_j；可研究其冻结分子表征的思路，但不能引用旧高分证明方法有效 |
 
 **当前不得声称已找到并冻结所有指标的 SOTA。** 特别是 Top-10、MRR 缺少完整同协议对比，
 GLACIER 附录不同配置的 Top-10 不能无说明拼到主表 checkpoint。
@@ -172,6 +173,9 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 清单为该目录的 `specembedding_retrieval_20260909_manifest.json` 和
 `specembedding_retrieval_20260909_additional_manifest.json`；保存 arXiv 版本、下载 URL、SHA-256 和时间，
 不将 PDF 纳入仓库或匿名补充材料。下载论文不是完成代码复现，也不自动启动 GLACIER 独立任务。
+补充保存 SpecBridge v2 历史 PDF（文件名标注 `WITHDRAWN_historical`）及 v3 官方撤回页面，
+清单为 `specembedding_retrieval_20260909_specbridge_manifest.json`；PDF 为 14 页，文件哈希已核验。
+撤回是排除其旧成绩的明确一手依据，不外推为其它方法存在同样问题，也不改变尚待核验的强参考。
 如采用文献方法，先核对原文与官方实现；引入论文时再逐条核验作者、出版物和 DOI。
 
 ## 6. 实验与计算边界
@@ -230,6 +234,11 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 - [ ] 论文修改后执行双语编译、引用/匿名扫描、发布 manifest 和仓库要求的复现检查。
 
 ## 10. 执行记录
+
+- 2026-09-09 15:24：A01 第 11 轮完整验证刷新本次 Top-1，既定早停计数重置，训练继续；
+  尚无最终选优与整体收益结论，A02 未派发。完成审计入口已提交并推送为 `0e2eaf3`，
+  新入口对真实固定 baseline 的全部保存分数核验通过，原始指标与排名逐条一致。
+  文献补充核验及 SpecBridge 历史 PDF/官方撤回记录保存完成，比较边界见第 5 节。
 
 - 2026-09-09：新增独立 CPU 完成审计入口 `audit_alignment_optimization.py`，检查所有保存排名、
   指标与权重/选优关联，并报告完整 Top-k/MRR 的改善与退步；仅接收完整优化队列，输出不得覆盖。
