@@ -166,6 +166,11 @@ checkpoint/版本、来源表格、分母和评价设置。各项的最好值可
 **当前不得声称已找到并冻结所有指标的 SOTA。** 特别是 Top-10、MRR 缺少完整同协议对比，
 GLACIER 附录不同配置的 Top-10 不能无说明拼到主表 checkpoint。
 
+GLMR的[正式出版页](https://ojs.aaai.org/index.php/AAAI/article/view/37132)已核验：AAAI 2026，
+40(2):1561–1569，DOI `10.1609/aaai.v40i2.37132`，发布日期2026-03-14；正式PDF已归档。
+上述数字与正式版Table 1一致，发表状态不再仅为预印本；其同协议复现状态仍为reported-only，
+模型阶段与尚缺的输入/评价证据见优化索引R03。
+
 2026-09-09 补充查询分母核验：官方 `RetrievalSimulationDataset` 继承 simulation 筛选，
 仅使用 `simulation_challenge` 行，不能与完整 `RetrievalDataset` 混用；见
 [官方数据加载器](https://github.com/pluskal-lab/MassSpecGym/blob/main/massspecgym/data/datasets.py)。
@@ -262,6 +267,27 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-09 23:46：核验A04专用pane仍存活，训练日志推进第十轮；第九轮的完整原始验证
+  成绩及资源更新于A04实验卡。尚未决定晋升，没有创建A05运行目录或改动两个固定worktree。
+  `93abdd8`的完整Morgan输入准备于23:30:39单次派发，23:41:59完成，独立CPU pane
+  `fingerprint-inputs/%5`退出0，socket沿用`/tmp/specembedding-validation-graphs-20260909-1010/tmux.sock`；
+  此任务只处理输入，不派发模型或GPU阶段。固定源码为
+  `/data1/zyl/repos/SpecEmbedding-fingerprints-20260909/`，缓存根为
+  `/data1/zyl/SpecEmbedding/fingerprint_cache/massspecgym_v15_morgan_r2_2048_20260909/`，
+  两个子目录为`train_topk256/`与`validation_topk256/`；其`preparation.json` SHA-256分别为
+  `f10f65b68e1a5048cbb90edb64c972c19000880f8723641fb4d16b3ae6570e11`与
+  `6de90c93cf76fc730f60c17023aba2c4365b4f3d6b8abf2c736978e86a6691a7`。
+  完整数量/字节及构建、独立逐位审计耗时只维护于D11；来源/全部命令/原始日志保存于
+  `/data1/zyl/SpecEmbedding/audits/fingerprint_preparation_20260909/`，其中
+  `inputs.json` SHA-256为`3adf74b950e9398296fec62b140c4d50cf3aa5f8994bfbacdd8dfa5007ecbea6`。
+  完成后公共读取器重新核验全部候选来源与文件SHA，`completion_verification.json` SHA-256
+  为`43b9f129ff956f424df50d643be7b7f18a9022e3cc19523a6616eb42218193ff`，相邻保存复核脚本。
+  正式GLMR论文另归档为`/data1/zyl/papers/AAAI_2026_40_2_1561_GLMR.pdf`，SHA-256为
+  `73160f5d07478e43242418dd751164d5ac40afe43a4a1cb2bcd9128386a45e17`；下载与出版信息清单为
+  `/data1/zyl/papers/specembedding_retrieval_20260909_glmr_publication_manifest.json`，SHA-256
+  `41bb6db3335c0f97b4a4d527f66b3a04085861ba913baf3996b562aeaf31521d`，原文边界见R03。
+  新实现32项专项通过，全仓443通过、1跳过、1个相同既有路径审计失败；Ruff、compileall及
+  diff检查通过，后续完成复核脚本另经静态检查。这里只完成输入与资料准备，计划仍执行中。
 - 2026-09-09 23:13：A04完成第七轮、开始第八轮；原日志Top-1为10.17%、MRR为0.2151，
   属于训练中途进展。开始准备后续轻量分子表示的固定Morgan输入：使用已审计完整train候选
   和validation候选，各自保留源索引顺序，radius2/2048位、无手性，packed存储并独立重算
@@ -774,8 +800,8 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
-- 验证结果：新增固定图缓存与正式接入检查通过；最新全仓411通过、1跳过、1个既有路径审计失败；静态检查、真实完整缓存审计、A05全量CPU采样预检及条件dry-run均通过
-- 当前训练状态：r4旧矩阵停止；A01未替换r4；A02完成审计并晋升；A03完整审计通过但未晋升；A04在GPU1完成前六轮全量训练/验证，当前选优第五轮、中途独立审计固定至第四轮；A05源码/输入/草案已准备，等待A04完整审计后确定唯一parent，未派发
+- 验证结果：新增完整指纹输入检查通过；最新全仓443通过、1跳过、1个既有路径审计失败；静态检查、真实完整验证图与训练/验证指纹缓存审计、A05全量CPU采样预检及条件dry-run均通过
+- 当前训练状态：r4旧矩阵停止；A01未替换r4；A02完成审计并晋升；A03完整审计通过但未晋升；A04在GPU1完成前九轮全量训练/验证，当前选优第九轮、中途独立审计固定至第四轮；A05源码/输入/草案已准备，等待A04完整审计后确定唯一parent，未派发
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；
