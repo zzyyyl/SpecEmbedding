@@ -63,6 +63,9 @@ MS/MS 谱图
 
 - 首选 Conda 环境为 `specembedding`，环境定义为 `environment.yml`，开发依赖为 `requirements-dev.txt`；运行实验前确认 Python、PyTorch、PyG、RDKit 和 matchms 可用。
 - 训练、评价和 rerank 超参数统一放在 `params.yaml`；缺失配置应尽早失败，不提供静默 fallback。
+- 从 A05 及后续启动起，使用 `run_with_storage.py` 和显式外部存储根；本机为
+  `/data1/${USER}/SpecEmbedding`。数据、缓存、下载缓存、临时数据与新训练工件不写入 `/home`。
+  不修改当前 A04 的源码、环境或文件路径；仍被活跃任务引用的旧文件保留。细则见 `docs/storage_zh.md`。
 - checkpoint 必须保存构建 reranker 所需的完整模型配置，包括模型类型、维度、归一化方式和特征开关。
 - 公共逻辑放在 `SpecEmbedding/utils/` 或 `SpecEmbedding/trainer/`；入口脚本负责参数解析和流程编排，不从入口脚本反向导入公共业务函数。
 - 正式 alignment、reranker、对照和消融必须使用完整训练划分中符合协议的全部可训练样本；不得自行限量、抽样或截取前 N 条。验证/测试不并入训练，运行前后核验实际样本数。
