@@ -52,12 +52,14 @@ checkpoint/版本、来源表格、分母和评价设置。各项的最好值可
 - v1.5 r4 已完成一个全量 alignment-42、六个缓存，以及 Mass relative 三 seed 和
   pointwise seed42 的完整训练/测试。用户要求缩小实验范围后，已主动中断 pointwise seed43
   与后续矩阵，保留原始工件；部分 checkpoint 不作为完成结果。
-- 现有新结果仍为 cache-local exact-target-SMILES；数字、权重来源、GPU 重编码证据和新旧
-  差异只维护于[准确率排查](../../analysis/massspecgym_v15_regression_audit.md)及其原始工件。
+- r4阶段结果为cache-local exact-target-SMILES；数字、权重来源、GPU重编码证据和新旧
+  差异维护于[准确率排查](../../analysis/massspecgym_v15_regression_audit.md)及其原始工件。
+  A01起的优化采用完整v1.5自然候选、二维身份检索验证，完成结果见[优化索引](../../analysis/massspecgym_optimization.md)。
 - Base 排序在进入 reranker 前已经较弱。新缓存并未复用旧 alignment 权重或旧磁盘 TokenSet。
   旧候选格式捷径已量化，但尚不能把旧模型的全部性能差额归因于单一因素。
 - r4 alignment 按每轮全部谱图训练，以验证对比损失选择 checkpoint；reranker 目前按验证 MRR
-  选择。A01 完成后未替换 r4；A02 完整训练与审计后整体改善，已成为下一轮比较基线。
+  选择。A01完成后未替换r4，A02首次整体改善；A04在完整25轮训练与独立审计后进一步改善，
+  epoch20已成为当前incumbent，A05基于它优化训练batch并应用固定验证图缓存。
   后续按完整验证轨迹判断结构、
   loss、预训练或参数变化的价值，不能只观察训练 loss。
 - 原模型、旧 query cap/top-40/forcing 结果只保留追溯，不能当成 v1.5 的可靠目标线。
@@ -284,6 +286,42 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-10：A04于03:39结束第25轮并按patience5早停，选中epoch20；原入口于03:50:03
+  完成全部负例重放，PID3360929为exit0的终态，训练子进程已退出。独立完成审计于04:14确认
+  正常退出，25轮完整样本/负例/排名/配置/权重与126项工件绑定通过；原始结果表见优化索引A04。
+  当前有效完成回执为`/data1/zyl/SpecEmbedding/audits/optimization_a04_20260910_r2/receipt.json`，
+  SHA-256 `39938d47a1d8e4f8cdd2a541e3252899f9ddf090c78a61b63683c28973206da3`。
+  首次审计在相邻无`_r2`目录因把A04旧runtime用于新存储入口而在导入阶段退出1，日志及
+  `failure.json`保留；修正仅是新审计导入配置的存储路径，模型/训练/增强/tokenizer保持A04
+  语义，实际审计仍读取并核验原runtime SHA。没有修改A04、放宽路径保护或覆盖失败目录。
+  独立审计socket为`/tmp/specembedding-a04-audit-r2-20260910-1010/tmux.sock`，
+  `audit/%0`、PID3452883已dead/exit0；训练和审计的结束不混作SOTA目标完成。
+- 2026-09-10：A05先完成A04条件parent完整预检，记录位于
+  `/data1/zyl/SpecEmbedding/audits/optimization_a05_conditional_a04_20260910/`，回执SHA-256
+  `ce27bf32377d34438c38f339fa4f4e0220ce8b5451a5af6b669727121ffe1482`；A04审计后复核全部工件，
+  明确晋升A04 epoch20并冻结唯一A05配置，最终完整dry-run通过。最终绑定根为
+  `/data1/zyl/SpecEmbedding/audits/optimization_a05_finalization_20260910/`；`ready.json` SHA-256
+  `145375356c25919d7a1136d8dbb2e91b89b1fe0521591d88a29def604ac3cf9f`，保存唯一决策、参数、
+  命令及派发记录。比较checkpoint SHA-256为
+  `1cf7db2be2d6df8360dc6938f41b60f4e38f39eb776f7d6a69337d7e6d649661`；A05仍从随机初始化训练。
+  04:18:19单次启动至`/data1/zyl/SpecEmbedding/experiments/massspecgym_v15_opt_a05_20260910_topk256/`，
+  固定干净源码`/data1/zyl/repos/SpecEmbedding-opt-a05-storage-r2-20260910/`，commit `a5aeb3b`；
+  专用socket `/tmp/specembedding-opt-a05-20260910-1010/tmux.sock`，`opt/%0`、入口PID3454081。
+  完整导入与baseline验证完成后，04:25:36重新通过GPU门槛，在物理GPU0映射的严格cuda:0
+  开始训练；PID3455061实际环境、运行配置SHA、外部缓存/临时路径及OMP/MKL=1已核验。
+  首轮于04:38:01完成，实际train194,119、val19,423，759个batch且最后71条；完整观察query
+  排列和文件SHA独立读回通过。早期指标与资源见A05实验卡，不称为新模型完成结果。
+  runtime SHA-256为`fdabcea3762906f8ef39d8eec75fc3b6b18f18efda66a886437689b76f5fa9c1`；
+  batch256、学习率1e-4、自然负例最多16/CE权重1及完整数据不变，所有新数据与缓存使用外部项目根。
+- 2026-09-10：A05基线已用固定图缓存重新编码全部827,600个候选，全部19,423条验证query
+  与A04同一checkpoint的选中轮保存分数独立对比通过；最大有效分数差4.18e-7，98条排名
+  变化，各项指标差异均低于预设容差。记录位于
+  `/data1/zyl/SpecEmbedding/audits/optimization_a05_baseline_cache_20260910/receipt.json`，SHA-256
+  `b41e7d3c54b314e21f7a93a47fba9150ec031de8b566a02898eba5906c4345fa`。
+  此次完整检索计时34.36秒，A04选中轮229.21秒；GPU/时段不同，不将全部比值归因缓存，
+  首轮资源回执已记录整轮682.62秒、训练631.47秒、检索验证45.99秒；相较A04首轮整轮
+  耗时短约15.5%，但训练阶段未加快，不能据此提前判定最终效率或模型收益。临时预检/对比
+  脚本的Ruff和语法检查通过，固定源码未改。
 - 2026-09-10：核对阶段验收清单，A02/A03完整回执及其117项工件逐文件哈希复查通过；
   纠正评价实现与checkpoint检查仍未勾选的过时状态，不改变当前实验或最终SOTA验收状态。
   新增独立MRR参考核对发现同分排序与非正分数处理的语义差异，说明及回归检查见D15。
