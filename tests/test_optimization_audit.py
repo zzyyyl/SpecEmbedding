@@ -106,6 +106,36 @@ def test_complete_audit_preserves_full_denominator_and_reports_topk_tradeoff(com
     assert len(report["pareto_candidates"]) == 2 and not report["test_evaluated_by_this_audit"]
 
 
+def test_completion_binds_imported_validation_to_original_source_and_receipt(completed_run):
+    run, _, _ = completed_run
+    source = run.parent / 'prepared.pt'
+    index = run / 'validation/mass_val_topk256.pt'
+    source.write_bytes(index.read_bytes())
+    source.with_suffix('.json').write_text(json.dumps({'sha256': sha256_file(source)}))
+    index.with_suffix('.json').write_bytes(source.with_suffix('.json').read_bytes())
+    prepared = {'path': str(source), 'sha256': sha256_file(source),
+                'receipt_sha256': sha256_file(source.with_suffix('.json'))}
+    manifest_path, status_path = run / 'inputs_and_commands.json', run / 'status.json'
+    manifest, status = json.loads(manifest_path.read_text()), json.loads(status_path.read_text())
+    manifest['prepared_validation'] = prepared
+    manifest['inputs'].update(prepared_validation_index={'path': str(source), 'sha256': prepared['sha256']},
+                              prepared_validation_receipt={'path': str(source.with_suffix('.json')),
+                                                           'sha256': prepared['receipt_sha256']})
+    status['stages'][1].update(name='import_validation', imported_validation={**prepared, 'path': str(index)})
+    write_json(manifest_path, manifest)
+    write_json(status_path, status)
+    assert audit.audit_optimization_run(run)['state'] == 'complete_validation_audit'
+    status['stages'][1]['imported_validation']['sha256'] = '0'*64
+    write_json(status_path, status)
+    with pytest.raises(ValueError, match='Imported validation'):
+        audit.audit_optimization_run(run)
+    status['stages'][1]['imported_validation']['sha256'] = prepared['sha256']
+    write_json(status_path, status)
+    index.with_suffix('.json').write_text('{}')
+    with pytest.raises(ValueError, match='fingerprint mismatch'):
+        audit.audit_optimization_run(run)
+
+
 def test_completion_rejects_changed_effective_training_augmentation(completed_run):
     run, _, selection = completed_run
     selection["config_snapshot"]["augmentation"]["node_drop_rate"] = 0.0

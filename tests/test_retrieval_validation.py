@@ -1,4 +1,5 @@
 import copy
+import json
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -10,11 +11,15 @@ import run_massspecgym_v15 as runner
 from SpecEmbedding.models import SiameseModel
 from SpecEmbedding.models_align import GINEEncoder, SpecMolAlignModel
 from SpecEmbedding.trainer.trainer_align import TrainerAlign
+from SpecEmbedding.utils.fulltrain import sha256_file
 from SpecEmbedding.utils.massspecgym_v15 import identity
 from SpecEmbedding.utils.retrieval_validation import (
     AlignmentRetrievalValidator,
     build_validation_index,
+    import_validation_index,
+    prepared_validation_input,
     retrieval_metrics,
+    validation_index_receipt,
 )
 
 
@@ -30,6 +35,76 @@ def build_index():
     raw = [spectrum(s) for s in ("CCO", "CCC", "CCN", "CCCC")]
     candidates = {"CCO": ["CCC", "OCC", "CCO"], "CCN": ["CCC"], "CCCC": []}
     return build_validation_index(raw, candidates, [1], {}, {"max_len": 8, "show_progress_bar": False})
+
+
+def reusable_index(tmp_path, monkeypatch):
+    import SpecEmbedding.utils.retrieval_validation as module
+
+    data = tmp_path / 'data'
+    data.mkdir()
+    (data / 'dataset_manifest.json').write_text('{}')
+    report = {'outputs': {'synthetic': 'CPU fixture'}}
+    monkeypatch.setattr(module, 'verify_dataset', lambda *a: report)
+    index = build_index()
+    index.update(dataset_manifest_sha256=sha256_file(data / 'dataset_manifest.json'),
+                 dataset_outputs=report['outputs'], graph_policy='rdkit_sanitized')
+    source = tmp_path / 'original.pt'
+    torch.save(index, source)
+    source.with_suffix('.json').write_text(json.dumps(validation_index_receipt(index, source)))
+    options = (data, {'val': 4}, [1], index['tokenizer_config'])
+    expected = prepared_validation_input(source, *options)
+    return source, expected, options
+
+
+def test_prepared_index_import_preserves_every_byte_and_rejects_existing_outputs(tmp_path, monkeypatch):
+    source, expected, options = reusable_index(tmp_path, monkeypatch)
+    destination = tmp_path / 'new' / 'mass_val_topk256.pt'
+    result = import_validation_index(source, destination, expected, *options)
+    assert result == {**expected, 'path': str(destination)}
+    assert result['queries'] == 3 and result['molecules'] == 3
+    assert result['positive_queries'] == 1 and result['multi_positive_queries'] == 1
+    assert destination.read_bytes() == source.read_bytes()
+    assert destination.with_suffix('.json').read_bytes() == source.with_suffix('.json').read_bytes()
+    with pytest.raises(FileExistsError):
+        import_validation_index(source, destination, expected, *options)
+
+
+@pytest.mark.parametrize('damage', ['index_bytes', 'receipt_count', 'receipt_bytes', 'tokenizer', 'exclusions', 'manifest'])
+def test_prepared_index_rejects_changed_inputs_before_copy(tmp_path, monkeypatch, damage):
+    source, expected, options = reusable_index(tmp_path, monkeypatch)
+    data, counts, exclusions, tokenizer = options
+    if damage == 'index_bytes':
+        source.write_bytes(source.read_bytes() + b'changed')
+    elif damage == 'receipt_count':
+        receipt = json.loads(source.with_suffix('.json').read_text())
+        receipt['queries'] = 2
+        source.with_suffix('.json').write_text(json.dumps(receipt))
+    elif damage == 'receipt_bytes':
+        source.with_suffix('.json').write_text(source.with_suffix('.json').read_text() + ' ')
+    elif damage == 'tokenizer':
+        tokenizer = {**tokenizer, 'max_len': 9}
+    elif damage == 'exclusions':
+        exclusions = []
+    else:
+        (data / 'dataset_manifest.json').write_text('{"changed": true}')
+    destination = tmp_path / 'new' / 'mass_val_topk256.pt'
+    with pytest.raises(ValueError):
+        import_validation_index(source, destination, expected, data, counts, exclusions, tokenizer)
+    assert not destination.exists()
+
+
+def test_prepared_index_detects_source_changes_during_copy(tmp_path, monkeypatch):
+    import SpecEmbedding.utils.retrieval_validation as module
+
+    source, expected, options = reusable_index(tmp_path, monkeypatch)
+    original = module.shutil.copyfileobj
+    def change_source(reader, writer):
+        original(reader, writer)
+        if reader.name == str(source):
+            source.write_bytes(source.read_bytes() + b'changed')
+    monkeypatch.setattr(module.shutil, 'copyfileobj', change_source)
+    with pytest.raises(ValueError, match='changed during import'):
+        import_validation_index(source, tmp_path / 'new.pt', expected, *options)
 
 
 def test_index_keeps_source_order_multiple_2d_positives_and_unlabeled_queries():

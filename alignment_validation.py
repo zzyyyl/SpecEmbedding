@@ -16,6 +16,7 @@ from SpecEmbedding.utils.retrieval_validation import (
     AlignmentRetrievalValidator,
     load_validation_index,
     prepare_validation_index,
+    validation_index_receipt,
 )
 from SpecEmbedding.utils.runtime import resolve_device, setup_logging
 
@@ -44,13 +45,7 @@ def main(argv=None):
                                          workers=config.fulltrain.v15.audit_workers)
         with args.index.open("xb") as handle:
             torch.save(index, handle)
-        write_json(args.index.with_suffix(".json"), {
-            "sha256": sha256_file(args.index), "protocol": index["protocol"],
-            "dataset_manifest_sha256": index["dataset_manifest_sha256"], "queries": len(index["sequences"]),
-            "molecules": len(index["mol_smiles"]), "graph_rejections": len(index["graph_rejections"]),
-            "positive_queries": int(index["positive_mask"].any(dim=1).sum()),
-            "multi_positive_queries": int((index["positive_mask"].sum(dim=1) > 1).sum()),
-        })
+        write_json(args.index.with_suffix(".json"), validation_index_receipt(index, args.index))
         return
     if args.output is None or args.output.exists():
         parser.error("Fresh checkpoint evaluation requires a new --output directory")

@@ -4,6 +4,7 @@ import json
 import logging
 import multiprocessing
 import pickle
+import shutil
 import time
 from pathlib import Path
 
@@ -127,6 +128,46 @@ def load_validation_index(path, data_path, expected_counts, exclusions, tokenize
             or ids.min() < -1 or ids.max() >= len(index["mol_smiles"]) or (labels & (ids < 0)).any()):
         raise ValueError("Invalid candidate/label matrix in validation index")
     return index
+
+
+def validation_index_receipt(index, path):
+    return {"sha256": sha256_file(path), "protocol": index["protocol"],
+            "dataset_manifest_sha256": index["dataset_manifest_sha256"], "queries": len(index["sequences"]),
+            "molecules": len(index["mol_smiles"]), "graph_rejections": len(index["graph_rejections"]),
+            "positive_queries": int(index["positive_mask"].any(dim=1).sum()),
+            "multi_positive_queries": int((index["positive_mask"].sum(dim=1) > 1).sum())}
+
+
+def prepared_validation_input(path, data_path, expected_counts, exclusions, tokenizer_config):
+    """Verify a reusable CPU index; no checkpoint or embeddings are included."""
+    path = Path(path).resolve()
+    receipt_path = path.with_suffix('.json')
+    index_sha, receipt_sha = sha256_file(path), sha256_file(receipt_path)
+    index = load_validation_index(path, data_path, expected_counts, exclusions, tokenizer_config)
+    expected = validation_index_receipt(index, path)
+    if (json.loads(receipt_path.read_text()) != expected or expected['sha256'] != index_sha
+            or sha256_file(receipt_path) != receipt_sha):
+        raise ValueError('Prepared validation index receipt is stale or inconsistent')
+    return {'path': str(path), 'receipt_sha256': receipt_sha, **expected}
+
+
+def import_validation_index(source, destination, expected, data_path, expected_counts, exclusions, tokenizer_config):
+    """Copy verified CPU index bytes into a new run; leave all model encoding fresh."""
+    source, destination = Path(source).resolve(), Path(destination).resolve()
+    if destination.exists() or destination.with_suffix('.json').exists():
+        raise FileExistsError('Refusing existing validation index artifacts')
+    observed = prepared_validation_input(source, data_path, expected_counts, exclusions, tokenizer_config)
+    if observed != expected:
+        raise ValueError('Prepared validation source changed since preflight')
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    for original, copied in ((source, destination), (source.with_suffix('.json'), destination.with_suffix('.json'))):
+        with original.open('rb') as reader, copied.open('xb') as writer:
+            shutil.copyfileobj(reader, writer)
+    imported = prepared_validation_input(destination, data_path, expected_counts, exclusions, tokenizer_config)
+    if (imported != {**expected, 'path': str(destination)} or sha256_file(source) != expected['sha256']
+            or sha256_file(source.with_suffix('.json')) != expected['receipt_sha256']):
+        raise ValueError('Validation source or imported copy changed during import')
+    return imported
 
 
 class StrictValidationMolecules(Dataset):

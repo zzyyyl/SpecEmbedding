@@ -139,6 +139,7 @@ def audit_optimization_run(run):
             "Optimization run is not complete; refusing a completion audit")
     require([row["name"] for row in status["stages"]] in (
         ["import_v15", "prepare_validation", "baseline_validation", "alignment42"],
+        ["import_v15", "import_validation", "baseline_validation", "alignment42"],
         ["prepare_v15", "prepare_validation", "baseline_validation", "alignment42"]), "Unexpected optimization stages")
     manifest = read_json(run / "inputs_and_commands.json")
     audit_versions = {name: version(name) for name in ("torch", "torchmetrics")}
@@ -157,6 +158,20 @@ def audit_optimization_run(run):
     index_path = run / "validation" / "mass_val_topk256.pt"
     index = load_validation_index(index_path, run / "data" / "MassSpecGym", counts, exclusions, runtime["data"]["tokenizer"])
     index_sha = fingerprint(index_path, status["stages"][1]["audit"]["sha256"])
+    if status["stages"][1]["name"] == "import_validation":
+        prepared = manifest.get("prepared_validation")
+        require(isinstance(prepared, dict), "Missing prepared validation input provenance")
+        imported = status["stages"][1].get("imported_validation")
+        require(imported == {**prepared, "path": str(index_path)} and prepared["sha256"] == index_sha,
+                "Imported validation index differs from the pinned source")
+        require(manifest["inputs"].get("prepared_validation_index") == {
+                    "path": prepared["path"], "sha256": index_sha}
+                and manifest["inputs"].get("prepared_validation_receipt") == {
+                    "path": str(Path(prepared["path"]).with_suffix('.json')), "sha256": prepared["receipt_sha256"]},
+                "Prepared validation input files differ from preflight")
+        fingerprint(index_path.with_suffix('.json'), prepared["receipt_sha256"])
+    else:
+        require("prepared_validation" not in manifest, "Prepared validation was not imported")
     directory = run / "alignment42_topk256"
     selection = read_json(directory / "alignment_selection.json")
     fingerprint(directory / "best_model_stage2.pth", selection["checkpoint_sha256"])

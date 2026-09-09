@@ -70,7 +70,8 @@ def test_molecular_masses_are_representation_invariant_and_invalid_graphs_fail()
 
 @pytest.mark.parametrize('mol_augmentation', [None, True, False])
 @pytest.mark.parametrize('candidate_supervision', [False, True])
-def test_optimization_preflight_pins_batching_without_changing_other_hyperparameters(tmp_path, mol_augmentation, candidate_supervision):
+@pytest.mark.parametrize('prepared_validation', [False, True])
+def test_optimization_preflight_pins_batching_without_changing_other_hyperparameters(tmp_path, mol_augmentation, candidate_supervision, prepared_validation):
     source = tmp_path / 'source'
     source.mkdir()
     (source / 'fixture.tsv').write_text('source')
@@ -91,12 +92,18 @@ def test_optimization_preflight_pins_batching_without_changing_other_hyperparame
     if candidate_supervision:
         args.prepared_data = tmp_path/'prepared'
         args.alignment_training_candidates = tmp_path/'metadata.pkl'
+    validation_receipt = {'path': str(tmp_path/'index.pt'), 'sha256': 'e'*64, 'receipt_sha256': 'f'*64}
+    if prepared_validation:
+        args.prepared_data = tmp_path/'prepared'
+        args.prepared_validation_index = tmp_path/'index.pt'
     with patch.object(config.fulltrain.v15, 'sources', ConfigObject({'fixture.tsv': sha256_file(source/'fixture.tsv')})), \
          patch.object(runner.subprocess, 'check_output', side_effect=lambda command, **kwargs: '' if 'status' in command else 'test-commit'), \
          patch.object(runner, 'prepared_source', return_value={'manifest_sha256': 'd'*64}), \
+         patch.object(runner, 'prepared_validation_input', return_value=validation_receipt) as prepare_index, \
          patch.object(runner, 'build_candidate_training_input', return_value=(None, candidate_receipt)) as build:
         manifest = runner.preflight(args)
     assert build.call_count == int(candidate_supervision)
+    assert prepare_index.call_count == int(prepared_validation)
     actual = manifest['runtime_config']['train']['align']
     expected = config.train.align.to_dict()
     expected.update(batching='mass_blocks', metric_for_best='validation_top1_then_mrr')
@@ -109,7 +116,8 @@ def test_optimization_preflight_pins_batching_without_changing_other_hyperparame
     assert config.augmentation.node_drop_rate == config.augmentation.edge_mask_rate == 0.1
     assert config.train.align.batching == 'random'
     assert [s['name'] for s in manifest['stages']] == [
-        'import_v15' if candidate_supervision else 'prepare_v15', 'prepare_validation', 'baseline_validation', 'alignment42']
+        'import_v15' if candidate_supervision or prepared_validation else 'prepare_v15',
+        'import_validation' if prepared_validation else 'prepare_validation', 'baseline_validation', 'alignment42']
     command = manifest['stages'][-1]['command']
     assert ('--candidate-training-input' in command) == candidate_supervision
     assert config.train.align.candidate_supervision.enabled is False
@@ -118,6 +126,10 @@ def test_optimization_preflight_pins_batching_without_changing_other_hyperparame
         assert manifest['candidate_training_input'] == candidate_receipt
         assert manifest['inputs']['training_candidates'] == {'path': str(tmp_path/'metadata.pkl'), 'sha256': 'a'*64}
         assert build.call_args.args[2] == expected['candidate_supervision']
+    if prepared_validation:
+        assert manifest['prepared_validation'] == validation_receipt
+        assert manifest['inputs']['prepared_validation_index'] == {'path': str(tmp_path/'index.pt'), 'sha256': 'e'*64}
+        assert 'command' not in manifest['stages'][1]
 
 
 @pytest.mark.parametrize('scheme', ['random', 'mass_blocks'])
@@ -186,6 +198,18 @@ def test_candidate_supervision_requires_optimization_and_prepared_data(tmp_path,
             runner.main(argv)
         preflight.assert_not_called()
     assert not (tmp_path/'new').exists()
+
+
+def test_prepared_validation_requires_prepared_data_and_optimization(tmp_path):
+    argv = ['--source-dir', str(tmp_path), '--legacy-tsv', str(tmp_path/'legacy'),
+            '--output-root', str(tmp_path/'new'), '--gpus', '0', '1', '--device', 'cuda:0',
+            '--prepared-validation-index', str(tmp_path/'index.pt'), '--dry-run']
+    with patch.object(runner, 'preflight') as preflight:
+        with pytest.raises(SystemExit):
+            runner.main(argv)
+        with pytest.raises(SystemExit):
+            runner.main(argv + ['--optimize-alignment', '--baseline-checkpoint', str(tmp_path/'baseline.pth')])
+        preflight.assert_not_called()
 
 
 def test_zero_graph_rates_keep_complete_graph_and_spectrum_augmentation(monkeypatch):

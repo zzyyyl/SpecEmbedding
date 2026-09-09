@@ -36,6 +36,7 @@ from SpecEmbedding.utils.gpu_pool import (
     wait_for_any_gpu,
 )
 from SpecEmbedding.utils.massspecgym_v15 import import_prepared_dataset, prepared_source, verify_dataset, write_json
+from SpecEmbedding.utils.retrieval_validation import import_validation_index, prepared_validation_input
 
 ROOT = Path(__file__).resolve().parent
 
@@ -74,6 +75,9 @@ def commands(args):
                    "--data-path", str(data), "--index", str(index), "--checkpoint", str(args.baseline_checkpoint),
                    "--output", str(args.output_root / "baseline_validation"), "--device", args.device]},
                   result[1]]
+        if getattr(args, "prepared_validation_index", None) is not None:
+            result[1] = {"name": "import_validation", "gpu": False,
+                         "source": str(args.prepared_validation_index), "output": str(index)}
     return result
 
 
@@ -132,6 +136,17 @@ def preflight(args):
             raise ValueError("Optimization baseline checkpoint/configuration provenance mismatch")
     source_config = Path(os.environ.get("SPECEMBEDDING_CONFIG", DEFAULT_CONFIG_PATH)).resolve()
     extra = {}
+    validation_path = getattr(args, "prepared_validation_index", None)
+    if validation_path is not None:
+        if not getattr(args, "optimize_alignment", False) or getattr(args, "prepared_data", None) is None:
+            raise ValueError("Prepared validation index requires optimization and a fully prepared dataset")
+        prepared = prepared_validation_input(validation_path, args.prepared_data,
+                                             config.fulltrain.expected_counts.to_dict(),
+                                             config.fulltrain.exclude_val_query_indices, config.data.tokenizer.to_dict())
+        extra["prepared_validation"] = prepared
+        inputs["prepared_validation_index"] = {"path": str(validation_path), "sha256": prepared["sha256"]}
+        inputs["prepared_validation_receipt"] = {"path": str(validation_path.with_suffix('.json')),
+                                                 "sha256": prepared["receipt_sha256"]}
     candidate_settings = align_settings["candidate_supervision"]
     validate_candidate_settings(candidate_settings)
     candidate_path = getattr(args, "alignment_training_candidates", None)
@@ -249,7 +264,7 @@ def execute(args, manifest):
             if sha256_file(args.output_root / "candidate_training_input.json") != status["candidate_training_input_sha256"]:
                 raise ValueError("Pinned candidate training input changed during queue wait")
         for item in status["stages"]:
-            if item["name"] == "prepare_validation" and item["state"] == "complete":
+            if item["name"] in ("prepare_validation", "import_validation") and item["state"] == "complete":
                 if sha256_file(args.output_root / "validation" / "mass_val_topk256.pt") != item["audit"]["sha256"]:
                     raise ValueError("Prepared validation index changed during queue wait")
 
@@ -278,6 +293,13 @@ def execute(args, manifest):
                                         manifest["prepared_input"], config.fulltrain.expected_counts.to_dict(),
                                         config.fulltrain.exclude_val_query_indices)
                 progress["prepared_input"] = manifest["prepared_input"]
+            elif stage["name"] == "import_validation":
+                progress["imported_validation"] = import_validation_index(
+                    args.prepared_validation_index, args.output_root / "validation" / "mass_val_topk256.pt",
+                    manifest["prepared_validation"], args.output_root / "data" / "MassSpecGym",
+                    config.fulltrain.expected_counts.to_dict(), config.fulltrain.exclude_val_query_indices,
+                    config.data.tokenizer.to_dict(),
+                )
             else:
                 with (logs / f"{stage['name']}.log").open("x") as handle:
                     subprocess.run(stage["command"], cwd=ROOT, env=child_environment, stdout=handle, stderr=subprocess.STDOUT, check=True)
@@ -294,7 +316,7 @@ def execute(args, manifest):
                             or summary["best_retrieval"]["queries"] != config.fulltrain.expected_counts.val - len(config.fulltrain.exclude_val_query_indices)):
                         raise ValueError("Alignment retrieval checkpoint-selection audit failed")
                     progress["retrieval_selection"] = summary
-            elif stage["name"] == "prepare_validation":
+            elif stage["name"] in ("prepare_validation", "import_validation"):
                 receipt = json.loads((args.output_root / "validation" / "mass_val_topk256.json").read_text())
                 if (receipt["sha256"] != sha256_file(args.output_root / "validation" / "mass_val_topk256.pt")
                         or receipt["queries"] != config.fulltrain.expected_counts.val - len(config.fulltrain.exclude_val_query_indices)):
@@ -328,6 +350,8 @@ def main(argv=None):
     add_gpu_arguments(parser)
     parser.add_argument("--device", required=True)
     parser.add_argument("--prepared-data", type=Path, help="Import a complete, fingerprint-verified CPU dataset into a new run")
+    parser.add_argument("--prepared-validation-index", type=Path,
+                        help="Reuse verified CPU validation index bytes; all model embeddings are still freshly encoded")
     parser.add_argument("--optimize-alignment", action="store_true", help="Full validation baseline then one alignment seed42 selected by retrieval; no test/rerank matrix")
     parser.add_argument("--baseline-checkpoint", type=Path, help="Frozen v1.5 seed42 baseline for the alignment optimization branch")
     parser.add_argument("--alignment-batching", choices=["random", "mass_blocks"],
@@ -347,6 +371,10 @@ def main(argv=None):
         setattr(args, name, getattr(args, name).expanduser().resolve())
     if args.prepared_data is not None:
         args.prepared_data = args.prepared_data.expanduser().resolve()
+    if args.prepared_validation_index is not None:
+        args.prepared_validation_index = args.prepared_validation_index.expanduser().resolve()
+        if not args.optimize_alignment or args.prepared_data is None:
+            parser.error("--prepared-validation-index requires --optimize-alignment and --prepared-data")
     if args.baseline_checkpoint is not None:
         args.baseline_checkpoint = args.baseline_checkpoint.expanduser().resolve()
     if args.alignment_training_candidates is not None:
