@@ -40,22 +40,21 @@ class TrainerAlign:
         
         os.makedirs(self.save_dir, exist_ok=True)
 
+    def training_batch_loss(self, batch):
+        mzs, ints, masks, mols, labels = batch
+        f_spec, f_mol, scale = self.model(mzs.to(self.device), ints.to(self.device),
+                                         masks.to(self.device), mols.to(self.device))
+        return self.criterion(f_spec, f_mol, scale, labels), mzs.shape[0]
+
     def train_epoch(self, optimizer, epoch, stage_name):
         self.model.train()
         total_loss = 0
         seen = 0
         pbar = tqdm(self.train_loader, desc=f"[{stage_name}] Epoch {epoch} Training", ascii=True)
         
-        for mzs, ints, masks, mols, labels in pbar:
-            spec_mz = mzs.to(self.device)
-            spec_intensity = ints.to(self.device)
-            spec_mask = masks.to(self.device)
-            mol_graph = mols.to(self.device)
-            
+        for batch in pbar:
             optimizer.zero_grad()
-            
-            f_spec, f_mol, scale = self.model(spec_mz, spec_intensity, spec_mask, mol_graph)
-            loss = self.criterion(f_spec, f_mol, scale, labels)
+            loss, query_count = self.training_batch_loss(batch)
             if self.expected_epoch_counts is not None and not torch.isfinite(loss):
                 raise RuntimeError("Non-finite formal alignment training loss")
             
@@ -64,7 +63,7 @@ class TrainerAlign:
             optimizer.step()
             
             total_loss += loss.item()
-            seen += mzs.shape[0]
+            seen += query_count
             pbar.set_postfix({'loss': f"{loss.item():.4f}"})
             
         if self.expected_epoch_counts is not None:

@@ -13,11 +13,12 @@ class AlignGraphDataset(TrainDataset):
     质谱-分子图对齐数据集。
     将 SMILES 转换为 PyG 的 Data 对象，用于 GNN (如 GINE) 训练。
     """
-    def __init__(self, *args, graph_cache_size: int = 0, full_spectra: bool = False, **kwargs):
+    def __init__(self, *args, graph_cache_size: int = 0, full_spectra: bool = False, graph_policy=None, **kwargs):
         super().__init__(*args, **kwargs)
         if graph_cache_size < -1:
             raise ValueError("graph_cache_size must be -1, 0, or a positive integer")
         self.graph_cache_size = graph_cache_size
+        self.graph_policy = graph_policy
         self._mol_cache = OrderedDict()
         self.full_spectra = full_spectra
         self._spectrum_indices = []
@@ -39,7 +40,7 @@ class AlignGraphDataset(TrainDataset):
             return mol
 
         smiles = self._data[label][0]["smiles"] if smiles is None else smiles
-        mol = smiles_to_graph(smiles)
+        mol = smiles_to_graph(smiles, graph_policy=self.graph_policy)
 
         if self.graph_cache_size != 0:
             self._mol_cache[cache_key] = mol
