@@ -288,6 +288,23 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-10：A04 epoch20的正常/置换/常量/只保留母离子四种完整验证视图已绑定与预检，
+  126项既有A04审计工件重验通过；固定源码仍为`8f6971f`，严格CPU构造及权重重载成功，
+  没有CPU模型forward。原模型/训练/验证语义不变，仅将12项旧默认路径迁入外部根并添加
+  storage配置；14项输入SHA与四条命令另行读回通过。准备根为
+  `/data1/zyl/SpecEmbedding/audits/spectrum_controls_a04_preparation_20260910/`，`manifest.json`
+  SHA-256 `e288274cbe2edd1305b1e898b6552607b85e011d3fc858171bef405b9e8a81fe`，入口脚本
+  `runner.py` SHA-256 `ffb4da51f240b616a2409aa524192bcfdb91ffeb469386a23d1d979790be046d`。
+  06:43:22已单次启动，`launch.json`与`dispatch.json`禁止删除或重发；独立socket为
+  `/tmp/specembedding-a04-controls-20260910-1010/tmux.sock`、`controls/%0`、PID3479867。
+  实际`status.json`首阶段为`normal/waiting_gpu`，PID与pane存活；GPU0/1当前均未满足门槛，
+  尚未开始推理。输出将位于
+  `/data1/zyl/SpecEmbedding/experiments/massspecgym_v15_a04_spectrum_controls_20260910_topk256/`。
+  每阶段等待两卡择一的原120秒门槛后严格cuda:0；重新编码完整候选，正常视图先检查是否
+  在原容差内复现A04，每阶段独立重算完整分数。脚本Ruff/语法通过，复用既有已测试的
+  GPU池、验证及审计组件。此队列是固定checkpoint诊断，不是新模型训练；A06派发前需
+  确认其终态，避免内部等待入口竞争。A05原训练PID3455061继续存活，06:40:34完成第11轮，
+  当前选优仍为epoch9；具体指标见A05实验卡，计划保持执行中。
 - 2026-09-10：补充D17保留母离子的碎片移除对照，实现提交`8f6971f`已推送，固定源码为
   `/data1/zyl/repos/SpecEmbedding-spectrum-controls-20260910/`、完整commit
   `8f6971f3c56b9d50ed5f29849ff17aa0422cd15c`；70项相关测试、Ruff、compileall和diff检查通过。
