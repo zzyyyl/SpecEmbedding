@@ -135,6 +135,8 @@ checkpoint/版本、来源表格、分母和评价设置。各项的最好值可
   MRR 用于辅助取舍，不能补偿某个 Top-k 没有达标。
 - 每轮把成功、失败、无收益、资源消耗和下一步理由写入同一实验索引；维护一个 incumbent，
   不反复重跑原始 baseline，不把排队/派发/半轮运行记作完成。
+- 最终候选冻结前，在完整验证集记录谱图置换/恒定输入敏感性，区分谱图信息与候选分布先验。
+  保持候选、分母与身份规则不变；这是候选捷径审计，不用测试样本选择控制设置或模型。
 
 ## 5. 文献与 SOTA 参考核验
 
@@ -165,6 +167,22 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 源哈希、逐 query 差集、固定源码快照哈希与可重跑脚本保存在
 `/data1/zyl/SpecEmbedding/audits/sota_protocol_20260909/receipt.json` 及相邻 `audit.py`。
 此项仅为比较条件审计，没有运行 GLACIER 推理、修改外部复现任务或改变 A01 完整协议。
+进一步只读核验了已固定的上游 `ed8311f`（不把独立复现分支的本地修改视为论文实现）：
+
+- [GLACIER 调用脚本](https://github.com/coleygroup/ms-pred/blob/ed8311f22958cb37f055b663b5f56c5c77a2ee33/run_scripts/glacier/03_run_retrieval.py)
+  的 MassSpecGym 项仍被注释，使用的 `msg` 路径/配置没有给出绑定论文训练的输入哈希；
+  README 中的 v1.5 数据处理说明不能单独证明该 checkpoint 已使用 v1.5。
+- [通用评价器](https://github.com/coleygroup/ms-pred/blob/ed8311f22958cb37f055b663b5f56c5c77a2ee33/src/ms_pred/retrieval/retrieval_benchmark.py)
+  使用 NumPy 稳定排序，并会跳过部分缺预测、空真谱、无正例或真值映射失败的 query；
+  其分母和同分规则不能直接继承为本计划的完整评价。
+- README 另建议使用 TorchMetrics 入口；该固定版本的
+  [对应文件](https://github.com/coleygroup/ms-pred/blob/ed8311f22958cb37f055b663b5f56c5c77a2ee33/src/ms_pred/retrieval/retrieval_benchmark_torchmetrics.py)
+  在第 139 行有未闭合字典表达式，独立 `ast.parse` 已证实不能原样执行。没有导入、运行或修复外部文件。
+
+上述发现描述可获得的固定源码，不证明论文实际用了哪个 revision、分母或排序，因而不据此
+否定其报告成绩。源文件、哈希与语法核验保存在上述 `sota_protocol_20260909` 审计根的
+`glacier_source_protocol/receipt.json` 和 `torchmetrics_addendum.json`；后续仍需逐 query 预测/覆盖
+及输入指纹，才能完成同协议比较。官方审计论文中的匿名架构也不直接对应为某篇论文的审计结论。
 以约 70% Top-1 的公开报告作为需要核验的强参考，不把 15%–16% 自动定为达标线。
 正式参考向量 S_j 只在逐项核对数据版本、完整分母、候选处理、身份规则、外部数据和模型版本后冻结；
 不排除生成式/forward 方法，只因协议不匹配而单列。无法核验的高分保留为 reported-only 并说明原因。
