@@ -288,6 +288,18 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-10：补充D17保留母离子的碎片移除对照，实现提交`8f6971f`已推送，固定源码为
+  `/data1/zyl/repos/SpecEmbedding-spectrum-controls-20260910/`、完整commit
+  `8f6971f3c56b9d50ed5f29849ff17aa0422cd15c`；70项相关测试、Ruff、compileall和diff检查通过。
+  06:15:32完成19,423条验证输入CPU重新分词/母离子逐条核验，随后独立读回全部保存张量并
+  重验8项输入SHA；两进程均正常退出0。工件根为
+  `/data1/zyl/SpecEmbedding/audits/precursor_control_inputs_20260910/`，完成回执SHA-256
+  `ac06bacc5db1a0f4b09a5c2058712ed197ce610928671dbbe2dea060348fd81e`，独立验证回执SHA-256
+  `6f19994a7c60532b1b5afac879e82bf92637e48bb1f0a7cebde708e4f14afc7a`；原始脚本、输入指纹和
+  `controlled_inputs.npz`均保存在该目录。候选/标签/源位置、原序列及训练RNG不变；这只是
+  输入敏感性准备，没有模型forward、GPU派发或test评价。A05/A06固定源码仍干净且未改。
+  同次复查A05原PID3455061及指定pane存活，06:15:30完成第9轮并继续训练；当前最佳为
+  epoch9，完整指标见A05实验卡，前9轮资源记录全部覆盖train194,119/val19,423。
 - 2026-09-10：05:34完成固定指纹下16/64/255自然负例预算的全量CPU输入诊断，05:35独立
   读回通过；每档194,119条训练query，逐项核验源位置、不同二维负例及实际输入位值，详见
   优化索引D16。原始根为`/data1/zyl/SpecEmbedding/audits/fingerprint_negative_budget_20260910/`，
