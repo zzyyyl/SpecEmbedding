@@ -5,7 +5,7 @@
 
 ## A01：按完整验证检索选择 alignment checkpoint
 
-- 状态：实现和 synthetic 验证完成，正式队列待派发；性能收益未知。
+- 状态：2026-09-09 14:07 派发，14:12 完成 CPU 准备与审计，进入 `baseline_validation/waiting_gpu`；性能收益未知。
 - 固定起点：v1.5 r4 alignment seed42，原按验证对比损失选中 epoch15；来源见
   [准确率排查](massspecgym_v15_regression_audit.md)。不重新执行旧 12 组矩阵。
 - 假设：验证对比损失最优的 epoch 未必具有最好的候选检索排名；直接观察完整验证检索
@@ -21,7 +21,8 @@
 - 同分规则：主指标对应 `torchmetrics==1.8.2` 的逐 query CPU `argsort(descending=True)`，
   padding 先移除；稳定排序另存敏感性视图。MRR 按同一排名扩展，不声称它是官方已报告指标。
 - 资源：单卡显式 CUDA，物理 GPU 0/1 择一等待；分子编码 batch512、谱图 batch128、CPU workers4。
-  现有 val cache 约 82.8 万个唯一分子，新索引的最终数量以实际审计为准。逐轮记录验证耗时，
+  新验证索引实测 827,600 个唯一分子、19,423 个 query，全部 query 自然包含正例；
+  记录 6 个源候选图排除条目，没有多正例 query。逐轮记录验证耗时，
   先实测再决定是否需要图缓存；不为省时减少 query 或候选。
 - 队列阶段：导入已审计数据 → CPU 验证索引 → 固定 checkpoint 验证 → 单 seed alignment。
   该队列不包含 test 推理或 reranker，完成只表示 A01 候选完成。
@@ -30,4 +31,6 @@
 - 验证：53 项专项通过；全仓 239 通过、1 跳过、1 个既有内部路径审计失败；Ruff、compileall、
   diff 检查通过。新增指标测试使用真实 `torchmetrics 1.8.2`，覆盖同分、多正例和空正例。
 
-原始运行地址、源码 commit 和后续结果在派发后回填；当前没有新的性能结论。
+运行位置、固定源码与启动记录集中在阶段计划第 10 节；原始索引回执为运行根中的
+`validation/mass_val_topk256.json`。CPU 子进程已退出，仅入口等待 GPU，尚未完成固定
+checkpoint 的新验证或 A01 训练；当前没有新的性能结论。

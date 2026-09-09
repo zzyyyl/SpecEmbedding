@@ -53,7 +53,7 @@ checkpoint/版本、来源表格、分母和评价设置。各项的最好值可
 - Base 排序在进入 reranker 前已经较弱。新缓存并未复用旧 alignment 权重或旧磁盘 TokenSet。
   旧候选格式捷径已量化，但尚不能把旧模型的全部性能差额归因于单一因素。
 - r4 alignment 按每轮全部谱图训练，以验证对比损失选择 checkpoint；reranker 目前按验证 MRR
-  选择。A01 已实现完整验证候选检索与 alignment 检索选优，正式运行待核验，再判断结构、
+  选择。A01 已实现完整验证候选检索与 alignment 检索选优，已完成 CPU 准备并等待 GPU，再判断结构、
   loss、预训练或参数变化的价值，不能只观察训练 loss。
 - 原模型、旧 query cap/top-40/forcing 结果只保留追溯，不能当成 v1.5 的可靠目标线。
   reranker 无法救回其候选池外的真值，必须同时记录 Base、coarse 与最终排序的 coverage。
@@ -153,6 +153,17 @@ checkpoint/版本、来源表格、分母和评价设置。各项的最好值可
 
 **当前不得声称已找到并冻结所有指标的 SOTA。** 特别是 Top-10、MRR 缺少完整同协议对比，
 GLACIER 附录不同配置的 Top-10 不能无说明拼到主表 checkpoint。
+
+2026-09-09 补充查询分母核验：官方 `RetrievalSimulationDataset` 继承 simulation 筛选，
+仅使用 `simulation_challenge` 行，不能与完整 `RetrievalDataset` 混用；见
+[官方数据加载器](https://github.com/pluskal-lab/MassSpecGym/blob/main/massspecgym/data/datasets.py)。
+对已校验 v1.5 TSV 重新计数，完整 test 为 17,556，simulation test 为 9,954。
+下载的 GLACIER **Formula** 候选表覆盖 17,147 个官方 test ID（缺 409 个），包含全部 simulation
+test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论文指标的影响尚未确定，
+不能据此断言 GLACIER Table 1 使用哪一个分母，更不能把 Formula 包的覆盖继承给缺失的 Mass 包。
+源哈希、逐 query 差集、固定源码快照哈希与可重跑脚本保存在
+`/data1/zyl/SpecEmbedding/audits/sota_protocol_20260909/receipt.json` 及相邻 `audit.py`。
+此项仅为比较条件审计，没有运行 GLACIER 推理、修改外部复现任务或改变 A01 完整协议。
 以约 70% Top-1 的公开报告作为需要核验的强参考，不把 15%–16% 自动定为达标线。
 正式参考向量 S_j 只在逐项核对数据版本、完整分母、候选处理、身份规则、外部数据和模型版本后冻结；
 不排除生成式/forward 方法，只因协议不匹配而单列。无法核验的高分保留为 reported-only 并说明原因。
@@ -219,6 +230,25 @@ GLACIER 附录不同配置的 Top-10 不能无说明拼到主表 checkpoint。
 - [ ] 论文修改后执行双语编译、引用/匿名扫描、发布 manifest 和仓库要求的复现检查。
 
 ## 10. 执行记录
+
+- 2026-09-09：补充 SOTA 查询分母审计，结果与边界见第 5 节；源 TSV 与已下载候选包哈希均
+  与既有来源 manifest 匹配。该审计没有新增模型分数；最终同协议参考向量仍未冻结。
+
+- 2026-09-09 14:12（北京时间）：A01 已完成数据导入及完整验证索引准备，状态实测为
+  `baseline_validation/waiting_gpu`，CPU 准备子进程已退出。候选/query 数量与协议见
+  [优化索引](../../analysis/massspecgym_optimization.md)，详细指纹见运行根的
+  `validation/mass_val_topk256.json`；全部有效 query 保留自然正例，没有 forcing。
+  14:07:18 单次启动，固定源码 `cba38a459fe438d29bc21bd19c54995f8d7e298e` 位于
+  `/data1/zyl/repos/SpecEmbedding-opt-a01-20260909/`，detached worktree 保持不变。
+  新运行根：`/data1/zyl/SpecEmbedding/experiments/massspecgym_v15_opt_a01_20260909_topk256/`；
+  独立 socket：`/tmp/specembedding-opt-a01-20260909-1010/tmux.sock`，session `opt` / pane `%0`，
+  入口 PID 3182732。`launch_receipt.json` 保存派发命令与固定提交；`inputs_and_commands.json`、
+  `runtime_params.yaml`、`status.json`、`runner.log` 保存输入、配置、阶段和等待证据。
+  启动前已核验目录/socket 未使用且没有同运行入口；未重发旧队列或删除任何锁。
+  本队列依次执行 CPU 导入、CPU 验证索引、旧 checkpoint 完整验证、单 seed42 alignment，
+  不包含 test 或 reranker。两 GPU 阶段分别等待物理 GPU 0/1，选中 UUID 映射为显式 `cuda:0`。
+  14:12:02 的历史快照为 GPU 0 利用率 93% / 空闲 19,188 MiB，GPU 1 为 76% / 20,646 MiB，
+  均未满足利用率门槛；后台继续等待，无新增外部监测器。排队不代表模型开始训练或性能改善。
 
 - 2026-09-09 A01：已实现完整验证检索选优，实验卡见
   [单 baseline 索引](../../analysis/massspecgym_optimization.md)。主排名使用已核验的
@@ -417,7 +447,7 @@ GLACIER 附录不同配置的 Top-10 不能无说明拼到主表 checkpoint。
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
 - 验证结果：本轮 53 项专项通过；全仓 239 通过、1 跳过、1 个既有路径审计失败；静态检查通过
-- 当前训练状态：r4 旧矩阵已主动停止，新优化训练尚未派发；详见停止回执和实验日志
+- 当前训练状态：r4 旧矩阵已主动停止；A01 队列已派发、CPU 准备完成，等待 GPU 执行基线验证
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；
