@@ -99,3 +99,28 @@ def test_dry_run_creates_no_directory_or_child(tmp_path):
                              '--dry-run', '--', 'not-an-executable'], text=True, capture_output=True, check=True)
     assert json.loads(result.stdout)['storage_root'] == str(root)
     assert not root.exists()
+
+
+def test_actual_queue_child_preserves_external_cache_environment(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    import run_massspecgym_v15 as runner
+
+    root = tmp_path / 'external'
+    root.mkdir()
+    overrides = storage_environment(root)
+    for key, value in overrides.items():
+        monkeypatch.setenv(key, value)
+    args = SimpleNamespace(output_root=root, source_dir=root / 'raw', legacy_tsv=root / 'old.tsv',
+                           gpu=1, device='cuda:1')
+    manifest = {'runtime_config': runner.config.to_dict(), 'stages': runner.commands(args)}
+    monkeypatch.setattr(runner, 'gpu_inventory', lambda: {0: 'GPU-a', 1: 'GPU-b'})
+    monkeypatch.setattr(runner, 'preflight', lambda _: manifest)
+    captured = {}
+    def child(*args, **kwargs):
+        captured.update(kwargs['env'])
+        raise RuntimeError('Synthetic child stopped before any data preparation')
+    monkeypatch.setattr(runner.subprocess, 'run', child)
+    with pytest.raises(RuntimeError, match='Synthetic child'):
+        runner.execute(args, manifest)
+    assert {key: captured[key] for key in overrides} == overrides

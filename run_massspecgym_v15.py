@@ -266,8 +266,9 @@ def execute(args, manifest):
         raise ValueError("Unexpected noncontiguous physical GPU inventory")
     environment.update(CUDA_VISIBLE_DEVICES="" if pool is not None else ",".join(ordered), SPECEMBEDDING_REQUIRE_CUDA="1",
                        SPECEMBEDDING_EXPECTED_CUDA_DEVICE=args.device,
-                       NUMBA_CACHE_DIR="/tmp/specembedding-v15-numba", MPLCONFIGDIR="/tmp/specembedding-v15-mpl",
                        OMP_NUM_THREADS="1", MKL_NUM_THREADS="1")
+    environment.setdefault('NUMBA_CACHE_DIR', '/tmp/specembedding-v15-numba')
+    environment.setdefault('MPLCONFIGDIR', '/tmp/specembedding-v15-mpl')
     logs = args.output_root / "logs"
     logs.mkdir()
     status = {"state": "running", "started_at": now(), "stages": [], "gpu_uuid_order": ordered,
