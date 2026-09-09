@@ -286,6 +286,19 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-10：05:34完成固定指纹下16/64/255自然负例预算的全量CPU输入诊断，05:35独立
+  读回通过；每档194,119条训练query，逐项核验源位置、不同二维负例及实际输入位值，详见
+  优化索引D16。原始根为`/data1/zyl/SpecEmbedding/audits/fingerprint_negative_budget_20260910/`，
+  完成回执SHA-256 `65c9f07a237155c52dfc918504acc7804f38a3c092f0f9e5b1362be26670ef17`，
+  独立读回回执SHA-256 `8fca1c103b6544141eaec3a0d0bd58e276cc9f7ba626419f762f268004bba5eb`；
+  重新核对20项输入和9项输出、25,046个target及三档全量query计数。单次CPU派发记录为
+  相邻`fingerprint_negative_budget_20260910.launch.json`，专用socket
+  `/tmp/specembedding-fingerprint-negative-budget-20260910-1010/tmux.sock`、`audit/%0`、PID3464183
+  已终态；`/proc`确认退出码0。两份诊断脚本Ruff/语法通过，源码仍为干净`d6226ef`。
+  此项没有模型forward、GPU派发或test评价，A05原训练进程仍存活，A06保持16负例配置；
+  未来是否增加监督预算仍待A06结果和正式GPU成本测量，未创建新的模型尝试或宣称检索收益。
+  05:38:34另记录A05第6轮完整验证刷新当前选优，Top-1为11.06%、MRR0.2218；前6轮资源均
+  记录完整train194,119/val19,423，正式训练继续，详情见A05实验卡。
 - 2026-09-10：05:03:33完成A06继承已晋升A04的全量CPU条件预检，源码仍为干净`d6226ef`，
   当前A05继续运行。新回执为`/data1/zyl/SpecEmbedding/audits/optimization_a06_conditional_a04_20260910/receipt.json`，
   SHA-256 `7c6a8a120de15294333ad620979220e1d5f332692dd76b596a931b8e84c35cd7`。
