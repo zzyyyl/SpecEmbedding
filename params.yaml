@@ -74,6 +74,9 @@ train:
       graph_cache_size: 10000 # bounded CPU cache of unaugmented candidate graphs
 
 retrieval_validation:
+  graph_cache_preparation:
+    workers: 8
+    chunk_size: 1024
   spectrum_controls:
     permutation_seed: 42
     constant_mz: [100.0, 50.0]

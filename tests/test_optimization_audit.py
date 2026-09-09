@@ -106,6 +106,61 @@ def test_complete_audit_preserves_full_denominator_and_reports_topk_tradeoff(com
     assert len(report["pareto_candidates"]) == 2 and not report["test_evaluated_by_this_audit"]
 
 
+@pytest.mark.parametrize('damage', [None, 'baseline', 'selection', 'snapshot', 'cache_bytes', 'unpinned'])
+def test_completion_checks_full_graph_cache_and_every_usage_receipt(completed_run, damage):
+    from SpecEmbedding.utils.molecule_graph_cache import audit_graph_cache, build_graph_cache, graph_cache_provenance
+    from SpecEmbedding.utils.retrieval_validation import load_validation_graph_cache
+
+    run, index, selection = completed_run
+    index['mol_smiles'] = ['C' * n for n in range(1, 26)]
+    index_path = run / 'validation/mass_val_topk256.pt'
+    torch.save(index, index_path)
+    index_sha = sha256_file(index_path)
+    root = run.parent / 'graphs'
+    provenance = graph_cache_provenance(index['mol_smiles'], index_sha256=index_sha,
+                                        dataset_manifest_sha256=index['dataset_manifest_sha256'])
+    build_graph_cache(index['mol_smiles'], root, provenance, workers=1, chunk_size=8)
+    audit_graph_cache(index['mol_smiles'], root, provenance, workers=1, chunk_size=8)
+    _, receipt = load_validation_graph_cache(index_path, index, root)
+    fingerprint = {key: receipt[key] for key in ('directory', 'manifest_sha256', 'audit_sha256')}
+    manifest_path = run / 'inputs_and_commands.json'
+    manifest = json.loads(manifest_path.read_text())
+    manifest['validation_graph_cache'] = receipt
+    files = {entry['filename']: entry['sha256'] for entry in receipt['files'].values()}
+    files.update({'manifest.json': receipt['manifest_sha256'], 'audit.json': receipt['audit_sha256']})
+    for name, digest in files.items():
+        manifest['inputs'][f'validation_graph_{name}'] = {'path': str(root / name), 'sha256': digest}
+    if damage == 'unpinned':
+        del manifest['inputs']['validation_graph_x.bin']
+    write_json(manifest_path, manifest)
+    status = json.loads((run / 'status.json').read_text())
+    status['stages'][1]['audit']['sha256'] = index_sha
+    write_json(run / 'status.json', status)
+    selection['validation_index']['sha256'] = index_sha
+    selection['validation_graph_cache'] = None if damage == 'selection' else receipt
+    write_json(run / 'alignment42_topk256/alignment_selection.json', selection)
+    baseline_path = run / 'baseline_validation/metrics.json'
+    baseline = json.loads(baseline_path.read_text())
+    baseline.update(index_sha256=index_sha, validation_graph_cache=None if damage == 'baseline' else receipt)
+    write_json(baseline_path, baseline)
+    for path in [run / 'baseline_validation/baseline_epoch000.pt',
+                 *sorted((run / 'alignment42_topk256/validation_retrieval').glob('*.pt'))]:
+        snapshot = torch.load(path, weights_only=False)
+        snapshot['validation_graph_cache'] = fingerprint
+        if damage == 'snapshot' and path.name == 'stage2_epoch002.pt':
+            snapshot['validation_graph_cache'] = None
+        torch.save(snapshot, path)
+    if damage == 'cache_bytes':
+        (root / 'x.bin').write_bytes((root / 'x.bin').read_bytes() + b'changed')
+    if damage is None:
+        result = audit.audit_optimization_run(run)
+        assert result['validation_graph_cache'] == receipt
+        assert all(str(root / name) in result['artifact_sha256'] for name in files)
+    else:
+        with pytest.raises(ValueError, match='[Gg]raph cache|fingerprint'):
+            audit.audit_optimization_run(run)
+
+
 def test_completion_binds_imported_validation_to_original_source_and_receipt(completed_run):
     run, _, _ = completed_run
     source = run.parent / 'prepared.pt'

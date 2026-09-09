@@ -16,6 +16,7 @@ from SpecEmbedding.data.graph_utils import smiles_to_graph
 from SpecEmbedding.data.tokenizer import Tokenizer
 from SpecEmbedding.utils.fulltrain import sha256_file
 from SpecEmbedding.utils.massspecgym_v15 import IDENTITY_POLICY, identity, verify_dataset
+from SpecEmbedding.utils.molecule_graph_cache import graph_cache_provenance, load_graph_cache, molecule_order_sha256
 from SpecEmbedding.utils.spectrum_controls import ControlledValidationSpectra
 
 PROTOCOL = "v1.5 source candidate order; 2D InChIKey; audited graph exclusions; torchmetrics 1.8.2 CPU argsort descending"
@@ -170,15 +171,27 @@ def import_validation_index(source, destination, expected, data_path, expected_c
     return imported
 
 
+def load_validation_graph_cache(index_path, index, directory):
+    provenance = graph_cache_provenance(index['mol_smiles'], index_sha256=sha256_file(index_path),
+                                        dataset_manifest_sha256=index['dataset_manifest_sha256'])
+    return load_graph_cache(index['mol_smiles'], directory, provenance)
+
+
 class StrictValidationMolecules(Dataset):
-    def __init__(self, smiles):
+    def __init__(self, smiles, graph_cache=None):
         self.smiles = smiles
+        self.graph_cache = graph_cache
+        if graph_cache is not None:
+            source = graph_cache.manifest['provenance']
+            if len(graph_cache) != len(smiles) or source['molecule_order_sha256'] != molecule_order_sha256(smiles):
+                raise ValueError('Validation graph cache changed molecule order or coverage')
 
     def __len__(self):
         return len(self.smiles)
 
     def __getitem__(self, index):
-        graph = smiles_to_graph(self.smiles[index], graph_policy="rdkit_sanitized")
+        graph = (smiles_to_graph(self.smiles[index], graph_policy="rdkit_sanitized")
+                 if self.graph_cache is None else self.graph_cache[index])
         if graph is None:
             raise ValueError(f"Previously eligible validation molecule failed to encode: {self.smiles[index]}")
         return {"graph": graph, "original_idx": index}
@@ -216,10 +229,16 @@ def retrieval_metrics(scores, positive, valid, top_k=(1, 5, 10, 20)):
 
 
 class AlignmentRetrievalValidator:
-    def __init__(self, index, settings, output_dir=None, *, spectrum_control=None, control_settings=None):
+    def __init__(self, index, settings, output_dir=None, *, spectrum_control=None, control_settings=None, graph_cache=None):
         self.index = index
         self.settings = settings
         self.output_dir = Path(output_dir) if output_dir is not None else None
+        if graph_cache is not None and graph_cache.manifest['provenance']['dataset_manifest_sha256'] != index.get('dataset_manifest_sha256'):
+            raise ValueError('Validation graph cache belongs to a different dataset')
+        self.molecules = StrictValidationMolecules(index['mol_smiles'], graph_cache)
+        self.graph_cache_fingerprint = (None if graph_cache is None else {
+            'directory': str(graph_cache.root), 'manifest_sha256': sha256_file(graph_cache.root / 'manifest.json'),
+            'audit_sha256': sha256_file(graph_cache.root / 'audit.json')})
         if spectrum_control is None:
             if control_settings is not None:
                 raise ValueError("Control settings require an explicit spectrum control")
@@ -238,7 +257,7 @@ class AlignmentRetrievalValidator:
         index, settings = self.index, self.settings
         # This generator is private: validation must not change the training RNG stream.
         generator = torch.Generator().manual_seed(0)
-        mol_loader = DataLoader(StrictValidationMolecules(index["mol_smiles"]), batch_size=settings.mol_batch_size,
+        mol_loader = DataLoader(self.molecules, batch_size=settings.mol_batch_size,
                                 num_workers=settings.num_workers, shuffle=False, collate_fn=mol_collate_fn,
                                 generator=generator)
         embeddings = None
@@ -280,6 +299,8 @@ class AlignmentRetrievalValidator:
             self.output_dir.mkdir(parents=True, exist_ok=True)
             path = self.output_dir / f"{stage}_epoch{epoch:03d}.pt"
             extra = {"spectrum_control": self.control_metadata} if self.control_metadata is not None else {}
+            if self.graph_cache_fingerprint is not None:
+                extra['validation_graph_cache'] = self.graph_cache_fingerprint
             with path.open("xb") as handle:
                 torch.save({"metrics": metrics, "ranks": ranks, "scores": all_scores,
                             "raw_query_indices": index["raw_query_indices"], "protocol": PROTOCOL, **extra}, handle)

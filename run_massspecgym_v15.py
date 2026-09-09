@@ -36,7 +36,12 @@ from SpecEmbedding.utils.gpu_pool import (
     wait_for_any_gpu,
 )
 from SpecEmbedding.utils.massspecgym_v15 import import_prepared_dataset, prepared_source, verify_dataset, write_json
-from SpecEmbedding.utils.retrieval_validation import import_validation_index, prepared_validation_input
+from SpecEmbedding.utils.retrieval_validation import (
+    import_validation_index,
+    load_validation_graph_cache,
+    load_validation_index,
+    prepared_validation_input,
+)
 
 ROOT = Path(__file__).resolve().parent
 
@@ -78,6 +83,9 @@ def commands(args):
         if getattr(args, "prepared_validation_index", None) is not None:
             result[1] = {"name": "import_validation", "gpu": False,
                          "source": str(args.prepared_validation_index), "output": str(index)}
+        if getattr(args, "validation_graph_cache", None) is not None:
+            result[2]["command"] += ["--graph-cache", str(args.validation_graph_cache)]
+            result[3]["command"] += ["--validation-graph-cache", str(args.validation_graph_cache)]
     return result
 
 
@@ -147,6 +155,18 @@ def preflight(args):
         inputs["prepared_validation_index"] = {"path": str(validation_path), "sha256": prepared["sha256"]}
         inputs["prepared_validation_receipt"] = {"path": str(validation_path.with_suffix('.json')),
                                                  "sha256": prepared["receipt_sha256"]}
+    graph_path = getattr(args, "validation_graph_cache", None)
+    if graph_path is not None:
+        if validation_path is None:
+            raise ValueError("Validation graph cache requires a verified prepared validation index")
+        index = load_validation_index(validation_path, args.prepared_data, config.fulltrain.expected_counts.to_dict(),
+                                      config.fulltrain.exclude_val_query_indices, config.data.tokenizer.to_dict())
+        _, graph_receipt = load_validation_graph_cache(validation_path, index, graph_path)
+        extra["validation_graph_cache"] = graph_receipt
+        graph_files = {entry['filename']: entry['sha256'] for entry in graph_receipt['files'].values()}
+        graph_files.update({'manifest.json': graph_receipt['manifest_sha256'], 'audit.json': graph_receipt['audit_sha256']})
+        inputs.update({f"validation_graph_{name}": {"path": str(graph_path / name), "sha256": digest}
+                       for name, digest in graph_files.items()})
     candidate_settings = align_settings["candidate_supervision"]
     validate_candidate_settings(candidate_settings)
     candidate_path = getattr(args, "alignment_training_candidates", None)
@@ -316,6 +336,8 @@ def execute(args, manifest):
                             or summary["best_retrieval"]["queries"] != config.fulltrain.expected_counts.val - len(config.fulltrain.exclude_val_query_indices)):
                         raise ValueError("Alignment retrieval checkpoint-selection audit failed")
                     progress["retrieval_selection"] = summary
+                    if selection.get("validation_graph_cache") != manifest.get("validation_graph_cache"):
+                        raise ValueError("Training used a different validation graph cache")
             elif stage["name"] in ("prepare_validation", "import_validation"):
                 receipt = json.loads((args.output_root / "validation" / "mass_val_topk256.json").read_text())
                 if (receipt["sha256"] != sha256_file(args.output_root / "validation" / "mass_val_topk256.pt")
@@ -326,6 +348,8 @@ def execute(args, manifest):
                 progress["audit"] = json.loads((args.output_root / "baseline_validation" / "metrics.json").read_text())
                 if progress["audit"]["checkpoint_sha256"] != manifest["inputs"]["baseline_checkpoint"]["sha256"]:
                     raise ValueError("Baseline checkpoint changed")
+                if progress["audit"].get("validation_graph_cache") != manifest.get("validation_graph_cache"):
+                    raise ValueError("Baseline used a different validation graph cache")
             else:
                 rerank = json.loads((args.output_root / "rerank_topk256" / "status.json").read_text())
                 validate_baseline_completion(rerank)
@@ -352,6 +376,7 @@ def main(argv=None):
     parser.add_argument("--prepared-data", type=Path, help="Import a complete, fingerprint-verified CPU dataset into a new run")
     parser.add_argument("--prepared-validation-index", type=Path,
                         help="Reuse verified CPU validation index bytes; all model embeddings are still freshly encoded")
+    parser.add_argument("--validation-graph-cache", type=Path, help="Reuse fully audited fixed validation molecule graphs")
     parser.add_argument("--optimize-alignment", action="store_true", help="Full validation baseline then one alignment seed42 selected by retrieval; no test/rerank matrix")
     parser.add_argument("--baseline-checkpoint", type=Path, help="Frozen v1.5 seed42 baseline for the alignment optimization branch")
     parser.add_argument("--alignment-batching", choices=["random", "mass_blocks"],
@@ -377,6 +402,10 @@ def main(argv=None):
             parser.error("--prepared-validation-index requires --optimize-alignment and --prepared-data")
     if args.baseline_checkpoint is not None:
         args.baseline_checkpoint = args.baseline_checkpoint.expanduser().resolve()
+    if args.validation_graph_cache is not None:
+        args.validation_graph_cache = args.validation_graph_cache.expanduser().resolve()
+        if args.prepared_validation_index is None:
+            parser.error("--validation-graph-cache requires --prepared-validation-index")
     if args.alignment_training_candidates is not None:
         args.alignment_training_candidates = args.alignment_training_candidates.expanduser().resolve()
         if not args.optimize_alignment or args.prepared_data is None:

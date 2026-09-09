@@ -383,6 +383,21 @@ SPECEMBEDDING_CONFIG="$FROZEN_CONTROL_CONFIG" python alignment_validation.py \
 
 ## 验证（不启动训练）
 
+下一轮优化可显式复用完整验证图，先在独立冻结源码内运行CPU准备：
+
+```bash
+CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+  python prepare_validation_graph_cache.py --data-path "$AUDITED_V15_DATA" \
+  --index "$FULL_VALIDATION_INDEX" --output "$NEW_VALIDATION_GRAPH_CACHE"
+```
+
+准备使用`params.yaml`中的`retrieval_validation.graph_cache_preparation`，完整构建后重新
+构图并逐张核对全部张量，保存`manifest.json`、`audit.json`和`preparation.json`；无limit或
+覆盖/续跑选项。只保存固定输入图，不包含模型embedding。完成审计后，在新的优化队列命令
+中同时加入`--prepared-validation-index "$FULL_VALIDATION_INDEX"`与
+`--validation-graph-cache "$NEW_VALIDATION_GRAPH_CACHE"`。baseline和每轮验证均重新编码，
+来源/软件版本/图文件指纹不符立即失败。不要修改或重启正在运行的队列来切换缓存。
+
 ```bash
 python -m pytest -q tests/test_gpu_tmux_watch.py
 python -m pytest -q tests/test_fulltrain_runner.py

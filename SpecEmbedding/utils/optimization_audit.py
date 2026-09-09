@@ -10,7 +10,7 @@ import torch
 import yaml
 
 from SpecEmbedding.utils.fulltrain import sha256_file
-from SpecEmbedding.utils.retrieval_validation import PROTOCOL, load_validation_index
+from SpecEmbedding.utils.retrieval_validation import PROTOCOL, load_validation_graph_cache, load_validation_index
 from SpecEmbedding.utils.training_resources import audit_resource_profiles
 
 METRICS = ("top1", "top5", "top10", "top20", "mrr")
@@ -32,10 +32,11 @@ def compare_metrics(candidate, baseline):
     return {"delta_raw": delta, "topk_gains": gains, "material_regressions": losses, "outcome": outcome}
 
 
-def audit_snapshot(path, index, *, expected_spectrum_control=None):
+def audit_snapshot(path, index, *, expected_spectrum_control=None, expected_graph_cache=None):
     """Independently reconstruct all ranks from saved float32 scores, including missing positives."""
     snapshot = torch.load(path, map_location="cpu", weights_only=False)
     require(snapshot.get("spectrum_control") == expected_spectrum_control, "Unexpected spectrum control in validation snapshot")
+    require(snapshot.get("validation_graph_cache") == expected_graph_cache, "Unexpected graph cache in validation snapshot")
     require(snapshot["protocol"] == index["protocol"] == PROTOCOL, "Snapshot protocol mismatch")
     require(snapshot["raw_query_indices"] == index["raw_query_indices"], "Snapshot query order/coverage mismatch")
     scores, labels = snapshot["scores"], index["positive_mask"]
@@ -65,7 +66,7 @@ def audit_snapshot(path, index, *, expected_spectrum_control=None):
     return metrics
 
 
-def audit_trajectory(directory, index, stage, baseline):
+def audit_trajectory(directory, index, stage, baseline, *, expected_graph_cache=None):
     history = stage["retrieval_history"]
     require([row["epoch"] for row in history] == list(range(1, stage["stop_epoch"] + 1)), "Incomplete epoch trajectory")
     require(bool(history) and stage["metric_for_best"] == "validation_top1_then_mrr", "Wrong selection protocol")
@@ -76,7 +77,7 @@ def audit_trajectory(directory, index, stage, baseline):
     for record in history:
         epoch = record["epoch"]
         path = directory / "validation_retrieval" / f"stage2_epoch{epoch:03d}.pt"
-        metrics = audit_snapshot(path, index)
+        metrics = audit_snapshot(path, index, expected_graph_cache=expected_graph_cache)
         hashes[str(path)] = sha256_file(path)
         for key, value in metrics.items():
             require(math.isclose(value, record[key], rel_tol=0, abs_tol=1e-12), f"Trajectory metric mismatch: epoch {epoch} {key}")
@@ -233,11 +234,27 @@ def audit_optimization_run(run):
     require(baseline_receipt["index_sha256"] == index_sha and baseline_receipt["protocol"] == PROTOCOL
             and baseline_receipt["checkpoint_sha256"] == manifest["inputs"]["baseline_checkpoint"]["sha256"], "Baseline provenance mismatch")
     baseline_path = run / "baseline_validation" / "baseline_epoch000.pt"
-    baseline = audit_snapshot(baseline_path, index)
+    graph_receipt = manifest.get('validation_graph_cache')
+    require(selection.get('validation_graph_cache') == baseline_receipt.get('validation_graph_cache') == graph_receipt,
+            'Validation graph cache differs between preflight, training and baseline')
+    graph_fingerprint = None
+    if graph_receipt is not None:
+        _, verified_graph = load_validation_graph_cache(index_path, index, graph_receipt['directory'])
+        require(verified_graph == graph_receipt, 'Validation graph cache changed since preflight')
+        graph_fingerprint = {key: graph_receipt[key] for key in ('directory', 'manifest_sha256', 'audit_sha256')}
+        graph_files = {entry['filename']: entry['sha256'] for entry in graph_receipt['files'].values()}
+        graph_files.update({'manifest.json': graph_receipt['manifest_sha256'], 'audit.json': graph_receipt['audit_sha256']})
+        for name, digest in graph_files.items():
+            path = Path(graph_receipt['directory']) / name
+            require(manifest['inputs'].get(f'validation_graph_{name}') == {'path': str(path), 'sha256': digest},
+                    'Graph cache file was not pinned in preflight')
+            fingerprint(path, digest)
+    baseline = audit_snapshot(baseline_path, index, expected_graph_cache=graph_fingerprint)
     fingerprint(baseline_path)
     require(all(math.isclose(baseline[key], baseline_receipt["metrics"][key], rel_tol=0, abs_tol=1e-12) for key in baseline),
             "Baseline receipt metrics mismatch")
-    report = audit_trajectory(directory, index, stage, baseline)
+    report = audit_trajectory(directory, index, stage, baseline, expected_graph_cache=graph_fingerprint)
+    report['validation_graph_cache'] = graph_receipt
     resource_report, resource_hashes = audit_resource_profiles(directory, stage, expected, selection["device"])
     report["resource_measurements"] = resource_report
     report["candidate_training"] = candidate_report

@@ -26,7 +26,11 @@ from SpecEmbedding.utils.mass_batching import MassBlockBatchSampler, molecular_e
 from SpecEmbedding.utils.massspecgym_v15 import classified_full_spectra
 from SpecEmbedding.utils.model import SiameseModel
 from SpecEmbedding.utils.providers import get_provider
-from SpecEmbedding.utils.retrieval_validation import AlignmentRetrievalValidator, load_validation_index
+from SpecEmbedding.utils.retrieval_validation import (
+    AlignmentRetrievalValidator,
+    load_validation_graph_cache,
+    load_validation_index,
+)
 from SpecEmbedding.utils.runtime import resolve_device, setup_logging, startup_logging
 from train import add_base_argument, get_classified_data
 
@@ -287,6 +291,7 @@ def main():
     parser.add_argument("--pretrained_spec", type=str, help="Path to your pre-trained SpecEmbedding model weights")
     parser.add_argument("--formal-fulltrain", action="store_true", help="Audited v1.5, fresh all-spectrum tokenization, strict CUDA, no old weights or caches")
     parser.add_argument("--validation-index", type=Path, help="Audited full Mass validation candidate/identity index for retrieval checkpoint selection")
+    parser.add_argument("--validation-graph-cache", type=Path, help="Fully audited fixed input graphs; embeddings remain fresh")
     parser.add_argument("--candidate-training-input", type=Path,
                         help="Pinned full natural training-candidate receipt from the optimization runner")
     parser.add_argument(
@@ -313,6 +318,8 @@ def main():
         parser.error("Retrieval selection requires --validation-index and the matching pinned metric configuration")
     if args.validation_index and not args.formal_fulltrain:
         parser.error("Retrieval selection requires audited formal full-training data")
+    if args.validation_graph_cache and not args.validation_index:
+        parser.error("--validation-graph-cache requires --validation-index")
     candidate_settings = config.train.align.candidate_supervision.to_dict()
     validate_candidate_settings(candidate_settings)
     if candidate_settings["enabled"] != bool(args.candidate_training_input):
@@ -355,10 +362,15 @@ def main():
             config.fulltrain.expected_counts.to_dict(), args.exclude_val_query_indices,
         )
     retrieval_validator = None
+    graph_receipt = None
     if args.validation_index:
         index = load_validation_index(args.validation_index, args.data_path, config.fulltrain.expected_counts.to_dict(),
                                       args.exclude_val_query_indices, config.data.tokenizer.to_dict())
-        retrieval_validator = AlignmentRetrievalValidator(index, config.retrieval_validation, save_path / "validation_retrieval")
+        graph_cache = None
+        if args.validation_graph_cache:
+            graph_cache, graph_receipt = load_validation_graph_cache(args.validation_index, index, args.validation_graph_cache)
+        retrieval_validator = AlignmentRetrievalValidator(index, config.retrieval_validation,
+                                                        save_path / "validation_retrieval", graph_cache=graph_cache)
 
     fulltrain_audit = None
     if args.formal_fulltrain:
@@ -442,6 +454,7 @@ def main():
         selection_metadata={
             "dataset_type": args.dataset_type,
             "candidate_training_input": candidate_input_fingerprint,
+            "validation_graph_cache": graph_receipt,
             "validation_index": ({"path": str(args.validation_index.resolve()),
                                   "sha256": sha256_file(args.validation_index)}
                                  if args.validation_index else None),
@@ -458,6 +471,10 @@ def main():
         },
     )
 
+    if args.validation_graph_cache:
+        _, final_graph_receipt = load_validation_graph_cache(args.validation_index, index, args.validation_graph_cache)
+        if final_graph_receipt != graph_receipt:
+            raise ValueError("Validation graph cache changed during training")
 
     logging.info("\nTraining complete! The final aligned model is returned and ready for evaluation/inference.")
 

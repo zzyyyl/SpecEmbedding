@@ -193,6 +193,90 @@ def test_real_small_model_validation_preserves_rng_and_responds_to_weight_change
         validator(model, torch.device("cpu"), 2, "synthetic")
 
 
+@pytest.mark.parametrize('workers', [0, 2])
+def test_cached_validation_matches_fresh_scores_and_reencodes_changed_weights(tmp_path, monkeypatch, workers):
+    from SpecEmbedding.utils.molecule_graph_cache import audit_graph_cache, build_graph_cache, graph_cache_provenance
+    from SpecEmbedding.utils.optimization_audit import audit_snapshot
+    from SpecEmbedding.utils.retrieval_validation import load_validation_graph_cache
+
+    source, _, _ = reusable_index(tmp_path, monkeypatch)
+    index = torch.load(source, weights_only=False)
+    provenance = graph_cache_provenance(index['mol_smiles'], index_sha256=sha256_file(source),
+                                        dataset_manifest_sha256=index['dataset_manifest_sha256'])
+    root = tmp_path / 'graphs'
+    build_graph_cache(index['mol_smiles'], root, provenance, workers=1, chunk_size=2)
+    audit_graph_cache(index['mol_smiles'], root, provenance, workers=1, chunk_size=2)
+    store, _ = load_validation_graph_cache(source, index, root)
+    model = SpecMolAlignModel(SiameseModel(embedding_dim=16, n_head=2, n_layer=1, dim_feedward=16, dim_target=16),
+                              GINEEncoder(emb_dim=8, n_layers=1, size_feature_dim=4, dropout_rate=0.),
+                              spec_dim=16, hidden_dim=16, final_dim=16, dropout_rate=0., tau=.07)
+    settings = SimpleNamespace(mol_batch_size=2, spec_batch_size=2, num_workers=workers, top_k=[1, 5, 10, 20])
+    fresh = AlignmentRetrievalValidator(index, settings, tmp_path / 'fresh')
+    cached = AlignmentRetrievalValidator(index, settings, tmp_path / 'cached', graph_cache=store)
+    rng = torch.get_rng_state().clone()
+    for epoch in (1, 2):
+        fresh(model, torch.device('cpu'), epoch, 'synthetic')
+        with patch('SpecEmbedding.utils.retrieval_validation.smiles_to_graph', side_effect=AssertionError('Cache bypassed')):
+            cached(model, torch.device('cpu'), epoch, 'synthetic')
+        a = torch.load(tmp_path / 'fresh' / f'synthetic_epoch{epoch:03d}.pt', weights_only=False)
+        b = torch.load(tmp_path / 'cached' / f'synthetic_epoch{epoch:03d}.pt', weights_only=False)
+        assert torch.equal(a['scores'], b['scores']) and torch.equal(a['ranks'], b['ranks'])
+        assert {k: v for k, v in a['metrics'].items() if k != 'seconds'} == {k: v for k, v in b['metrics'].items() if k != 'seconds'}
+        assert b['raw_query_indices'] == [0, 2, 3] and b['metrics']['queries'] == 3
+        audit_snapshot(tmp_path / 'cached' / f'synthetic_epoch{epoch:03d}.pt', index,
+                       expected_graph_cache=cached.graph_cache_fingerprint)
+        with pytest.raises(ValueError, match='graph cache'):
+            audit_snapshot(tmp_path / 'cached' / f'synthetic_epoch{epoch:03d}.pt', index)
+        if epoch == 1:
+            old_scores = b['scores'].clone()
+            with torch.no_grad():
+                for parameter in model.mol_proj.parameters():
+                    parameter.zero_()
+        else:
+            assert not torch.equal(old_scores, b['scores'])
+    assert torch.equal(rng, torch.get_rng_state())
+    for changed in ({**index, 'mol_smiles': list(reversed(index['mol_smiles']))},
+                    {**index, 'dataset_manifest_sha256': 'f' * 64}):
+        with pytest.raises(ValueError, match='cache'):
+            AlignmentRetrievalValidator(changed, settings, graph_cache=store)
+
+
+def test_graph_preparation_cli_builds_full_audited_inputs_without_gpu(tmp_path, monkeypatch):
+    import prepare_validation_graph_cache as entry
+    from SpecEmbedding.utils.retrieval_validation import load_validation_graph_cache
+
+    source, _, options = reusable_index(tmp_path, monkeypatch)
+    data, counts, exclusions, tokenizer = options
+    def node(value):
+        return SimpleNamespace(to_dict=lambda: value)
+    monkeypatch.setattr(entry, 'config', SimpleNamespace(
+        fulltrain=SimpleNamespace(expected_counts=node(counts), exclude_val_query_indices=exclusions),
+        data=SimpleNamespace(tokenizer=node(tokenizer)),
+        retrieval_validation=SimpleNamespace(graph_cache_preparation=node({'workers': 1, 'chunk_size': 2}))))
+    root = tmp_path / 'cache'
+    args = ['--data-path', str(data), '--index', str(source), '--output', str(root)]
+    with patch('torch.cuda.is_available', side_effect=AssertionError('CPU preparation touched CUDA')):
+        entry.main(args)
+    report = json.loads((root / 'preparation.json').read_text())
+    assert report['state'] == 'complete_validation_graph_cache_preparation'
+    assert report['audit']['audited_molecules'] == 3 and not report['model_encoding_performed']
+    _, receipt = load_validation_graph_cache(source, torch.load(source, weights_only=False), root)
+    assert receipt == report['graph_cache']
+    with pytest.raises(SystemExit):
+        entry.main(args)
+
+
+def test_graph_cache_queue_binds_same_cache_to_both_gpu_stages(tmp_path):
+    args = SimpleNamespace(output_root=tmp_path, source_dir=tmp_path / 'source', legacy_tsv=tmp_path / 'old',
+                           gpu=None, gpus=[0, 1], device='cuda:0', optimize_alignment=True,
+                           baseline_checkpoint=tmp_path / 'baseline.pth', prepared_data=tmp_path / 'prepared',
+                           prepared_validation_index=tmp_path / 'index.pt', validation_graph_cache=tmp_path / 'graphs')
+    stages = runner.commands(args)
+    assert [s['name'] for s in stages] == ['import_v15', 'import_validation', 'baseline_validation', 'alignment42']
+    for stage, flag in ((stages[2], '--graph-cache'), (stages[3], '--validation-graph-cache')):
+        assert stage['command'][stage['command'].index(flag) + 1] == str(args.validation_graph_cache)
+
+
 def test_retrieval_selection_can_prefer_higher_loss_and_preserves_topk_frontier(tmp_path):
     model = torch.nn.Linear(1, 1)
     trajectory = [{"top1": .1, "mrr": .2, "top5": .5, "top10": .6, "top20": .8},
