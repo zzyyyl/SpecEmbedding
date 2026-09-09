@@ -1,3 +1,4 @@
+import json
 import logging
 import math
 import os
@@ -10,6 +11,7 @@ from tqdm import tqdm
 
 from SpecEmbedding.loss_align import ContrastiveAlignmentLoss
 from SpecEmbedding.models_align import SpecMolAlignModel
+from SpecEmbedding.utils.training_resources import EpochResources
 
 
 class TrainerAlign:
@@ -22,6 +24,7 @@ class TrainerAlign:
         device: torch.device,
         save_dir: str = "./checkpoints",
         retrieval_validator=None,
+        record_resources=False,
     ):
         self.model = model.to(device)
         self.train_loader = train_loader
@@ -33,6 +36,7 @@ class TrainerAlign:
         self.expected_epoch_counts = None
         self.epoch_counts = []
         self.retrieval_validator = retrieval_validator
+        self.record_resources = record_resources
         
         os.makedirs(self.save_dir, exist_ok=True)
 
@@ -112,17 +116,26 @@ class TrainerAlign:
         stop_epoch = 0
         early_stopped = False
         validator = getattr(self, "retrieval_validator", None)
+        record_resources = getattr(self, "record_resources", False)
         best_retrieval = None
         retrieval_history = []
         frontier = []
+        resource_profiles = []
         
         for epoch in range(1, epochs + 1):
             stop_epoch = epoch
+            resources = EpochResources(self.model, self.device) if record_resources else None
             train_loss = self.train_epoch(optimizer, epoch, stage_name)
+            if resources is not None:
+                resources.phase("train")
             val_loss = self.validate(epoch, stage_name)
+            if resources is not None:
+                resources.phase("contrastive_validation")
             if not math.isfinite(train_loss) or not math.isfinite(val_loss):
                 raise RuntimeError("Non-finite alignment epoch loss; refusing checkpoint selection")
             retrieval = validator(self.model, self.device, epoch, stage_name) if validator is not None else None
+            if resources is not None:
+                resources.phase("retrieval_validation")
             if retrieval is not None:
                 metrics = ("top1", "top5", "top10", "top20", "mrr")
                 if any(not math.isfinite(retrieval[key]) or not 0 <= retrieval[key] <= 1 for key in metrics):
@@ -163,7 +176,19 @@ class TrainerAlign:
                 if patience_counter >= patience:
                     logging.info("Early stopping triggered.")
                     early_stopped = True
-                    break
+            if resources is not None:
+                observed = self.epoch_counts[-1] if self.expected_epoch_counts is not None else None
+                profile = {"stage": stage_name, "epoch": epoch, **resources.finish(observed)}
+                directory = Path(self.save_dir) / "resources"
+                directory.mkdir(exist_ok=True)
+                path = directory / f"{stage_name}_epoch{epoch:03d}.json"
+                with path.open("x") as handle:
+                    json.dump(profile, handle, indent=2, allow_nan=False)
+                    handle.write("\n")
+                resource_profiles.append(profile)
+                logging.info("Epoch resource measurement: %s", json.dumps(profile, allow_nan=False))
+            if early_stopped:
+                break
                 
         if best_model_state is not None:
             self.model.load_state_dict(best_model_state)
@@ -180,5 +205,7 @@ class TrainerAlign:
         if validator is not None:
             self.stage_summaries[stage_name].update(best_retrieval=best_retrieval,
                                                    retrieval_history=retrieval_history, pareto_frontier=frontier)
+        if record_resources:
+            self.stage_summaries[stage_name]["resource_profiles"] = resource_profiles
             
         return best_val_loss

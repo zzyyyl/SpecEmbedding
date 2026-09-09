@@ -11,6 +11,7 @@ import yaml
 
 from SpecEmbedding.utils.fulltrain import sha256_file
 from SpecEmbedding.utils.retrieval_validation import PROTOCOL, load_validation_index
+from SpecEmbedding.utils.training_resources import audit_resource_profiles
 
 METRICS = ("top1", "top5", "top10", "top20", "mrr")
 TOLERANCE = {key: .002 for key in METRICS}  # Top-k: 0.2 percentage points; MRR: 0.002 raw.
@@ -200,6 +201,9 @@ def audit_optimization_run(run):
     require(all(math.isclose(baseline[key], baseline_receipt["metrics"][key], rel_tol=0, abs_tol=1e-12) for key in baseline),
             "Baseline receipt metrics mismatch")
     report = audit_trajectory(directory, index, stage, baseline)
+    resource_report, resource_hashes = audit_resource_profiles(directory, stage, expected, selection["device"])
+    report["resource_measurements"] = resource_report
+    hashes.update(resource_hashes)
     report["artifact_sha256"].update(hashes)
     report.update(run=str(run), source_commit=manifest["git_commit"], protocol=PROTOCOL,
                   audit_versions=audit_versions,

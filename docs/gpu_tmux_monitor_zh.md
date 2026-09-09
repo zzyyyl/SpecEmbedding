@@ -280,6 +280,14 @@ seed42 全量 alignment 训练；不派发测试或 reranker。去掉 `--dry-run
 `validation_retrieval/` 保存每轮分数和排名，selection JSON 记录选优轨迹及 Pareto 文件名。
 训练完成只代表这一个优化候选完成，不代表已接近 SOTA。表现改善后再恢复矩阵。
 
+新源码的正式 alignment 自动逐轮保存 `resources/stage2_epochNNN.json`，并将相同记录写入
+selection 的 `resource_profiles`。记录参数量、实际 query 数、训练吞吐、训练/对比验证/
+完整检索验证/选优与 checkpoint 的同步墙钟耗时，以及该进程在显式 CUDA 设备上的
+PyTorch allocated/reserved 峰值；早停的最后一轮也保留记录。检索验证耗时包含候选重编码，
+这些阶段耗时不等于部署延迟。CPU 内存字段仅为主进程生命周期峰值 RSS，包含之前的准备工作，
+不包含 DataLoader workers，不能称为全进程树或整机峰值。该记录器不创建后台监测进程，
+也不改变训练 RNG、选优或早停规则。运行中的旧固定源码不会新增此记录，不能事后补造峰值。
+
 训练顺序实验可在上述优化命令中显式添加 `--alignment-batching mass_blocks`。
 默认仍为 `train.align.batching: random`；`mass_block_size: 32` 来自 `params.yaml`，
 必须整除 batch size。该选项只改变训练 batch 的组装：按计算精确质量形成小组，混合小组
@@ -303,6 +311,8 @@ python audit_alignment_optimization.py --run "$COMPLETED_OPTIMIZATION_ROOT" \
 
 该入口拒绝未完成的队列和已有输出文件；重新检查输入/配置指纹、每轮完整计数，
 从全部保存分数独立重算排名和 Top-k/MRR，并核对选优、Pareto 候选及最终权重。
+若保存了逐轮资源记录，还会检查阶段时长/吞吐/设备/计数/显存值及独立文件与 selection 的一致性，
+并保存文件哈希；旧固定源码未记录的资源明确标为 `not_recorded`。
 报告比较原 baseline，以及同一已观察轨迹中的最低验证 loss 轮；后者不代表重新执行了
 按 loss 早停的反事实训练。容差固定为各 Top-k 0.2 个百分点、MRR 0.002 原值，
 报告所有改善与退步项，不自动换 checkpoint、重启训练或修改论文。

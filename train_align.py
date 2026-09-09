@@ -162,6 +162,7 @@ def train_align(
         device,
         save_dir=save_dir,
         retrieval_validator=retrieval_validator,
+        record_resources=formal_fulltrain,
     )
     if formal_fulltrain:
         trainer.expected_epoch_counts = expected
