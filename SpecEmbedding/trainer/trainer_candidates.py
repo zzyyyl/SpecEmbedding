@@ -1,14 +1,19 @@
 """Candidate-supervised alignment component; formal runner integration is separate."""
 
 import hashlib
+import json
 import math
 from numbers import Real
+from pathlib import Path
 
+import numpy as np
 import torch
 
 from SpecEmbedding.data.datasets_candidates import CandidateAlignDataset, CandidateAlignmentBatch
 from SpecEmbedding.loss_candidates import candidate_alignment_loss
 from SpecEmbedding.trainer.trainer_align import TrainerAlign
+from SpecEmbedding.utils.candidate_training import LOSS_NAME
+from SpecEmbedding.utils.fulltrain import sha256_file
 
 
 class CandidateTrainerAlign(TrainerAlign):
@@ -52,6 +57,8 @@ class CandidateTrainerAlign(TrainerAlign):
         candidate_loss = candidate_alignment_loss(f_spec, f_positive, f_negative, batch.negative_ptr, scale)
         base_loss = self.criterion(f_spec, f_positive, scale, labels)
         self._candidate_seen.index_add_(0, raw, torch.ones_like(raw))
+        self._candidate_query_order.extend(raw.tolist())
+        self._candidate_batch_sizes.append(n)
         counts = batch.negative_ptr[1:] - batch.negative_ptr[:-1]
         self._candidate_counts[raw] = counts
         for value in (raw, batch.negative_ptr, batch.candidate_indices, batch.source_positions):
@@ -67,24 +74,37 @@ class CandidateTrainerAlign(TrainerAlign):
         self._candidate_counts = torch.zeros(len(dataset), dtype=torch.long)
         self._candidate_sample_hash = hashlib.sha256()
         self._candidate_loss_sum = 0.0
+        self._candidate_query_order = []
+        self._candidate_batch_sizes = []
         loss = super().train_epoch(optimizer, epoch, stage_name)
         if not torch.all(self._candidate_seen == 1):
             raise RuntimeError("Candidate training did not visit each original training query exactly once")
         counts = self._candidate_counts
-        self.candidate_epoch_audits.append({
+        directory = Path(self.save_dir) / "candidate_training"
+        directory.mkdir(exist_ok=True)
+        order_path = directory / f"{stage_name}_epoch{epoch:03d}.npy"
+        with order_path.open("xb") as handle:
+            np.save(handle, np.asarray(self._candidate_query_order, dtype=np.int64), allow_pickle=False)
+        record = {
             "stage": stage_name, "epoch": epoch, "seed": dataset.seed, "queries": len(dataset),
             "unique_queries": len(dataset), "negative_samples": int(counts.sum()),
             "minimum_negatives": int(counts.min()), "maximum_negatives": int(counts.max()),
             "queries_without_negatives": int((counts == 0).sum()),
             "candidate_loss_query_mean": self._candidate_loss_sum / len(dataset),
             "observed_query_sample_order_sha256": self._candidate_sample_hash.hexdigest(),
-        })
+            "batch_sizes": self._candidate_batch_sizes,
+            "query_order_file": order_path.name, "query_order_sha256": sha256_file(order_path),
+        }
+        with order_path.with_suffix(".json").open("x") as handle:
+            json.dump(record, handle, indent=2, allow_nan=False)
+            handle.write("\n")
+        self.candidate_epoch_audits.append(record)
         return loss
 
     def fit(self, epochs, optimizer, scheduler=None, stage_name="Stage", patience=5):
         result = super().fit(epochs, optimizer, scheduler=scheduler, stage_name=stage_name, patience=patience)
         self.stage_summaries[stage_name]["candidate_training"] = {
-            "loss": "baseline_bidirectional_inbatch_plus_per_query_candidate_ce",
+            "loss": LOSS_NAME,
             "candidate_loss_weight": self.candidate_loss_weight,
             "data": self.train_loader.dataset.provenance,
             "epochs": [record for record in self.candidate_epoch_audits if record["stage"] == stage_name],

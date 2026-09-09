@@ -14,10 +14,13 @@ from torch.utils.data import DataLoader
 
 from SpecEmbedding.config import config
 from SpecEmbedding.data.datasets_align import AlignGraphDataset, align_collate_fn
+from SpecEmbedding.data.datasets_candidates import CandidateAlignDataset, candidate_align_collate_fn
 from SpecEmbedding.data.overlap import filter_classified_validation
 from SpecEmbedding.models_align import GINEEncoder, SpecMolAlignModel
 from SpecEmbedding.trainer.trainer import set_seed
 from SpecEmbedding.trainer.trainer_align import TrainerAlign
+from SpecEmbedding.trainer.trainer_candidates import CandidateTrainerAlign
+from SpecEmbedding.utils.candidate_training import read_candidate_training_input, validate_candidate_settings
 from SpecEmbedding.utils.fulltrain import sha256_file
 from SpecEmbedding.utils.mass_batching import MassBlockBatchSampler, molecular_exact_masses
 from SpecEmbedding.utils.massspecgym_v15 import classified_full_spectra
@@ -51,9 +54,21 @@ def train_align(
     seed: int = config.general.seed,
     formal_fulltrain: bool = False,
     retrieval_validator=None,
+    training_candidates=None,
+    candidate_input_receipt=None,
 ):
     if seed < 0:
         raise ValueError("seed must be a non-negative integer")
+    candidate_settings = config.train.align.candidate_supervision.to_dict()
+    validate_candidate_settings(candidate_settings)
+    if candidate_settings["enabled"] != (training_candidates is not None):
+        raise ValueError("Candidate supervision requires both enabled configuration and verified input")
+    if candidate_settings["enabled"] and (
+        not formal_fulltrain or retrieval_validator is None or spec_encoder is not None or candidate_input_receipt is None
+    ):
+        raise ValueError("Candidate supervision requires formal fresh training and full retrieval selection")
+    if not candidate_settings["enabled"] and candidate_input_receipt is not None:
+        raise ValueError("Unexpected candidate input in an inactive run")
     device = resolve_device(device)
     batching = config.train.align.batching
     if batching not in {"random", "mass_blocks"}:
@@ -72,6 +87,7 @@ def train_align(
         is_augment=True,
         graph_cache_size=graph_cache_size,
         full_spectra=formal_fulltrain,
+        graph_policy=config.model.mol_encoder.graph_policy,
         **({"augment_config": config.augmentation.to_dict()} if formal_fulltrain else {}),
     )
     val_dataset = AlignGraphDataset(
@@ -81,6 +97,7 @@ def train_align(
         is_augment=False,
         graph_cache_size=graph_cache_size,
         full_spectra=formal_fulltrain,
+        graph_policy=config.model.mol_encoder.graph_policy,
         **({"augment_config": config.augmentation.to_dict()} if formal_fulltrain else {}),
     )
     if formal_fulltrain:
@@ -104,10 +121,21 @@ def train_align(
         train_batching = {"batch_sampler": sampler}
         logging.info("Alignment mass blocks: queries=%s batch=%s block=%s mass_sha256=%s",
                      len(smiles), batch_size, config.train.align.mass_block_size, sampler.mass_sha256)
+    if candidate_settings["enabled"]:
+        train_dataset = CandidateAlignDataset(
+            train_dataset, training_candidates,
+            dataset_manifest_sha256=selection_metadata["fulltrain_audit"]["dataset_manifest_sha256"],
+            negative_count=candidate_settings["negative_count"], seed=seed,
+            graph_cache_size=candidate_settings["graph_cache_size"],
+        )
+        if (train_dataset.provenance["dataset_to_raw_query_sha256"]
+                != candidate_input_receipt["dataset_to_raw_query_sha256"]):
+            raise ValueError("Actual training query order differs from candidate input preflight")
+        logging.info("Formal natural candidate supervision: %s", train_dataset.provenance)
     train_loader = DataLoader(
         train_dataset,
         **train_batching,
-        collate_fn=align_collate_fn, 
+        collate_fn=candidate_align_collate_fn if candidate_settings["enabled"] else align_collate_fn,
         num_workers=config.train.align.num_workers,
         worker_init_fn=seed_worker,
         generator=g
@@ -155,7 +183,8 @@ def train_align(
         dropout_rate=config.model.align.dropout_rate,
         tau=config.model.align.tau
     )
-    trainer = TrainerAlign(
+    trainer_class = CandidateTrainerAlign if candidate_settings["enabled"] else TrainerAlign
+    trainer = trainer_class(
         model,
         train_loader,
         val_loader,
@@ -163,6 +192,7 @@ def train_align(
         save_dir=save_dir,
         retrieval_validator=retrieval_validator,
         record_resources=formal_fulltrain,
+        **({"candidate_loss_weight": candidate_settings["loss_weight"]} if candidate_settings["enabled"] else {}),
     )
     if formal_fulltrain:
         trainer.expected_epoch_counts = expected
@@ -257,6 +287,8 @@ def main():
     parser.add_argument("--pretrained_spec", type=str, help="Path to your pre-trained SpecEmbedding model weights")
     parser.add_argument("--formal-fulltrain", action="store_true", help="Audited v1.5, fresh all-spectrum tokenization, strict CUDA, no old weights or caches")
     parser.add_argument("--validation-index", type=Path, help="Audited full Mass validation candidate/identity index for retrieval checkpoint selection")
+    parser.add_argument("--candidate-training-input", type=Path,
+                        help="Pinned full natural training-candidate receipt from the optimization runner")
     parser.add_argument(
         "--tokenset_cache",
         "--tokenset-cache",
@@ -281,6 +313,12 @@ def main():
         parser.error("Retrieval selection requires --validation-index and the matching pinned metric configuration")
     if args.validation_index and not args.formal_fulltrain:
         parser.error("Retrieval selection requires audited formal full-training data")
+    candidate_settings = config.train.align.candidate_supervision.to_dict()
+    validate_candidate_settings(candidate_settings)
+    if candidate_settings["enabled"] != bool(args.candidate_training_input):
+        parser.error("Candidate supervision requires matching enabled configuration and --candidate-training-input")
+    if args.candidate_training_input and (not args.formal_fulltrain or not args.validation_index):
+        parser.error("Candidate supervision requires formal training and full retrieval selection")
     args.exclude_val_query_indices = sorted(set(args.exclude_val_query_indices))
     if any(index < 0 for index in args.exclude_val_query_indices):
         parser.error("--exclude-val-query-indices must contain non-negative integers")
@@ -310,6 +348,12 @@ def main():
     startup_logging(args)
     set_seed(args.seed)
     device = resolve_device(args.device)
+    training_candidates = candidate_input_receipt = candidate_input_fingerprint = None
+    if args.candidate_training_input:
+        training_candidates, candidate_input_receipt, candidate_input_fingerprint = read_candidate_training_input(
+            args.candidate_training_input, args.data_path, candidate_settings,
+            config.fulltrain.expected_counts.to_dict(), args.exclude_val_query_indices,
+        )
     retrieval_validator = None
     if args.validation_index:
         index = load_validation_index(args.validation_index, args.data_path, config.fulltrain.expected_counts.to_dict(),
@@ -393,8 +437,11 @@ def main():
         seed=args.seed,
         formal_fulltrain=args.formal_fulltrain,
         retrieval_validator=retrieval_validator,
+        training_candidates=training_candidates,
+        candidate_input_receipt=candidate_input_receipt,
         selection_metadata={
             "dataset_type": args.dataset_type,
+            "candidate_training_input": candidate_input_fingerprint,
             "validation_index": ({"path": str(args.validation_index.resolve()),
                                   "sha256": sha256_file(args.validation_index)}
                                  if args.validation_index else None),

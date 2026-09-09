@@ -1,4 +1,6 @@
 import copy
+import hashlib
+import json
 import math
 import pickle
 
@@ -16,6 +18,8 @@ from SpecEmbedding.loss_candidates import candidate_alignment_loss
 from SpecEmbedding.models import SiameseModel
 from SpecEmbedding.models_align import GINEEncoder, SpecMolAlignModel
 from SpecEmbedding.trainer.trainer_candidates import CandidateTrainerAlign
+from SpecEmbedding.utils import candidate_training as candidate_io
+from SpecEmbedding.utils.fulltrain import sha256_file
 from SpecEmbedding.utils.training_candidates import TrainingCandidateIndex, validate_training_candidate_metadata
 
 
@@ -252,3 +256,133 @@ def test_candidate_trainer_refuses_persistent_workers_and_query_dropping(monkeyp
         with pytest.raises(ValueError):
             CandidateTrainerAlign(small_model(), loader, val, torch.device("cpu"), save_dir=str(tmp_path),
                                   candidate_loss_weight=1.0)
+
+
+def pinned_synthetic_candidate_input(monkeypatch, tmp_path):
+    dataset = candidate_dataset(monkeypatch)
+    index = dataset.candidates
+    metadata = tmp_path / "metadata.pkl"
+    metadata.write_bytes(pickle.dumps(index.metadata))
+    for name in ("receipt.json", "verification.json"):
+        (tmp_path / name).write_text('{}')
+    index.provenance.update(path=str(metadata), sha256=sha256_file(metadata),
+                            receipt_sha256=sha256_file(tmp_path / "receipt.json"),
+                            verification_sha256=sha256_file(tmp_path / "verification.json"))
+    # Full metadata/source validation has separate real-file tests. Here the
+    # verified synthetic index connects input pinning to actual model training.
+    monkeypatch.setattr(candidate_io, "load_training_candidates", lambda *a, **k: index)
+    settings = {"enabled": True, "negative_count": 16, "loss_weight": 0.5, "pool_cache_size": 1, "graph_cache_size": 1}
+    _, receipt = candidate_io.build_candidate_training_input(metadata, tmp_path, settings, {"train": 3}, [])
+    path = tmp_path / "candidate_training_input.json"
+    path.write_text(json.dumps(receipt))
+    dataset.provenance.update(index.provenance)
+    return dataset, settings, receipt, path
+
+
+def test_candidate_input_checks_actual_grouped_order_and_refuses_changed_receipt(monkeypatch, tmp_path):
+    dataset, settings, receipt, path = pinned_synthetic_candidate_input(monkeypatch, tmp_path)
+    _, actual, fingerprint = candidate_io.read_candidate_training_input(path, tmp_path, settings, {"train": 3}, [])
+    assert actual == receipt and fingerprint == {"path": str(path), "sha256": sha256_file(path)}
+    assert candidate_io.grouped_query_order(dataset.candidates).tolist() == [0, 2, 1]
+    receipt["dataset_to_raw_query_sha256"] = hashlib.sha256(np.arange(3, dtype='<i8').tobytes()).hexdigest()
+    path.write_text(json.dumps(receipt))
+    with pytest.raises(ValueError, match="provenance"):
+        candidate_io.read_candidate_training_input(path, tmp_path, settings, {"train": 3}, [])
+    with pytest.raises(ValueError, match="configuration"):
+        candidate_io.read_candidate_training_input(path, tmp_path, {**settings, "loss_weight": 2.0}, {"train": 3}, [])
+
+
+def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monkeypatch, tmp_path):
+    import train_align as entry
+    from SpecEmbedding.config import ConfigObject
+
+    dataset, settings, receipt, path = pinned_synthetic_candidate_input(monkeypatch, tmp_path)
+    monkeypatch.setattr(config.train.align, "candidate_supervision", ConfigObject(settings))
+    monkeypatch.setattr(config.train.align, "epochs_stage2", 2)
+    monkeypatch.setattr(config.train.align, "num_workers", 0)
+    monkeypatch.setattr(config.train.align, "batching", "mass_blocks")
+    monkeypatch.setattr(config.train.align, "mass_block_size", 1)
+    monkeypatch.setattr(config.model, "spec_encoder", ConfigObject({
+        "embedding_dim": 8, "n_head": 2, "n_layer": 1, "dim_feedward": 8, "dim_target": 8,
+        "feedward_activation": "selu"}))
+    monkeypatch.setattr(config.model, "mol_encoder", ConfigObject({
+        "emb_dim": 8, "n_layers": 2, "dropout_rate": 0., "size_feature_dim": 4,
+        "norm_type": "layernorm", "norm_eps": 1e-5, "graph_policy": "rdkit_sanitized"}))
+    monkeypatch.setattr(config.model.align, "final_dim", 8)
+    monkeypatch.setattr(config.augmentation, "prob", 0.)
+    # Synthetic CPU wiring test: keep the actual trainer and optimizer; only
+    # omit formal CUDA telemetry, which is independently tested with fixtures.
+    def cpu_trainer(*args, **kwargs):
+        kwargs["record_resources"] = False
+        return CandidateTrainerAlign(*args, **kwargs)
+    monkeypatch.setattr(entry, "CandidateTrainerAlign", cpu_trainer)
+    output = tmp_path / "run"
+    entry.train_align(
+        dataset.base._data, sorted(dataset.base._keys), dataset.base._data, sorted(dataset.base._keys), None,
+        batch_size=2, lr=0.001, save_dir=str(output), device="cpu", seed=42, formal_fulltrain=True,
+        retrieval_validator=lambda *a: {"top1": 0.5, "top5": 1., "top10": 1., "top20": 1., "mrr": 0.75},
+        training_candidates=dataset.candidates, candidate_input_receipt=receipt,
+        selection_metadata={"fulltrain_audit": {"expected_epoch_counts": {"train": 3, "val": 3},
+                                               "dataset_manifest_sha256": "a" * 64}},
+    )
+    selection = json.loads((output / "alignment_selection.json").read_text())
+    stage = selection["stages"]["stage2"]
+    report, hashes = candidate_io.audit_candidate_training(output, stage, path, settings, 42, 2, tmp_path, {"train": 3}, [])
+    assert report["state"] == "verified_full_candidate_replay" and report["epochs"] == 2
+    assert report["queries_per_epoch"] == 3 and len(hashes) == 8
+    for row in selection["fulltrain_audit"]["epochs"]:
+        assert row["train"] == row["val"] == 3 and row["batching"]["unique_queries"] == 3
+    record = stage["candidate_training"]["epochs"][0]
+    saved_path = output / "candidate_training" / "stage2_epoch001.json"
+    order_path = saved_path.with_suffix('.npy')
+    original = copy.deepcopy(record)
+    original_order_bytes = order_path.read_bytes()
+    for damage in ("sample_hash", "count", "batch_sizes", "weight", "missing_epochs", "order", "duplicate"):
+        altered = copy.deepcopy(stage)
+        if damage == "weight":
+            altered["candidate_training"]["candidate_loss_weight"] = 2.0
+        elif damage == "missing_epochs":
+            altered["candidate_training"]["epochs"].pop()
+        else:
+            row = altered["candidate_training"]["epochs"][0]
+            if damage == "sample_hash":
+                row["observed_query_sample_order_sha256"] = '0' * 64
+            elif damage == "count":
+                row["negative_samples"] += 1
+            elif damage == "batch_sizes":
+                row["batch_sizes"] = [1, 2]
+            else:
+                order = np.load(order_path)
+                if damage == "order":
+                    order = np.roll(order, 1)
+                else:
+                    order[0] = order[1]
+                with order_path.open('wb') as handle:
+                    np.save(handle, order)
+                row["query_order_sha256"] = sha256_file(order_path)
+            saved_path.write_text(json.dumps(row))
+        with pytest.raises(ValueError):
+            candidate_io.audit_candidate_training(output, altered, path, settings, 42, 2, tmp_path, {"train": 3}, [])
+        saved_path.write_text(json.dumps(original))
+        order_path.write_bytes(original_order_bytes)
+
+
+@pytest.mark.parametrize('change', [
+    {'enabled': 1}, {'negative_count': 0}, {'negative_count': 256}, {'negative_count': 2.5},
+    {'loss_weight': 0}, {'loss_weight': float('nan')}, {'loss_weight': True},
+    {'pool_cache_size': 0}, {'graph_cache_size': -1}, {'unexpected': 1},
+])
+def test_candidate_settings_reject_invalid_or_undeclared_parameters(change):
+    settings = {'enabled': True, 'negative_count': 16, 'loss_weight': 1., 'pool_cache_size': 1, 'graph_cache_size': 1}
+    with pytest.raises(ValueError):
+        candidate_io.validate_candidate_settings({**settings, **change})
+
+
+def test_inactive_or_legacy_audit_refuses_candidate_artifacts(tmp_path):
+    args = (None, 42, 128, tmp_path, {'train': 3}, [])
+    assert candidate_io.audit_candidate_training(tmp_path, {}, None, *args)[0]['state'] == 'disabled'
+    with pytest.raises(ValueError, match='Unexpected'):
+        candidate_io.audit_candidate_training(tmp_path, {'candidate_training': {}}, None, *args)
+    (tmp_path / 'candidate_training').mkdir()
+    with pytest.raises(ValueError, match='Unexpected'):
+        candidate_io.audit_candidate_training(tmp_path, {}, None, *args)

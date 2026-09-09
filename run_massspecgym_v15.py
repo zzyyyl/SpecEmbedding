@@ -15,6 +15,12 @@ from pathlib import Path
 import yaml
 
 from SpecEmbedding.config import DEFAULT_CONFIG_PATH, config
+from SpecEmbedding.utils.candidate_training import (
+    audit_candidate_training,
+    build_candidate_training_input,
+    candidate_source_inputs,
+    validate_candidate_settings,
+)
 from SpecEmbedding.utils.fulltrain import (
     sha256_file,
     validate_baseline_completion,
@@ -59,6 +65,8 @@ def commands(args):
     if getattr(args, "optimize_alignment", False):
         index = args.output_root / "validation" / "mass_val_topk256.pt"
         result[1]["command"] += ["--validation-index", str(index)]
+        if getattr(args, "alignment_training_candidates", None) is not None:
+            result[1]["command"] += ["--candidate-training-input", str(args.output_root / "candidate_training_input.json")]
         result = [result[0],
                   {"name": "prepare_validation", "gpu": False, "command": [sys.executable, str(ROOT / "alignment_validation.py"),
                    "--data-path", str(data), "--index", str(index), "--prepare-only"]},
@@ -124,6 +132,20 @@ def preflight(args):
             raise ValueError("Optimization baseline checkpoint/configuration provenance mismatch")
     source_config = Path(os.environ.get("SPECEMBEDDING_CONFIG", DEFAULT_CONFIG_PATH)).resolve()
     extra = {}
+    candidate_settings = align_settings["candidate_supervision"]
+    validate_candidate_settings(candidate_settings)
+    candidate_path = getattr(args, "alignment_training_candidates", None)
+    if candidate_path is None and candidate_settings["enabled"]:
+        raise ValueError("Enabled candidate supervision requires --alignment-training-candidates")
+    if candidate_path is not None:
+        if not getattr(args, "optimize_alignment", False) or getattr(args, "prepared_data", None) is None:
+            raise ValueError("Candidate supervision requires optimization and a fully prepared dataset")
+        candidate_settings["enabled"] = True
+        _, receipt = build_candidate_training_input(candidate_path, args.prepared_data, candidate_settings,
+                                                   config.fulltrain.expected_counts.to_dict(),
+                                                   config.fulltrain.exclude_val_query_indices)
+        extra["candidate_training_input"] = receipt
+        inputs.update(candidate_source_inputs(receipt))
     if getattr(args, "gpus", None) is not None:
         extra["gpu_pool"] = pin_pool(args.gpus)
     if getattr(args, "prepared_data", None) is not None:
@@ -173,12 +195,25 @@ def audit_alignment(args, alignment_settings, augmentation_settings):
                 raise ValueError("Mass batching coverage/configuration audit failed")
         elif batch_audit is not None:
             raise ValueError("Unexpected mass batching in a random-batching trial")
+    candidate_path = args.output_root / "candidate_training_input.json"
+    candidate_input = candidate_path if candidate_path.exists() else None
+    expected_input = ({"path": str(candidate_path.resolve()), "sha256": sha256_file(candidate_path)}
+                      if candidate_input is not None else None)
+    if selection.get("candidate_training_input") != expected_input:
+        raise ValueError("Alignment used a different candidate training input")
+    candidate_report, candidate_hashes = audit_candidate_training(
+        directory, stage, candidate_input, alignment_settings.get("candidate_supervision"), selection["seed"],
+        alignment_settings["batch_size"], data, config.fulltrain.expected_counts.to_dict(),
+        config.fulltrain.exclude_val_query_indices,
+    )
     return {"checkpoint_sha256": selection["checkpoint_sha256"], "epochs": len(audit["epochs"]),
-            "expected_epoch_counts": expected, "graph_policy": selection["graph_policy"]}
+            "expected_epoch_counts": expected, "graph_policy": selection["graph_policy"],
+            "candidate_training": candidate_report, "candidate_artifact_sha256": candidate_hashes}
 
 
 def execute(args, manifest):
-    for name in ("status.json", "data", "alignment42_topk256", "rerank_topk256", "logs", "validation", "baseline_validation"):
+    for name in ("status.json", "data", "alignment42_topk256", "rerank_topk256", "logs", "validation", "baseline_validation",
+                 "candidate_training_input.json"):
         if (args.output_root / name).exists():
             raise FileExistsError(f"Refusing existing v1.5 run artifact: {name}")
     runtime_path = args.output_root / "runtime_params.yaml"
@@ -200,12 +235,19 @@ def execute(args, manifest):
     logs.mkdir()
     status = {"state": "running", "started_at": now(), "stages": [], "gpu_uuid_order": ordered,
               "runtime_config_sha256": sha256_file(runtime_path)}
+    if "candidate_training_input" in manifest:
+        candidate_path = args.output_root / "candidate_training_input.json"
+        write_json(candidate_path, manifest["candidate_training_input"])
+        status["candidate_training_input_sha256"] = sha256_file(candidate_path)
     if pool is not None:
         status["gpu_pool"] = manifest["gpu_pool"]
 
     def check_preflight():
         if sha256_file(runtime_path) != status["runtime_config_sha256"] or preflight(args) != manifest:
             raise ValueError("Inputs/source/configuration changed during queue wait")
+        if "candidate_training_input_sha256" in status:
+            if sha256_file(args.output_root / "candidate_training_input.json") != status["candidate_training_input_sha256"]:
+                raise ValueError("Pinned candidate training input changed during queue wait")
         for item in status["stages"]:
             if item["name"] == "prepare_validation" and item["state"] == "complete":
                 if sha256_file(args.output_root / "validation" / "mass_val_topk256.pt") != item["audit"]["sha256"]:
@@ -292,6 +334,8 @@ def main(argv=None):
                         help="Optimization trial: override only the training batch assembly; block size comes from params.yaml")
     parser.add_argument("--alignment-mol-augmentation", action=argparse.BooleanOptionalAction, default=None,
                         help="Optimization trial: --no-alignment-mol-augmentation disables graph perturbations only")
+    parser.add_argument("--alignment-training-candidates", type=Path,
+                        help="Opt in to natural candidate supervision using fully audited training metadata")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--write-preflight", action="store_true")
     args = parser.parse_args(argv)
@@ -305,6 +349,10 @@ def main(argv=None):
         args.prepared_data = args.prepared_data.expanduser().resolve()
     if args.baseline_checkpoint is not None:
         args.baseline_checkpoint = args.baseline_checkpoint.expanduser().resolve()
+    if args.alignment_training_candidates is not None:
+        args.alignment_training_candidates = args.alignment_training_candidates.expanduser().resolve()
+        if not args.optimize_alignment or args.prepared_data is None:
+            parser.error("--alignment-training-candidates requires --optimize-alignment and --prepared-data")
     if args.optimize_alignment != (args.baseline_checkpoint is not None):
         parser.error("--optimize-alignment and --baseline-checkpoint must be provided together")
     if args.alignment_batching is not None and not args.optimize_alignment:

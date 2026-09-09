@@ -192,6 +192,28 @@ def audit_optimization_run(run):
                     "Invalid mass batching coverage/configuration receipt")
         else:
             require(batching == "random" and "batching" not in record, "Unexpected training batch audit")
+    from SpecEmbedding.utils.candidate_training import audit_candidate_training, candidate_source_inputs
+    candidate_path = run / "candidate_training_input.json"
+    candidate_input = candidate_path if candidate_path.exists() else None
+    candidate_fingerprint = ({"path": str(candidate_path), "sha256": fingerprint(candidate_path)}
+                             if candidate_input is not None else None)
+    require(selection.get("candidate_training_input") == candidate_fingerprint,
+            "Candidate training receipt differs from the actual training input")
+    if candidate_input is not None:
+        receipt = json.loads(candidate_path.read_text())
+        require(receipt == manifest.get("candidate_training_input")
+                and status.get("candidate_training_input_sha256") == candidate_fingerprint["sha256"],
+                "Candidate training input differs from preflight/status")
+        require(all(manifest["inputs"].get(name) == item for name, item in candidate_source_inputs(receipt).items()),
+                "Candidate sources differ from the pinned manifest")
+    else:
+        require("candidate_training_input" not in manifest and "candidate_training_input_sha256" not in status,
+                "Missing candidate input from a pinned run")
+    candidate_report, candidate_hashes = audit_candidate_training(
+        directory, stage, candidate_input, settings.get("candidate_supervision"), selection["seed"],
+        settings["batch_size"], run / "data" / "MassSpecGym", counts, exclusions,
+    )
+    hashes.update(candidate_hashes)
     baseline_receipt = read_json(run / "baseline_validation" / "metrics.json")
     require(baseline_receipt["index_sha256"] == index_sha and baseline_receipt["protocol"] == PROTOCOL
             and baseline_receipt["checkpoint_sha256"] == manifest["inputs"]["baseline_checkpoint"]["sha256"], "Baseline provenance mismatch")
@@ -203,6 +225,7 @@ def audit_optimization_run(run):
     report = audit_trajectory(directory, index, stage, baseline)
     resource_report, resource_hashes = audit_resource_profiles(directory, stage, expected, selection["device"])
     report["resource_measurements"] = resource_report
+    report["candidate_training"] = candidate_report
     hashes.update(resource_hashes)
     report["artifact_sha256"].update(hashes)
     report.update(run=str(run), source_commit=manifest["git_commit"], protocol=PROTOCOL,

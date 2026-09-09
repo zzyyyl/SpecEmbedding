@@ -69,7 +69,8 @@ def test_molecular_masses_are_representation_invariant_and_invalid_graphs_fail()
 
 
 @pytest.mark.parametrize('mol_augmentation', [None, True, False])
-def test_optimization_preflight_pins_batching_without_changing_other_hyperparameters(tmp_path, mol_augmentation):
+@pytest.mark.parametrize('candidate_supervision', [False, True])
+def test_optimization_preflight_pins_batching_without_changing_other_hyperparameters(tmp_path, mol_augmentation, candidate_supervision):
     source = tmp_path / 'source'
     source.mkdir()
     (source / 'fixture.tsv').write_text('source')
@@ -85,12 +86,21 @@ def test_optimization_preflight_pins_batching_without_changing_other_hyperparame
     args = SimpleNamespace(source_dir=source, legacy_tsv=legacy, output_root=tmp_path/'run',
         device='cuda:0', gpu=0, gpus=None, optimize_alignment=True, baseline_checkpoint=checkpoint,
         prepared_data=None, alignment_batching='mass_blocks', alignment_mol_augmentation=mol_augmentation)
+    candidate_receipt = {'provenance': {'path': str(tmp_path/'metadata.pkl'), 'sha256': 'a'*64,
+                                      'receipt_sha256': 'b'*64, 'verification_sha256': 'c'*64}}
+    if candidate_supervision:
+        args.prepared_data = tmp_path/'prepared'
+        args.alignment_training_candidates = tmp_path/'metadata.pkl'
     with patch.object(config.fulltrain.v15, 'sources', ConfigObject({'fixture.tsv': sha256_file(source/'fixture.tsv')})), \
-         patch.object(runner.subprocess, 'check_output', side_effect=lambda command, **kwargs: '' if 'status' in command else 'test-commit'):
+         patch.object(runner.subprocess, 'check_output', side_effect=lambda command, **kwargs: '' if 'status' in command else 'test-commit'), \
+         patch.object(runner, 'prepared_source', return_value={'manifest_sha256': 'd'*64}), \
+         patch.object(runner, 'build_candidate_training_input', return_value=(None, candidate_receipt)) as build:
         manifest = runner.preflight(args)
+    assert build.call_count == int(candidate_supervision)
     actual = manifest['runtime_config']['train']['align']
     expected = config.train.align.to_dict()
     expected.update(batching='mass_blocks', metric_for_best='validation_top1_then_mrr')
+    expected['candidate_supervision']['enabled'] = candidate_supervision
     assert actual == expected
     augmentation = config.augmentation.to_dict()
     if mol_augmentation is False:
@@ -98,7 +108,16 @@ def test_optimization_preflight_pins_batching_without_changing_other_hyperparame
     assert manifest['runtime_config']['augmentation'] == augmentation
     assert config.augmentation.node_drop_rate == config.augmentation.edge_mask_rate == 0.1
     assert config.train.align.batching == 'random'
-    assert [s['name'] for s in manifest['stages']] == ['prepare_v15','prepare_validation','baseline_validation','alignment42']
+    assert [s['name'] for s in manifest['stages']] == [
+        'import_v15' if candidate_supervision else 'prepare_v15', 'prepare_validation', 'baseline_validation', 'alignment42']
+    command = manifest['stages'][-1]['command']
+    assert ('--candidate-training-input' in command) == candidate_supervision
+    assert config.train.align.candidate_supervision.enabled is False
+    if candidate_supervision:
+        assert command[-2:] == ['--candidate-training-input', str(tmp_path/'run'/'candidate_training_input.json')]
+        assert manifest['candidate_training_input'] == candidate_receipt
+        assert manifest['inputs']['training_candidates'] == {'path': str(tmp_path/'metadata.pkl'), 'sha256': 'a'*64}
+        assert build.call_args.args[2] == expected['candidate_supervision']
 
 
 @pytest.mark.parametrize('scheme', ['random', 'mass_blocks'])
@@ -151,6 +170,20 @@ def test_molecular_augmentation_override_cannot_enter_default_queue(tmp_path):
             runner.main(['--source-dir', str(tmp_path), '--legacy-tsv', str(tmp_path/'legacy'),
                          '--output-root', str(tmp_path/'new'), '--gpus', '0', '1', '--device', 'cuda:0',
                          '--no-alignment-mol-augmentation', '--dry-run'])
+        preflight.assert_not_called()
+    assert not (tmp_path/'new').exists()
+
+
+@pytest.mark.parametrize('optimization', [False, True])
+def test_candidate_supervision_requires_optimization_and_prepared_data(tmp_path, optimization):
+    argv = ['--source-dir', str(tmp_path), '--legacy-tsv', str(tmp_path/'legacy'),
+            '--output-root', str(tmp_path/'new'), '--gpus', '0', '1', '--device', 'cuda:0',
+            '--alignment-training-candidates', str(tmp_path/'metadata.pkl'), '--dry-run']
+    if optimization:
+        argv += ['--optimize-alignment', '--baseline-checkpoint', str(tmp_path/'baseline.pth')]
+    with patch.object(runner, 'preflight') as preflight:
+        with pytest.raises(SystemExit):
+            runner.main(argv)
         preflight.assert_not_called()
     assert not (tmp_path/'new').exists()
 

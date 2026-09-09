@@ -66,6 +66,12 @@ train:
     weight_decay: 0.0001 # 1e-4
     patience: 5
     num_workers: 4
+    candidate_supervision:
+      enabled: false # optimization runner must opt in with audited prepared training candidates
+      negative_count: 16 # proposed trial setting; all training queries are still visited
+      loss_weight: 1.0
+      pool_cache_size: 128
+      graph_cache_size: 10000 # bounded CPU cache of unaugmented candidate graphs
 
 retrieval_validation:
   spectrum_controls:
