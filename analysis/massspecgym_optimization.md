@@ -374,6 +374,32 @@ A03截至19:31:40的前11份 `resources/stage2_epochNNN.json` 平均：训练81.
 批大小变化可能带来浮点舍入差异，原文依据为[PyTorch数值精度说明](https://docs.pytorch.org/docs/main/notes/numerical_accuracy.html)
 （2026-09-09核验）；本项目同权重重复编码的既有微小排名波动另见D02。当前没有新batch实测收益。
 
+用户随后询问CPU并行化/迁移GPU。19:39的只读核验确认当前CPU亲和性包含128个逻辑CPU，
+验证确有4个存活的DataLoader worker；进程`ps %CPU`是生命周期平均值，不作为区间利用率或
+CPU瓶颈证明。代码`StrictValidationMolecules.__getitem__`在每次验证重做SMILES解析和构图，
+没有复用验证图缓存；`AlignmentRetrievalValidator`将本轮分子embedding逐batch拷回CPU，
+随后按query取候选embedding再传GPU评分。前13轮日志中，完整分子阶段平均162.05秒，
+其后谱图编码、候选评分和排名约10.03秒；前者同时包含CPU构图/组batch/等待、GPU编码与传输，
+不能全部归为CPU耗时，须进一步测量各段。
+
+后续可独立核验的工程方向如下，不同时叠加、尚未修改正式实现：
+
+- 将验证workers4增加到8，检查真实加载等待、吞吐和内存；继续保持输出顺序和全部候选。
+  RDKit的Python构图采用多进程，不能只换成普通Python线程就预设并行收益，依据为
+  [RDKit线程说明](https://www.rdkit.org/docs/RDKit_Book.html#thread-safety-and-the-rdkit)。
+- 完整预计算并缓存规范的节点/边图张量，按候选源顺序、SMILES、构图源码、RDKit版本和图策略
+  固定指纹；每轮读取相同图，避免反复解析。优先使用紧凑数组/共享文件，避免worker各自复制
+  整个Python图对象列表。必须逐图验证与原构图完全一致，保留无效图审计和所有query。
+  这是确定性输入缓存；模型权重变化后embedding仍须重新编码，不能跨epoch复用旧embedding。
+- 本轮827,600×512维float32分子embedding载荷为1.5785 GiB（不含模型/临时图和分数），
+  可评估留在选定GPU上直接索引候选和评分，避免每个query重复传输候选embedding；按当前
+  19,423×256的矩阵宽度，该重复H2D载荷约9.4839 GiB/轮，属于字节计算而非已测传输耗时。
+  最终主排名仍使用原CPU逐query排序与同分规则，不因工程提速改变评价协议。
+  DataLoader固定内存与异步传输可另行测量，正确同步和实际收益依据
+  [PyTorch传输指南](https://docs.pytorch.org/tutorials/intermediate/pinmem_nonblock.html)，不直接照搬文档倍速。
+
+这些是可行性与瓶颈定位结果，不是新模型成绩或已实现加速；A03与既有输入/源码不变。
+
 ## R01：候选对比目标与轻量分子表示的研究依据
 
 当前 `ContrastiveAlignmentLoss` 仍是双向 in-batch 多正例损失；A02 增加邻近质量负例的出现
