@@ -87,6 +87,8 @@ checkpoint/版本、来源表格、分母和评价设置。各项的最好值可
   不人为限制训练条数，不用前 N 条成绩代替正式结果。
 - 候选使用版本化的官方自然候选，当前最多 256；所有 split 无 forcing。
   无效图、身份重复、同分排序和二维多正例必须显式审计，不静默改变官方分母或候选集合。
+- MRR沿用与Top-k相同的CPU argsort首正例排名，分数≤0不删除正例，无正例贡献0并保留分母。
+  这是既有实现的明确说明；不等同于TorchMetrics独立MRR函数的topk/正值过滤语义，详见D15。
 - 正式训练/编码/推理显式 cuda:N，忙则等待；默认在物理 GPU 0/1 中择一，通过 UUID 映射 cuda:0。
   不进行两组并行抢卡，不终止其他任务。CPU 仅处理、审计及 synthetic smoke。
 - 不修改固定运行 worktree，不覆盖旧 checkpoint/cache/log/status/锁；每次正式实验独立目录。
@@ -240,8 +242,10 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 - [x] 旧队列曾收窄为Mass/relative/seed42；当前优化入口运行单seed基础检索，拒绝意外展开矩阵。
 - [x] 初步检索一手来源，建立本计划和本地 PDF 资料库。
 - [ ] 补齐各指标 SOTA 来源/协议/分母对照，冻结版本化参考向量和缺失项。
-- [ ] 完成完整验证集官方候选/二维身份 evaluator；从现有 seed42 工件冻结 baseline 验证报告。
-- [x] 实现检索指标选 checkpoint、Pareto 记录及优化分支不跑测试；测试覆盖全量/设备保护，正式运行待核验。
+- [x] 完成完整验证集官方候选/二维身份 evaluator，并冻结seed42 baseline报告；A01–A03完成回执及
+  A02 incumbent见第10节。2026-09-10重验A02/A03回执绑定的117项工件哈希与完成状态一致。
+- [x] 实现检索指标选 checkpoint、Pareto 记录及优化分支不跑测试；测试覆盖全量/设备保护，
+  已在A01–A03正式运行中核验，后续每次实验继续独立审计。
 - [ ] 按第 4 节顺序启动一个实验，持续完成“训练—验证—审计—保留/舍弃—下一假设”闭环。
 - [ ] 核验预训练来源，保证其结构保持不变，再决定是否启用权重。
 - [ ] 验证指标接近目标后冻结一个方案，在完整测试集评价并完成新缓存/身份审计。
@@ -268,9 +272,11 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
   当前失败涉及 GLACIER manifest、GLACIER 交接、项目记忆和已提交的 v1.5 准确率审计文档；
   与本轮范围修改无关，不改写这些原始来源以隐藏失败。
 - [x] Ruff、compileall、git diff --check；后续新增代码必须重新执行相应验证。
-- [ ] evaluator 测试：二维多正例、候选 permutation、同分、无正例、无效图、完整分母；
-  用小型 synthetic 例与独立官方实现核对，CPU 测试不作为正式实验。
-- [ ] checkpoint 选优与恢复测试：保存指标/配置/权重一致，完整 train/val 数量与实际每轮一致。
+- [x] evaluator 测试：二维多正例、候选 permutation、同分、无正例、无效图、完整分母；
+  Top-k与独立TorchMetrics Hit Rate核对，MRR按共同排名定义并显式测试独立RR函数的差异，见D15。
+  CPU合成检查不作为正式实验，完整真实分数的MRR敏感性与独立读回已完成，范围见D15。
+- [x] checkpoint 选优与恢复测试：保存指标/配置/权重一致，完整 train/val 数量与实际每轮一致；
+  A02/A03完整27轮回执与真实工件重验通过，后续每次实验仍须独立完成审计。
 - [ ] 预训练结构与来源：新旧结构签名、严格 state_dict 加载、tokenizer 语义、身份污染审计。
 - [ ] 正式运行：独立干净源码、配置/数据/SHA 固定、CUDA UUID、GPU 门槛、阶段完成标志与进程一致。
 - [ ] 最终结果：完整 Top-k/MRR、可比 S_j、每项差距、单 seed/均值/SD、完整审计，不遗漏失败项。
@@ -278,6 +284,16 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-10：核对阶段验收清单，A02/A03完整回执及其117项工件逐文件哈希复查通过；
+  纠正评价实现与checkpoint检查仍未勾选的过时状态，不改变当前实验或最终SOTA验收状态。
+  新增独立MRR参考核对发现同分排序与非正分数处理的语义差异，说明及回归检查见D15。
+  `/data1/zyl/SpecEmbedding/audits/mrr_semantics_20260910/`冻结100份完整验证快照和来源指纹，
+  独立CPU诊断于03:20:42正常退出，`receipt.json` SHA-256为
+  `4ccdb58f4cb5abeb3136186d899751fa167d41305ec689cb4c01b96d734e2186`；108项来源指纹和所有
+  逐query排名工件的独立读回通过，`verification.json` SHA-256为
+  `c8e40f3ab7e5390f448c49e064af3b58a20ad55c95998907c1d736417a1ded6d`。
+  评价回归21项通过，其余相关61项通过；Ruff、语法与diff检查通过。保留现有共同排名定义，
+  未改原始分数、选优记录、训练源码或A05草案；A04已完成24轮，正式完成审计仍待训练结束。
 - 2026-09-10 02:26：完整train/val元数据及A04固定epoch20保存分数CPU审计完成，详情见D14；
   专用socket `/tmp/specembedding-query-metadata-20260910-1010/tmux.sock`，`metadata/%0`已dead，
   原PID3439063内核退出码0。审计根`/data1/zyl/SpecEmbedding/audits/query_metadata_a04_e020_20260910/`

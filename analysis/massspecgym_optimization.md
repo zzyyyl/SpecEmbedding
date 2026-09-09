@@ -646,6 +646,29 @@ Top-1新增命中2,689条、丢失830条、净增1,859条；没有过滤缺元�
 但不足以支持把截断当作当前主要瓶颈并立即增加token预算；配置保持不变。完整分组另存
 `verification.json`，该补充回执不覆盖或替换原审计记录。
 
+## D15：MRR 排名定义与独立参考函数的差异
+
+当前 Top-k 与 MRR 共用按候选原顺序执行的 CPU descending argsort 排名，MRR 取首个二维
+正例的倒数排名，无正例 query 贡献0并保留在完整分母。余弦分数为0或负数时仍参与排名。
+这是既有实现的定义，不能仅因使用TorchMetrics的Hit Rate顺序就称为其独立MRR函数的结果。
+
+已核对安装的TorchMetrics 1.8.2及对应发布源码：[Hit Rate](https://raw.githubusercontent.com/Lightning-AI/torchmetrics/v1.8.2/src/torchmetrics/functional/retrieval/hit_rate.py)
+使用argsort，而[reciprocal rank](https://raw.githubusercontent.com/Lightning-AI/torchmetrics/v1.8.2/src/torchmetrics/functional/retrieval/reciprocal_rank.py)
+使用topk且先屏蔽分数≤0的正例；完全同分时两者可产生不同排序。2026-09-10核验的
+[MassSpecGym检索入口](https://raw.githubusercontent.com/pluskal-lab/MassSpecGym/main/massspecgym/models/retrieval/base.py)
+调用Hit Rate，没有调用该独立MRR函数。外部MRR比较仍须逐项确认其排序、分数处理与分母。
+
+新增回归检查明确覆盖同分差异、非正余弦分数以及平移分数后排名/MRR保持不变；评价模块
+21项通过，其余checkpoint/完整性/审计相关61项通过。未修改生产评价函数、运行源码或配置。
+完整CPU诊断与独立工件读回已完成：A01–A03完整轨迹及A04截至epoch23共100份baseline/逐轮
+验证快照，每份19,423条，共1,942,300条query记录。纯topk同分排序造成的最大MRR差异为
+0.00003922；再加入独立RR函数的分数正值过滤后，最大差异为0.00058251，出现在A04 epoch1。
+A04当前最佳epoch20的原MRR为0.28666375，独立RR视图为0.28665978；这些均是固定分数
+的定义敏感性，不是新推理结果。两种替代MRR视图下，各冻结轨迹的选中epoch、完整Pareto集合
+及所有epoch相对baseline的预设容差判断均不变。源文件、逐query排名和读回回执见阶段计划。
+保留当前共同排名定义；该诊断不构成A04完成审计，不覆盖epoch24及之后的新分数、最终权重
+选择或自然负例重放，也不证明外部论文已经与本地MRR同协议。
+
 ## R01：候选对比目标与轻量分子表示的研究依据
 
 当前 `ContrastiveAlignmentLoss` 仍是双向 in-batch 多正例损失；A02 增加邻近质量负例的出现

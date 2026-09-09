@@ -133,7 +133,7 @@ def test_index_rejects_missing_mapping_and_unrecorded_invalid_molecule():
 
 
 def test_metrics_full_denominator_ties_multiple_positives_and_official_argsort():
-    from torchmetrics.functional.retrieval import retrieval_hit_rate
+    from torchmetrics.functional.retrieval import retrieval_hit_rate, retrieval_reciprocal_rank
 
     scores = torch.tensor([[.9, .7, .7], [.4, .1, .2], [0., 0., 0.]])
     positives = torch.tensor([[False, True, True], [False, False, False], [False, False, False]])
@@ -146,6 +146,9 @@ def test_metrics_full_denominator_ties_multiple_positives_and_official_argsort()
         expected = sum(float(retrieval_hit_rate(s[v], p[v], top_k=k)) if v.any() else 0
                        for s, p, v in zip(scores, positives, valid, strict=True)) / 3
         assert values[f"top{k}"] == pytest.approx(expected)
+    expected_mrr = sum(float(retrieval_reciprocal_rank(s[v], p[v])) if v.any() else 0
+                       for s, p, v in zip(scores, positives, valid, strict=True)) / 3
+    assert values["mrr"] == pytest.approx(expected_mrr)
     tied, ranks = retrieval_metrics(torch.ones((1, 3)), torch.tensor([[False, False, True]]), torch.ones((1, 3), dtype=torch.bool))
     assert ranks.tolist() == [3] and tied["top1"] == 0
     # Long equal-score arrays exercise the reference's non-stable tie behavior.
@@ -157,6 +160,11 @@ def test_metrics_full_denominator_ties_multiple_positives_and_official_argsort()
         assert actual["stable_top1"] == 1
         for k in (1, 5, 10, 20):
             assert actual[f"top{k}"] == float(retrieval_hit_rate(tied_scores[0], tied_labels[0], top_k=k))
+        if width == 17:
+            # The pinned CPU reference uses topk for RR but argsort for HitRate.
+            # Our MRR deliberately shares the HitRate ranking across all metrics.
+            assert actual["mrr"] == pytest.approx(.1)
+            assert float(retrieval_reciprocal_rank(tied_scores[0], tied_labels[0])) == pytest.approx(.0625)
     with pytest.raises(ValueError, match="Non-finite"):
         retrieval_metrics(torch.full((1, 1), float("nan")), torch.ones((1, 1), dtype=torch.bool), torch.ones((1, 1), dtype=torch.bool))
 
@@ -169,6 +177,21 @@ def test_non_tied_metrics_are_candidate_permutation_invariant():
     order = torch.tensor([2, 0, 3, 1])
     actual, _ = retrieval_metrics(scores[:, order], labels[:, order], mask[:, order])
     assert expected == actual
+
+
+def test_mrr_keeps_nonpositive_cosine_scores_in_the_same_ranking():
+    from torchmetrics.functional.retrieval import retrieval_reciprocal_rank
+
+    scores = torch.tensor([[.9, .8, .7]])
+    labels = torch.tensor([[False, True, False]])
+    actual, ranks = retrieval_metrics(scores, labels, torch.ones_like(labels))
+    shifted, shifted_ranks = retrieval_metrics(scores - 1, labels, torch.ones_like(labels))
+    assert actual == shifted and torch.equal(ranks, shifted_ranks)
+    assert actual['mrr'] == .5 and ranks.tolist() == [2]
+    # TorchMetrics 1.8.2 RR suppresses targets at scores <= 0; raw cosine
+    # scores do not have probability semantics, so that filter is not used.
+    assert float(retrieval_reciprocal_rank(scores[0], labels[0])) == .5
+    assert float(retrieval_reciprocal_rank(scores[0] - 1, labels[0])) == 0.
 
 
 def test_real_small_model_validation_preserves_rng_and_responds_to_weight_changes(tmp_path):
