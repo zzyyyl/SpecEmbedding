@@ -56,6 +56,8 @@ train:
     early_stop: 20
   align:
     metric_for_best: validation_contrastive_loss # optimization runner selects validation_top1_then_mrr
+    batching: random # random or mass_blocks; optimization trial must select explicitly
+    mass_block_size: 32 # mass_blocks mixes four nearby-mass blocks in batch128
     batch_size: 128
     epochs_stage1: 50
     epochs_stage2: 100

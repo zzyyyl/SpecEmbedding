@@ -179,7 +179,8 @@ def test_v15_loader_refuses_unproven_or_legacy_alignment(tmp_path):
             load_align_model(str(checkpoint), torch.device("cpu"), "layernorm", 1e-5)
 
 
-def test_synthetic_formal_alignment_saves_counts_and_loadable_provenance(tmp_path):
+@pytest.mark.parametrize("batching", ["random", "mass_blocks"])
+def test_synthetic_formal_alignment_saves_counts_and_loadable_provenance(tmp_path, batching):
     model_config = config.model.to_dict()
     model_config["spec_encoder"].update(embedding_dim=8, n_head=2, n_layer=1, dim_feedward=8, dim_target=8)
     model_config["mol_encoder"].update(emb_dim=8, n_layers=1, dropout_rate=0, size_feature_dim=4, graph_policy="rdkit_sanitized")
@@ -188,12 +189,21 @@ def test_synthetic_formal_alignment_saves_counts_and_loadable_provenance(tmp_pat
     with patch.object(config, "model", ConfigObject(model_config)), \
          patch.object(config.train.align, "epochs_stage2", 1), \
          patch.object(config.train.align, "num_workers", 0), \
+         patch.object(config.train.align, "batching", batching), \
+         patch.object(config.train.align, "mass_block_size", 1), \
          patch.object(config.augmentation, "prob", 0):
         train_align.train_align(data, list(data), data, list(data), None, batch_size=2, device="cpu",
                                 save_dir=str(tmp_path), formal_fulltrain=True,
                                 selection_metadata={"seed": 42, "fulltrain_audit": {"expected_epoch_counts": {"train": 3, "val": 3}}})
         selection = json.loads((tmp_path / "alignment_selection.json").read_text())
-        assert selection["fulltrain_audit"]["epochs"] == [{"stage": "stage2", "epoch": 1, "train": 3, "val": 3}]
+        epoch = selection["fulltrain_audit"]["epochs"][0]
+        assert {k: epoch[k] for k in ("stage", "epoch", "train", "val")} == {"stage": "stage2", "epoch": 1, "train": 3, "val": 3}
+        assert selection["fulltrain_audit"]["training_batching"] == batching
+        if batching == "mass_blocks":
+            assert epoch["batching"]["queries"] == epoch["batching"]["unique_queries"] == 3
+            assert len(epoch["batching"]["order_sha256"]) == 64
+        else:
+            assert "batching" not in epoch
         assert selection["graph_policy"] == "rdkit_sanitized"
         loaded = load_align_model(str(tmp_path / "best_model_stage2.pth"), torch.device("cpu"), "layernorm", 1e-5)
         assert loaded.training is False

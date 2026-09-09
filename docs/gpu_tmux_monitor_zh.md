@@ -280,6 +280,13 @@ seed42 全量 alignment 训练；不派发测试或 reranker。去掉 `--dry-run
 `validation_retrieval/` 保存每轮分数和排名，selection JSON 记录选优轨迹及 Pareto 文件名。
 训练完成只代表这一个优化候选完成，不代表已接近 SOTA。表现改善后再恢复矩阵。
 
+训练顺序实验可在上述优化命令中显式添加 `--alignment-batching mass_blocks`。
+默认仍为 `train.align.batching: random`；`mass_block_size: 32` 来自 `params.yaml`，
+必须整除 batch size。该选项只改变训练 batch 的组装：按计算精确质量形成小组，混合小组
+并保留尾批，每条训练谱图每轮恰好一次；不改变验证顺序、模型、loss 或候选池。
+selection 的逐轮审计记录质量与排列指纹、query 唯一覆盖数，队列完成检查拒绝配置不符或丢样。
+按计划一次只评估一个方案；新选项的实现或 dry-run 不表示它已派发，也不改运行中的固定源码。
+
 ## 验证（不启动训练）
 
 ```bash

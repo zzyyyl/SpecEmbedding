@@ -88,6 +88,18 @@ def preflight(args):
     runtime_config = config.to_dict()
     runtime_config["model"]["mol_encoder"]["graph_policy"] = config.fulltrain.v15.graph_policy
     runtime_config["general"]["device"] = args.device
+    batching = getattr(args, "alignment_batching", None)
+    if batching is not None:
+        if not getattr(args, "optimize_alignment", False) or batching not in {"random", "mass_blocks"}:
+            raise ValueError("Alignment batching override requires the optimization branch")
+        runtime_config["train"]["align"]["batching"] = batching
+    align_settings = runtime_config["train"]["align"]
+    if align_settings["batching"] not in {"random", "mass_blocks"}:
+        raise ValueError("Unknown alignment batching in configuration")
+    if align_settings["batching"] == "mass_blocks" and (
+        align_settings["mass_block_size"] < 1 or align_settings["batch_size"] % align_settings["mass_block_size"]
+    ):
+        raise ValueError("Mass block size must divide the alignment batch size")
     if getattr(args, "optimize_alignment", False):
         if args.baseline_checkpoint is None:
             raise ValueError("Alignment optimization requires the frozen baseline checkpoint")
@@ -117,7 +129,7 @@ def preflight(args):
             "stages": commands(args), "protocol": "v1.5 source order, sanitized graphs; cache-local exact-target-SMILES sensitivity; independent 2D result audit pending"}
 
 
-def audit_alignment(args):
+def audit_alignment(args, alignment_settings):
     data = args.output_root / "data" / "MassSpecGym"
     verify_dataset(data, config.fulltrain.expected_counts.to_dict(), config.fulltrain.exclude_val_query_indices)
     directory = args.output_root / "alignment42_topk256"
@@ -132,12 +144,26 @@ def audit_alignment(args):
             or audit["dataset_manifest_sha256"] != sha256_file(data / "dataset_manifest.json")
             or selection["checkpoint_sha256"] != sha256_file(directory / "best_model_stage2.pth")
             or selection["exclude_val_query_indices"] != config.fulltrain.exclude_val_query_indices
+            or selection["training_config"] != alignment_settings
+            or audit["training_batching"] != alignment_settings["batching"]
             or len(audit["epochs"]) != stage["stop_epoch"] or stage["best_epoch"] is None
             or stage["stop_epoch"] <= 0):
         raise ValueError("Formal v1.5 alignment completion audit failed")
     for index, epoch in enumerate(audit["epochs"], 1):
-        if epoch != {"stage": "stage2", "epoch": index, **expected}:
+        counts = {key: value for key, value in epoch.items() if key != "batching"}
+        if counts != {"stage": "stage2", "epoch": index, **expected}:
             raise ValueError("Alignment did not visit all train/validation spectra every epoch")
+        batch_audit = epoch.get("batching")
+        if alignment_settings["batching"] == "mass_blocks":
+            if (not isinstance(batch_audit, dict) or batch_audit.get("scheme") != "mass_blocks"
+                    or batch_audit.get("epoch") != index or batch_audit.get("seed") != selection["seed"]
+                    or batch_audit.get("queries") != expected["train"] or batch_audit.get("unique_queries") != expected["train"]
+                    or batch_audit.get("batch_size") != alignment_settings["batch_size"]
+                    or batch_audit.get("block_size") != alignment_settings["mass_block_size"]
+                    or any(len(batch_audit.get(key, "")) != 64 for key in ("mass_sha256", "order_sha256"))):
+                raise ValueError("Mass batching coverage/configuration audit failed")
+        elif batch_audit is not None:
+            raise ValueError("Unexpected mass batching in a random-batching trial")
     return {"checkpoint_sha256": selection["checkpoint_sha256"], "epochs": len(audit["epochs"]),
             "expected_epoch_counts": expected, "graph_policy": selection["graph_policy"]}
 
@@ -208,7 +234,7 @@ def execute(args, manifest):
                 data_report = verify_dataset(args.output_root / "data" / "MassSpecGym", config.fulltrain.expected_counts.to_dict(), config.fulltrain.exclude_val_query_indices)
                 progress["audit"] = data_report["target_audit"]
             elif stage["name"] == "alignment42":
-                progress["audit"] = audit_alignment(args)
+                progress["audit"] = audit_alignment(args, manifest["runtime_config"]["train"]["align"])
                 if getattr(args, "optimize_alignment", False):
                     selection = json.loads((args.output_root / "alignment42_topk256" / "alignment_selection.json").read_text())
                     summary = selection["stages"]["stage2"]
@@ -252,6 +278,8 @@ def main(argv=None):
     parser.add_argument("--prepared-data", type=Path, help="Import a complete, fingerprint-verified CPU dataset into a new run")
     parser.add_argument("--optimize-alignment", action="store_true", help="Full validation baseline then one alignment seed42 selected by retrieval; no test/rerank matrix")
     parser.add_argument("--baseline-checkpoint", type=Path, help="Frozen v1.5 seed42 baseline for the alignment optimization branch")
+    parser.add_argument("--alignment-batching", choices=["random", "mass_blocks"],
+                        help="Optimization trial: override only the training batch assembly; block size comes from params.yaml")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--write-preflight", action="store_true")
     args = parser.parse_args(argv)
@@ -267,6 +295,8 @@ def main(argv=None):
         args.baseline_checkpoint = args.baseline_checkpoint.expanduser().resolve()
     if args.optimize_alignment != (args.baseline_checkpoint is not None):
         parser.error("--optimize-alignment and --baseline-checkpoint must be provided together")
+    if args.alignment_batching is not None and not args.optimize_alignment:
+        parser.error("--alignment-batching requires --optimize-alignment")
     manifest = preflight(args)
     if args.dry_run:
         print(json.dumps(manifest, ensure_ascii=False, indent=2))

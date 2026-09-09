@@ -19,6 +19,7 @@ from SpecEmbedding.models_align import GINEEncoder, SpecMolAlignModel
 from SpecEmbedding.trainer.trainer import set_seed
 from SpecEmbedding.trainer.trainer_align import TrainerAlign
 from SpecEmbedding.utils.fulltrain import sha256_file
+from SpecEmbedding.utils.mass_batching import MassBlockBatchSampler, molecular_exact_masses
 from SpecEmbedding.utils.massspecgym_v15 import classified_full_spectra
 from SpecEmbedding.utils.model import SiameseModel
 from SpecEmbedding.utils.providers import get_provider
@@ -54,6 +55,11 @@ def train_align(
     if seed < 0:
         raise ValueError("seed must be a non-negative integer")
     device = resolve_device(device)
+    batching = config.train.align.batching
+    if batching not in {"random", "mass_blocks"}:
+        raise ValueError(f"Unknown alignment batching: {batching}")
+    if batching == "mass_blocks" and not formal_fulltrain:
+        raise ValueError("Mass-block batching requires full-spectrum alignment")
     epochs_stage1 = config.train.align.epochs_stage1
     epochs_stage2 = config.train.align.epochs_stage2
 
@@ -90,10 +96,17 @@ def train_align(
     g.manual_seed(seed)
 
     # 必须使用 align_collate_fn 来组装 PyG 的 Graph Batch
+    train_batching = {"batch_size": batch_size, "shuffle": True}
+    if batching == "mass_blocks":
+        smiles = [train_data[key][offset]["smiles"] for key, offset in train_dataset._spectrum_indices]
+        sampler = MassBlockBatchSampler(molecular_exact_masses(smiles), batch_size=batch_size,
+                                       block_size=config.train.align.mass_block_size, seed=seed)
+        train_batching = {"batch_sampler": sampler}
+        logging.info("Alignment mass blocks: queries=%s batch=%s block=%s mass_sha256=%s",
+                     len(smiles), batch_size, config.train.align.mass_block_size, sampler.mass_sha256)
     train_loader = DataLoader(
-        train_dataset, 
-        batch_size=batch_size, 
-        shuffle=True, 
+        train_dataset,
+        **train_batching,
         collate_fn=align_collate_fn, 
         num_workers=config.train.align.num_workers,
         worker_init_fn=seed_worker,
@@ -222,6 +235,7 @@ def train_align(
     if formal_fulltrain:
         selection_summary["fulltrain_audit"]["epochs"] = trainer.epoch_counts
         selection_summary["fulltrain_audit"]["validation_permutation_seed"] = seed
+        selection_summary["fulltrain_audit"]["training_batching"] = batching
     (Path(save_dir) / "alignment_selection.json").write_text(
         json.dumps(selection_summary, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",

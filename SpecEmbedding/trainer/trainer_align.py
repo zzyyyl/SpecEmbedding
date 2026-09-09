@@ -67,6 +67,11 @@ class TrainerAlign:
             if seen != self.expected_epoch_counts["train"]:
                 raise RuntimeError(f"Incomplete alignment epoch: trained {seen} spectra")
             self.epoch_counts.append({"stage": stage_name, "epoch": epoch, "train": seen})
+            batch_audit = getattr(self.train_loader.batch_sampler, "last_audit", None)
+            if batch_audit is not None:
+                if batch_audit["queries"] != seen or batch_audit["unique_queries"] != seen:
+                    raise RuntimeError("Training sampler coverage differs from observed query count")
+                self.epoch_counts[-1]["batching"] = dict(batch_audit)
             logging.info("Formal alignment epoch %s trained all %s spectra", epoch, seen)
         return total_loss / len(self.train_loader)
 
