@@ -38,7 +38,7 @@ def main(argv=None):
     parser.add_argument('--fingerprint-cache', type=Path, help='The fingerprint checkpoint\'s own audited validation inputs')
     parser.add_argument("--checkpoint-model-config", action="store_true",
                         help="Construct the baseline from its own verified selection metadata; preserve shared data/tokenizer protocol")
-    parser.add_argument("--spectrum-control", choices=("permuted", "constant"),
+    parser.add_argument("--spectrum-control", choices=("permuted", "constant", "precursor_only"),
                         help="Full validation input intervention; separate output, never checkpoint selection")
     args = parser.parse_args(argv)
     if args.graph_cache and args.prepare_only:

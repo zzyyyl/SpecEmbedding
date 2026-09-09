@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 from types import SimpleNamespace
 
@@ -64,7 +65,58 @@ def test_constant_removes_precursor_length_mask_and_identity_information():
     assert torch.equal(index["positive_mask"], before["positive_mask"])
 
 
-@pytest.mark.parametrize("mode", ["permuted", "constant"])
+def test_precursor_only_retains_mass_but_ignores_fragments_labels_and_peak_count():
+    index = control_index()
+    before = copy.deepcopy(index)
+    changed = copy.deepcopy(index)
+    changed["positive_mask"].logical_not_()
+    changed["candidate_indices"].fill_(-1)
+    for seq in changed["sequences"]:
+        seq["smiles"] = "not a molecule; never inspected by this control"
+        seq["mz"][1:] = 900.
+        seq["intensity"][1:] = .9
+        seq["mask"][1:] = False
+    rng = torch.get_rng_state().clone()
+    first = ControlledValidationSpectra(index, "precursor_only", settings())
+    second = ControlledValidationSpectra(changed, "precursor_only", settings())
+    assert first.metadata == second.metadata
+    expected_masses = np.array([100., 101., 102., 103.], dtype="<f4")
+    assert first.metadata["precursor_mz_float32_le_sha256"] == hashlib.sha256(expected_masses.tobytes()).hexdigest()
+    for i in range(4):
+        sample = first[i]
+        assert sample["spec_mz"].tolist() == [100. + i, 0., 0., 0., 0., 0.]
+        assert sample["spec_intensity"].tolist() == [2., 0., 0., 0., 0., 0.]
+        assert sample["spec_mask"].tolist() == [False, True, True, True, True, True]
+        assert "smiles" not in sample
+        assert all(torch.equal(sample[key], value) for key, value in second[i].items())
+        for value in sample.values():
+            value.fill_(1)
+        assert all(torch.equal(first[i][key], value) for key, value in second[i].items())
+    assert torch.equal(rng, torch.get_rng_state())
+    for a, b in zip(index["sequences"], before["sequences"], strict=True):
+        assert all(np.array_equal(a[key], b[key]) for key in ("mz", "intensity", "mask"))
+    index["sequences"][0]["mz"][0] = 999.
+    assert first[0]["spec_mz"][0] == 100.  # Captured input is independent of later source mutation.
+
+
+@pytest.mark.parametrize("key,value", [("mz", 0.), ("mz", float("nan")), ("mz", float("inf")),
+                                      ("intensity", 1.), ("intensity", float("nan")), ("mask", True)])
+def test_precursor_only_rejects_invalid_precursor_token(key, value):
+    index = control_index()
+    index["sequences"][2][key][0] = value
+    with pytest.raises(ValueError, match="unmasked measured precursor"):
+        ControlledValidationSpectra(index, "precursor_only", settings())
+
+
+@pytest.mark.parametrize("shape", [(0,), (5,), (6, 1)])
+def test_precursor_only_rejects_inconsistent_token_width(shape):
+    index = control_index()
+    index["sequences"][2]["mz"] = np.ones(shape)
+    with pytest.raises(ValueError, match="consistent nonempty tokenizer widths"):
+        ControlledValidationSpectra(index, "precursor_only", settings())
+
+
+@pytest.mark.parametrize("mode", ["permuted", "constant", "precursor_only"])
 def test_real_control_forward_keeps_all_queries_and_normal_audit_rejects_it(tmp_path, mode):
     index = control_index()
     ids, labels = index["candidate_indices"].clone(), index["positive_mask"].clone()
@@ -110,8 +162,9 @@ def test_single_query_permutation_and_implicit_control_settings_are_rejected():
         AlignmentRetrievalValidator(index, SimpleNamespace(), control_settings=settings())
 
 
-def test_cli_controls_cannot_prepare_index_or_fall_back_to_cpu(tmp_path):
-    common = ["--data-path", str(tmp_path), "--index", str(tmp_path / "index.pt"), "--spectrum-control", "constant"]
+@pytest.mark.parametrize("mode", ["constant", "precursor_only"])
+def test_cli_controls_cannot_prepare_index_or_fall_back_to_cpu(tmp_path, mode):
+    common = ["--data-path", str(tmp_path), "--index", str(tmp_path / "index.pt"), "--spectrum-control", mode]
     with pytest.raises(SystemExit):
         alignment_validation.main(common + ["--prepare-only"])
     with pytest.raises(SystemExit):
@@ -121,7 +174,8 @@ def test_cli_controls_cannot_prepare_index_or_fall_back_to_cpu(tmp_path):
 
 
 @pytest.mark.parametrize("tamper", [False, True])
-def test_control_cli_binds_checkpoint_and_publishes_audited_separate_receipt(tmp_path, monkeypatch, tamper):
+@pytest.mark.parametrize("mode", ["constant", "precursor_only"])
+def test_control_cli_binds_checkpoint_and_publishes_audited_separate_receipt(tmp_path, monkeypatch, tamper, mode):
     index = control_index()
     index["dataset_outputs"] = {"synthetic": True}
     index_file = tmp_path / "index.pt"
@@ -150,7 +204,7 @@ def test_control_cli_binds_checkpoint_and_publishes_audited_separate_receipt(tmp
     monkeypatch.setattr(alignment_validation, "load_align_model", lambda *args: model)
     output = tmp_path / "output"
     argv = ["--data-path", str(tmp_path), "--index", str(index_file), "--checkpoint", str(checkpoint),
-            "--output", str(output), "--device", "cuda:0", "--spectrum-control", "constant"]
+            "--output", str(output), "--device", "cuda:0", "--spectrum-control", mode]
     if tamper:
         with pytest.raises(ValueError, match="provenance mismatch"):
             alignment_validation.main(argv)
@@ -158,9 +212,9 @@ def test_control_cli_binds_checkpoint_and_publishes_audited_separate_receipt(tmp
         return
     alignment_validation.main(argv)
     receipt = json.loads((output / "metrics.json").read_text())
-    assert receipt["spectrum_control"]["mode"] == "constant"
+    assert receipt["spectrum_control"]["mode"] == mode
     assert receipt["saved_score_audit"] == "passed" and not receipt["used_for_checkpoint_selection"]
     assert receipt["checkpoint_sha256"] == sha256_file(checkpoint)
-    assert receipt["snapshot_sha256"] == sha256_file(output / "control_constant_epoch000.pt")
+    assert receipt["snapshot_sha256"] == sha256_file(output / f"control_{mode}_epoch000.pt")
     assert receipt["metrics"]["queries"] == 4 and not receipt["test_evaluated"]
     assert not (output / "baseline_epoch000.pt").exists()

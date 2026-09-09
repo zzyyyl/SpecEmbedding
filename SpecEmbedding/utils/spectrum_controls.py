@@ -58,6 +58,24 @@ class ControlledValidationSpectra(Dataset):
             self.metadata.update(constant_mz=mz.tolist(), constant_intensity=intensity.tolist(),
                                  token_width=width, valid_tokens=len(mz),
                                  intervention="Identical fixed tokens and padding for all queries; no measured precursor retained")
+        elif mode == "precursor_only":
+            width = len(index["sequences"][0]["mz"])
+            if width < 1 or any(torch.as_tensor(seq[key]).shape != (width,)
+                                for seq in index["sequences"] for key in ("mz", "intensity", "mask")):
+                raise ValueError("Precursor control requires consistent nonempty tokenizer widths")
+            # Tokenizer.get_metadata places the measured precursor first, with intensity 2.
+            self.precursors = torch.tensor([seq["mz"][0] for seq in index["sequences"]], dtype=torch.float32)
+            if (not torch.isfinite(self.precursors).all() or (self.precursors <= 0).any()
+                    or any(seq["mask"][0] or seq["intensity"][0] != 2. for seq in index["sequences"])):
+                raise ValueError("Precursor control requires an unmasked measured precursor token with intensity 2")
+            self.constant = {"spec_mz": torch.zeros(width), "spec_intensity": torch.zeros(width),
+                             "spec_mask": torch.ones(width, dtype=torch.bool)}
+            self.constant["spec_intensity"][0] = 2.
+            self.constant["spec_mask"][0] = False
+            digest = hashlib.sha256(self.precursors.numpy().astype("<f4", copy=False).tobytes()).hexdigest()
+            self.metadata.update(token_width=width, valid_tokens=1, precursor_intensity=2.,
+                                 precursor_mz_float32_le_sha256=digest,
+                                 intervention="Retain each query's measured precursor; remove all fragment tokens and peak-count information")
         else:
             raise ValueError(f"Unknown spectrum control: {mode}")
 
@@ -68,4 +86,7 @@ class ControlledValidationSpectra(Dataset):
         if self.mode == "permuted":
             sample = self.original[int(self.donors[index])]
             return {key: value for key, value in sample.items() if key != "smiles"}
-        return {key: value.clone() for key, value in self.constant.items()}
+        sample = {key: value.clone() for key, value in self.constant.items()}
+        if self.mode == "precursor_only":
+            sample["spec_mz"][0] = self.precursors[index]
+        return sample
