@@ -287,6 +287,21 @@ seed42 全量 alignment 训练；不派发测试或 reranker。去掉 `--dry-run
 selection 的逐轮审计记录质量与排列指纹、query 唯一覆盖数，队列完成检查拒绝配置不符或丢样。
 按计划一次只评估一个方案；新选项的实现或 dry-run 不表示它已派发，也不改运行中的固定源码。
 
+单次优化完成后，使用独立 CPU 审计生成新回执：
+
+```bash
+CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+python audit_alignment_optimization.py --run "$COMPLETED_OPTIMIZATION_ROOT" \
+  --output "$NEW_AUDIT_RECEIPT"
+```
+
+该入口拒绝未完成的队列和已有输出文件；重新检查输入/配置指纹、每轮完整计数，
+从全部保存分数独立重算排名和 Top-k/MRR，并核对选优、Pareto 候选及最终权重。
+报告比较原 baseline，以及同一已观察轨迹中的最低验证 loss 轮；后者不代表重新执行了
+按 loss 早停的反事实训练。容差固定为各 Top-k 0.2 个百分点、MRR 0.002 原值，
+报告所有改善与退步项，不自动换 checkpoint、重启训练或修改论文。
+它是保存分数的完整 CPU 审计，不是新的模型推理、官方 loader 测试或 SOTA 验收。
+
 ## 验证（不启动训练）
 
 ```bash

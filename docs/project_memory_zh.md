@@ -67,6 +67,8 @@ JESTR-style cosine 只是本地保存嵌入上的重实现打分控制，JESTR/G
   14:34 完成 r4 checkpoint 的完整验证重编码，14:36:53 在物理 GPU 0 上启动 alignment；
   进程/UUID/固定源码已核验一致，第一轮全量训练和完整检索验证已完成，继续后续 epochs。基线数字见优化索引；
   A01 的最终选择与收益尚未完成，不能写成已提升。
+  独立完成审计入口已实现，可逐轮重算保存分数与排名、核对权重/选优和完整覆盖，
+  按预设容差列出各 Top-k/MRR 改善及退步；对未完成 A01 的保护已实测，正式回执待训练结束。
   主排名匹配 torchmetrics1.8.2 逐 query CPU argsort，稳定排序另列敏感性视图；
   实验卡与最新测试见[优化索引](../analysis/massspecgym_optimization.md)。调参仅看验证集，矩阵后置。
   等待期间已实现 A02 质量邻近 batch：保持 batch128、模型/loss 不变，全谱每轮一次，
