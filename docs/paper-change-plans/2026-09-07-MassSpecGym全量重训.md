@@ -53,7 +53,7 @@ checkpoint/版本、来源表格、分母和评价设置。各项的最好值可
 - Base 排序在进入 reranker 前已经较弱。新缓存并未复用旧 alignment 权重或旧磁盘 TokenSet。
   旧候选格式捷径已量化，但尚不能把旧模型的全部性能差额归因于单一因素。
 - r4 alignment 按每轮全部谱图训练，以验证对比损失选择 checkpoint；reranker 目前按验证 MRR
-  选择。A01 已完成固定 baseline 重编码并开始训练，后续按完整验证轨迹判断结构、
+  选择。A01 已完成固定 baseline 重编码、训练和审计，保留 r4；后续按完整验证轨迹判断结构、
   loss、预训练或参数变化的价值，不能只观察训练 loss。
 - 原模型、旧 query cap/top-40/forcing 结果只保留追溯，不能当成 v1.5 的可靠目标线。
   reranker 无法救回其候选池外的真值，必须同时记录 Base、coarse 与最终排序的 coverage。
@@ -252,6 +252,29 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 - [ ] 论文修改后执行双语编译、引用/匿名扫描、发布 manifest 和仓库要求的复现检查。
 
 ## 10. 执行记录
+
+- 2026-09-09 16:01：A01 完整审计与基线决策后，单次启动 A02 质量邻近 batch 队列。
+  干净 detached 源码为 `/data1/zyl/repos/SpecEmbedding-opt-a02-20260909/`，固定提交
+  `fc42b271ba355306f8ba6fad604e81053da78904`；运行根为
+  `/data1/zyl/SpecEmbedding/experiments/massspecgym_v15_opt_a02_20260909_topk256/`。
+  独立 socket `/tmp/specembedding-opt-a02-20260909-1010/tmux.sock`，session `opt` / pane `%0`，
+  入口 PID 3219277，派发时间 16:01:20。`launch_receipt.json` 绑定 A01 审计与决策哈希，
+  `parent_decision.json` 保存保留 r4 的依据；`inputs_and_commands.json` 已经真实输入预检复核。
+  16:01:31 数据导入完成，16:05:28 验证索引准备与核验完成，实测进入
+  `baseline_validation/waiting_gpu`，尚无 alignment 训练目录。索引 SHA-256 与 A01 相同，
+  query/候选/排除及自然正例覆盖一致；初始两卡均为 0% / 空闲 24,206 MiB，继续保持 120 秒检查。
+  只增加 `--alignment-batching mass_blocks`，保持 seed42、随机初始化、batch128/block32，
+  不从 r4/A01 继续训练；r4 仅作固定比较。四阶段与完整协议不变，各 GPU 阶段继续独立等待
+  物理 GPU 0/1 择一并绑定逻辑 `cuda:0`，没有新增外部监测器或并行实验。
+
+- 2026-09-09 16:00：A01 于 15:58:57 在第 19 轮按既定规则早停；外层四阶段 complete、
+  指定 pane dead=1，入口 PID 3182732 与训练 PID 3192041 均已退出。独立完成审计通过，
+  原始回执为 `/data1/zyl/SpecEmbedding/audits/optimization_a01_20260909/receipt.json`，
+  SHA-256 `ab402240b49b86b3c296f40198051a0bc3c76460973791312e548b8013471354`；
+  相邻 `decision.json` 记录保留 r4 和下一项 A02 的范围。选优、完整非支配候选及比较数字
+  只维护于优化索引。全部 19 轮样本覆盖、保存分数/排名/指标、输入指纹与权重关联通过核验；
+  未运行 test，没有将指标取舍写成整体改善或 SOTA 结果。计划继续 `执行中`，论文保持未修改。
+  本轮只更新文档：结果表逐项对照完成回执、相对链接与 diff 检查通过，未重复运行无变更的训练测试。
 
 - 2026-09-09 15:24：A01 第 11 轮完整验证刷新本次 Top-1，既定早停计数重置，训练继续；
   尚无最终选优与整体收益结论，A02 未派发。完成审计入口已提交并推送为 `0e2eaf3`，
@@ -511,7 +534,7 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
 - 验证结果：新增 14 项完成审计测试通过；最新全仓 273 通过、1 跳过、1 个既有路径审计失败；静态检查通过
-- 当前训练状态：r4 旧矩阵停止；A01 基线验证完成、alignment 训练中；A02 实现与 CPU 核验完成，未派发
+- 当前训练状态：r4 旧矩阵停止；A01 完成并审计通过、未替换 r4；A02 CPU 准备完成，等待 GPU 基线验证
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；
