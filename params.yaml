@@ -23,6 +23,14 @@ augmentation:
   node_drop_rate: 0.1
   edge_mask_rate: 0.1
 
+# Inactive component settings for a future single fingerprint-tower trial.
+fingerprint_encoder:
+  input_bits: 2048
+  hidden_dim: 512
+  emb_dim: 128
+  dropout_rate: 0.2
+  norm_eps: 0.00001
+
 model:
   spec_encoder:
     embedding_dim: 512

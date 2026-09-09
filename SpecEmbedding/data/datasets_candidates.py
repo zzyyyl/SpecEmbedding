@@ -25,7 +25,7 @@ class CandidateExample:
 @dataclass
 class CandidateAlignmentBatch:
     anchor: tuple
-    negative_graphs: Batch | None
+    negative_graphs: Batch | torch.Tensor | None
     negative_ptr: torch.Tensor
     raw_query_indices: torch.Tensor
     candidate_indices: torch.Tensor
@@ -120,14 +120,22 @@ class CandidateAlignDataset(Dataset):
 def candidate_align_collate_fn(examples):
     if not examples:
         raise ValueError("Cannot collate an empty candidate batch")
+    graphs = [graph for example in examples for graph in example.negative_graphs]
+    return make_candidate_batch(examples, align_collate_fn([example.anchor for example in examples]),
+                                Batch.from_data_list(graphs) if graphs else None)
+
+
+def make_candidate_batch(examples, anchor, negative_molecules):
+    """Bind graph or fingerprint tensors to the same observed candidate sample metadata."""
+    if not examples:
+        raise ValueError("Cannot collate an empty candidate batch")
     counts = [len(example.negative_graphs) for example in examples]
     if any(count != len(example.sample.molecule_indices) or count != len(example.sample.source_positions)
            or count != len(example.sample.identity_2d) for count, example in zip(counts, examples, strict=True)):
         raise ValueError("Candidate graph and source metadata counts differ")
-    graphs = [graph for example in examples for graph in example.negative_graphs]
     return CandidateAlignmentBatch(
-        anchor=align_collate_fn([example.anchor for example in examples]),
-        negative_graphs=Batch.from_data_list(graphs) if graphs else None,
+        anchor=anchor,
+        negative_graphs=negative_molecules,
         negative_ptr=torch.tensor([0, *np.cumsum(counts).tolist()], dtype=torch.long),
         raw_query_indices=torch.tensor([example.raw_query_index for example in examples], dtype=torch.long),
         candidate_indices=torch.tensor([int(i) for example in examples for i in example.sample.molecule_indices], dtype=torch.long),

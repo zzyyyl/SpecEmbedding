@@ -250,6 +250,17 @@ class AlignmentRetrievalValidator:
             self.spectra = ControlledValidationSpectra(index, spectrum_control, control_settings)
             self.control_metadata = self.spectra.metadata
 
+    def molecule_loader(self, generator):
+        return DataLoader(self.molecules, batch_size=self.settings.mol_batch_size,
+                          num_workers=self.settings.num_workers, shuffle=False, collate_fn=mol_collate_fn,
+                          generator=generator)
+
+    def snapshot_metadata(self):
+        extra = {"spectrum_control": self.control_metadata} if self.control_metadata is not None else {}
+        if self.graph_cache_fingerprint is not None:
+            extra['validation_graph_cache'] = self.graph_cache_fingerprint
+        return extra
+
     @torch.inference_mode()
     def __call__(self, model, device, epoch, stage):
         started = time.monotonic()
@@ -257,13 +268,11 @@ class AlignmentRetrievalValidator:
         index, settings = self.index, self.settings
         # This generator is private: validation must not change the training RNG stream.
         generator = torch.Generator().manual_seed(0)
-        mol_loader = DataLoader(self.molecules, batch_size=settings.mol_batch_size,
-                                num_workers=settings.num_workers, shuffle=False, collate_fn=mol_collate_fn,
-                                generator=generator)
+        mol_loader = self.molecule_loader(generator)
         embeddings = None
         seen = torch.zeros(len(index["mol_smiles"]), dtype=torch.bool)
         for batch_number, batch in enumerate(mol_loader, 1):
-            indices = torch.tensor(batch["indices"], dtype=torch.long)
+            indices = torch.as_tensor(batch["indices"], dtype=torch.long, device='cpu')
             encoded = model.encode_mol(batch["mol_graph"].to(device), normalize=True).float().cpu()
             if not torch.isfinite(encoded).all() or seen[indices].any():
                 raise ValueError("Non-finite or repeated validation molecule embeddings")
@@ -298,9 +307,7 @@ class AlignmentRetrievalValidator:
         if self.output_dir is not None:
             self.output_dir.mkdir(parents=True, exist_ok=True)
             path = self.output_dir / f"{stage}_epoch{epoch:03d}.pt"
-            extra = {"spectrum_control": self.control_metadata} if self.control_metadata is not None else {}
-            if self.graph_cache_fingerprint is not None:
-                extra['validation_graph_cache'] = self.graph_cache_fingerprint
+            extra = self.snapshot_metadata()
             with path.open("xb") as handle:
                 torch.save({"metrics": metrics, "ranks": ranks, "scores": all_scores,
                             "raw_query_indices": index["raw_query_indices"], "protocol": PROTOCOL, **extra}, handle)

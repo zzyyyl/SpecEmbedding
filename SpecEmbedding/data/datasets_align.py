@@ -97,12 +97,19 @@ class AlignGraphDataset(TrainDataset):
                 mol_graph.edge_attr = mol_graph.edge_attr[edge_mask]
         return mol_graph
 
+    def full_spectrum_item(self, index):
+        """Read one complete-spectrum item with the existing spectral augmentation."""
+        if not self.full_spectra:
+            raise ValueError("Full-spectrum access requires full_spectra=True")
+        label, offset = self._spectrum_indices[index]
+        sequence = self._data[label][offset]
+        if self.is_augment and np.random.random() < self.augment_config["prob"]:
+            sequence = self.aug(sequence)
+        return sequence, label
+
     def __getitem__(self, index):
         if self.full_spectra:
-            label, offset = self._spectrum_indices[index]
-            sequence = self._data[label][offset]
-            if self.is_augment and np.random.random() < self.augment_config["prob"]:
-                sequence = self.aug(sequence)
+            sequence, label = self.full_spectrum_item(index)
             spec_views = [[sequence["mz"], sequence["intensity"], sequence["mask"]]]
         else:
             spec_views, label = super().__getitem__(index)

@@ -32,11 +32,14 @@ def compare_metrics(candidate, baseline):
     return {"delta_raw": delta, "topk_gains": gains, "material_regressions": losses, "outcome": outcome}
 
 
-def audit_snapshot(path, index, *, expected_spectrum_control=None, expected_graph_cache=None):
+def audit_snapshot(path, index, *, expected_spectrum_control=None, expected_graph_cache=None,
+                   expected_fingerprint_cache=None):
     """Independently reconstruct all ranks from saved float32 scores, including missing positives."""
     snapshot = torch.load(path, map_location="cpu", weights_only=False)
     require(snapshot.get("spectrum_control") == expected_spectrum_control, "Unexpected spectrum control in validation snapshot")
     require(snapshot.get("validation_graph_cache") == expected_graph_cache, "Unexpected graph cache in validation snapshot")
+    require(snapshot.get("validation_fingerprint_cache") == expected_fingerprint_cache,
+            "Unexpected fingerprint cache in validation snapshot")
     require(snapshot["protocol"] == index["protocol"] == PROTOCOL, "Snapshot protocol mismatch")
     require(snapshot["raw_query_indices"] == index["raw_query_indices"], "Snapshot query order/coverage mismatch")
     scores, labels = snapshot["scores"], index["positive_mask"]
