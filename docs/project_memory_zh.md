@@ -1,6 +1,6 @@
 # SpecEmbedding 项目记忆
 
-最后更新：2026-09-08。本文是内部状态摘要，不放入匿名补充包；事实以代码、配置和可校验工件为准。
+最后更新：2026-09-09。本文是内部状态摘要，不放入匿名补充包；事实以代码、配置和可校验工件为准。
 运行入口见 [文档地图](README_zh.md)，模型细节见 [reranker 说明](reranker_solution_zh.md)。
 
 ## 当前实现与证据
@@ -23,7 +23,7 @@ JESTR-style cosine 只是本地保存嵌入上的重实现打分控制，JESTR/G
 
 ## 在途任务
 
-- [MassSpecGym 全量重训](paper-change-plans/2026-09-07-MassSpecGym全量重训.md)：**执行中，恢复 v1.5 正式队列**。
+- [MassSpecGym 全量重训](paper-change-plans/2026-09-07-MassSpecGym全量重训.md)：**已偏离待确认，论文解释暂停，原 v1.5 队列继续运行**。
   当前 processed 数据已核验为 v1。用户已授权采用 v1.5，并在审计证明必要时重训 alignment。
   旧监测器于 19:48 停止，未派发训练，原锁、日志和固定源码保留。
   旧构图的芳香性/键类型依赖 SMILES 表示，迁移需规范构图并重训一个 alignment-42；
@@ -48,7 +48,15 @@ JESTR-style cosine 只是本地保存嵌入上的重实现打分控制，JESTR/G
   严格 `cuda:0`、正式全量模式和全部 194,119 条训练谱图，复查已进入第 1 轮训练，
   GPU 进程记录与 UUID 绑定一致。此单个 alignment-42 完成后再运行 12 个全量 reranker 组合；
   不能称为三 alignment 矩阵。
-  运行路径、独立 socket、状态入口及验证记录集中于计划。尚无新 GPU 训练结果。
+  2026-09-09 复查：alignment、六缓存已完成；Mass relative 三 seed、pointwise seed42 的
+  全量训练和完整测试完成，pointwise seed43 正在训练。结果仍为 cache-local exact-target-SMILES。
+  用户要求排查准确率落差，已核对新旧实际权重哈希、六 cache 指纹、四 test cache 全 query
+  标签/来源/点积及分散样本 GPU 重编码，未发现旧权重或磁盘 TokenSet 缓存复用。
+  旧候选真值与干扰项的芳香性表示存在强格式捷径，已用完整候选上的无谱图解析规则量化；
+  不能将旧高分直接作为新版应恢复的可靠基准，旧模型依赖程度仍需控制实验。
+  详见[准确率排查](../analysis/massspecgym_v15_regression_audit.md)。该证据影响旧结果解释，
+  计划设为待确认，暂停论文结论更新与新增实验；保留已授权队列，不改当前协议。
+  运行路径、独立 socket、状态入口及验证记录集中于计划。
 - [NPLIB1 增强](paper-change-plans/2026-09-05-NPLIB1跨数据集增强.md)：计划状态为执行中，
   数据处理、重叠审计与实现 pilot 已记录，正式 GPU 矩阵尚未完成。该数据与 MassSpecGym
   有明显训练身份重叠，定位为第二套 in-domain 派生协议；去重 zero-shot 仅作小样本敏感性分析。
