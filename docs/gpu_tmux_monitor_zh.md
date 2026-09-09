@@ -287,6 +287,12 @@ seed42 全量 alignment 训练；不派发测试或 reranker。去掉 `--dry-run
 selection 的逐轮审计记录质量与排列指纹、query 唯一覆盖数，队列完成检查拒绝配置不符或丢样。
 按计划一次只评估一个方案；新选项的实现或 dry-run 不表示它已派发，也不改运行中的固定源码。
 
+检验分子图扰动的单项实验可在优化命令中添加 `--no-alignment-mol-augmentation`。
+该开关仅把运行配置中的 `augmentation.node_drop_rate` 和 `augmentation.edge_mask_rate` 置零，
+保留谱图增强、`prob`、batch、网络和损失。省略开关或使用正向开关时沿用 `params.yaml` 的
+扰动率；该选项不能用于默认队列。完成检查与独立审计均核对 selection 的实际
+`config_snapshot.augmentation` 是否与运行前指纹配置一致，避免只核对预期命令。
+
 单次优化完成后，使用独立 CPU 审计生成新回执：
 
 ```bash
