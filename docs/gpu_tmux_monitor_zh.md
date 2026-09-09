@@ -216,8 +216,9 @@ python run_massspecgym_v15.py --gpu 1 --device cuda:1 \
 2. 审计通过后，满足既定 GPU 门槛才从随机初始化训练 alignment seed=42。新运行配置显式使用
    `rdkit_sanitized` 构图；训练每轮遍历 194,119 条谱图，验证保留既定六条排除，实际 19,423 条。
    同二维身份使用 multi-positive 标签；验证采用一次固定 seed 排列，跨 epoch 不重抽谱。
-3. 验证新 checkpoint 的数据、构图、配置、设备及每轮数量后，运行六个 top-256/no-forcing 缓存
-   和十二组 reranker 训练/完整测试。后续每个 GPU 阶段仍重新等待。
+3. 验证新 checkpoint 的数据、构图、配置、设备及每轮数量后，运行 Mass 三个 top-256/no-forcing
+   缓存和一组 relative/seed42 训练及完整测试。2026-09-09 起按用户要求固定单 baseline，
+   不再自动展开 Formula、pointwise 或多 seed；后续每个 GPU 阶段仍重新等待。
 
 `model.mol_encoder.graph_policy` 默认 `legacy_raw`，用于旧工件复核；v1.5 入口从 `params.yaml`
 生成独立 `runtime_params.yaml`，显式切换构图策略。新 alignment 的 selection 文件保存完整模型配置、
@@ -225,7 +226,7 @@ python run_massspecgym_v15.py --gpu 1 --device cuda:1 \
 策略后称为 v1.5 重训。原始来源的 CPU 审计也不替代新模型输出的官方候选顺序/二维身份结果审计。
 
 状态入口为运行根的 `status.json`、`runner.log`、`logs/prepare_v15.log`、
-`data/MassSpecGym/dataset_manifest.json`。alignment 日志在 `logs/alignment42.log`，子矩阵状态在
+`data/MassSpecGym/dataset_manifest.json`。alignment 日志在 `logs/alignment42.log`，reranker 状态在
 `rerank_topk256/status.json`。顶层完成只代表配置的训练/测试阶段完成，结果身份审计和论文状态另记。
 缓存另外保存数据版本、数据 manifest 哈希、实际无法编码的分子列表与数量；任何目标编码丢失均
 拒绝生成缓存。源候选身份审计与有效图候选池必须区分，不能把图排除后的结果称为未经处理的完整官方评价。
@@ -234,8 +235,9 @@ python run_massspecgym_v15.py --gpu 1 --device cuda:1 \
 
 `run_fulltrain_rerank.py` 是[全量重训计划](paper-change-plans/2026-09-07-MassSpecGym全量重训.md)
 的独立正式入口，不改变通用监测器语义。它要求新输出目录、干净的固定源码 worktree，读取
-`params.yaml` 的 `fulltrain` 配置：先重建并核验六个全量/no-forcing/top-256 缓存，再依次执行
-mass/formula × relative/pointwise × seeds 42/43/44 的训练与完整测试评价。每个 GPU 阶段再次等待。
+`params.yaml` 的 `fulltrain` 配置：先重建并核验 Mass train/val/test 三个全量/no-forcing/top-256
+缓存，再执行 relative/seed42 一组训练与完整测试评价。入口拒绝扩大候选协议、模型和 seed 范围。
+旧 12 组矩阵只保留在原固定源码及历史配置中。每个 GPU 阶段再次等待。
 
 先把下面变量替换为已核验的**绝对路径**，运行只读检查；`MSG_DATA` 直接指向包含 `train.pkl`
 等文件的目录，checkpoint 旁须有匹配的 `alignment_selection.json`：
@@ -256,7 +258,9 @@ detached 会话方式启动监测器。实际入口重新核对输入/config/com
 无正例 query 不能监督训练，单独统计，不混同人为限量；完整测试仍包含无正例 query。
 每阶段记录 `status.json`，失败立即停止、不重试或覆盖旧工件；人工排查后使用新输出目录。
 `monitor.log` 的 SENT 只表示派发，训练/评价进度须查看 `status.json`、`runner.log` 和各阶段日志。
-三 seed 汇总、二维身份审计及论文更新仍是后续工作，不能将队列派发说成实验完成。
+单 baseline 优化使用验证集 Top-k（1/5/10/20）整体表现、MRR 为辅作决策，测试集不用于反复调参。
+当前训练器仍按既有验证损失/alignment、验证 MRR/reranker 选 checkpoint；更改选优逻辑须单独
+实现、验证并记录为实验变量，不能把目标写成已实现行为。表现改善后再恢复矩阵，身份审计与论文更新仍待完成。
 
 ## 验证（不启动训练）
 
