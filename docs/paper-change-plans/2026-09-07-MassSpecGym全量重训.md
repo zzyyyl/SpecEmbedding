@@ -290,6 +290,29 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-10：D18完整train/val母离子—碎片差值CPU输入审计于10:12:35完成，原PID3543224
+  （starttime1449447742）已退出0；未增强的token与D14完整指纹一致，val逐项匹配固定索引，
+  没有读取test或执行模型。独立复核因首次权限审核超时未启动，按工具允许重试一次后于
+  10:26:32完成，9项输入、4项输出、完整query顺序和计数通过；未重启原数据审计或训练。
+  工件根`/data1/zyl/SpecEmbedding/audits/precursor_delta_inputs_20260910/`，`receipt.json`
+  SHA-256 `f14f30a4931f03ff60a3d8bca5c37f62d59b8aa22d1082deff22fa75db815057`，
+  `verification.json` SHA-256 `d46d38cfa2191d4b2a0634496d9abf86802033486e738eef00e578ca3a706c0e`；
+  相邻`audit.py`、`verify.py`和完整train/val逐query数组均保留。准备与原日志在
+  `/data1/zyl/SpecEmbedding/audits/precursor_delta_preparation_20260910/`，专用socket为
+  `/tmp/specembedding-precursor-delta-20260910-1010/tmux.sock`；该一次性CPU任务已结束，不重发。
+  输入统计和设计限制仅维护于优化索引D18，尚未修改模型/缓存或指定A07。
+  R05另归档DreaMS原文至`/data1/zyl/papers/DreaMS_s41587-025-02663-3.pdf`，SHA-256
+  `84f8d3ff8df42b1709e201ce335fcf6f60e4479ed056c15ecbda9ba26c914e05`；官方源码子集位于
+  `/data1/zyl/repos/DreaMS/`，绑定commit `dbec3a0b514a99e5056cfccde4559fda8cfe8129`，不是完整
+  clone或论文运行版本绑定。下载manifest为`/data1/zyl/papers/specembedding_dreams_20260910_manifest.json`，
+  SHA-256 `b1ff2e7027309faef2e8ffd7d4a33f72199d989773655fd7535c8c1ca79b9634`；PDF首页、PDF及
+  三项源码/许可证指纹独立读回通过。编码差的线性偏置推断经合成数组核验，范围见R05；
+  未执行外部模型、下载权重或更改SpecEmbedding预训练架构。10:24:41宿主机核验原对照
+  PID3479867及指定tmux pane存活，`permuted/waiting_gpu`；GPU0/1利用率89%/83%、空闲
+  显存6381/10431MiB，均未满足门槛。A06最终目录及模型运行目录仍不存在，未重复派发。
+  10:30:44实际执行既有A06入口`--check-only`再次确认run/audit complete、controls running、
+  原对照PID/starttime匹配及`dependencies_pending`，没有创建最终准备或运行目录。审计及
+  复核脚本Ruff/语法、文档diff检查通过；此次只归档输入证据，不重跑全仓或宣称新模型验证。
 - 2026-09-10：A05原入口于09:32:15完成全量24轮负例重放，四阶段均complete，原PID
   退出0；`status.json` SHA-256 `14e0df29a36ec1de152525ca81ce7c7427fde6cd9325425c2a1b0165c81cd04d`。
   既有独立完成审计队列于09:32:26单次启动PID3536765，实际进程的CUDA为空、OMP/MKL均为1、
@@ -1086,7 +1109,7 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
 - 验证结果：最新全仓501通过、1跳过、1个既有路径审计失败；静态检查、完整验证图与训练/验证指纹缓存审计、真实完整指纹输入预检、A05全量CPU采样及新存储条件dry-run均通过，下一轮固定源码存储/队列相关29项通过
-- 当前训练状态（2026-09-10 09:51核验）：r4旧矩阵停止；A01未替换r4；A02完成审计并晋升；A03完整审计通过但未晋升；A04完整25轮及独立审计通过，epoch20为当前incumbent；A05完成24轮全量训练及独立审计，选中第19轮和全部Pareto候选均未通过改善门槛，已确认保留A04，原入口/训练/审计均结束；A04正常输入复现通过，其余三个诊断视图尚无结果，队列等待GPU；A06确认继承A04的训练设置，完整条件预检及最终绑定入口准备通过，最终配置绑定和派发仍待输入对照完成
+- 当前训练状态（2026-09-10 10:30核验）：r4旧矩阵停止；A01未替换r4；A02完成审计并晋升；A03完整审计通过但未晋升；A04完整25轮及独立审计通过，epoch20为当前incumbent；A05完成24轮全量训练及独立审计，选中第19轮和全部Pareto候选均未通过改善门槛，已确认保留A04，原入口/训练/审计均结束；A04正常输入复现通过，其余三个诊断视图尚无结果，原队列存活并等待GPU；D18完整差值输入审计及独立复核通过；A06确认继承A04的训练设置，完整条件预检及最终绑定入口准备通过，实际只读检查仍等待输入对照完成，尚未最终绑定或派发
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；
