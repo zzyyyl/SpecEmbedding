@@ -290,6 +290,43 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-10：A04输入对照的其余三个视图依次通过物理GPU0原空闲门槛，均使用严格cuda:0；
+  四视图于10:59:02全部完成，原PID3479867及各子进程退出0，未重启队列。状态SHA-256
+  `0c157ab68f5e7302c1d9170109da8e76e259caaa0660f8d48881d119aba5c054`；全部19,423条query的
+  四份保存分数、主/稳定排名、指标及控制元数据再次独立复核通过，完整结果集中于优化索引D17。
+  `/data1/zyl/SpecEmbedding/audits/spectrum_controls_a04_review_20260910/review.json` SHA-256
+  `cf596e7fb818c609dc2f8d8ee4e77d236f777a63086e4e2c521a7d36694a00cf`，相邻`decision_a06.json`
+  SHA-256 `d826f28535ac9b4fb9f4646b783421a9f1496bbbc791bfe182624759265549c6`；相邻`review.py`
+  保留可重跑检查。正常输入优于干预输入，但常量/母离子视图也保留命中，不能将全部成绩
+  归因于碎片或视为重训消融；该结果不改变A06假设、A04 parent及完整评价协议。
+  原最终绑定入口的`--check-only`确认所有依赖完成及退出0；显式A04决定随后通过完整CPU
+  dry-run，11:12:42生成`/data1/zyl/SpecEmbedding/audits/optimization_a06_finalization_20260910/ready.json`，
+  SHA-256 `13ae34ddffabf6e23998679dff8f4c2171658110ff45289c5e55d416b943c4c7`。7份最终文件
+  独立读回一致；`preflight.json` SHA-256 `62ece9b559f4cc06f1bbdd8010a6420c6fe3f6e18ef276668a530a85b09a2a7d`，
+  配置SHA仍为`8f96d043b8c46c9c43652a8aada2f8363537abf6c77806619a1b260463f76dec`，固定源码仍是
+  干净`d6226efb8492ce5595a953bc720ecc741c4f4867`，未修改在途worktree或模型架构方案。
+  11:16:29以明确argv单次启动A06，独立socket为`/tmp/specembedding-opt-a06-20260910-1010/tmux.sock`，
+  session`opt`/pane`%0`，PID3551413、starttime1449836778；启动脚本、排他`dispatch.json`和
+  `launch.json`及stdout日志位于`/data1/zyl/SpecEmbedding/audits/optimization_a06_launch_20260910/`。
+  运行根为`/data1/zyl/SpecEmbedding/experiments/massspecgym_v15_opt_a06_20260910_topk256/`；
+  11:17:39实际进入CPU导入，11:19:42完成数据与验证索引。完整划分、有效验证和五项导入
+  文件SHA通过，实际`inputs_and_commands.json`与最终preflight逐字节相同；运行配置SHA-256
+  `29376c32ec777447d01f2347b50f37004ed08b803b409ea60ec5ece514ff2c34`。
+  11:25:58独立核验原PID、真实命令、固定源码、配置及外部缓存/临时目录，启动审计目录中的
+  `runtime_verification.json` SHA-256 `c03ac09e1dc5b32340f900960c00cccd87b8b0908f27fda783a5746314fafc0a`；
+  相邻`verify_start.py`保存检查。实际CPU父进程的CUDA为空，等待GPU0/1原门槛，当前
+  `baseline_validation/waiting_gpu`，尚未启动本轮模型训练。脚本Ruff/语法与只读启动检查通过；
+  GPU设备、首轮实际覆盖/耗时和最终模型成绩仍待后续阶段核验。
+- 2026-09-10：D19外部参考query覆盖审计于10:56:30完成，11:01:05独立pandas完整重读复核
+  通过，两个CPU进程退出0。只读取已下载的两个Formula候选表和官方test元数据，不读取
+  模型预测、不修改GLACIER独立复现或本地训练。工件根为
+  `/data1/zyl/SpecEmbedding/audits/reference_query_coverage_20260910/`，`receipt.json` SHA-256
+  `4e323563793acde438b44cdd2ff679950e7bc316104a2661b596afa4d3721030`，`verification.json` SHA-256
+  `79bea8658d3de791adfd9c967f8af489564e25136191f555d692632fcb62b4f0`；相邻两份脚本及完整逐query表
+  保留，4项输入/2项输出重验通过。两文件的query集合精确对应官方test仪器类型非空记录，
+  具体覆盖数及边界集中于优化索引D19；它不是上游筛选因果证据，不能继承给缺失Mass包或
+  论文Table 1分母，S_j和同协议资格仍待核验。原文及已固定上游源码只读检查未补齐这些绑定；
+  未修复或运行外部文件，未依据外部test元数据调整模型。相关脚本Ruff/语法和文档检查通过。
 - 2026-09-10：D18完整train/val母离子—碎片差值CPU输入审计于10:12:35完成，原PID3543224
   （starttime1449447742）已退出0；未增强的token与D14完整指纹一致，val逐项匹配固定索引，
   没有读取test或执行模型。独立复核因首次权限审核超时未启动，按工具允许重试一次后于
@@ -1109,7 +1146,7 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
 - 验证结果：最新全仓501通过、1跳过、1个既有路径审计失败；静态检查、完整验证图与训练/验证指纹缓存审计、真实完整指纹输入预检、A05全量CPU采样及新存储条件dry-run均通过，下一轮固定源码存储/队列相关29项通过
-- 当前训练状态（2026-09-10 10:30核验）：r4旧矩阵停止；A01未替换r4；A02完成审计并晋升；A03完整审计通过但未晋升；A04完整25轮及独立审计通过，epoch20为当前incumbent；A05完成24轮全量训练及独立审计，选中第19轮和全部Pareto候选均未通过改善门槛，已确认保留A04，原入口/训练/审计均结束；A04正常输入复现通过，其余三个诊断视图尚无结果，原队列存活并等待GPU；D18完整差值输入审计及独立复核通过；A06确认继承A04的训练设置，完整条件预检及最终绑定入口准备通过，实际只读检查仍等待输入对照完成，尚未最终绑定或派发
+- 当前训练状态（2026-09-10 11:25核验）：r4旧矩阵停止；A01未替换r4；A02完成审计并晋升；A03完整审计通过但未晋升；A04完整25轮及独立审计通过，epoch20为当前incumbent；A05完成24轮全量训练及独立审计但未晋升；A04四种完整输入对照及独立排名复核通过，原队列退出0；D18/D19完整输入/参考覆盖审计通过；A06继承A04训练设置，最终绑定和全量预检通过并单次派发，原PID存活，数据与验证索引导入及实际输入/环境核验通过，当前等待基线验证GPU，暂无本轮模型结果
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；

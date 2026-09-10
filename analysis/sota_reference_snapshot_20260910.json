@@ -8,7 +8,14 @@
     "glacier_v1": {
       "url": "https://arxiv.org/html/2606.29161v1",
       "pdf_filename": "2606.29161v1_GLACIER.pdf",
-      "pdf_sha256": "6f02ebba898df22acc2ea42a385a53c1b167986b8a5dcfcdf2d439127ccda7a0"
+      "pdf_sha256": "6f02ebba898df22acc2ea42a385a53c1b167986b8a5dcfcdf2d439127ccda7a0",
+      "downloaded_query_coverage_evidence": {
+        "analysis_section": "massspecgym_optimization.md#d19已下载外部formula候选表的测试query覆盖差集",
+        "scope": "Downloaded Formula files only; their query sets exactly match official test queries with nonempty instrument_type.",
+        "establishes_mass_table1_denominator": false,
+        "establishes_filtering_cause": false,
+        "changes_unified_eligibility": false
+      }
     },
     "glmr_aaai2026": {
       "url": "https://ojs.aaai.org/index.php/AAAI/article/view/37132",
