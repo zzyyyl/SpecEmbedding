@@ -56,6 +56,12 @@ qk_norm_encoder:
 attention_pool_encoder:
   norm_eps: 0.00001
 
+# Inactive A13 component preset. Formal use requires audited query metadata and runner integration.
+adduct_conditioning_encoder:
+  adducts: ["[M+H]+", "[M+Na]+"]
+  unknown_id: 2
+  unknown_policy: identity
+
 model:
   spec_encoder:
     embedding_dim: 512
