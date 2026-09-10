@@ -323,6 +323,25 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-11 02:54：A11仅CPU最终绑定组件完成准备，归档根为
+  `/data1/zyl/SpecEmbedding/audits/optimization_a11_finalization_preparation_20260911`；
+  `receipt.json` SHA为`07db46581c03faef70035510535388d637dde7f9bce546b76734cccb6ddaa1cc`，
+  `finalize.py` SHA为`57885eb38fe5473d4fd72893cee50074c31f28d3d6b5311c1047fcfe635b9aec`。
+  固定候选源码仍为干净的`54b00e8`，只新增汇聚的配置继承、独立原模型baseline、指纹及
+  结构采样完整输入绑定、实际CLI阶段、失败/旧输出拒绝与审计后parent选择共106项CPU
+  检查通过。实际宿主机check-only核验原A10 PID3756121/starttime1455331545仍存活，
+  精确命令为原CPU successor，返回waiting_a10_completion_and_binding，未创建A11最终
+  配置或模型目录，未部署队列或派发模型。8个归档文件与6项固定参考另行重算SHA一致，
+  Ruff与源码编译通过，预训练共享源码及运行中的A09/A10固定源码不变。
+  完整通过日志在`/data1/zyl/SpecEmbedding/audits/optimization_a11_finalizer_checks_20260911_r2`，
+  回执SHA为`94e3e841c9d6b29c091dbdf46c6ebbe1f415b924df6c13a4a73332c98af1796a`，
+  用时27.42秒；相邻`optimization_a11_finalizer_checks_20260911_r1`保留首次98通过、8失败
+  的测试源码及日志，回执SHA为`cd4cddaf884456187165727abbd00dc3c7dfeedb919f7075b6f1c4052d0c4356`。
+  首次错误为沿用A10测试末尾“新模型等于parent”的断言，修正为分别核对候选汇聚配置
+  与原始baseline后通过，最终绑定脚本未因此变更；不记为失败模型attempt。
+  仍须A10真实训练及独立完成审计的依赖绑定、全部完成、最终parent决定与真实全量预检；
+  不以准备检查代替这些证据。A09训练与A10原等待队列保持运行，当前incumbent仍是A04。
+
 - 2026-09-11 02:32：A09 fresh基线验证于02:08:41完成，02:11:34正式训练选中物理
   GPU1（UUID `GPU-a52199f5-d656-ff80-6b9c-489eecd7869f`）显露为cuda:0，02:13:10进入
   stage2；首轮02:27:07完整记录train194,119、val19,423，后续仍在训练。原入口
