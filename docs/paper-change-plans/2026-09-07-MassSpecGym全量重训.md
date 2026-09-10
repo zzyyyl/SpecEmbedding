@@ -290,6 +290,45 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-10：准备A06完成审计时发现固定`d6226ef`入口在指纹模型训练结束后，会错误要求
+  其`validation_graph_cache`等于GINE比较基线的图缓存；真实manifest的模型类型为fingerprint、
+  baseline使用图缓存，而训练配置明确使用指纹缓存，故该检查会误报失败。尚无GPU阶段输出，
+  核验原PID/starttime、等待阶段及目录后仅向原入口发送SIGINT，保留旧运行/锁/源码。
+  准备以合成阶段执行路径复现并修复此检查，再用原A06源码加最小修复创建新固定版本及运行
+  目录；模型、数据、候选、seed和训练超参数不变。刚准备的旧A06完成审计队列未启动，
+  不向其派发，也不把预检或主动中断记为模型失败。此为执行错误修复，不改变实验协议或范围。
+  原队列已于12:24:34记录`KeyboardInterrupt()`并退出，原PID3551413为Z，专用pane为dead；
+  合成回归在修复前准确暴露指纹正常缓存被拒绝、错误图缓存被接受，修复后四种GINE/指纹
+  路径符合预期。相关43项检查通过，修复`2e9ea2a`已推送。新的固定源码为
+  `/data1/zyl/repos/SpecEmbedding-opt-a06-20260910-r2`，commit
+  `65eecfce9c1522b8e86e6e92bb345d2c652799d0`，相对原d622仅结束检查及回归测试两文件不同；
+  该实际运行版本全仓505通过、1跳过、1个相同既有路径审计失败，静态检查通过，工作树干净。
+  新运行根为`/data1/zyl/SpecEmbedding/experiments/massspecgym_v15_opt_a06_20260910_r2_topk256`；
+  完整CPU预检及原A06的`runtime_config`逐项比较通过，只允许源码commit和源码/配置/输出路径
+  改变，未带入差值组件、改变参数或重建有效输入缓存。新准备目录
+  `/data1/zyl/SpecEmbedding/audits/optimization_a06_r2_preparation_20260910`的`ready.json`SHA-256
+  为`f53f21607a21ca7eb006e54fc25281ee804ced91aa712a93dffa7adad1d3696a`，`preflight.json`为
+  `7fdadadecc9894a19f4f7875c73c63f6696dfc3863c776afe1c0cbd0fc2016db`。单次启动记录位于
+  `/data1/zyl/SpecEmbedding/audits/optimization_a06_r2_launch_20260910`；12:36:24派发专用socket
+  `/tmp/specembedding-opt-a06-r2-20260910-1010/tmux.sock`，session`opt`/pane`%0`，PID3563758、
+  starttime1450316244。12:39:36已完成CPU导入并等待基线验证GPU；实际输入清单与新preflight
+  逐字节一致，五份导入文件、完整计数及原PID/外部存储环境独立核验通过。启动目录内
+  `runtime_verification.json`SHA-256为`49d567cf0fc171b444bb8999477a2900b03b122bafb3ac073214899f508a69ac`，
+  runtime配置SHA仍为`29376c32ec777447d01f2347b50f37004ed08b803b409ea60ec5ece514ff2c34`；
+  原worktree、失败前日志及单次派发锁均保留。暂无本轮GPU训练、模型结果或晋升决定。
+  12:46:01另单次派发r2专用CPU完成审计队列，目录
+  `/data1/zyl/SpecEmbedding/audits/optimization_a06_r2_completion_queue_20260910`；manifest SHA-256
+  `b03e3ec25a428846d4b53a064c92cc5470d2b7d830efeddb06af4ae08ae28961`，runner SHA-256
+  `4d7ac0a42656ea5c2b8394daf6573cf7702b033004d79b47faa549165af82f63`，launch SHA-256
+  `b082c2cf470d6326816aebfee9e2bb5dcc5db36cfbd526e9e661c6f10118cf5e`。13项生命周期合成检查
+  通过，29项固定输入重新核验，真实运行中审计入口退出1并明确拒绝不完整结果，未创建输出。
+  专用socket为`/tmp/specembedding-a06-r2-completion-20260910-1010/tmux.sock`，session`audit`；
+  原PID3565443、starttime1450373960于12:48:06独立核验存活、CUDA不可见、外部存储及
+  `waiting_parent/audit_started=false`，回执`runtime_verification.json`SHA-256为
+  `c4908afbc500601fe232712b759600ced75950da7c5cfe71918667f68b28068c`。它只在绑定的A06入口
+  退出且全部阶段完成后运行一次CPU排名/全量计数/固定输入审计和严格权重读回；失败停留，
+  不重试、不启动训练、不自动晋升。未来输出为`/data1/zyl/SpecEmbedding/audits/optimization_a06_r2_20260910`。
+  旧`optimization_a06_completion_queue_20260910`准备目录没有派发，保留且不再使用。
 - 2026-09-10：11:47只读核验A06原PID3551413仍存活且实际命令不变，继续等待基线验证GPU。
   利用等待时间准备独立下游谱图差值分支：保留有符号`precursor_mz - fragment_mz`，用小型
   Fourier/MLP残差加入峰表示，母离子角色与padding显式处理；不修改SpecEmbedding预训练
@@ -1160,8 +1199,8 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
-- 验证结果：最新全仓539通过、1跳过、1个既有路径审计失败；静态检查及新增下游差值分支的合成训练/严格重载检查通过；此前完整验证图与训练/验证指纹缓存审计、真实完整指纹输入预检、A05全量CPU采样及新存储条件dry-run均通过，下一轮固定源码存储/队列相关29项通过
-- 当前训练状态（2026-09-10 11:25核验）：r4旧矩阵停止；A01未替换r4；A02完成审计并晋升；A03完整审计通过但未晋升；A04完整25轮及独立审计通过，epoch20为当前incumbent；A05完成24轮全量训练及独立审计但未晋升；A04四种完整输入对照及独立排名复核通过，原队列退出0；D18/D19完整输入/参考覆盖审计通过；A06继承A04训练设置，最终绑定和全量预检通过并单次派发，原PID存活，数据与验证索引导入及实际输入/环境核验通过，当前等待基线验证GPU，暂无本轮模型结果
+- 验证结果：差值组件开发版本全仓539通过、1跳过、1个既有路径审计失败；后续结束检查修复相关43项通过，实际A06 r2固定版本65eecfc全仓505通过、1跳过、1个相同既有路径审计失败，静态检查通过；r2完整预检和运行配置一致性核验通过，CPU完成审计队列13项生命周期检查通过；此前完整输入缓存审计和预检记录保留
+- 当前训练状态（2026-09-10 12:48核验）：r4旧矩阵停止；A01未替换r4；A02完成审计并晋升；A03完整审计通过但未晋升；A04完整25轮及独立审计通过，epoch20为当前incumbent；A05完成24轮全量训练及独立审计但未晋升；A04四种完整输入对照及独立排名复核通过；D18/D19完整输入/参考覆盖审计通过；A06原队列在首次GPU阶段前因发现结束检查错误而主动停止，最小修复版r2已按相同配置单次恢复，CPU导入与实际输入/环境核验通过，原PID存活并等待基线验证GPU；专用CPU完成审计队列已绑定r2原进程并等待；暂无本轮模型结果
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；
