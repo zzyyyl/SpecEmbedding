@@ -323,6 +323,13 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-11 01:32：A08日志确认第27轮正常早停（01:25:49），原训练PID3676372已退出；
+  原入口PID3670350仍存活，`runner.log`已重放第1–13轮，每轮194,119条训练query，
+  run及alignment阶段保持running。这是入口收尾检查，不能写为仍在GPU训练或整轮审计
+  完成。独立完成审计PID3675710及A09后继PID3678937仍是原starttime的活跃等待进程，
+  `audit_started=false`、后继`decision=null`；保留原队列，不启动重复审计或提前派发。
+  已更新attempts、A08卡和项目记忆，暂不改晋升状态；文档diff检查通过。
+
 - 2026-09-11 01:20：完成D24外部保存分数核验。GLACIER独立复现原完成时间为
   2026-09-09 06:45:18 UTC，源码`c0cb5bc0c81ca13c8390754bf23ae8c205f6e584`工作树干净，
   公开checkpoint SHA为`5a47cecca707d3abd5a49c7dbac99d100aa2a586d5d4f848f1e8e35140d7db11`。
