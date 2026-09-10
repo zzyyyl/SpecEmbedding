@@ -314,6 +314,30 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-10 19:09：A07前20轮全量计数核验通过，第18–20轮完整query顺序、保存排名及
+  原始日志指标独立重算一致；具体结果只维护于A07实验卡，仍在训练、尚未晋升。
+  准备A09衔接时发现原A08最终清单检查假设每个阶段都有command，而两个CPU导入阶段
+  只有source/output，会在交接时报KeyError；原合成夹具未覆盖该真实结构。
+  修复准备冻结于`/data1/zyl/SpecEmbedding/audits/optimization_a08_finalization_preparation_20260910_r2`，
+  `finalize.py` SHA为`d5efcc3af20c6ea794fe5e043a5bec088fb71e98d35344e98abaa6a22657de81`，
+  `receipt.json` SHA为`63e9da563518a390e059dbba92a979dba452fd53dd4d110a87c9cba3ff58e076`。
+  25项最终检查通过，包括真实全清单一致及未知/错误导入阶段拒绝；模型与配置无改动。
+  替代队列位于`/data1/zyl/SpecEmbedding/audits/optimization_a08_successor_queue_20260910_r3`，
+  19项检查（含独立tmux真实传参）通过；准备回执SHA为
+  `d66783e1459dcd290aaef283b6932fe37a5d7434c96c122a4b396edcc695c89f`，manifest SHA为
+  `bb2d8aa708210210fe6d63c527ee091bf6bb20aedaaa11a69f8074660b8c3f14`，successor SHA为
+  `a2497cd12b486b7fcdfbfb2c18fa0436043e9f79544b73d0f633de0f300d17d1`。
+  旧r2等待进程3609809/starttime1451589300在未派发时被明确替换，旧锁/日志/源码保留；
+  首次替换辅助程序因pidfd API不可用在发信号前退出，复核现场后通过原socket的%0
+  发送Ctrl-C并确认退出，没有删除旧保护文件或重试正式运行目录。
+  `previous_queue.json` SHA为`823055407a84cd9dbe874f6d695448a9533413bc290b402b6bb58282243eb219`。
+  19:04:52单次启动新队列，socket为`/tmp/specembedding-opt-a08-r3-20260910-1010/tmux.sock`，
+  session opt/pane %0，PID3670350/starttime1452647082；19:06独立核验实际命令、空CUDA、
+  完整外部存储环境、原A07三进程及无finalization/runner_exec/模型目录通过。
+  `runtime_verification.json` SHA为`51d110eb7200eb90d85cc422dd768334218d2e50e7b00a3f0d9bf9810279ef07`，
+  launch SHA为`06c336edd92a3dcfa2b6afd9d8b45a8415a6244007f451c5c355c8378f2582fa`。
+  A07/A08/A09固定源码均干净且未改；A08仍等待完整审计，不是新模型或失败模型attempt。
+  A09最终衔接仍在准备，尚无其队列或模型运行；论文和既有实验协议保持，计划继续执行中。
 - 2026-09-10 18:34：A09源码固定为`ef2526d9c4cdd7561b7d40d605ced5c4b5c28dda`，
   独立工作树`/data1/zyl/repos/SpecEmbedding-opt-a09-20260910`保持干净。18:29:06通过
   A04条件的真实全量CPU预检，目录为
@@ -1435,8 +1459,8 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
-- 验证结果：A09正式接入通过合成检查，真实入口初始化已核对，主机全仓668通过、1跳过、1个相同既有路径审计失败，静态检查通过；ef2526d固定源码的A04条件真实全量预检与独立读回通过；A08已有衔接准备保持，A07前17轮完整计数及新增排名重算已核验
-- 当前训练状态（2026-09-10 18:34核验）：A04 epoch20为当前incumbent；A05及A06完整审计均未晋升；A07前17轮全量训练与验证正常，尚未完成审计或晋升；A08的CPU衔接队列等待前序完整审计，最终parent未绑定、模型未派发；A09正式接入和A04条件全量预检通过，最终parent/配置/派发仍待A08审计；模型优化和SOTA达标未完成
+- 验证结果：A09正式接入及A04条件全量预检已通过，最近训练源码全仓668通过、1跳过、1个相同既有路径审计失败；本次A08衔接修复25项最终检查、19项队列检查及独立运行核验通过，固定训练源码未改；A07前20轮完整计数及新增排名重算已核验
+- 当前训练状态（2026-09-10 19:09核验）：A04 epoch20为当前incumbent；A05及A06完整审计均未晋升；A07前20轮全量训练与验证正常，尚未完成审计或晋升；A08已单次替换修复后的CPU衔接队列并继续等待，最终parent未绑定、模型未派发；A09最终parent/配置/派发仍待A08审计；模型优化和SOTA达标未完成
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；
