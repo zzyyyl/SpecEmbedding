@@ -9,7 +9,7 @@ from torch_geometric.data import Batch
 
 from SpecEmbedding.data.graph_utils import smiles_to_graph
 from SpecEmbedding.models_graph_fingerprint import GraphFingerprintAlignmentModel, validate_fingerprint_residual
-from SpecEmbedding.utils.formal_alignment import formal_model_type
+from SpecEmbedding.utils.formal_alignment import build_formal_alignment, formal_model_type
 from tests.test_precursor_delta import delta_config, spectra
 from tests.test_qk_norm import definition
 
@@ -203,7 +203,7 @@ def test_invalid_settings_fail_before_model_construction(damage):
         validate_fingerprint_residual(values)
 
 
-def test_metadata_is_independent_and_formal_entry_refuses_unintegrated_component():
+def test_metadata_is_independent_and_formal_constructor_requires_complete_new_settings():
     parent, fingerprint = parent_config(True, True), settings()
     expected_parent, expected_fingerprint = copy.deepcopy(parent), copy.deepcopy(fingerprint)
     model = GraphFingerprintAlignmentModel(parent_model_config=parent, fingerprint_config=fingerprint)
@@ -213,7 +213,14 @@ def test_metadata_is_independent_and_formal_entry_refuses_unintegrated_component
     assert metadata['align'] == expected_parent['align'] and metadata['fingerprint_residual'] == expected_fingerprint
     metadata['fingerprint_residual']['input_bits'] = 999
     assert model.construction_config()['fingerprint_residual'] == expected_fingerprint
+    assert formal_model_type(model.construction_config()) == 'gine_fingerprint'
+    restored = build_formal_alignment(model.construction_config()).eval()
+    restored.load_state_dict(model.state_dict(), strict=True)
+    molecules = Batch.from_data_list(molecule_list())
+    torch.testing.assert_close(restored.encode_mol(molecules), model.eval().encode_mol(molecules), rtol=0, atol=0)
+    incomplete = model.construction_config()
+    del incomplete['fingerprint_residual']
     with pytest.raises(ValueError, match='formal model configuration'):
-        formal_model_type(model.construction_config())
+        formal_model_type(incomplete)
     with pytest.raises(ValueError, match='GINE parent'):
         GraphFingerprintAlignmentModel(parent_model_config=definition('fingerprint'), fingerprint_config=settings())

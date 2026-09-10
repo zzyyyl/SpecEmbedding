@@ -71,7 +71,7 @@ def read_candidate_training_input(path, data_path, settings, expected_counts, ex
 
 
 def audit_candidate_training(directory, stage, input_path, settings, seed, batch_size, data_path, counts, exclusions,
-                             *, fingerprint_cache=None):
+                             *, fingerprint_cache=None, graph_fingerprint=False):
     """Replay every observed query's negative sample; never run a model or use test labels."""
     record = stage.get("candidate_training")
     if settings is not None:
@@ -82,6 +82,8 @@ def audit_candidate_training(directory, stage, input_path, settings, seed, batch
         return {"state": "disabled"}, {}
     if record is None or input_path is None:
         raise ValueError("Missing candidate training completion evidence")
+    if graph_fingerprint and fingerprint_cache is None:
+        raise ValueError('Graph fingerprint candidate audit requires both input representations')
     index, input_receipt, input_fingerprint = read_candidate_training_input(input_path, data_path, settings, counts, exclusions)
     expected_provenance = {**index.provenance, "negative_count": settings["negative_count"], "seed": seed,
                            "graph_cache_size": settings["graph_cache_size"],
@@ -97,7 +99,8 @@ def audit_candidate_training(directory, stage, input_path, settings, seed, batch
         _, verified = load_fingerprint_cache(index.metadata['mol_smiles'], fingerprint_cache['directory'], expected_source)
         if verified != fingerprint_cache:
             raise ValueError('Candidate fingerprint source differs from the declared model inputs')
-        expected_provenance = fingerprint_training_provenance(expected_provenance, verified)
+        expected_provenance = fingerprint_training_provenance(expected_provenance, verified,
+                                                              graph_fingerprint=graph_fingerprint)
     if (record["loss"] != LOSS_NAME or record["candidate_loss_weight"] != settings["loss_weight"]
             or record["data"] != expected_provenance or len(record["epochs"]) != stage["stop_epoch"]):
         raise ValueError("Candidate loss, input or trajectory differs from the pinned experiment")

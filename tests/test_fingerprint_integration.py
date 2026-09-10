@@ -165,9 +165,12 @@ def test_fingerprint_completion_rejects_mixed_unpinned_or_corrupt_evidence(finge
         audit_optimization_run(run)
 
 
-@pytest.mark.parametrize('kind', ['gine', 'fingerprint'])
+@pytest.mark.parametrize('kind', ['gine', 'fingerprint', 'gine_fingerprint'])
+@pytest.mark.parametrize('parent_kind', ['gine', 'fingerprint', 'gine_fingerprint'])
 @pytest.mark.parametrize('wrong_training_cache', [False, True])
-def test_execution_distinguishes_baseline_graph_cache_from_candidate_inputs(tmp_path, monkeypatch, kind, wrong_training_cache):
+def test_execution_distinguishes_baseline_graph_cache_from_candidate_inputs(
+    tmp_path, monkeypatch, kind, parent_kind, wrong_training_cache,
+):
     """Run the real completion branches with synthetic GPU children, never launch training."""
     from types import SimpleNamespace
 
@@ -179,12 +182,16 @@ def test_execution_distinguishes_baseline_graph_cache_from_candidate_inputs(tmp_
     expected_cache = None if kind == 'fingerprint' else graph_cache
     observed_cache = (graph_cache if kind == 'fingerprint' else None) if wrong_training_cache else expected_cache
     query_count = runtime['fulltrain']['expected_counts']['val'] - len(runtime['fulltrain']['exclude_val_query_indices'])
-    parent = {'model_type': 'gine', 'model_config': model_config('gine')}
+    parent = {'model_type': parent_kind, 'model_config': model_config(parent_kind)}
+    parent_graph = None if parent_kind == 'fingerprint' else graph_cache
+    parent_bits = {'synthetic': 'parent bits'} if parent_kind != 'gine' else None
     manifest = {'runtime_config': runtime, 'gpu_pool': {'0': 'GPU-synthetic'},
                 'validation_graph_cache': graph_cache, 'checkpoint_model': parent,
                 'inputs': {'baseline_checkpoint': {'sha256': 'a' * 64}},
                 'stages': [{'name': name, 'gpu': True, 'command': ['synthetic-child', name]}
                            for name in ('baseline_validation', 'alignment42')]}
+    if parent_bits is not None:
+        manifest['baseline_fingerprint_input'] = {'cache': parent_bits}
     args = SimpleNamespace(output_root=tmp_path, gpus=[0], device='cuda:0', optimize_alignment=True)
     monkeypatch.setattr(runner, 'gpu_inventory', lambda: {0: 'GPU-synthetic'})
     monkeypatch.setattr(runner, 'preflight', lambda _: manifest)
@@ -192,12 +199,13 @@ def test_execution_distinguishes_baseline_graph_cache_from_candidate_inputs(tmp_
     monkeypatch.setattr(runner, 'pool_environment', lambda selected, environment: environment)
     monkeypatch.setattr(runner, 'audit_alignment', lambda *a: {'synthetic': True})
     monkeypatch.setattr(inputs_module, 'audit_model_fingerprint_inputs',
-                        lambda *a: ({'synthetic': True} if kind == 'fingerprint' else None, {}))
+                        lambda *a: ({'synthetic': True} if kind in ('fingerprint', 'gine_fingerprint') else None, {}))
 
     def child(command, **kwargs):
         if command[-1] == 'baseline_validation':
             save(tmp_path / 'baseline_validation/metrics.json', {
-                'checkpoint_sha256': 'a' * 64, 'validation_graph_cache': graph_cache, 'checkpoint_model': parent,
+                'checkpoint_sha256': 'a' * 64, 'validation_graph_cache': parent_graph, 'checkpoint_model': parent,
+                'validation_fingerprint_cache': parent_bits,
             })
         else:
             save(tmp_path / 'alignment42_topk256/alignment_selection.json', {
@@ -217,4 +225,4 @@ def test_execution_distinguishes_baseline_graph_cache_from_candidate_inputs(tmp_
         status = json.loads((tmp_path / 'status.json').read_text())
         assert status['state'] == 'complete'
         assert all(stage['state'] == 'complete' for stage in status['stages'])
-        assert status['stages'][0]['audit']['validation_graph_cache'] == graph_cache
+        assert status['stages'][0]['audit']['validation_graph_cache'] == parent_graph

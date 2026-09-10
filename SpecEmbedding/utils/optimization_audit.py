@@ -240,6 +240,7 @@ def audit_optimization_run(run):
         directory, stage, candidate_input, settings.get("candidate_supervision"), selection["seed"],
         settings["batch_size"], run / "data" / "MassSpecGym", counts, exclusions,
         fingerprint_cache=selection.get('training_fingerprint_cache'),
+        graph_fingerprint=selection['model_config'].get('type', 'gine') == 'gine_fingerprint',
     )
     hashes.update(candidate_hashes)
     baseline_receipt = read_json(run / "baseline_validation" / "metrics.json")
@@ -262,10 +263,13 @@ def audit_optimization_run(run):
         require(verified_model == checkpoint_model, 'Baseline model or shared protocol changed since preflight')
     baseline_fingerprint = manifest.get('baseline_fingerprint_input')
     baseline_fingerprint_cache = baseline_fingerprint['cache'] if baseline_fingerprint is not None else None
+    if checkpoint_model is not None:
+        require((checkpoint_model['model_type'] in ('fingerprint', 'gine_fingerprint')) == (baseline_fingerprint is not None),
+                'Baseline model type and fixed fingerprint inputs disagree')
     require(baseline_receipt.get('validation_fingerprint_cache') == baseline_fingerprint_cache,
             'Baseline fingerprint cache differs from preflight')
     if baseline_fingerprint is not None:
-        require(checkpoint_model is not None and checkpoint_model['model_type'] == 'fingerprint'
+        require(checkpoint_model is not None and checkpoint_model['model_type'] in ('fingerprint', 'gine_fingerprint')
                 and parent_selection.get('validation_fingerprint_cache') == baseline_fingerprint_cache,
                 'Baseline fingerprint inputs differ from its own selected model')
         hashes.update(audit_pinned_fingerprint_input(
@@ -275,9 +279,10 @@ def audit_optimization_run(run):
             and baseline_receipt["checkpoint_sha256"] == manifest["inputs"]["baseline_checkpoint"]["sha256"], "Baseline provenance mismatch")
     baseline_path = run / "baseline_validation" / "baseline_epoch000.pt"
     graph_receipt = manifest.get('validation_graph_cache')
-    fingerprint_model = fingerprint_report is not None
+    fingerprint_model = runtime['model'].get('type', 'gine') == 'fingerprint'
+    baseline_fingerprint_model = checkpoint_model is not None and checkpoint_model['model_type'] == 'fingerprint'
     require(selection.get('validation_graph_cache') == (None if fingerprint_model else graph_receipt)
-            and baseline_receipt.get('validation_graph_cache') == graph_receipt,
+            and baseline_receipt.get('validation_graph_cache') == (None if baseline_fingerprint_model else graph_receipt),
             'Validation graph cache differs between preflight, training and baseline')
     graph_fingerprint = None
     if graph_receipt is not None:
@@ -291,7 +296,7 @@ def audit_optimization_run(run):
             require(manifest['inputs'].get(f'validation_graph_{name}') == {'path': str(path), 'sha256': digest},
                     'Graph cache file was not pinned in preflight')
             fingerprint(path, digest)
-    baseline = audit_snapshot(baseline_path, index, expected_graph_cache=graph_fingerprint,
+    baseline = audit_snapshot(baseline_path, index, expected_graph_cache=None if baseline_fingerprint_model else graph_fingerprint,
                               expected_fingerprint_cache=baseline_fingerprint_cache)
     fingerprint(baseline_path)
     require(all(math.isclose(baseline[key], baseline_receipt["metrics"][key], rel_tol=0, abs_tol=1e-12) for key in baseline),

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from SpecEmbedding.utils.fingerprint_cache import fingerprint_provenance, load_fingerprint_cache
 from SpecEmbedding.utils.fingerprint_preparation import fingerprint_source
+from SpecEmbedding.utils.formal_alignment import fingerprint_input_bits
 from SpecEmbedding.utils.fulltrain import sha256_file
 
 
@@ -36,7 +37,10 @@ def fingerprint_input_files(receipt, prefix):
     return files
 
 
-def fingerprint_training_provenance(provenance, receipt):
+def fingerprint_training_provenance(provenance, receipt, *, graph_fingerprint=False):
+    if graph_fingerprint:
+        return {**provenance, 'molecule_input': 'graph_with_fixed_morgan_bits', 'fingerprint_cache': receipt,
+                'fingerprint_augmentation': 'None: fixed bits describe original positive and negative molecules'}
     return {**provenance, 'graph_cache_size': 0, 'molecule_input': 'fixed_morgan_bits', 'fingerprint_cache': receipt,
             'negative_graph_augmentation': 'None: fixed fingerprints for both positives and negatives'}
 
@@ -60,18 +64,20 @@ def audit_model_fingerprint_inputs(manifest, selection, data_path, validation_in
     runtime = manifest['runtime_config']
     pinned = manifest.get('fingerprint_inputs')
     recorded = {key: selection.get(key) for key in ('training_fingerprint_cache', 'validation_fingerprint_cache')}
-    if runtime['model'].get('type', 'gine') != 'fingerprint':
+    kind = runtime['model'].get('type', 'gine')
+    if kind not in ('fingerprint', 'gine_fingerprint'):
         if pinned is not None or any(value is not None for value in recorded.values()):
             raise ValueError('Unexpected fingerprint inputs in a GINE model run')
         return None, {}
     if (not isinstance(pinned, dict) or set(pinned) != {'train', 'validation'}
-            or any(runtime['augmentation'][key] != 0 for key in ('node_drop_rate', 'edge_mask_rate'))):
+            or (kind == 'fingerprint' and any(runtime['augmentation'][key] != 0
+                                             for key in ('node_drop_rate', 'edge_mask_rate')))):
         raise ValueError('Missing fingerprint inputs or active graph augmentation')
     hashes = {}
     for kind, field in (('train', 'training_fingerprint_cache'), ('validation', 'validation_fingerprint_cache')):
         item = pinned[kind]
         if (item['source']['kind'] != kind or recorded[field] != item['cache']
-                or item['cache']['provenance']['options']['bits'] != runtime['model']['mol_encoder']['input_bits']):
+                or item['cache']['provenance']['options']['bits'] != fingerprint_input_bits(runtime['model'])):
             raise ValueError('Selected fingerprint model/input provenance mismatch')
         hashes.update(audit_pinned_fingerprint_input(item, f'fingerprint_{kind}', manifest, data_path, runtime,
                                                     settings=runtime['molecule_fingerprints']))

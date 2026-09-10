@@ -1,4 +1,4 @@
-"""Prepared graph/fingerprint fusion component; formal data/audit integration is separate."""
+"""Independent graph/fingerprint fusion tower with complete formal construction metadata."""
 
 import copy
 import math

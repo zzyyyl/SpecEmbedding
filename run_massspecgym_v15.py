@@ -22,7 +22,11 @@ from SpecEmbedding.utils.candidate_training import (
     validate_candidate_settings,
 )
 from SpecEmbedding.utils.fingerprint_alignment_inputs import fingerprint_input_files, load_alignment_fingerprints
-from SpecEmbedding.utils.formal_alignment import formal_model_type, read_formal_alignment_checkpoint
+from SpecEmbedding.utils.formal_alignment import (
+    fingerprint_input_bits,
+    formal_model_type,
+    read_formal_alignment_checkpoint,
+)
 from SpecEmbedding.utils.fulltrain import (
     sha256_file,
     validate_baseline_completion,
@@ -53,7 +57,7 @@ def now():
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
-def commands(args):
+def commands(args, *, baseline_model_type='gine'):
     data = args.output_root / "data" / "MassSpecGym"
     alignment = args.output_root / "alignment42_topk256"
     pool = getattr(args, "gpus", None)
@@ -73,6 +77,7 @@ def commands(args):
         result[0] = {"name": "import_v15", "gpu": False, "source": str(args.prepared_data), "output": str(data)}
     if getattr(args, "optimize_alignment", False):
         fingerprint_model = getattr(args, 'molecule_input', 'gine') == 'fingerprint'
+        uses_fingerprints = getattr(args, 'molecule_input', 'gine') in ('fingerprint', 'gine_fingerprint')
         index = args.output_root / "validation" / "mass_val_topk256.pt"
         result[1]["command"] += ["--validation-index", str(index)]
         if getattr(args, "alignment_training_candidates", None) is not None:
@@ -88,14 +93,15 @@ def commands(args):
             result[1] = {"name": "import_validation", "gpu": False,
                          "source": str(args.prepared_validation_index), "output": str(index)}
         if getattr(args, "validation_graph_cache", None) is not None:
-            result[2]["command"] += ["--graph-cache", str(args.validation_graph_cache)]
+            if baseline_model_type != 'fingerprint':
+                result[2]["command"] += ["--graph-cache", str(args.validation_graph_cache)]
             if not fingerprint_model:
                 result[3]["command"] += ["--validation-graph-cache", str(args.validation_graph_cache)]
-        if getattr(args, "checkpoint_model_config", False) or fingerprint_model:
+        if getattr(args, "checkpoint_model_config", False) or uses_fingerprints:
             result[2]["command"] += ["--checkpoint-model-config"]
         if getattr(args, 'baseline_fingerprint_cache', None) is not None:
             result[2]['command'] += ['--fingerprint-cache', str(args.baseline_fingerprint_cache)]
-        if fingerprint_model:
+        if uses_fingerprints:
             for flag in ('fingerprint_training_index', 'training_fingerprint_cache', 'validation_fingerprint_cache'):
                 result[3]['command'] += ['--' + flag.replace('_', '-'), str(getattr(args, flag))]
     return result
@@ -104,7 +110,8 @@ def commands(args):
 def preflight(args):
     storage = storage_receipt(args.output_root)
     fingerprint_model = getattr(args, 'molecule_input', 'gine') == 'fingerprint'
-    independent_baseline = getattr(args, 'checkpoint_model_config', False) or fingerprint_model
+    uses_fingerprints = getattr(args, 'molecule_input', 'gine') in ('fingerprint', 'gine_fingerprint')
+    independent_baseline = getattr(args, 'checkpoint_model_config', False) or uses_fingerprints
     if any(hasattr(config.model.spec_encoder, key) for key in ('precursor_delta', 'qk_norm')) and not independent_baseline:
         raise ValueError('Downstream spectral variants require independent baseline checkpoint construction')
     if independent_baseline and (not getattr(args, 'optimize_alignment', False)
@@ -131,7 +138,11 @@ def preflight(args):
     if fingerprint_model:
         runtime_config['model']['type'] = 'fingerprint'
         runtime_config['model']['mol_encoder'] = {**config.fingerprint_encoder.to_dict(), 'graph_policy': 'rdkit_sanitized'}
-    formal_model_type(runtime_config['model'])
+    elif getattr(args, 'molecule_input', 'gine') == 'gine_fingerprint':
+        runtime_config['model']['type'] = 'gine_fingerprint'
+        runtime_config['model']['fingerprint_residual'] = config.graph_fingerprint_residual.to_dict()
+    if formal_model_type(runtime_config['model']) != getattr(args, 'molecule_input', 'gine'):
+        raise ValueError('Molecule input argument differs from the model configuration')
     mol_augmentation = getattr(args, "alignment_mol_augmentation", None)
     if mol_augmentation is not None:
         if not getattr(args, "optimize_alignment", False) or not isinstance(mol_augmentation, bool):
@@ -140,9 +151,9 @@ def preflight(args):
             # Keep spectrum augmentation and its probability unchanged; disable only graph perturbations.
             runtime_config["augmentation"]["node_drop_rate"] = 0.0
             runtime_config["augmentation"]["edge_mask_rate"] = 0.0
-    if fingerprint_model and (runtime_config['augmentation']['node_drop_rate'] != 0
-                              or runtime_config['augmentation']['edge_mask_rate'] != 0
-                              or runtime_config['model']['mol_encoder']['input_bits'] != config.molecule_fingerprints.bits):
+    if uses_fingerprints and (fingerprint_input_bits(runtime_config['model']) != config.molecule_fingerprints.bits
+                              or (fingerprint_model and (runtime_config['augmentation']['node_drop_rate'] != 0
+                                                         or runtime_config['augmentation']['edge_mask_rate'] != 0))):
         raise ValueError('Fingerprint training requires explicitly disabled graph augmentation and matching input width')
     batching = getattr(args, "alignment_batching", None)
     if batching is not None:
@@ -198,7 +209,7 @@ def preflight(args):
             exclusions=config.fulltrain.exclude_val_query_indices,
         )
         baseline_fingerprints = getattr(args, 'baseline_fingerprint_cache', None)
-        if (model_receipt['model_type'] == 'fingerprint') != bool(baseline_fingerprints):
+        if (model_receipt['model_type'] in ('fingerprint', 'gine_fingerprint')) != bool(baseline_fingerprints):
             raise ValueError('Baseline model type requires matching explicit molecular inputs')
         if baseline_fingerprints:
             expected_cache = parent_selection['validation_fingerprint_cache']
@@ -207,7 +218,8 @@ def preflight(args):
                 counts=config.fulltrain.expected_counts.to_dict(), exclusions=config.fulltrain.exclude_val_query_indices,
                 tokenizer_config=config.data.tokenizer.to_dict(), settings=expected_cache['provenance']['options'],
                 pool_cache_size=config.train.align.candidate_supervision.pool_cache_size)
-            if baseline_input['cache'] != expected_cache:
+            if (baseline_input['cache'] != expected_cache
+                    or fingerprint_input_bits(model_receipt['model_config']) != expected_cache['provenance']['options']['bits']):
                 raise ValueError('Baseline fingerprints differ from its own selected model inputs')
             extra['baseline_fingerprint_input'] = baseline_input
             inputs.update(fingerprint_input_files(baseline_input, 'baseline_fingerprint'))
@@ -237,7 +249,7 @@ def preflight(args):
                                                    config.fulltrain.exclude_val_query_indices)
         extra["candidate_training_input"] = receipt
         inputs.update(candidate_source_inputs(receipt))
-    if fingerprint_model:
+    if uses_fingerprints:
         extra['fingerprint_inputs'] = {}
         for split, index_path, cache_path in (('train', args.fingerprint_training_index, args.training_fingerprint_cache),
                                               ('validation', validation_path, args.validation_fingerprint_cache)):
@@ -260,7 +272,8 @@ def preflight(args):
             "runtime_versions": {"python": sys.version, **{name: version(name) for name in ("torch", "torch-geometric", "rdkit", "matchms")}},
             "source_config": str(source_config), "source_config_sha256": sha256_file(source_config),
             "runtime_config": runtime_config, "inputs": inputs, "device": args.device, "gpu": args.gpu,
-            "stages": commands(args), "protocol": "v1.5 source order, sanitized graphs; cache-local exact-target-SMILES sensitivity; independent 2D result audit pending"}
+            "stages": commands(args, baseline_model_type=extra.get('checkpoint_model', {}).get('model_type', 'gine')),
+            "protocol": "v1.5 source order, sanitized graphs; cache-local exact-target-SMILES sensitivity; independent 2D result audit pending"}
 
 
 def audit_alignment(args, alignment_settings, augmentation_settings):
@@ -310,6 +323,7 @@ def audit_alignment(args, alignment_settings, augmentation_settings):
         alignment_settings["batch_size"], data, config.fulltrain.expected_counts.to_dict(),
         config.fulltrain.exclude_val_query_indices,
         fingerprint_cache=selection.get('training_fingerprint_cache'),
+        graph_fingerprint=selection['model_config'].get('type', 'gine') == 'gine_fingerprint',
     )
     return {"checkpoint_sha256": selection["checkpoint_sha256"], "epochs": len(audit["epochs"]),
             "expected_epoch_counts": expected, "graph_policy": selection["graph_policy"],
@@ -416,7 +430,8 @@ def execute(args, manifest):
                             or summary["best_retrieval"]["queries"] != config.fulltrain.expected_counts.val - len(config.fulltrain.exclude_val_query_indices)):
                         raise ValueError("Alignment retrieval checkpoint-selection audit failed")
                     progress["retrieval_selection"] = summary
-                    training_graph_cache = None if fp_report is not None else manifest.get("validation_graph_cache")
+                    training_graph_cache = (None if selection['model_config'].get('type', 'gine') == 'fingerprint'
+                                            else manifest.get('validation_graph_cache'))
                     if selection.get("validation_graph_cache") != training_graph_cache:
                         raise ValueError("Training used a different validation graph cache")
             elif stage["name"] in ("prepare_validation", "import_validation"):
@@ -429,7 +444,9 @@ def execute(args, manifest):
                 progress["audit"] = json.loads((args.output_root / "baseline_validation" / "metrics.json").read_text())
                 if progress["audit"]["checkpoint_sha256"] != manifest["inputs"]["baseline_checkpoint"]["sha256"]:
                     raise ValueError("Baseline checkpoint changed")
-                if progress["audit"].get("validation_graph_cache") != manifest.get("validation_graph_cache"):
+                baseline_graph_cache = (None if manifest.get('checkpoint_model', {}).get('model_type') == 'fingerprint'
+                                        else manifest.get('validation_graph_cache'))
+                if progress["audit"].get("validation_graph_cache") != baseline_graph_cache:
                     raise ValueError("Baseline used a different validation graph cache")
                 if progress['audit'].get('checkpoint_model') != manifest.get('checkpoint_model'):
                     raise ValueError('Baseline model construction changed after preflight')
@@ -469,7 +486,7 @@ def main(argv=None):
     parser.add_argument("--baseline-checkpoint", type=Path, help="Frozen v1.5 seed42 baseline for the alignment optimization branch")
     parser.add_argument("--checkpoint-model-config", action="store_true",
                         help="Build the baseline from its own verified model configuration, sharing the full data protocol")
-    parser.add_argument('--molecule-input', choices=('gine', 'fingerprint'), default='gine')
+    parser.add_argument('--molecule-input', choices=('gine', 'fingerprint', 'gine_fingerprint'), default='gine')
     parser.add_argument('--fingerprint-training-index', type=Path)
     parser.add_argument('--training-fingerprint-cache', type=Path)
     parser.add_argument('--validation-fingerprint-cache', type=Path)
@@ -484,16 +501,14 @@ def main(argv=None):
     parser.add_argument("--write-preflight", action="store_true")
     args = parser.parse_args(argv)
     fp_paths = (args.fingerprint_training_index, args.training_fingerprint_cache, args.validation_fingerprint_cache)
-    if ((args.molecule_input == 'fingerprint') != any(fp_paths)
-            or (args.molecule_input == 'fingerprint' and not all(fp_paths))):
+    uses_fingerprints = args.molecule_input in ('fingerprint', 'gine_fingerprint')
+    if (uses_fingerprints != any(fp_paths) or (uses_fingerprints and not all(fp_paths))):
         parser.error('Fingerprint model requires all three explicit fixed-input paths')
-    if args.molecule_input == 'fingerprint' and (not args.optimize_alignment or args.prepared_data is None
+    if uses_fingerprints and (not args.optimize_alignment or args.prepared_data is None
                                                 or args.prepared_validation_index is None):
         parser.error('Fingerprint optimization requires complete prepared data and validation index')
-    if args.baseline_fingerprint_cache and (args.validation_graph_cache or not (
-        args.checkpoint_model_config or args.molecule_input == 'fingerprint'
-    )):
-        parser.error('Baseline fingerprints require independent model loading without baseline graph cache')
+    if args.baseline_fingerprint_cache and not (args.checkpoint_model_config or uses_fingerprints):
+        parser.error('Baseline fingerprints require independent model loading')
     for key in ('fingerprint_training_index', 'training_fingerprint_cache', 'validation_fingerprint_cache',
                 'baseline_fingerprint_cache'):
         if getattr(args, key) is not None:

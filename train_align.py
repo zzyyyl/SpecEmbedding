@@ -21,6 +21,10 @@ from SpecEmbedding.data.datasets_fingerprint import (
     candidate_fingerprint_collate_fn,
     fingerprint_align_collate_fn,
 )
+from SpecEmbedding.data.datasets_graph_fingerprint import (
+    CandidateGraphFingerprintDataset,
+    GraphFingerprintAlignmentDataset,
+)
 from SpecEmbedding.data.overlap import filter_classified_validation
 from SpecEmbedding.models_align import GINEEncoder, SpecMolAlignModel
 from SpecEmbedding.models_precursor_delta import build_spectrum_encoder
@@ -30,8 +34,9 @@ from SpecEmbedding.trainer.trainer_candidates import CandidateTrainerAlign
 from SpecEmbedding.utils.candidate_training import read_candidate_training_input, validate_candidate_settings
 from SpecEmbedding.utils.fingerprint_alignment_inputs import load_alignment_fingerprints
 from SpecEmbedding.utils.fingerprint_validation import FingerprintRetrievalValidator
-from SpecEmbedding.utils.formal_alignment import build_formal_alignment, formal_model_type
+from SpecEmbedding.utils.formal_alignment import build_formal_alignment, fingerprint_input_bits, formal_model_type
 from SpecEmbedding.utils.fulltrain import sha256_file
+from SpecEmbedding.utils.graph_fingerprint_validation import GraphFingerprintRetrievalValidator
 from SpecEmbedding.utils.mass_batching import MassBlockBatchSampler, molecular_exact_masses
 from SpecEmbedding.utils.massspecgym_v15 import classified_full_spectra
 from SpecEmbedding.utils.model import SiameseModel
@@ -85,13 +90,22 @@ def train_align(
         raise ValueError("Candidate supervision requires formal fresh training and full retrieval selection")
     if not candidate_settings["enabled"] and candidate_input_receipt is not None:
         raise ValueError("Unexpected candidate input in an inactive run")
-    fingerprint_model = getattr(config.model, 'type', 'gine') == 'fingerprint'
-    if getattr(config.model, 'type', 'gine') not in ('gine', 'fingerprint'):
+    kind = getattr(config.model, 'type', 'gine')
+    fingerprint_model = kind == 'fingerprint'
+    uses_fingerprints = kind in ('fingerprint', 'gine_fingerprint')
+    if kind not in ('gine', 'fingerprint', 'gine_fingerprint'):
         raise ValueError('Unknown alignment model type')
-    if fingerprint_model != (fingerprint_inputs is not None and fingerprint_smiles is not None):
+    if ((uses_fingerprints and (fingerprint_inputs is None or fingerprint_smiles is None))
+            or (not uses_fingerprints and (fingerprint_inputs is not None or fingerprint_smiles is not None))):
         raise ValueError('Fingerprint model requires both complete train and validation inputs')
-    if fingerprint_model and (not formal_fulltrain or retrieval_validator is None or spec_encoder is not None):
+    if uses_fingerprints and (not formal_fulltrain or retrieval_validator is None or spec_encoder is not None):
         raise ValueError('Fingerprint alignment currently requires fresh formal training and full retrieval selection')
+    if uses_fingerprints:
+        if set(fingerprint_inputs) != {'train', 'validation'} or set(fingerprint_smiles) != {'train', 'validation'}:
+            raise ValueError('Fingerprint model requires both complete train and validation inputs')
+        if any(item['cache']['provenance']['options']['bits'] != fingerprint_input_bits(config.model.to_dict())
+               for item in fingerprint_inputs.values()):
+            raise ValueError('Fingerprint model width differs from its fixed inputs')
     if hasattr(config.model.spec_encoder, 'precursor_delta') and (
         not formal_fulltrain or retrieval_validator is None or spec_encoder is not None
     ):
@@ -107,9 +121,10 @@ def train_align(
 
     logging.info("1. 初始化数据集与 DataLoader...")
     # 使用自定义的 AlignGraphDataset (继承自 TrainDataset)
-    dataset_class = FingerprintAlignmentDataset if fingerprint_model else AlignGraphDataset
+    dataset_class = {'gine': AlignGraphDataset, 'fingerprint': FingerprintAlignmentDataset,
+                     'gine_fingerprint': GraphFingerprintAlignmentDataset}[kind]
     def dataset_extra(split):
-        if not fingerprint_model:
+        if not uses_fingerprints:
             return {}
         receipt = fingerprint_inputs[split]['cache']
         return {'fingerprint_root': receipt['directory'], 'fingerprint_smiles': fingerprint_smiles[split],
@@ -159,7 +174,8 @@ def train_align(
         logging.info("Alignment mass blocks: queries=%s batch=%s block=%s mass_sha256=%s",
                      len(smiles), batch_size, config.train.align.mass_block_size, sampler.mass_sha256)
     if candidate_settings["enabled"]:
-        candidate_dataset_class = CandidateFingerprintDataset if fingerprint_model else CandidateAlignDataset
+        candidate_dataset_class = {'gine': CandidateAlignDataset, 'fingerprint': CandidateFingerprintDataset,
+                                   'gine_fingerprint': CandidateGraphFingerprintDataset}[kind]
         train_dataset = candidate_dataset_class(
             train_dataset, training_candidates,
             dataset_manifest_sha256=selection_metadata["fulltrain_audit"]["dataset_manifest_sha256"],
@@ -193,7 +209,7 @@ def train_align(
     logging.info("2. 初始化模型...")
 
     has_pretrained_spec = spec_encoder is not None
-    if fingerprint_model:
+    if uses_fingerprints:
         model = build_formal_alignment(config.model.to_dict())
     else:
         # Preserve the original GINE initialization order and legacy pretrained path.
@@ -356,16 +372,19 @@ def main():
         parser.error("Retrieval selection requires audited formal full-training data")
     if args.validation_graph_cache and not args.validation_index:
         parser.error("--validation-graph-cache requires --validation-index")
-    fingerprint_model = getattr(config.model, 'type', 'gine') == 'fingerprint'
+    kind = getattr(config.model, 'type', 'gine')
+    fingerprint_model = kind == 'fingerprint'
+    uses_fingerprints = kind in ('fingerprint', 'gine_fingerprint')
     fingerprint_paths = (args.fingerprint_training_index, args.training_fingerprint_cache, args.validation_fingerprint_cache)
-    if any(fingerprint_paths) != fingerprint_model or (fingerprint_model and not all(fingerprint_paths)):
+    if any(fingerprint_paths) != uses_fingerprints or (uses_fingerprints and not all(fingerprint_paths)):
         parser.error('Fingerprint model and all three fixed input paths must be provided together')
-    if fingerprint_model and (not args.formal_fulltrain or not args.validation_index or args.validation_graph_cache):
+    if uses_fingerprints and (not args.formal_fulltrain or not args.validation_index
+                              or (fingerprint_model and args.validation_graph_cache)):
         parser.error('Fingerprint training requires formal retrieval selection and fingerprint validation inputs')
-    if fingerprint_model:
+    if uses_fingerprints:
         formal_model_type(config.model.to_dict())
-        if (config.model.mol_encoder.input_bits != config.molecule_fingerprints.bits
-                or config.augmentation.node_drop_rate != 0 or config.augmentation.edge_mask_rate != 0):
+        if (fingerprint_input_bits(config.model.to_dict()) != config.molecule_fingerprints.bits
+                or (fingerprint_model and (config.augmentation.node_drop_rate != 0 or config.augmentation.edge_mask_rate != 0))):
             parser.error('Fingerprint width must match fixed inputs and graph augmentation must be explicitly disabled')
     candidate_settings = config.train.align.candidate_supervision.to_dict()
     validate_candidate_settings(candidate_settings)
@@ -411,7 +430,7 @@ def main():
     retrieval_validator = None
     graph_receipt = None
     fingerprint_inputs = fingerprint_smiles = None
-    if fingerprint_model:
+    if uses_fingerprints:
         fingerprint_inputs, fingerprint_smiles = {}, {}
         for split, index_path, cache_path in (('train', args.fingerprint_training_index, args.training_fingerprint_cache),
                                                ('validation', args.validation_index, args.validation_fingerprint_cache)):
@@ -425,12 +444,14 @@ def main():
         graph_cache = None
         if args.validation_graph_cache:
             graph_cache, graph_receipt = load_validation_graph_cache(args.validation_index, index, args.validation_graph_cache)
-        if fingerprint_model:
+        if uses_fingerprints:
             receipt = fingerprint_inputs['validation']['cache']
-            retrieval_validator = FingerprintRetrievalValidator(
+            validator_class = FingerprintRetrievalValidator if fingerprint_model else GraphFingerprintRetrievalValidator
+            retrieval_validator = validator_class(
                 index, config.retrieval_validation, save_path / 'validation_retrieval',
                 fingerprint_root=receipt['directory'], fingerprint_provenance=receipt['provenance'],
-                index_sha256=sha256_file(args.validation_index))
+                index_sha256=sha256_file(args.validation_index),
+                **({} if fingerprint_model else {'graph_cache': graph_cache}))
         else:
             retrieval_validator = AlignmentRetrievalValidator(index, config.retrieval_validation,
                                                             save_path / "validation_retrieval", graph_cache=graph_cache)
@@ -534,7 +555,7 @@ def main():
             "validation_exclusion_report": exclusion_report,
             "fulltrain_audit": fulltrain_audit,
             **({'training_fingerprint_cache': fingerprint_inputs['train']['cache'],
-                'validation_fingerprint_cache': fingerprint_inputs['validation']['cache']} if fingerprint_model else {}),
+                'validation_fingerprint_cache': fingerprint_inputs['validation']['cache']} if uses_fingerprints else {}),
         },
     )
 
@@ -542,7 +563,7 @@ def main():
         _, final_graph_receipt = load_validation_graph_cache(args.validation_index, index, args.validation_graph_cache)
         if final_graph_receipt != graph_receipt:
             raise ValueError("Validation graph cache changed during training")
-    if fingerprint_model:
+    if uses_fingerprints:
         for split, index_path, cache_path in (('train', args.fingerprint_training_index, args.training_fingerprint_cache),
                                                ('validation', args.validation_index, args.validation_fingerprint_cache)):
             _, verified = load_alignment_fingerprints(

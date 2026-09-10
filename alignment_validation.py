@@ -11,8 +11,9 @@ from SpecEmbedding.config import config
 from SpecEmbedding.utils.align import load_align_model
 from SpecEmbedding.utils.fingerprint_alignment_inputs import load_alignment_fingerprints
 from SpecEmbedding.utils.fingerprint_validation import FingerprintRetrievalValidator
-from SpecEmbedding.utils.formal_alignment import load_formal_alignment
+from SpecEmbedding.utils.formal_alignment import fingerprint_input_bits, formal_model_type, load_formal_alignment
 from SpecEmbedding.utils.fulltrain import sha256_file
+from SpecEmbedding.utils.graph_fingerprint_validation import GraphFingerprintRetrievalValidator
 from SpecEmbedding.utils.massspecgym_v15 import write_json
 from SpecEmbedding.utils.optimization_audit import audit_snapshot
 from SpecEmbedding.utils.retrieval_validation import (
@@ -45,8 +46,8 @@ def main(argv=None):
         parser.error("--graph-cache requires checkpoint evaluation")
     if args.checkpoint_model_config and args.prepare_only:
         parser.error("--checkpoint-model-config requires checkpoint evaluation")
-    if args.fingerprint_cache and (args.prepare_only or args.graph_cache or not args.checkpoint_model_config):
-        parser.error('Fingerprint validation requires independent checkpoint construction and excludes graph-cache input')
+    if args.fingerprint_cache and (args.prepare_only or not args.checkpoint_model_config):
+        parser.error('Fingerprint validation requires independent checkpoint construction')
     if args.spectrum_control is not None and args.prepare_only:
         parser.error("Spectrum controls require checkpoint evaluation, not index preparation")
     if args.prepare_only:
@@ -67,13 +68,17 @@ def main(argv=None):
         parser.error("Formal validation encoding requires strict explicit cuda:N after the GPU gate")
     if config.model.mol_encoder.graph_policy != "rdkit_sanitized":
         parser.error("Formal validation requires sanitized molecular graphs")
-    device = resolve_device(args.device)
     index = load_validation_index(args.index, args.data_path, config.fulltrain.expected_counts.to_dict(),
                                   config.fulltrain.exclude_val_query_indices, config.data.tokenizer.to_dict())
+    selection = json.loads((args.checkpoint.parent / "alignment_selection.json").read_text())
+    kind = formal_model_type(selection['model_config']) if args.checkpoint_model_config else 'gine'
+    if (kind in ('fingerprint', 'gine_fingerprint')) != bool(args.fingerprint_cache):
+        raise ValueError('Baseline model type and molecular inputs disagree')
+    if kind == 'fingerprint' and args.graph_cache:
+        raise ValueError('Fingerprint-only baseline does not accept graph-cache input')
     graph_cache = graph_receipt = None
     if args.graph_cache:
         graph_cache, graph_receipt = load_validation_graph_cache(args.index, index, args.graph_cache)
-    selection = json.loads((args.checkpoint.parent / "alignment_selection.json").read_text())
     if (selection["seed"] != 42 or selection["fulltrain_audit"]["dataset_version"] != "1.5"
             or selection["fulltrain_audit"]["input_outputs"] != index["dataset_outputs"]):
         raise ValueError("Baseline checkpoint has different data provenance")
@@ -98,13 +103,16 @@ def main(argv=None):
             pool_cache_size=config.train.align.candidate_supervision.pool_cache_size)
         if fingerprint_input['cache'] != expected_cache:
             raise ValueError('Validation inputs differ from the fingerprint checkpoint\'s own inputs')
-        validator = FingerprintRetrievalValidator(
+        validator_class = FingerprintRetrievalValidator if kind == 'fingerprint' else GraphFingerprintRetrievalValidator
+        validator = validator_class(
             index, config.retrieval_validation, args.output, fingerprint_root=args.fingerprint_cache,
-            fingerprint_provenance=expected_cache['provenance'], index_sha256=sha256_file(args.index), **control)
+            fingerprint_provenance=expected_cache['provenance'], index_sha256=sha256_file(args.index), **control,
+            **({} if kind == 'fingerprint' else {'graph_cache': graph_cache}))
     else:
         validator = AlignmentRetrievalValidator(index, config.retrieval_validation, args.output, graph_cache=graph_cache, **control)
     args.output.mkdir(parents=True)
     setup_logging(args.output / "validation.log")
+    device = resolve_device(args.device)
     model_receipt = None
     if args.checkpoint_model_config:
         model, _, model_receipt = load_formal_alignment(
@@ -114,9 +122,9 @@ def main(argv=None):
                              'val': config.fulltrain.expected_counts.val - len(config.fulltrain.exclude_val_query_indices)},
             exclusions=config.fulltrain.exclude_val_query_indices,
         )
-        if (model_receipt['model_type'] == 'fingerprint') != bool(args.fingerprint_cache):
+        if model_receipt['model_type'] != kind:
             raise ValueError('Baseline model type and molecular inputs disagree')
-        if args.fingerprint_cache and (model_receipt['model_config']['mol_encoder']['input_bits']
+        if args.fingerprint_cache and (fingerprint_input_bits(model_receipt['model_config'])
                                         != fingerprint_input['cache']['provenance']['options']['bits']):
             raise ValueError('Fingerprint model width differs from its fixed inputs')
     else:

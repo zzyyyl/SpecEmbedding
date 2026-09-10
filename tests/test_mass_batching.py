@@ -149,6 +149,7 @@ def test_queue_completion_audits_actual_batching_and_unique_coverage(tmp_path, s
         list(sampler)
         epoch['batching'] = sampler.last_audit
     selection = {'graph_policy': 'rdkit_sanitized', 'seed': 42, 'device': 'cuda:0',
+        'model_config': config.model.to_dict(),
         'checkpoint_sha256': sha256_file(checkpoint), 'exclude_val_query_indices': [],
         'training_config': settings, 'config_snapshot': {'augmentation': config.augmentation.to_dict()},
         'stages': {'stage2': {'stop_epoch': 1, 'best_epoch': 1}},

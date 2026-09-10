@@ -17,13 +17,16 @@ from SpecEmbedding.utils.fulltrain import sha256_file
 
 def model_config(kind='gine'):
     molecule = ({'emb_dim': 8, 'n_layers': 1, 'dropout_rate': 0., 'size_feature_dim': 4,
-                 'norm_type': 'layernorm', 'norm_eps': 1e-5} if kind == 'gine'
+                 'norm_type': 'layernorm', 'norm_eps': 1e-5} if kind != 'fingerprint'
                 else {'input_bits': 2048, 'hidden_dim': 16, 'emb_dim': 8, 'dropout_rate': 0., 'norm_eps': 1e-5})
-    return {'type': kind,
+    result = {'type': kind,
             'spec_encoder': {'embedding_dim': 8, 'n_head': 2, 'n_layer': 1, 'dim_feedward': 8,
                              'dim_target': 8, 'feedward_activation': 'selu'},
             'mol_encoder': {**molecule, 'graph_policy': 'rdkit_sanitized'},
             'align': {'final_dim': 8, 'dropout_rate': 0., 'tau': .2}}
+    if kind == 'gine_fingerprint':
+        result['fingerprint_residual'] = {'input_bits': 2048, 'hidden_dim': 12, 'norm_eps': 1e-5}
+    return result
 
 
 def checkpoint_fixture(tmp_path, kind='gine'):
@@ -42,14 +45,14 @@ def checkpoint_fixture(tmp_path, kind='gine'):
                                      'input_outputs': protocol['dataset_outputs'],
                                      'dataset_manifest_sha256': protocol['dataset_manifest_sha256'],
                                      'expected_epoch_counts': protocol['expected_counts']}}
-    if kind == 'fingerprint':
+    if kind in ('fingerprint', 'gine_fingerprint'):
         selection.update(training_fingerprint_cache={'synthetic': 'not a formal input'},
                          validation_fingerprint_cache={'synthetic': 'not a formal input'})
     (tmp_path / 'alignment_selection.json').write_text(json.dumps(selection))
     return path, model, selection, protocol
 
 
-@pytest.mark.parametrize('kind', ['gine', 'fingerprint'])
+@pytest.mark.parametrize('kind', ['gine', 'fingerprint', 'gine_fingerprint'])
 def test_saved_model_reconstructs_without_candidate_configuration(tmp_path, monkeypatch, kind):
     path, original, _, protocol = checkpoint_fixture(tmp_path, kind)
     import SpecEmbedding.config as global_configuration
@@ -108,7 +111,7 @@ def test_historical_gine_tag_is_explicitly_recognized_but_fingerprint_requires_p
         read_formal_alignment_checkpoint(path, **protocol)
 
 
-@pytest.mark.parametrize('kind', ['gine', 'fingerprint'])
+@pytest.mark.parametrize('kind', ['gine', 'fingerprint', 'gine_fingerprint'])
 def test_baseline_cli_uses_own_configuration_and_binds_receipt(tmp_path, monkeypatch, kind):
     import alignment_validation as entry
     from tests.test_retrieval_validation import build_index
@@ -131,7 +134,8 @@ def test_baseline_cli_uses_own_configuration_and_binds_receipt(tmp_path, monkeyp
     index_path = tmp_path / 'index.pt'
     torch.save(index, index_path)
     extra = []
-    if kind == 'fingerprint':
+    graph_cache = None
+    if kind in ('fingerprint', 'gine_fingerprint'):
         from SpecEmbedding.utils.fingerprint_cache import load_fingerprint_cache
         from tests.test_fingerprint_alignment import make_cache
         root = tmp_path / 'bits'
@@ -142,6 +146,20 @@ def test_baseline_cli_uses_own_configuration_and_binds_receipt(tmp_path, monkeyp
         # Only source inventory is synthetic; the actual validator reads and encodes audited bits.
         monkeypatch.setattr(entry, 'load_alignment_fingerprints', lambda *a, **k: (index['mol_smiles'], {'cache': cache}))
         extra = ['--fingerprint-cache', str(root)]
+    if kind == 'gine_fingerprint':
+        from SpecEmbedding.utils.molecule_graph_cache import (
+            audit_graph_cache,
+            build_graph_cache,
+            graph_cache_provenance,
+        )
+        from SpecEmbedding.utils.retrieval_validation import load_validation_graph_cache
+        graph_root = tmp_path / 'graphs'
+        source = graph_cache_provenance(index['mol_smiles'], index_sha256=sha256_file(index_path),
+                                        dataset_manifest_sha256=protocol['dataset_manifest_sha256'])
+        build_graph_cache(index['mol_smiles'], graph_root, source, workers=1, chunk_size=2)
+        audit_graph_cache(index['mol_smiles'], graph_root, source, workers=1, chunk_size=2)
+        graph_cache, graph_receipt = load_validation_graph_cache(index_path, index, graph_root)
+        extra += ['--graph-cache', str(graph_root)]
     output = tmp_path / 'validation'
     entry.main(['--data-path', str(tmp_path), '--index', str(index_path), '--checkpoint', str(path),
                 '--output', str(output), '--device', 'cuda:0', '--checkpoint-model-config', *extra])
@@ -149,11 +167,14 @@ def test_baseline_cli_uses_own_configuration_and_binds_receipt(tmp_path, monkeyp
     assert result['checkpoint_model']['model_config']['align']['final_dim'] == 8
     assert result['split'] == 'val' and not result['test_evaluated']
     from SpecEmbedding.utils.retrieval_validation import AlignmentRetrievalValidator
-    if kind == 'fingerprint':
-        reference_validator = entry.FingerprintRetrievalValidator(
+    if kind in ('fingerprint', 'gine_fingerprint'):
+        validator_class = entry.FingerprintRetrievalValidator if kind == 'fingerprint' else entry.GraphFingerprintRetrievalValidator
+        reference_validator = validator_class(
             index, entry.config.retrieval_validation, fingerprint_root=root, fingerprint_provenance=provenance,
-            index_sha256=sha256_file(index_path))
+            index_sha256=sha256_file(index_path), **({'graph_cache': graph_cache} if graph_cache is not None else {}))
         assert result['validation_fingerprint_cache'] == cache
+        if graph_cache is not None:
+            assert result['validation_graph_cache'] == graph_receipt
     else:
         reference_validator = AlignmentRetrievalValidator(index, entry.config.retrieval_validation)
     reference = reference_validator(original, torch.device('cpu'), 0, 'reference')
@@ -162,8 +183,9 @@ def test_baseline_cli_uses_own_configuration_and_binds_receipt(tmp_path, monkeyp
 
 @pytest.mark.parametrize('candidate_supervision', [False, True])
 @pytest.mark.parametrize('precursor_delta', [False, True])
+@pytest.mark.parametrize('kind', ['fingerprint', 'gine_fingerprint'])
 def test_training_entry_saves_complete_typed_model_inputs_and_all_queries(
-    tmp_path, monkeypatch, candidate_supervision, precursor_delta,
+    tmp_path, monkeypatch, candidate_supervision, precursor_delta, kind,
 ):
     import train_align as entry
     from SpecEmbedding.utils.fingerprint_cache import load_fingerprint_cache
@@ -184,12 +206,16 @@ def test_training_entry_saves_complete_typed_model_inputs_and_all_queries(
     _, val_cache = load_fingerprint_cache(index['mol_smiles'], val_root, provenance)
     inputs = {'train': {'cache': dataset.base.fingerprint_receipt}, 'validation': {'cache': val_cache}}
     settings = copy.deepcopy(entry.config.to_dict())
-    settings['model'] = model_config('fingerprint')
+    settings['model'] = model_config(kind)
+    if kind == 'gine_fingerprint':
+        settings['model']['spec_encoder']['qk_norm'] = {'eps': 1e-6}
     if precursor_delta:
         settings['model']['spec_encoder']['precursor_delta'] = {
             'fourier_dim': 8, 'hidden_dim': 8, 'min_wavelength': .01, 'max_wavelength': 10000.,
         }
     settings['augmentation'] = {**dataset.base.augment_config, 'node_drop_rate': 0., 'edge_mask_rate': 0.}
+    if kind == 'gine_fingerprint':
+        settings['augmentation'].update(node_drop_rate=.1, edge_mask_rate=.1)
     settings['data']['tokenizer'] = tokenizer
     align = settings['train']['align']
     align.update(batching='mass_blocks', batch_size=2, mass_block_size=1, epochs_stage2=2,
@@ -198,7 +224,8 @@ def test_training_entry_saves_complete_typed_model_inputs_and_all_queries(
     settings['retrieval_validation'].update(mol_batch_size=2, spec_batch_size=2, num_workers=0)
     monkeypatch.setattr(entry, 'config', ConfigObject(settings))
     output = tmp_path / 'training'
-    validator = FingerprintRetrievalValidator(index, entry.config.retrieval_validation, output / 'validation_retrieval',
+    validator_class = FingerprintRetrievalValidator if kind == 'fingerprint' else entry.GraphFingerprintRetrievalValidator
+    validator = validator_class(index, entry.config.retrieval_validation, output / 'validation_retrieval',
                                              fingerprint_root=val_root, fingerprint_provenance=provenance,
                                              index_sha256=sha256_file(index_path))
     metadata = {'seed': 42, 'exclude_val_query_indices': [],
@@ -216,7 +243,7 @@ def test_training_entry_saves_complete_typed_model_inputs_and_all_queries(
                        fingerprint_inputs=inputs,
                        fingerprint_smiles={'train': dataset.candidates.metadata['mol_smiles'], 'validation': index['mol_smiles']})
     selection = json.loads((output / 'alignment_selection.json').read_text())
-    assert selection['model_config']['type'] == 'fingerprint'
+    assert selection['model_config']['type'] == kind
     assert selection['training_fingerprint_cache'] == inputs['train']['cache']
     assert selection['validation_fingerprint_cache'] == val_cache
     assert [(row['train'], row['val']) for row in selection['fulltrain_audit']['epochs']] == [(3, 3), (3, 3)]
@@ -225,13 +252,14 @@ def test_training_entry_saves_complete_typed_model_inputs_and_all_queries(
     restored, _, _ = load_formal_alignment(output / 'best_model_stage2.pth', torch.device('cpu'),
                                            dataset_outputs=index['dataset_outputs'], dataset_manifest_sha256='a' * 64,
                                            tokenizer_config=tokenizer, expected_counts={'train': 3, 'val': 3}, exclusions=[])
-    assert formal_model_type(selection['model_config']) == 'fingerprint'
+    assert formal_model_type(selection['model_config']) == kind
     assert restored.mol_encoder.input_bits == 2048
     assert hasattr(restored.spec_encoder, 'delta_projection') == precursor_delta
     assert selection['model_config']['spec_encoder'] == settings['model']['spec_encoder']
     if candidate_supervision:
+        molecule_input = 'fixed_morgan_bits' if kind == 'fingerprint' else 'graph_with_fixed_morgan_bits'
         evidence = selection['stages']['stage2']['candidate_training']
-        assert evidence['data']['molecule_input'] == 'fixed_morgan_bits'
+        assert evidence['data']['molecule_input'] == molecule_input
         assert [row['queries'] for row in evidence['epochs']] == [3, 3]
         import SpecEmbedding.utils.candidate_training as candidate_io
         marker = tmp_path / 'synthetic_candidate_input.json'
@@ -241,15 +269,15 @@ def test_training_entry_saves_complete_typed_model_inputs_and_all_queries(
         monkeypatch.setattr(candidate_io, 'candidate_source_inputs', lambda _: {})
         report, _ = candidate_io.audit_candidate_training(
             output, selection['stages']['stage2'], marker, align['candidate_supervision'], 42, 2,
-            tmp_path, {'train': 3}, [], fingerprint_cache=inputs['train']['cache'])
+            tmp_path, {'train': 3}, [], fingerprint_cache=inputs['train']['cache'], graph_fingerprint=kind == 'gine_fingerprint')
         assert report['state'] == 'verified_full_candidate_replay' and report['epochs'] == 2
-        assert report['input_provenance']['molecule_input'] == 'fixed_morgan_bits'
+        assert report['input_provenance']['molecule_input'] == molecule_input
         assert report['queries_per_epoch'] == 3
         damaged = copy.deepcopy(selection['stages']['stage2'])
-        damaged['candidate_training']['data']['graph_cache_size'] = 10000
+        damaged['candidate_training']['data']['graph_cache_size'] += 1
         with pytest.raises(ValueError, match='Candidate loss, input or trajectory'):
             candidate_io.audit_candidate_training(output, damaged, marker, align['candidate_supervision'], 42, 2,
-                tmp_path, {'train': 3}, [], fingerprint_cache=inputs['train']['cache'])
+                tmp_path, {'train': 3}, [], fingerprint_cache=inputs['train']['cache'], graph_fingerprint=kind == 'gine_fingerprint')
 
 
 @pytest.mark.parametrize('candidate_supervision', [False, True])
