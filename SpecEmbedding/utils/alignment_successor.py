@@ -101,6 +101,15 @@ def qk_successor_configuration(parent_runtime, selection, qk_settings, gpu_setti
                                             gpu_settings, storage_template=storage_template)
 
 
+def attention_pool_successor_configuration(parent_runtime, selection, pool_settings, gpu_settings, *, storage_template):
+    from SpecEmbedding.utils.formal_alignment import formal_model_type
+
+    if formal_model_type(parent_runtime['model']) not in ('gine', 'gine_fingerprint'):
+        raise ValueError('Attention pooling successor requires a retained GINE or GINE+fingerprint parent')
+    return _spectral_successor_configuration(parent_runtime, selection, 'attention_pool', pool_settings,
+                                            gpu_settings, storage_template=storage_template)
+
+
 def _spectral_successor_configuration(parent_runtime, selection, feature, settings, gpu_settings, *, storage_template):
     """Inherit scientific settings, adding the feature and rebinding explicit external storage."""
     if (selection['model_config'] != parent_runtime['model']

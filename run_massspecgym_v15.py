@@ -112,7 +112,7 @@ def preflight(args):
     fingerprint_model = getattr(args, 'molecule_input', 'gine') == 'fingerprint'
     uses_fingerprints = getattr(args, 'molecule_input', 'gine') in ('fingerprint', 'gine_fingerprint')
     independent_baseline = getattr(args, 'checkpoint_model_config', False) or uses_fingerprints
-    if any(hasattr(config.model.spec_encoder, key) for key in ('precursor_delta', 'qk_norm')) and not independent_baseline:
+    if any(hasattr(config.model.spec_encoder, key) for key in ('precursor_delta', 'qk_norm', 'attention_pool')) and not independent_baseline:
         raise ValueError('Downstream spectral variants require independent baseline checkpoint construction')
     if independent_baseline and (not getattr(args, 'optimize_alignment', False)
                                   or getattr(args, 'prepared_validation_index', None) is None):

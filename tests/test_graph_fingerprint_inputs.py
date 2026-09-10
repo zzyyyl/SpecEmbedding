@@ -299,14 +299,18 @@ def test_fingerprint_collision_does_not_merge_2d_positives_or_candidate_rows(tmp
 
 
 @pytest.mark.parametrize('structural', [False, True])
-def test_synthetic_training_audits_full_query_coverage_and_reaches_both_molecule_branches(tmp_path, monkeypatch, structural):
+@pytest.mark.parametrize('attention_pool', [False, True])
+def test_synthetic_training_audits_full_query_coverage_and_reaches_both_molecule_branches(tmp_path, monkeypatch, structural, attention_pool):
     dataset, _, _ = make_dataset(tmp_path, monkeypatch, augment=True, structural=structural)
     train = DataLoader(dataset, batch_size=2, collate_fn=candidate_align_collate_fn)
     validation_base = copy.copy(dataset.base)
     validation_base.is_augment = False
     val = DataLoader(validation_base, batch_size=2, collate_fn=align_collate_fn)
     validate, _ = make_validator(tmp_path)
-    model = small_model()
+    from SpecEmbedding.utils.formal_alignment import build_formal_alignment
+    from tests.test_attention_pool_integration import definition
+
+    model = build_formal_alignment(definition('gine_fingerprint', qk=True)) if attention_pool else small_model()
     before = {name: value.clone() for name, value in model.state_dict().items()}
     trainer = CandidateTrainerAlign(model, train, val, torch.device('cpu'), save_dir=str(tmp_path / 'run'),
                                     candidate_loss_weight=1., retrieval_validator=validate)
@@ -316,6 +320,8 @@ def test_synthetic_training_audits_full_query_coverage_and_reaches_both_molecule
     for prefix in ('spec_encoder.', 'mol_encoder.convs.', 'mol_encoder.fingerprint_branch.0.',
                    'mol_encoder.fingerprint_branch.3.', 'spec_proj.', 'mol_proj.'):
         assert any(not torch.equal(value, before[name]) for name, value in model.state_dict().items() if name.startswith(prefix))
+    if attention_pool:
+        assert model.spec_encoder.pool.query.detach().abs().sum() > 0
     records = trainer.stage_summaries['stage2']['candidate_training']
     assert records['data']['molecule_input'] == 'graph_with_fixed_morgan_bits'
     assert ('structural_sampling' in records['data']) == structural
@@ -327,7 +333,7 @@ def test_synthetic_training_audits_full_query_coverage_and_reaches_both_molecule
         audit_snapshot(tmp_path / 'run/validation_retrieval' / f'stage2_epoch{epoch:03}.pt', validate.index,
                         expected_graph_cache=validate.graph_cache_fingerprint,
                         expected_fingerprint_cache=validate.fingerprint_receipt)
-    clone = small_model().eval()
+    clone = (build_formal_alignment(definition('gine_fingerprint', qk=True)) if attention_pool else small_model()).eval()
     clone.load_state_dict(torch.load(tmp_path / 'run/best_model_stage2.pth', weights_only=True), strict=True)
     # Loading the selected weight set and encoding actual combined DataLoader tensors succeeds.
     batch = next(iter(val))

@@ -1,4 +1,4 @@
-"""Prepared downstream readout component; formal construction is deliberately not enabled yet."""
+"""Opt-in downstream readout; the shared SpecEmbedding pretraining class is unchanged."""
 
 import math
 

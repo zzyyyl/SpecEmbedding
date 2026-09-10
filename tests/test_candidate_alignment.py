@@ -313,10 +313,10 @@ def test_candidate_input_checks_actual_grouped_order_and_refuses_changed_receipt
         candidate_io.read_candidate_training_input(path, tmp_path, {**settings, "loss_weight": 2.0}, {"train": 3}, [])
 
 
-@pytest.mark.parametrize('precursor_delta', [False, True])
+@pytest.mark.parametrize('spectrum_variant', [None, 'precursor_delta', 'attention_pool'])
 @pytest.mark.parametrize('qk_norm', [False, True])
 @pytest.mark.parametrize('structural', [False, True])
-def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monkeypatch, tmp_path, precursor_delta, qk_norm, structural):
+def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monkeypatch, tmp_path, spectrum_variant, qk_norm, structural):
     import train_align as entry
     from SpecEmbedding.config import ConfigObject
 
@@ -329,10 +329,12 @@ def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monke
     monkeypatch.setattr(config.model, "spec_encoder", ConfigObject({
         "embedding_dim": 8, "n_head": 2, "n_layer": 1, "dim_feedward": 8, "dim_target": 8,
         "feedward_activation": "selu"}))
-    if precursor_delta:
+    if spectrum_variant == 'precursor_delta':
         monkeypatch.setattr(config.model.spec_encoder, 'precursor_delta', ConfigObject({
             'fourier_dim': 8, 'hidden_dim': 8, 'min_wavelength': .01, 'max_wavelength': 10000.,
         }), raising=False)
+    elif spectrum_variant == 'attention_pool':
+        monkeypatch.setattr(config.model.spec_encoder, 'attention_pool', ConfigObject({'norm_eps': 1e-5}), raising=False)
     if qk_norm:
         monkeypatch.setattr(config.model.spec_encoder, 'qk_norm', ConfigObject({'eps': 1e-6}), raising=False)
     monkeypatch.setattr(config.model, "mol_encoder", ConfigObject({
@@ -347,18 +349,51 @@ def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monke
         return CandidateTrainerAlign(*args, **kwargs)
     monkeypatch.setattr(entry, "CandidateTrainerAlign", cpu_trainer)
     output = tmp_path / "run"
+    def validator(*args):
+        return {"top1": 0.5, "top5": 1., "top10": 1., "top20": 1., "mrr": 0.75}
+    metadata = {"fulltrain_audit": {"expected_epoch_counts": {"train": 3, "val": 3},
+                                   "dataset_manifest_sha256": "a" * 64}}
+    if spectrum_variant == 'attention_pool':
+        from types import SimpleNamespace
+
+        from SpecEmbedding.utils.retrieval_validation import AlignmentRetrievalValidator
+        from tests.test_retrieval_validation import build_index
+
+        index = build_index()  # One positive query and two queries without a positive, including an empty pool.
+        index.update(dataset_manifest_sha256='a' * 64, dataset_outputs={'synthetic': 'CPU wiring only'})
+        validator = AlignmentRetrievalValidator(index, SimpleNamespace(
+            mol_batch_size=2, spec_batch_size=2, num_workers=0, top_k=(1, 5, 10, 20)),
+            output / 'validation_retrieval')
+        monkeypatch.setattr(config.data, 'tokenizer', ConfigObject(index['tokenizer_config']))
+        metadata.update(seed=42, exclude_val_query_indices=[])
+        metadata['fulltrain_audit'].update(formal_fulltrain=True, dataset_version='1.5',
+                                           input_outputs=index['dataset_outputs'])
     entry.train_align(
         dataset.base._data, sorted(dataset.base._keys), dataset.base._data, sorted(dataset.base._keys), None,
         batch_size=2, lr=0.001, save_dir=str(output), device="cpu", seed=42, formal_fulltrain=True,
-        retrieval_validator=lambda *a: {"top1": 0.5, "top5": 1., "top10": 1., "top20": 1., "mrr": 0.75},
+        retrieval_validator=validator,
         training_candidates=dataset.candidates, candidate_input_receipt=receipt,
-        selection_metadata={"fulltrain_audit": {"expected_epoch_counts": {"train": 3, "val": 3},
-                                               "dataset_manifest_sha256": "a" * 64}},
+        selection_metadata=metadata,
     )
     selection = json.loads((output / "alignment_selection.json").read_text())
-    assert ('precursor_delta' in selection['model_config']['spec_encoder']) == precursor_delta
+    assert ('precursor_delta' in selection['model_config']['spec_encoder']) == (spectrum_variant == 'precursor_delta')
+    assert ('attention_pool' in selection['model_config']['spec_encoder']) == (spectrum_variant == 'attention_pool')
     assert ('qk_norm' in selection['model_config']['spec_encoder']) == qk_norm
     weights = torch.load(output / 'best_model_stage2.pth', map_location='cpu', weights_only=True)
+    if spectrum_variant == 'attention_pool':
+        from SpecEmbedding.utils.formal_alignment import load_formal_alignment
+        from SpecEmbedding.utils.optimization_audit import audit_snapshot
+
+        assert torch.isfinite(weights['spec_encoder.pool.query']).all()
+        assert weights['spec_encoder.pool.query'].abs().sum() > 0
+        restored, _, receipt_model = load_formal_alignment(output / 'best_model_stage2.pth', torch.device('cpu'),
+            dataset_outputs=index['dataset_outputs'], dataset_manifest_sha256='a' * 64,
+            tokenizer_config=index['tokenizer_config'], expected_counts={'train': 3, 'val': 3}, exclusions=[])
+        assert receipt_model['model_config'] == selection['model_config']
+        assert all(torch.equal(value, restored.state_dict()[key]) for key, value in weights.items())
+        for epoch in (1, 2):
+            result = audit_snapshot(output / 'validation_retrieval' / f'stage2_epoch{epoch:03d}.pt', index)
+            assert result['queries'] == 3 and result['positive_queries'] == 1
     norm_keys = [key for key in weights if '.q_norm.' in key or '.k_norm.' in key]
     assert bool(norm_keys) == qk_norm
     assert all(bool(torch.isfinite(weights[key]).all()) for key in norm_keys)

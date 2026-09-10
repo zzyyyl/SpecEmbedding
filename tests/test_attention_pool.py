@@ -1,5 +1,6 @@
 """Synthetic readout/component checks; no formal experiment or full integration claim."""
 
+import copy
 import io
 import math
 
@@ -54,7 +55,9 @@ def test_uniform_initialization_preserves_both_towers_rng_and_eval_outputs(kind,
     original = build_formal_alignment(config).eval()
     rng = torch.get_rng_state()
     torch.manual_seed(42)
-    candidate = wrap(build_formal_alignment(config)).eval()
+    candidate_config = copy.deepcopy(config)
+    candidate_config['spec_encoder']['attention_pool'] = {'norm_eps': 1e-5}
+    candidate = build_formal_alignment(candidate_config).eval()
     assert torch.equal(torch.get_rng_state(), rng)
     for key, value in original.state_dict().items():
         target = 'spec_encoder.base.' + key[len('spec_encoder.'):] if key.startswith('spec_encoder.') else key
@@ -142,12 +145,15 @@ def test_invalid_pool_inputs_are_rejected(damage):
         MaskedAttentionPool(3, norm_eps=1e-5)(features, padding)
 
 
-def test_unconnected_formal_configuration_and_other_forward_overrides_are_rejected():
+def test_incomplete_formal_configuration_and_other_forward_overrides_are_rejected():
     config = model_config()
-    config['spec_encoder']['attention_pool'] = {'norm_eps': 1e-5}
+    config['spec_encoder']['attention_pool'] = {}
     with pytest.raises(ValueError):
         build_formal_alignment(config)
     config = model_config()['spec_encoder']
     config['precursor_delta'] = delta_config()
     with pytest.raises(ValueError, match='supported SiameseModel'):
         AttentionPoolingEncoder(build_spectrum_encoder(config), {'norm_eps': 1e-5})
+    config['attention_pool'] = {'norm_eps': 1e-5}
+    with pytest.raises(ValueError, match='does not support precursor delta'):
+        build_spectrum_encoder(config)

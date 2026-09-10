@@ -69,7 +69,8 @@ def audit_snapshot(path, index, *, expected_spectrum_control=None, expected_grap
     return metrics
 
 
-def audit_trajectory(directory, index, stage, baseline, *, expected_graph_cache=None, expected_fingerprint_cache=None):
+def audit_trajectory(directory, index, stage, baseline, *, expected_graph_cache=None, expected_fingerprint_cache=None,
+                     expected_attention_pool=False):
     history = stage["retrieval_history"]
     require([row["epoch"] for row in history] == list(range(1, stage["stop_epoch"] + 1)), "Incomplete epoch trajectory")
     require(bool(history) and stage["metric_for_best"] == "validation_top1_then_mrr", "Wrong selection protocol")
@@ -107,6 +108,8 @@ def audit_trajectory(directory, index, stage, baseline, *, expected_graph_cache=
         path = directory / filename
         hashes[str(path)] = sha256_file(path)
     selected = torch.load(directory / "best_model_stage2.pth", map_location="cpu", weights_only=True)
+    require(any(key.startswith('spec_encoder.pool.') for key in selected) == expected_attention_pool,
+            'Attention pooling weights and explicit model configuration disagree')
     selected_candidate = directory / f"candidate_stage2_epoch{best['epoch']:03d}.pth"
     hashes[str(selected_candidate)] = sha256_file(selected_candidate)
     candidate = torch.load(selected_candidate, map_location="cpu", weights_only=True)
@@ -247,6 +250,10 @@ def audit_optimization_run(run):
     checkpoint_model = manifest.get('checkpoint_model')
     if fingerprint_report is not None:
         require(checkpoint_model is not None, 'Fingerprint optimization requires independently bound baseline construction')
+    attention_pool = 'attention_pool' in selection['model_config'].get('spec_encoder', {})
+    if attention_pool:
+        require(checkpoint_model is not None, 'Attention pooling requires independently bound baseline construction')
+    if fingerprint_report is not None or attention_pool:
         from SpecEmbedding.utils.formal_alignment import load_formal_alignment
         load_formal_alignment(directory / 'best_model_stage2.pth', torch.device('cpu'),
                               dataset_outputs=index['dataset_outputs'], dataset_manifest_sha256=index['dataset_manifest_sha256'],
@@ -301,7 +308,7 @@ def audit_optimization_run(run):
     fingerprint(baseline_path)
     require(all(math.isclose(baseline[key], baseline_receipt["metrics"][key], rel_tol=0, abs_tol=1e-12) for key in baseline),
             "Baseline receipt metrics mismatch")
-    report = audit_trajectory(directory, index, stage, baseline,
+    report = audit_trajectory(directory, index, stage, baseline, expected_attention_pool=attention_pool,
                               expected_graph_cache=None if fingerprint_model else graph_fingerprint,
                               expected_fingerprint_cache=selection.get('validation_fingerprint_cache'))
     report['validation_graph_cache'] = graph_receipt

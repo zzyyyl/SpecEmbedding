@@ -116,6 +116,10 @@ def train_align(
         not formal_fulltrain or retrieval_validator is None or spec_encoder is not None
     ):
         raise ValueError('Precursor delta training requires fresh formal training and full retrieval selection')
+    if hasattr(config.model.spec_encoder, 'attention_pool'):
+        if not formal_fulltrain or retrieval_validator is None or spec_encoder is not None:
+            raise ValueError('Attention pooling requires fresh formal training and full retrieval selection')
+        formal_model_type(config.model.to_dict())
     device = resolve_device(device)
     batching = config.train.align.batching
     if batching not in {"random", "mass_blocks"}:
@@ -366,6 +370,10 @@ def main():
     )
 
     args = parser.parse_args()
+    if hasattr(config.model.spec_encoder, 'attention_pool'):
+        if not args.formal_fulltrain or not args.validation_index or args.pretrained_spec:
+            parser.error('Attention pooling requires fresh formal training and full retrieval selection')
+        formal_model_type(config.model.to_dict())
     if hasattr(config.model.spec_encoder, 'precursor_delta'):
         if not args.formal_fulltrain or not args.validation_index or args.pretrained_spec:
             parser.error('Precursor delta training requires fresh formal training and full retrieval selection')
