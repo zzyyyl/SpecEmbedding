@@ -258,7 +258,7 @@ def test_candidate_trainer_refuses_persistent_workers_and_query_dropping(monkeyp
                                   candidate_loss_weight=1.0)
 
 
-def pinned_synthetic_candidate_input(monkeypatch, tmp_path, *, structural=False):
+def pinned_synthetic_candidate_input(monkeypatch, tmp_path, *, structural=False, loss_weight=0.5):
     dataset = candidate_dataset(monkeypatch)
     index = dataset.candidates
     metadata = tmp_path / "metadata.pkl"
@@ -271,7 +271,7 @@ def pinned_synthetic_candidate_input(monkeypatch, tmp_path, *, structural=False)
     # Full metadata/source validation has separate real-file tests. Here the
     # verified synthetic index connects input pinning to actual model training.
     monkeypatch.setattr(candidate_io, "load_training_candidates", lambda *a, **k: index)
-    settings = {"enabled": True, "negative_count": 16, "loss_weight": 0.5, "pool_cache_size": 1, "graph_cache_size": 1}
+    settings = {"enabled": True, "negative_count": 16, "loss_weight": loss_weight, "pool_cache_size": 1, "graph_cache_size": 1}
     if structural:
         from SpecEmbedding.utils.fingerprint_cache import (
             audit_fingerprint_cache,
@@ -316,11 +316,12 @@ def test_candidate_input_checks_actual_grouped_order_and_refuses_changed_receipt
 @pytest.mark.parametrize('spectrum_variant', [None, 'precursor_delta', 'attention_pool'])
 @pytest.mark.parametrize('qk_norm', [False, True])
 @pytest.mark.parametrize('structural', [False, True])
-def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monkeypatch, tmp_path, spectrum_variant, qk_norm, structural):
+@pytest.mark.parametrize('loss_weight', [0.5, 2.0])
+def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monkeypatch, tmp_path, spectrum_variant, qk_norm, structural, loss_weight):
     import train_align as entry
     from SpecEmbedding.config import ConfigObject
 
-    dataset, settings, receipt, path = pinned_synthetic_candidate_input(monkeypatch, tmp_path, structural=structural)
+    dataset, settings, receipt, path = pinned_synthetic_candidate_input(monkeypatch, tmp_path, structural=structural, loss_weight=loss_weight)
     monkeypatch.setattr(config.train.align, "candidate_supervision", ConfigObject(settings))
     monkeypatch.setattr(config.train.align, "epochs_stage2", 2)
     monkeypatch.setattr(config.train.align, "num_workers", 0)
@@ -398,6 +399,9 @@ def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monke
     assert bool(norm_keys) == qk_norm
     assert all(bool(torch.isfinite(weights[key]).all()) for key in norm_keys)
     stage = selection["stages"]["stage2"]
+    assert selection['training_config']['candidate_supervision']['loss_weight'] == loss_weight
+    assert selection['config_snapshot']['train']['align']['candidate_supervision']['loss_weight'] == loss_weight
+    assert stage['candidate_training']['candidate_loss_weight'] == loss_weight
     report, hashes = candidate_io.audit_candidate_training(output, stage, path, settings, 42, 2, tmp_path, {"train": 3}, [])
     assert report["state"] == "verified_full_candidate_replay" and report["epochs"] == 2
     assert report["queries_per_epoch"] == 3 and len(hashes) == (16 if structural else 8)
@@ -411,7 +415,7 @@ def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monke
     for damage in ("sample_hash", "count", "batch_sizes", "weight", "missing_epochs", "order", "duplicate"):
         altered = copy.deepcopy(stage)
         if damage == "weight":
-            altered["candidate_training"]["candidate_loss_weight"] = 2.0
+            altered["candidate_training"]["candidate_loss_weight"] = loss_weight + 1.0
         elif damage == "missing_epochs":
             altered["candidate_training"]["epochs"].pop()
         else:

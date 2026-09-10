@@ -110,24 +110,54 @@ def attention_pool_successor_configuration(parent_runtime, selection, pool_setti
                                             gpu_settings, storage_template=storage_template)
 
 
+def candidate_weight_successor_configuration(parent_runtime, selection, weight_settings, gpu_settings, *, storage_template):
+    """Change only the candidate loss coefficient after checking the declared parent coefficient."""
+    from SpecEmbedding.utils.candidate_training import validate_candidate_settings
+    from SpecEmbedding.utils.formal_alignment import formal_model_type
+
+    if formal_model_type(parent_runtime['model']) not in ('gine', 'gine_fingerprint'):
+        raise ValueError('Candidate weight successor requires a retained GINE or GINE+fingerprint parent')
+    if not isinstance(weight_settings, dict) or set(weight_settings) != {'expected_parent_weight', 'loss_weight'}:
+        raise ValueError('Incomplete explicit candidate weight change')
+    settings = parent_runtime['train']['align']['candidate_supervision']
+    validate_candidate_settings(settings)
+    for weight in weight_settings.values():
+        validate_candidate_settings({**settings, 'loss_weight': weight})
+    if not settings['enabled'] or settings['loss_weight'] != weight_settings['expected_parent_weight']:
+        raise ValueError('Parent candidate supervision or loss weight differs from the declared baseline')
+    if settings['loss_weight'] == weight_settings['loss_weight']:
+        raise ValueError('Candidate weight change must differ from the parent')
+    result = _inherited_successor_configuration(parent_runtime, selection, gpu_settings,
+                                                storage_template=storage_template)
+    result['train']['align']['candidate_supervision']['loss_weight'] = float(weight_settings['loss_weight'])
+    return result
+
+
 def _spectral_successor_configuration(parent_runtime, selection, feature, settings, gpu_settings, *, storage_template):
     """Inherit scientific settings, adding the feature and rebinding explicit external storage."""
+    from SpecEmbedding.models_precursor_delta import validate_spectrum_config
+
+    if feature in parent_runtime['model']['spec_encoder']:
+        raise ValueError(f'Parent already has the proposed {feature} feature')
+    result = _inherited_successor_configuration(parent_runtime, selection, gpu_settings,
+                                                storage_template=storage_template)
+    result['model']['spec_encoder'][feature] = copy.deepcopy(settings)
+    validate_spectrum_config(result['model']['spec_encoder'])
+    return result
+
+
+def _inherited_successor_configuration(parent_runtime, selection, gpu_settings, *, storage_template):
     if (selection['model_config'] != parent_runtime['model']
             or selection['training_config'] != parent_runtime['train']['align']
             or selection['config_snapshot']['augmentation'] != parent_runtime['augmentation']):
         raise ValueError('Parent model/training/augmentation provenance differs')
-    if feature in parent_runtime['model']['spec_encoder']:
-        raise ValueError(f'Parent already has the proposed {feature} feature')
     if set(gpu_settings) != {'min_free_mib', 'max_utilization', 'poll_seconds', 'hold_seconds'}:
         raise ValueError('Incomplete explicitly authorized GPU policy')
     result = copy.deepcopy(parent_runtime)
-    result['model']['spec_encoder'][feature] = copy.deepcopy(settings)
     result['fulltrain'].update(gpu_settings)
     from SpecEmbedding.config import PATH_FIELDS
-    from SpecEmbedding.models_precursor_delta import validate_spectrum_config
     from SpecEmbedding.utils.storage import external_storage_root, storage_path
 
-    validate_spectrum_config(result['model']['spec_encoder'])
     root = external_storage_root(storage_template['storage']['root'])
     result['storage'] = copy.deepcopy(storage_template['storage'])
     for keys in PATH_FIELDS:

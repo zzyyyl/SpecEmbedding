@@ -300,7 +300,8 @@ def test_fingerprint_collision_does_not_merge_2d_positives_or_candidate_rows(tmp
 
 @pytest.mark.parametrize('structural', [False, True])
 @pytest.mark.parametrize('attention_pool', [False, True])
-def test_synthetic_training_audits_full_query_coverage_and_reaches_both_molecule_branches(tmp_path, monkeypatch, structural, attention_pool):
+@pytest.mark.parametrize('loss_weight', [1.0, 2.0])
+def test_synthetic_training_audits_full_query_coverage_and_reaches_both_molecule_branches(tmp_path, monkeypatch, structural, attention_pool, loss_weight):
     dataset, _, _ = make_dataset(tmp_path, monkeypatch, augment=True, structural=structural)
     train = DataLoader(dataset, batch_size=2, collate_fn=candidate_align_collate_fn)
     validation_base = copy.copy(dataset.base)
@@ -313,7 +314,7 @@ def test_synthetic_training_audits_full_query_coverage_and_reaches_both_molecule
     model = build_formal_alignment(definition('gine_fingerprint', qk=True)) if attention_pool else small_model()
     before = {name: value.clone() for name, value in model.state_dict().items()}
     trainer = CandidateTrainerAlign(model, train, val, torch.device('cpu'), save_dir=str(tmp_path / 'run'),
-                                    candidate_loss_weight=1., retrieval_validator=validate)
+                                    candidate_loss_weight=loss_weight, retrieval_validator=validate)
     trainer.expected_epoch_counts = {'train': 3, 'val': 3}
     trainer.fit(epochs=2, optimizer=torch.optim.AdamW(model.parameters(), lr=.001), stage_name='stage2')
     assert trainer.epoch_counts == [{'stage': 'stage2', 'epoch': e, 'train': 3, 'val': 3} for e in (1, 2)]
@@ -323,6 +324,7 @@ def test_synthetic_training_audits_full_query_coverage_and_reaches_both_molecule
     if attention_pool:
         assert model.spec_encoder.pool.query.detach().abs().sum() > 0
     records = trainer.stage_summaries['stage2']['candidate_training']
+    assert records['candidate_loss_weight'] == loss_weight
     assert records['data']['molecule_input'] == 'graph_with_fixed_morgan_bits'
     assert ('structural_sampling' in records['data']) == structural
     assert records['data']['graph_cache_size'] == 1
