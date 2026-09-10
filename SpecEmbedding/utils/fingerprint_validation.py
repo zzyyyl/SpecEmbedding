@@ -7,6 +7,13 @@ from SpecEmbedding.utils.fingerprint_cache import load_fingerprint_cache
 from SpecEmbedding.utils.retrieval_validation import AlignmentRetrievalValidator
 
 
+def load_validation_fingerprints(index, fingerprint_root, fingerprint_provenance, index_sha256):
+    if (fingerprint_provenance['dataset_manifest_sha256'] != index['dataset_manifest_sha256']
+            or fingerprint_provenance['index_sha256'] != index_sha256):
+        raise ValueError('Fingerprint validation input does not match the audited index')
+    return load_fingerprint_cache(index['mol_smiles'], fingerprint_root, fingerprint_provenance)
+
+
 class ValidationFingerprints(Dataset):
     def __init__(self, cache):
         self.cache = cache
@@ -21,11 +28,8 @@ class ValidationFingerprints(Dataset):
 class FingerprintRetrievalValidator(AlignmentRetrievalValidator):
     def __init__(self, index, settings, output_dir=None, *, fingerprint_root, fingerprint_provenance,
                  index_sha256, spectrum_control=None, control_settings=None):
-        if (fingerprint_provenance['dataset_manifest_sha256'] != index['dataset_manifest_sha256']
-                or fingerprint_provenance['index_sha256'] != index_sha256):
-            raise ValueError('Fingerprint validation input does not match the audited index')
-        cache, self.fingerprint_receipt = load_fingerprint_cache(index['mol_smiles'], fingerprint_root,
-                                                               fingerprint_provenance)
+        cache, self.fingerprint_receipt = load_validation_fingerprints(
+            index, fingerprint_root, fingerprint_provenance, index_sha256)
         super().__init__(index, settings, output_dir, spectrum_control=spectrum_control, control_settings=control_settings)
         self.molecules = ValidationFingerprints(cache)
 

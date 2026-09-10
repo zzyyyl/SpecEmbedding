@@ -9,25 +9,42 @@ from SpecEmbedding.utils.fingerprint_cache import fingerprint_provenance, load_f
 from SpecEmbedding.utils.training_candidates import _integer
 
 
+def bind_target_fingerprints(dataset, *, fingerprint_root, fingerprint_smiles, fingerprint_provenance,
+                             dataset_manifest_sha256):
+    """Bind full-spectrum targets by exact source SMILES, retaining only their row lookups."""
+    if not dataset.full_spectra or dataset.graph_policy != 'rdkit_sanitized':
+        raise ValueError('Fingerprint alignment requires the complete audited spectrum/graph-eligibility protocol')
+    if fingerprint_provenance['dataset_manifest_sha256'] != dataset_manifest_sha256:
+        raise ValueError('Fingerprint inputs and tokenized spectra have different provenance')
+    cache, receipt = load_fingerprint_cache(fingerprint_smiles, fingerprint_root, fingerprint_provenance)
+    targets = {row['smiles'] for sequences in dataset._data.values() for row in sequences}
+    lookup = {smiles: i for i, smiles in enumerate(fingerprint_smiles) if smiles in targets}
+    if set(lookup) != targets:
+        raise ValueError('A paired target is missing from the fixed input inventory; do not substitute an identity alias')
+    return cache, receipt, lookup
+
+
+def check_candidate_fingerprint_binding(base, candidates, dataset_manifest_sha256):
+    source = base.fingerprint_receipt['provenance']
+    expected = fingerprint_provenance(candidates.metadata['mol_smiles'],
+                                      index_sha256=candidates.provenance['sha256'],
+                                      dataset_manifest_sha256=dataset_manifest_sha256,
+                                      radius=source['options']['radius'], bits=source['options']['bits'])
+    if source != expected:
+        raise ValueError('Fingerprint index differs from natural training candidates')
+
+
 class FingerprintAlignmentDataset(AlignGraphDataset):
     """Share the baseline spectrum ordering and augmentation, without constructing molecular graphs."""
 
     def __init__(self, *args, fingerprint_root, fingerprint_smiles, fingerprint_provenance,
                  dataset_manifest_sha256, **kwargs):
         super().__init__(*args, **kwargs)
-        if not self.full_spectra or self.graph_policy != 'rdkit_sanitized':
-            raise ValueError('Fingerprint alignment requires the complete audited spectrum/graph-eligibility protocol')
         if any(self.augment_config[key] != 0 for key in ('node_drop_rate', 'edge_mask_rate')):
             raise ValueError('Fixed fingerprint inputs require explicitly disabled molecular graph augmentation')
-        if fingerprint_provenance['dataset_manifest_sha256'] != dataset_manifest_sha256:
-            raise ValueError('Fingerprint inputs and tokenized spectra have different provenance')
-        self.fingerprints, self.fingerprint_receipt = load_fingerprint_cache(
-            fingerprint_smiles, fingerprint_root, fingerprint_provenance)
-        # Only retain target lookups, rather than a second multi-million-entry dictionary in each worker.
-        targets = {row['smiles'] for sequences in self._data.values() for row in sequences}
-        self._target_fingerprints = {smiles: i for i, smiles in enumerate(fingerprint_smiles) if smiles in targets}
-        if set(self._target_fingerprints) != targets:
-            raise ValueError('A paired target is missing from the fixed input inventory; do not substitute an identity alias')
+        self.fingerprints, self.fingerprint_receipt, self._target_fingerprints = bind_target_fingerprints(
+            self, fingerprint_root=fingerprint_root, fingerprint_smiles=fingerprint_smiles,
+            fingerprint_provenance=fingerprint_provenance, dataset_manifest_sha256=dataset_manifest_sha256)
 
     def __getitem__(self, index):
         index = _integer(index, 'dataset_index')
@@ -59,13 +76,7 @@ class CandidateFingerprintDataset(CandidateAlignDataset):
             raise ValueError('Candidate fingerprints require the audited fingerprint spectrum dataset')
         super().__init__(base, candidates, dataset_manifest_sha256=dataset_manifest_sha256,
                          negative_count=negative_count, seed=seed, graph_cache_size=0)
-        source = base.fingerprint_receipt['provenance']
-        expected = fingerprint_provenance(candidates.metadata['mol_smiles'],
-                                          index_sha256=candidates.provenance['sha256'],
-                                          dataset_manifest_sha256=dataset_manifest_sha256,
-                                          radius=source['options']['radius'], bits=source['options']['bits'])
-        if source != expected:
-            raise ValueError('Fingerprint index differs from natural training candidates')
+        check_candidate_fingerprint_binding(base, candidates, dataset_manifest_sha256)
         self.provenance.update(molecule_input='fixed_morgan_bits', fingerprint_cache=base.fingerprint_receipt,
                                negative_graph_augmentation='None: fixed fingerprints for both positives and negatives')
 

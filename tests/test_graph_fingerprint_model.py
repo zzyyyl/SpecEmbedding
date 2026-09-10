@@ -9,7 +9,7 @@ from torch_geometric.data import Batch
 
 from SpecEmbedding.data.graph_utils import smiles_to_graph
 from SpecEmbedding.models_graph_fingerprint import GraphFingerprintAlignmentModel, validate_fingerprint_residual
-from SpecEmbedding.utils.formal_alignment import build_formal_alignment, formal_model_type
+from SpecEmbedding.utils.formal_alignment import formal_model_type
 from tests.test_precursor_delta import delta_config, spectra
 from tests.test_qk_norm import definition
 
@@ -37,12 +37,39 @@ def parent_config(qk=False, delta=False):
     return result
 
 
+def training_parent(monkeypatch, definition):
+    """Capture the actual fresh training entry before optimization, without reproducing its constructor."""
+    import train_align
+    from SpecEmbedding.config import ConfigObject
+    from tests.test_candidate_alignment import candidate_dataset
+
+    data = candidate_dataset(monkeypatch).base._data
+    captured = {}
+    class CapturedModel(Exception):
+        pass
+    def capture(model, *args, **kwargs):
+        captured['model'] = model
+        raise CapturedModel
+    with monkeypatch.context() as scope:
+        scope.setattr(train_align.config, 'model', ConfigObject(copy.deepcopy(definition)))
+        scope.setattr(train_align.config.train.align, 'batching', 'random')
+        scope.setattr(train_align.config.train.align.candidate_supervision, 'enabled', False)
+        scope.setattr(train_align, 'TrainerAlign', capture)
+        with pytest.raises(CapturedModel):
+            train_align.train_align(data, list(data), data, list(data), None, batch_size=2, device='cpu',
+                                    formal_fulltrain=True, retrieval_validator=object(),
+                                    mol_norm_type=definition['mol_encoder']['norm_type'],
+                                    mol_norm_eps=definition['mol_encoder']['norm_eps'],
+                                    selection_metadata={'fulltrain_audit': {'expected_epoch_counts': {'train': 3, 'val': 3}}})
+    return captured['model']
+
+
 @pytest.mark.parametrize('qk', [False, True])
 @pytest.mark.parametrize('delta', [False, True])
-def test_preserves_inherited_weights_rng_and_zero_residual_outputs(qk, delta):
+def test_preserves_inherited_weights_rng_and_zero_residual_outputs(monkeypatch, qk, delta):
     config = parent_config(qk, delta)
     torch.manual_seed(42)
-    baseline = build_formal_alignment(config).eval()
+    baseline = training_parent(monkeypatch, config).eval()
     after = torch.get_rng_state()
     torch.manual_seed(42)
     candidate = GraphFingerprintAlignmentModel(parent_model_config=config, fingerprint_config=settings()).eval()

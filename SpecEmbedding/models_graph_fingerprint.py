@@ -64,11 +64,13 @@ class GraphFingerprintAlignmentModel(SpecMolAlignModel):
             raise ValueError('Graph fingerprint residual requires a GINE parent')
         parent = copy.deepcopy(parent_model_config)
         spec, align = parent['spec_encoder'], parent['align']
-        spectrum = build_spectrum_encoder(spec)
+        # Fresh GINE training in train_align constructs the molecular tower first.
+        # Checkpoint reconstruction has a different order, but then replaces every weight.
         molecule = GraphFingerprintEncoder(
             fingerprint_config=fingerprint_config,
             **{key: value for key, value in parent['mol_encoder'].items() if key != 'graph_policy'},
         )
+        spectrum = build_spectrum_encoder(spec)
         super().__init__(spec_encoder=spectrum, mol_encoder=molecule, spec_dim=spec['dim_target'],
                          hidden_dim=align['final_dim'], final_dim=align['final_dim'],
                          dropout_rate=align['dropout_rate'], tau=align['tau'])
