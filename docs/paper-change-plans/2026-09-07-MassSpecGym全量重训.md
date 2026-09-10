@@ -2,7 +2,7 @@
 
 - 状态：`执行中`
 - 创建日期：2026-09-07
-- 最后更新：2026-09-10
+- 最后更新：2026-09-11
 - 负责人：Codex / 作者核验
 - 关联论文：`paper/main.tex` / `paper/main_cn.tex`；目前不改论文结果或结论
 - 计划约束：本文件沿用仓库模板与原全量重训计划，作为本工作的唯一计划；不另建冲突版本。
@@ -322,6 +322,84 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 - [ ] 论文修改后执行双语编译、引用/匿名扫描、发布 manifest 和仓库要求的复现检查。
 
 ## 10. 执行记录
+
+- 2026-09-11 02:32：A09 fresh基线验证于02:08:41完成，02:11:34正式训练选中物理
+  GPU1（UUID `GPU-a52199f5-d656-ff80-6b9c-489eecd7869f`）显露为cuda:0，02:13:10进入
+  stage2；首轮02:27:07完整记录train194,119、val19,423，后续仍在训练。原入口
+  PID3678937/starttime1452981635、直接训练PID3752707/starttime1455207255、独立
+  审计PID3751689/starttime1455162245均核验真实命令、完整环境与原socket，源码保持
+  `ef2526d`且干净，runtime与冻结manifest相符；不把首轮记录写为完成审计或晋升。
+  已在`/data1/zyl/SpecEmbedding/audits/optimization_a10_dependency_binding_20260910`
+  将上述三个进程及43项不可变文件绑定，`binding.json` SHA为
+  `77cf15021730078b5910e95352e514d7b12d830a9f4b09a3af16f049dab27ada`；核验脚本与真实
+  check-only/准备日志、退出码均保留。沿用已归档A10组件和`a8ad5f2`固定源码，实际
+  依赖检查确认parent尚未就绪，准备新队列后于02:32:17单次启动。
+  队列根`/data1/zyl/SpecEmbedding/audits/optimization_a10_successor_queue_20260910`，
+  独立socket`/tmp/specembedding-opt-a10-20260910-1010/tmux.sock`，`opt/%0`；实际
+  PID3756121/starttime1455331545于02:32:47核验为CPU waiting_parent，空CUDA与
+  全部外部存储环境一致，原三项依赖仍存活，没有最终配置目录、模型目录或提前派发。
+  preparation_receipt SHA为`06422a930430acbec96b764b399c9015e7d96cfb7969f234db9b8ddd03c27a9a`，
+  manifest SHA为`478ff7341c2c7e697c7193a3edc216cacbbe7c4a51c137a0f451a8b7ad97d6d7`，
+  launch SHA为`530249893237b95d8f845700737855b8b6aa755d6b47ad476193fd6dc12de344`，
+  runtime_verification SHA为`b30bf255603b3e74e176e4396f494e2ba921f95af575cf62688f07abc747b5bd`。
+  原24项组件检查通过且来源未变，本次真实绑定、单次派发及独立进程/环境核验通过；
+  新绑定/准备/核验脚本Ruff通过。仍待A09完整训练与审计后作parent决定、最终全量预检
+  和逐阶段GPU等待，失败停止并保留记录，不自动重试或提前扩展矩阵。A11保持准备状态。
+
+- 2026-09-11 02:09：A09在A08完整审计未晋升后绑定A04，最终全量预检于01:54:05
+  通过，原PID3678937/starttime1452981635已exec固定`ef2526d`正式入口；数据及完整
+  验证索引导入完成。后续按原始阶段时间核对：baseline_validation于02:08:41完成，
+  02:09正在等待alignment42的GPU；此时尚无训练子进程，实际启动见上一条。
+  最终根`/data1/zyl/SpecEmbedding/audits/optimization_a09_finalization_20260910`的
+  `ready.json` SHA为`a34f43a124f1f1dbc261ef74f71f880fc106a71624d96da75569b0676500fc4c`，
+  `decision.json` SHA为`11e7f3e8b85f31a7ffc3437f7c472f3bca04f90e61ed46d7875234cda110ebbf`。
+  运行根`/data1/zyl/SpecEmbedding/experiments/massspecgym_v15_opt_a09_20260910_topk256`
+  的manifest与最终preflight相同，SHA为
+  `f1a3512374053a8271f879b640bbd25852ae5abe28b08e7dbc25513ff3bcf2ad`；展开CLI模型选项后
+  runtime_params SHA为`77e9fa6e988a4abe308f8a460ee6c534636e3742d99981a9b2155903dbe6ed55`，
+  展开前源params SHA为`20f934d045fdf83353c79d1ce0c2dfcc9ef8dc6b0a68a522fcf69aeba289c2a6`。
+  实际runtime与冻结preflight逐字段一致，差异仅为已登记的model.type及指纹残差展开。
+  已为该实际run建立`/data1/zyl/SpecEmbedding/audits/optimization_a09_completion_queue_20260911`，
+  13项生命周期检查、29个不同路径输入核验及真实未完成拒绝探测通过；02:04:04单次部署
+  至`/tmp/specembedding-a09-completion-20260911-1010/tmux.sock`，`audit/%0`。
+  02:09:58核验实际PID3751689/starttime1455162245与原入口、pane和全部外部存储环境，
+  CUDA不可见，状态waiting_parent、audit_started=false；输出固定为
+  `/data1/zyl/SpecEmbedding/audits/optimization_a09_20260911/receipt.json`，尚未生成。
+  队列manifest SHA为`3a3b1a22b962890bad5457df82ecce69d988a6583ee6daf768efbd82ea2e75ab`，
+  runner SHA为`45c5b0af918f5183e0ece3179dfc36a7e68629e15c985787a2c9075812ac7822`，
+  launch SHA为`a69d581d327c926dc7d5266e427e81fa4c69bc19a5a0752edb41d60b5a6dc346`，
+  runtime_verification SHA为`2c0330f4fe7aab1c9688c47650c0560d2bd0a1b5a6332ca0d7edc1f4494785cd`。
+  首个只读核验脚本错误地以源params SHA检查runtime，修正后通过；原脚本与诊断保留
+  在该队列目录，没有更改运行配置或重启任务。准备/核验脚本Ruff通过，独立socket真实
+  进程与环境核验通过；A10仍须本轮真实训练PID及审计身份绑定，未提前部署。
+
+- 2026-09-11 01:52：A08完整27轮训练、入口收尾及独立审计完成，全部每轮train/val
+  数量、候选重放、验证排名、选优、Pareto与资源记录通过；142项工件另行重新计算SHA
+  一致，最终Q/K模型严格CPU重载通过。原训练、入口及审计进程均已结束。
+  完成回执`/data1/zyl/SpecEmbedding/audits/optimization_a08_20260910/receipt.json` SHA为
+  `325a5f72f890d56214228e96b84e354631e3e01c6bdacc072997b37f8abe9cf7`，同目录verification SHA为
+  `b6e297aa8ef056a4e0922d88401c1e3a0d77fed609159f307bdf23b1ac182eff`。
+  选中epoch22权重SHA为`51b11c84073a6892354327c101df8016e1aa3960e5e2a60cf800f07e23b9c24f`，
+  selection SHA为`247e7c7dbb4575994843943d824841d36e8d752a9fc429117b481cde356d7695`。
+  选中及其余Pareto候选22/24/27均未通过原晋升规则，保留A04，完整指标只维护于A08卡，
+  attempts已加删除线。决定及其审查工件在上述A09最终绑定目录保存；没有使用test选模型。
+
+- 2026-09-11 01:49：D24补齐完整候选身份复查，沿用先前已核验的原候选文件和完整
+  test顺序；两种协议共7,366,917条候选记录、1,290,382个不同SMILES，两环境各4个
+  CPU进程重算结果逐字节一致。1,290,374个成功身份全与原键相同，8个均无法构图，
+  没有有效分子身份错误；回映全部17,556条query后，Mass31个图排除与既有记录一致，
+  Formula无排除，正例位置差集在两协议下均恰好为先前五条目标记录。未更改原标签或
+  重算新标签下的模型指标；详细覆盖/位置结果只维护于D24报告与JSON。
+  派生根为`/data1/zyl/SpecEmbedding/audits/glacier_reference_bridge_20260911/candidate_identity_r1`；
+  `input_manifest.json` SHA为`d51d9c003e7328cfd54c87adecbfa919f7bece028b5484497171c72eb57ee13c`，
+  `glacier/receipt.json` SHA为`7ff34aaa22ee836e300fc9eabf5e09029eb075e002e938d83b28e574ecbfb4e2`，
+  `specembedding/receipt.json` SHA为`928bcf49fc7b94936b2d834828f02b8484acef6baa29ce06c97089f8906c0eb4`，
+  `comparison/receipt.json` SHA为`d23f7dce09c58ba7e75f726a188b953d60334d3d631a9bd16bd0ced3fcb80ecd`。
+  两份完整identities.jsonl SHA均为
+  `19f53fa951fc321f54f4f92de689c206412f692efda9e0dc9132fb16349e7efc`；prepare/encode/compare
+  脚本均独立归档，所有来源与输出SHA核验通过，逐query表完整读回核对通过。
+  输入提取32.45秒，两环境重算215.65/222.28秒，关联比较49.34秒，全部exit0，Ruff通过。
+  原始分数回执保留历史范围；目标/图准入比较视图、CE和论文权重仍待对齐，SOTA门槛不变。
 
 - 2026-09-11 01:32：A08日志确认第27轮正常早停（01:25:49），原训练PID3676372已退出；
   原入口PID3670350仍存活，`runner.log`已重放第1–13轮，每轮194,119条训练query，

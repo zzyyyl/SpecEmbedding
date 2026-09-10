@@ -43,7 +43,7 @@
       "MassSpecGymID0397915",
       "MassSpecGymID0402198"
     ],
-    "fresh_all_candidate_identities_reencoded": false
+    "fresh_all_candidate_strings_checked": true
   },
   "metrics": {
     "mass": {
@@ -281,5 +281,90 @@
     "sota_threshold_lowered": false
   },
   "reported_reference_snapshot": "sota_reference_snapshot_20260910.json",
-  "artifact_locations": "See stage plan section 10; all derived arrays and raw source files remain outside the repository."
+  "artifact_locations": "See stage plan section 10; all derived arrays and raw source files remain outside the repository.",
+  "candidate_identity_followup": {
+    "state": "complete_full_test_candidate_identity_and_label_difference_audit",
+    "verified_at": "2026-09-11T01:49:16+08:00",
+    "unique_smiles_attempted": 1290382,
+    "runtime_counts": {
+      "glacier": {
+        "records": 1290382,
+        "ok": 1290374,
+        "kekule_retries": 0,
+        "stored_nonempty_key_differs": 0,
+        "stored_empty_key_recovered": 0,
+        "invalid_graph": 8
+      },
+      "specembedding": {
+        "records": 1290382,
+        "ok": 1290374,
+        "kekule_retries": 0,
+        "stored_nonempty_key_differs": 0,
+        "stored_empty_key_recovered": 0,
+        "invalid_graph": 8
+      }
+    },
+    "unique_comparison": {
+      "cross_runtime_identity_or_status_differences": 0,
+      "both_successful_identities_equal": 1290374
+    },
+    "query_comparison": {
+      "mass": {
+        "counts": {
+          "project_kekule_retry_entries": 0,
+          "queries": 17556,
+          "candidate_entries": 4457058,
+          "original_positive_queries": 17553,
+          "project_positive_queries": 17556,
+          "project_invalid_graph_entries": 31,
+          "graph_exclusion_disagreement_entries": 0,
+          "project_unresolved_identity_entries": 0,
+          "project_vs_stored_key_difference_entries": 0,
+          "cross_runtime_identity_difference_entries": 0
+        },
+        "positive_mask_changed_queries": 5,
+        "positive_mask_changed_query_ids": [
+          "MassSpecGymID0202045",
+          "MassSpecGymID0202046",
+          "MassSpecGymID0202274",
+          "MassSpecGymID0397915",
+          "MassSpecGymID0402198"
+        ]
+      },
+      "formula": {
+        "counts": {
+          "project_kekule_retry_entries": 0,
+          "queries": 17556,
+          "candidate_entries": 2909859,
+          "original_positive_queries": 17555,
+          "project_positive_queries": 17556,
+          "project_invalid_graph_entries": 0,
+          "graph_exclusion_disagreement_entries": 0,
+          "project_unresolved_identity_entries": 0,
+          "project_vs_stored_key_difference_entries": 0,
+          "cross_runtime_identity_difference_entries": 0
+        },
+        "positive_mask_changed_queries": 5,
+        "positive_mask_changed_query_ids": [
+          "MassSpecGymID0202045",
+          "MassSpecGymID0202046",
+          "MassSpecGymID0202274",
+          "MassSpecGymID0397915",
+          "MassSpecGymID0402198"
+        ]
+      }
+    },
+    "receipt_sha256": {
+      "input_manifest.json": "d51d9c003e7328cfd54c87adecbfa919f7bece028b5484497171c72eb57ee13c",
+      "glacier/receipt.json": "7ff34aaa22ee836e300fc9eabf5e09029eb075e002e938d83b28e574ecbfb4e2",
+      "specembedding/receipt.json": "928bcf49fc7b94936b2d834828f02b8484acef6baa29ce06c97089f8906c0eb4",
+      "comparison/receipt.json": "d23f7dce09c58ba7e75f726a188b953d60334d3d631a9bd16bd0ced3fcb80ecd"
+    },
+    "identity_results_same_bytes": true,
+    "identity_results_sha256": "19f53fa951fc321f54f4f92de689c206412f692efda9e0dc9132fb16349e7efc",
+    "only_target_label_change_topk_bound_percentage_points": 0.028480291638186377,
+    "source_labels_changed": false,
+    "new_retrieval_metrics_generated": false,
+    "same_complete_paper_protocol_proven": false
+  }
 }
