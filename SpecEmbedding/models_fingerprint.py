@@ -7,8 +7,8 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from SpecEmbedding.models import SiameseModel
 from SpecEmbedding.models_align import SpecMolAlignModel
+from SpecEmbedding.models_precursor_delta import build_spectrum_encoder, validate_spectrum_config
 
 
 class FingerprintEncoder(nn.Module):
@@ -41,14 +41,13 @@ class FingerprintAlignmentModel(SpecMolAlignModel):
     """Use unchanged spectral/projection paths and cosine scoring with a trainable fingerprint MLP."""
 
     def __init__(self, *, spec_config, molecule_config, alignment_config):
-        if set(spec_config) != {'embedding_dim', 'n_head', 'n_layer', 'dim_feedward', 'dim_target', 'feedward_activation'}:
-            raise ValueError("Incomplete fingerprint spectral configuration")
+        validate_spectrum_config(spec_config)
         if set(molecule_config) != {'input_bits', 'hidden_dim', 'emb_dim', 'dropout_rate', 'norm_eps'}:
             raise ValueError("Incomplete fingerprint molecular configuration")
         if set(alignment_config) != {'final_dim', 'dropout_rate', 'tau'}:
             raise ValueError("Incomplete fingerprint alignment configuration")
         super().__init__(
-            spec_encoder=SiameseModel(**spec_config), mol_encoder=FingerprintEncoder(**molecule_config),
+            spec_encoder=build_spectrum_encoder(spec_config), mol_encoder=FingerprintEncoder(**molecule_config),
             spec_dim=spec_config['dim_target'], hidden_dim=alignment_config['final_dim'],
             final_dim=alignment_config['final_dim'], dropout_rate=alignment_config['dropout_rate'],
             tau=alignment_config['tau'],

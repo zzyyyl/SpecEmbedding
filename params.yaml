@@ -34,6 +34,14 @@ fingerprint_encoder:
   dropout_rate: 0.2
   norm_eps: 0.00001
 
+# Inactive downstream feature settings; activation requires an explicit copy into
+# model.spec_encoder.precursor_delta in a new run's pinned configuration.
+precursor_delta_encoder:
+  fourier_dim: 64
+  hidden_dim: 128
+  min_wavelength: 0.01
+  max_wavelength: 10000.0
+
 model:
   spec_encoder:
     embedding_dim: 512

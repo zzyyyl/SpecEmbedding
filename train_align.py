@@ -23,6 +23,7 @@ from SpecEmbedding.data.datasets_fingerprint import (
 )
 from SpecEmbedding.data.overlap import filter_classified_validation
 from SpecEmbedding.models_align import GINEEncoder, SpecMolAlignModel
+from SpecEmbedding.models_precursor_delta import build_spectrum_encoder
 from SpecEmbedding.trainer.trainer import set_seed
 from SpecEmbedding.trainer.trainer_align import TrainerAlign
 from SpecEmbedding.trainer.trainer_candidates import CandidateTrainerAlign
@@ -91,6 +92,10 @@ def train_align(
         raise ValueError('Fingerprint model requires both complete train and validation inputs')
     if fingerprint_model and (not formal_fulltrain or retrieval_validator is None or spec_encoder is not None):
         raise ValueError('Fingerprint alignment currently requires fresh formal training and full retrieval selection')
+    if hasattr(config.model.spec_encoder, 'precursor_delta') and (
+        not formal_fulltrain or retrieval_validator is None or spec_encoder is not None
+    ):
+        raise ValueError('Precursor delta training requires fresh formal training and full retrieval selection')
     device = resolve_device(device)
     batching = config.train.align.batching
     if batching not in {"random", "mass_blocks"}:
@@ -201,14 +206,7 @@ def train_align(
             norm_eps=mol_norm_eps,
         )
         if not spec_encoder:
-            spec_encoder = SiameseModel(
-                embedding_dim=config.model.spec_encoder.embedding_dim,
-                n_head=config.model.spec_encoder.n_head,
-                n_layer=config.model.spec_encoder.n_layer,
-                dim_feedward=config.model.spec_encoder.dim_feedward,
-                dim_target=config.model.spec_encoder.dim_target,
-                feedward_activation=config.model.spec_encoder.feedward_activation
-            )
+            spec_encoder = build_spectrum_encoder(config.model.spec_encoder.to_dict())
         model = SpecMolAlignModel(
             spec_encoder=spec_encoder,
             mol_encoder=mol_encoder,
@@ -346,6 +344,10 @@ def main():
     )
 
     args = parser.parse_args()
+    if hasattr(config.model.spec_encoder, 'precursor_delta'):
+        if not args.formal_fulltrain or not args.validation_index or args.pretrained_spec:
+            parser.error('Precursor delta training requires fresh formal training and full retrieval selection')
+        formal_model_type(config.model.to_dict())
     if config.train.align.metric_for_best not in ("validation_contrastive_loss", "validation_top1_then_mrr"):
         parser.error("Unknown alignment checkpoint-selection metric")
     if (config.train.align.metric_for_best == "validation_top1_then_mrr") != bool(args.validation_index):

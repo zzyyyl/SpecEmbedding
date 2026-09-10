@@ -7,12 +7,11 @@ from pathlib import Path
 import torch
 from rdkit import rdBase
 
-from SpecEmbedding.models import SiameseModel
 from SpecEmbedding.models_align import GINEEncoder, SpecMolAlignModel
 from SpecEmbedding.models_fingerprint import FingerprintAlignmentModel
+from SpecEmbedding.models_precursor_delta import build_spectrum_encoder, validate_spectrum_config
 from SpecEmbedding.utils.fulltrain import sha256_file
 
-SPEC_FIELDS = {'embedding_dim', 'n_head', 'n_layer', 'dim_feedward', 'dim_target', 'feedward_activation'}
 ALIGN_FIELDS = {'final_dim', 'dropout_rate', 'tau'}
 GINE_FIELDS = {'emb_dim', 'n_layers', 'dropout_rate', 'size_feature_dim', 'norm_type', 'norm_eps', 'graph_policy'}
 FINGERPRINT_FIELDS = {'input_bits', 'hidden_dim', 'emb_dim', 'dropout_rate', 'norm_eps', 'graph_policy'}
@@ -27,7 +26,8 @@ def formal_model_type(model_config):
     kind = model_config.get('type', 'gine')
     if kind not in ('gine', 'fingerprint'):
         raise ValueError('Unknown formal alignment model type')
-    if (set(model_config['spec_encoder']) != SPEC_FIELDS or set(model_config['align']) != ALIGN_FIELDS
+    validate_spectrum_config(model_config['spec_encoder'])
+    if (set(model_config['align']) != ALIGN_FIELDS
             or set(model_config['mol_encoder']) != (GINE_FIELDS if kind == 'gine' else FINGERPRINT_FIELDS)
             or model_config['mol_encoder']['graph_policy'] != 'rdkit_sanitized'):
         raise ValueError('Incomplete formal model construction fields or graph policy')
@@ -40,7 +40,7 @@ def build_formal_alignment(model_config):
     spec, align = model_config['spec_encoder'], model_config['align']
     if kind == 'fingerprint':
         return FingerprintAlignmentModel(spec_config=spec, molecule_config=molecule, alignment_config=align)
-    return SpecMolAlignModel(spec_encoder=SiameseModel(**spec), mol_encoder=GINEEncoder(**molecule),
+    return SpecMolAlignModel(spec_encoder=build_spectrum_encoder(spec), mol_encoder=GINEEncoder(**molecule),
                              spec_dim=spec['dim_target'], hidden_dim=align['final_dim'], final_dim=align['final_dim'],
                              dropout_rate=align['dropout_rate'], tau=align['tau'])
 

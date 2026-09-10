@@ -105,6 +105,8 @@ def preflight(args):
     storage = storage_receipt(args.output_root)
     fingerprint_model = getattr(args, 'molecule_input', 'gine') == 'fingerprint'
     independent_baseline = getattr(args, 'checkpoint_model_config', False) or fingerprint_model
+    if hasattr(config.model.spec_encoder, 'precursor_delta') and not independent_baseline:
+        raise ValueError('Precursor delta optimization requires independent baseline checkpoint construction')
     if independent_baseline and (not getattr(args, 'optimize_alignment', False)
                                   or getattr(args, 'prepared_validation_index', None) is None):
         raise ValueError('Independent baseline construction requires optimization and a prepared full validation index')
@@ -129,7 +131,7 @@ def preflight(args):
     if fingerprint_model:
         runtime_config['model']['type'] = 'fingerprint'
         runtime_config['model']['mol_encoder'] = {**config.fingerprint_encoder.to_dict(), 'graph_policy': 'rdkit_sanitized'}
-        formal_model_type(runtime_config['model'])
+    formal_model_type(runtime_config['model'])
     mol_augmentation = getattr(args, "alignment_mol_augmentation", None)
     if mol_augmentation is not None:
         if not getattr(args, "optimize_alignment", False) or not isinstance(mol_augmentation, bool):

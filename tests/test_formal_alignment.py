@@ -161,7 +161,10 @@ def test_baseline_cli_uses_own_configuration_and_binds_receipt(tmp_path, monkeyp
 
 
 @pytest.mark.parametrize('candidate_supervision', [False, True])
-def test_training_entry_saves_complete_typed_model_inputs_and_all_queries(tmp_path, monkeypatch, candidate_supervision):
+@pytest.mark.parametrize('precursor_delta', [False, True])
+def test_training_entry_saves_complete_typed_model_inputs_and_all_queries(
+    tmp_path, monkeypatch, candidate_supervision, precursor_delta,
+):
     import train_align as entry
     from SpecEmbedding.utils.fingerprint_cache import load_fingerprint_cache
     from SpecEmbedding.utils.fingerprint_validation import FingerprintRetrievalValidator
@@ -182,6 +185,10 @@ def test_training_entry_saves_complete_typed_model_inputs_and_all_queries(tmp_pa
     inputs = {'train': {'cache': dataset.base.fingerprint_receipt}, 'validation': {'cache': val_cache}}
     settings = copy.deepcopy(entry.config.to_dict())
     settings['model'] = model_config('fingerprint')
+    if precursor_delta:
+        settings['model']['spec_encoder']['precursor_delta'] = {
+            'fourier_dim': 8, 'hidden_dim': 8, 'min_wavelength': .01, 'max_wavelength': 10000.,
+        }
     settings['augmentation'] = {**dataset.base.augment_config, 'node_drop_rate': 0., 'edge_mask_rate': 0.}
     settings['data']['tokenizer'] = tokenizer
     align = settings['train']['align']
@@ -220,6 +227,8 @@ def test_training_entry_saves_complete_typed_model_inputs_and_all_queries(tmp_pa
                                            tokenizer_config=tokenizer, expected_counts={'train': 3, 'val': 3}, exclusions=[])
     assert formal_model_type(selection['model_config']) == 'fingerprint'
     assert restored.mol_encoder.input_bits == 2048
+    assert hasattr(restored.spec_encoder, 'delta_projection') == precursor_delta
+    assert selection['model_config']['spec_encoder'] == settings['model']['spec_encoder']
     if candidate_supervision:
         evidence = selection['stages']['stage2']['candidate_training']
         assert evidence['data']['molecule_input'] == 'fixed_morgan_bits'

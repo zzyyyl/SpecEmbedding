@@ -8,6 +8,7 @@ from rdkit import rdBase
 from SpecEmbedding.config import config
 from SpecEmbedding.models import SiameseModel
 from SpecEmbedding.models_align import GINEEncoder, SpecMolAlignModel
+from SpecEmbedding.models_precursor_delta import build_spectrum_encoder
 from SpecEmbedding.utils.fulltrain import sha256_file
 
 
@@ -17,14 +18,7 @@ def create_align_model(
     spec_encoder: SiameseModel | None = None,
 ) -> SpecMolAlignModel:
     if spec_encoder is None:
-        spec_encoder = SiameseModel(
-            embedding_dim=config.model.spec_encoder.embedding_dim,
-            n_head=config.model.spec_encoder.n_head,
-            n_layer=config.model.spec_encoder.n_layer,
-            dim_feedward=config.model.spec_encoder.dim_feedward,
-            dim_target=config.model.spec_encoder.dim_target,
-            feedward_activation=config.model.spec_encoder.feedward_activation,
-        )
+        spec_encoder = build_spectrum_encoder(config.model.spec_encoder.to_dict())
 
     mol_encoder = GINEEncoder(
         emb_dim=config.model.mol_encoder.emb_dim,

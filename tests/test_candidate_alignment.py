@@ -292,7 +292,8 @@ def test_candidate_input_checks_actual_grouped_order_and_refuses_changed_receipt
         candidate_io.read_candidate_training_input(path, tmp_path, {**settings, "loss_weight": 2.0}, {"train": 3}, [])
 
 
-def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monkeypatch, tmp_path):
+@pytest.mark.parametrize('precursor_delta', [False, True])
+def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monkeypatch, tmp_path, precursor_delta):
     import train_align as entry
     from SpecEmbedding.config import ConfigObject
 
@@ -305,6 +306,10 @@ def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monke
     monkeypatch.setattr(config.model, "spec_encoder", ConfigObject({
         "embedding_dim": 8, "n_head": 2, "n_layer": 1, "dim_feedward": 8, "dim_target": 8,
         "feedward_activation": "selu"}))
+    if precursor_delta:
+        monkeypatch.setattr(config.model.spec_encoder, 'precursor_delta', ConfigObject({
+            'fourier_dim': 8, 'hidden_dim': 8, 'min_wavelength': .01, 'max_wavelength': 10000.,
+        }), raising=False)
     monkeypatch.setattr(config.model, "mol_encoder", ConfigObject({
         "emb_dim": 8, "n_layers": 2, "dropout_rate": 0., "size_feature_dim": 4,
         "norm_type": "layernorm", "norm_eps": 1e-5, "graph_policy": "rdkit_sanitized"}))
@@ -326,6 +331,7 @@ def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monke
                                                "dataset_manifest_sha256": "a" * 64}},
     )
     selection = json.loads((output / "alignment_selection.json").read_text())
+    assert ('precursor_delta' in selection['model_config']['spec_encoder']) == precursor_delta
     stage = selection["stages"]["stage2"]
     report, hashes = candidate_io.audit_candidate_training(output, stage, path, settings, 42, 2, tmp_path, {"train": 3}, [])
     assert report["state"] == "verified_full_candidate_replay" and report["epochs"] == 2
