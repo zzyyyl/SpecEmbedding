@@ -314,6 +314,55 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-10 20:04：A07完整审计通过，19:38另行核对119项工件、审计源码和原进程退出，
+  并重算全部保留候选的晋升判定，确认未晋升、保留A04；attempts已加删除线，完整结果
+  维护于A07实验卡。`audits/optimization_a07_20260910/receipt.json` SHA为
+  `06c8f40ace25eb3e9de248c1070e86f8397f642529a7fd26bd8e6ebfa8af92d0`，verification SHA为
+  `3c6f0752f7f844e7c3e40811e04212ccf1446ae7148cdbbf5410598d0205cb76`。
+  A08已在`/data1/zyl/SpecEmbedding/audits/optimization_a08_finalization_20260910`绑定A04并
+  通过最终全量预检，ready SHA为`16b2fbfbfd3aeab136f8005381e2955668c62938399cd362f443a0b98ec6c7e3`，
+  decision SHA为`83ab52c4f50d2dd9165b2849430944db9dd723812ab39c149ca3be77c0b06d6b`；运行根为
+  `/data1/zyl/SpecEmbedding/experiments/massspecgym_v15_opt_a08_20260910_topk256`，实际manifest
+  与最终preflight的SHA均为`5a981e29a80179b1e5a3768a74d062d04b67a2db9c52e5cd0788b7715baeff69`，
+  runtime SHA为`0d68b7d93bd01e71cf3af3d8f9c045ab16b813261ccd6c67ea128ed0c853890c`。
+  原r3队列同一PID3670350/starttime1452647082已exec正式入口；19:44:50完成基线重编码，
+  19:47:20逐阶段复查后在GPU1启动训练，PID3676372/starttime1452901895，严格cuda:0、
+  UUID和配置均实测一致。与A04的科学配置逐项比较只有Q/K归一化新增，完整计数已核验，
+  首轮和基线全量排名已重算；详细指标/显存/时间只维护于A08实验卡，仍无完整结果。
+  A08完成审计队列`/data1/zyl/SpecEmbedding/audits/optimization_a08_completion_queue_20260910`
+  已单次启动并核验：socket`/tmp/specembedding-a08-completion-20260910-1010/tmux.sock`，
+  audit/%0，PID3675710/starttime1452877142；13项检查及未完成拒绝探测通过，23项输入重核。
+  manifest SHA为`b6d9c5956d4bc431f4a1c8333737215af586051960b9879aa6274a171a083a69`，launch SHA为
+  `3dde9bd0f9b413b27f57695768f0d8ff56b995947b5c06320e325702177f17d2`，runtime_verification SHA为
+  `bb26584e3f01e06104e7866ee0fea8091af0849cb1b8591ad181086ef169d3f0`；当前为CPU等待，未审计。
+  A09真实依赖绑定为`/data1/zyl/SpecEmbedding/audits/optimization_a09_dependency_binding_20260910/binding.json`，
+  SHA为`543390d30eae584e7d3e2c777418e6f71d838f3ce49f5a3905d5b647de448f9d`；只绑定实际
+  A08入口/训练/审计身份及不可变来源，不预填完成或parent结论。衔接队列位于
+  `/data1/zyl/SpecEmbedding/audits/optimization_a09_successor_queue_20260910`，20项检查及真实
+  等待探测通过；准备回执SHA为`3d93d702af94690365d9b828bc8139d25187d4bce0740ec704fd8c500cdc0771`，
+  manifest SHA为`72dce557a8424088d6971ad24bb30b4dfa75df6911af86b887e6661280c916c2`，successor SHA为
+  `818ea267f687a4befd8a99cd9336f8f9fac95658f14e0d7ddd9202209eb986ab`。首次准备因审批服务连接
+  中断被拒，证明尚未执行且各输出目录不存在后重试同一CPU准备命令成功，未绕过审批。
+  20:00:38单次启动，socket`/tmp/specembedding-opt-a09-20260910-1010/tmux.sock`，opt/%0，
+  PID3678937/starttime1452981635；20:02独立核验实际CPU等待和全部A08原依赖仍活跃。
+  launch SHA为`19fb1607de7253c36fa124338f91a981f5032905b10d78ca99002967aeaf481f`，runtime_verification
+  SHA为`4b69ba0478a03a05246bab293050196e59fed26ccfc59a8df57b66d30bba80d7`。仍无A09最终
+  配置目录、runner_exec或模型目录；固定训练源码和现有缓存未改，未使用test或更新论文。
+- 2026-09-10 19:30：A07在19:16:44结束全21轮训练，selection记录第16轮选优；最后一轮
+  完整排名重算、全21轮计数和保存权重SHA核验通过。checkpoint SHA为
+  `27873f9606030be999f1f5141e4b8d36e628c70214313791ea7a6327f23f05b2`，selection SHA为
+  `adbe927249d604c3357dcf21aff74ddba29e31348643b013e55ce0f1dfb3fad2`；完整指标及资源只维护于
+  A07实验卡。正式入口完成自身候选重放后以exit0退出，原完成审计队列于19:25:59启动
+  独立CPU审计，子进程PID3673760；19:30主机核验该进程及原审计父进程仍活跃，原训练
+  和入口已退出、指定pane dead1/exit0。A08修复队列继续等待，尚无本轮最终晋升决定。
+  A09最终parent绑定入口已于19:22:27归档至
+  `/data1/zyl/SpecEmbedding/audits/optimization_a09_finalization_preparation_20260910`，
+  `receipt.json` SHA为`06888a8ee7519c30368586c0ba13ca5a3404a1b9c3d423b7f1eb955043a54523`，
+  `finalize.py` SHA为`ba66a7d4827506b249e460a0ecd5f90d4eda5a8d71dc4bcfe916f9b2823e0933`。
+  64项检查覆盖三种parent、继承参数、真实导入清单、完整依赖退出/审计/来源绑定及失败
+  阻断；Ruff通过，10个准备文件和固定ef2526d源码另行读回核验通过。实际探测确认
+  A08原PID3670350/starttime1452647082存活；本入口不派发模型，仍需绑定实际A08完成
+  审计及后续单次衔接队列，没有A09最终绑定或运行目录。训练源码及科学协议保持。
 - 2026-09-10 19:09：A07前20轮全量计数核验通过，第18–20轮完整query顺序、保存排名及
   原始日志指标独立重算一致；具体结果只维护于A07实验卡，仍在训练、尚未晋升。
   准备A09衔接时发现原A08最终清单检查假设每个阶段都有command，而两个CPU导入阶段
@@ -1459,8 +1508,8 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
-- 验证结果：A09正式接入及A04条件全量预检已通过，最近训练源码全仓668通过、1跳过、1个相同既有路径审计失败；本次A08衔接修复25项最终检查、19项队列检查及独立运行核验通过，固定训练源码未改；A07前20轮完整计数及新增排名重算已核验
-- 当前训练状态（2026-09-10 19:09核验）：A04 epoch20为当前incumbent；A05及A06完整审计均未晋升；A07前20轮全量训练与验证正常，尚未完成审计或晋升；A08已单次替换修复后的CPU衔接队列并继续等待，最终parent未绑定、模型未派发；A09最终parent/配置/派发仍待A08审计；模型优化和SOTA达标未完成
+- 验证结果：最近训练源码全仓668通过、1跳过、1个相同既有路径审计失败；本次A09最终绑定64项/队列20项检查、Ruff和独立运行核验通过，A08完成审计队列13项检查及实测等待通过；A07独立完成审计和119项工件另行核验完成，A08首轮及基线全量排名已重算
+- 当前训练状态（2026-09-10 20:04核验）：A04 epoch20仍为incumbent；A07完整审计未晋升；A08已绑定A04在GPU1全量训练，独立完成审计队列等待；A09单次CPU衔接队列已部署并验证，仍待A08完成审计后绑定最终parent及配置、没有A09模型训练；模型优化和SOTA达标未完成
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；
