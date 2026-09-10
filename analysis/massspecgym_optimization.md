@@ -1156,3 +1156,20 @@ GLACIER本身是分子到谱图的前向预测系统，其对比微调使用预�
 A10只借鉴结构相似候选的选择思路：在原CE16和启用轮次不变的情况下，从固定训练池
 混合抽取相似与均匀负例。8/8比例、前32组、精确均值和私有RNG是本地预登记设计，
 不是JESTR的复现或已经证明最优的设置。不引入额外分子、公式条件、模型挖掘或验证监督。
+
+## R09：可学习的谱图汇聚
+
+[Set Transformer（ICML 2019）](https://proceedings.mlr.press/v97/lee19d.html)第3.2节用学习
+查询汇聚集合表示；其[补充材料Lemma 1](https://proceedings.mlr.press/v97/lee19d/lee19d-supp.pdf)
+给出零查询softmax注意力表示均值的构造。[Attention-based MIL（ICML 2018）](https://proceedings.mlr.press/v80/ilse18a.html)
+也研究可学习加权聚合，但任务、网络和监督均不同，不能据此推定本项目的检索收益。
+
+当前代码在谱图Transformer后屏蔽padding并等权取均值。已预登记[A11](../attempt_11.md)：
+仅增加零初始化单查询，用归一化上下文token计算权重，汇聚原始value并继承原decoder。
+归一化位置、单向量参数化及固定eps是本地实验设计；不是完整PMA或MIL架构复现，也
+不增加查询—候选交互。现有self-attention已经能聚合信息，均值本身不是已确证瓶颈。
+
+独立下游组件及24项合成检查已通过，涵盖初始权重/RNG与均值数值关系、非均匀权重的
+独立标量参考、padding零梯度、排列语义、两塔训练梯度和严格保存重载。未接通正式构造时
+配置会被拒绝，不影响现有运行；完整正式入口/审计接入和真实全量预检仍待。SpecEmbedding
+预训练共享类未改，论文与补充材料保存于用户指定目录，来源和SHA集中于阶段计划。
