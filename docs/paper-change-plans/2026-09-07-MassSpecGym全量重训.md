@@ -120,8 +120,8 @@ checkpoint/版本、来源表格、分母和评价设置。各项的最好值可
 
 用户要求后续每轮均提前写入`attempts.md`和`attempt_<n>.md`；启动前标注准备状态、唯一
 假设、parent绑定条件、参数、缓存影响与验收标准，实际启动/完成后更新同一条目，不预填
-收益。当前已登记[A07谱图差值残差](../../attempt_7.md)，训练与完成审计衔接组件准备中；
-尚未最终绑定parent或派发A07。失败尝试的删除线及完整追溯要求继续适用。
+收益。当前已登记[A07谱图差值残差](../../attempt_7.md)，A06完整审计后已绑定A04并单次
+启动入口，实际状态见第10节；失败尝试的删除线及完整追溯要求继续适用。
 
 ### 4.1 第一优先：评价与选优对齐
 
@@ -307,6 +307,44 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-10：A06 r3在第9轮正常早停，原入口于14:02:08完成全量检查，独立CPU审计队列
+  于14:08:07完成全部保存排名、负例重放和严格权重重载；原入口退出0、原审计进程结束。
+  完成审计目录为`/data1/zyl/SpecEmbedding/audits/optimization_a06_r3_20260910`，
+  `receipt.json` SHA为`83ca88d066325bc5e425ffc2a0dbfa7e06ee5377243a8ed7dc95176337533b66`，
+  `verification.json` SHA为`62dc1a97879802c923234691ae43948d4c1352390984251fafb155a128c6b951`，
+  74项工件已重核。选中epoch4且为唯一Pareto候选，所有指标均低于A04，保留A04；完整指标与
+  9轮资源统计仅维护于[A06实验卡](../../attempt_6.md)，未使用test作决定，attempts已加删除线。
+  A07采用此前已登记的谱图差值残差，固定源码
+  `/data1/zyl/repos/SpecEmbedding-opt-a07-20260910`，commit`36e1b0c`；实际固定源码全仓
+  561通过、1跳过、1个相同既有路径审计失败。A04条件的全量预检于14:00:02完成，目录为
+  `/data1/zyl/SpecEmbedding/audits/optimization_a07_conditional_a04_20260910`，
+  `receipt.json` SHA为`698ebbc3c7b25957967909566df0c950697f9fd23f1f41b97718ab8579aecee6`。
+  A06完成后另建`/data1/zyl/SpecEmbedding/audits/optimization_a07_finalization_20260910`，
+  重核209项前序与条件工件、原进程终态及完整Pareto规则后绑定A04；`decision.json` SHA为
+  `b9744c0e5642c7641e067c3bec9edabf5df0c94db6c88fd2112efddb4c7f1a30`。
+  最终真实输入预检与条件预检仅配置路径不同，`preflight.json` SHA为
+  `efe68c6177e0098631d898ec196be6e27123f4e945b7e787d9c80b8f0dd5c124`，
+  `ready.json` SHA为`4d505002d38f3b8d5aebcc1a30b00037905b634a09ea21b8403efe41437cfa12`。
+  14:20:38单次派发至新运行
+  `/data1/zyl/SpecEmbedding/experiments/massspecgym_v15_opt_a07_20260910_topk256`，专用socket
+  `/tmp/specembedding-opt-a07-20260910-1010/tmux.sock`，session`opt`/pane`%0`；原入口
+  PID3590868/starttime1450941701。14:22:33完成数据与验证索引导入并进入双GPU等待，
+  采用10,000 MiB/不限利用率、30秒轮询、连续120秒及最终复查。启动回执位于
+  `/data1/zyl/SpecEmbedding/audits/optimization_a07_launch_20260910`，其中实际输入/配置/环境
+  核验`runtime_verification.json` SHA为`6e74113c77767e1b49d8e65a53152cb968cdcb9a79e9a483dcf4a876a2caf9da`，
+  实际runtime SHA为`37e6796605128cf07baac90c2ab0f4c664d50e8622b7862fc3f8243868ff2203`。
+  独立完成审计准备目录为
+  `/data1/zyl/SpecEmbedding/audits/optimization_a07_completion_queue_20260910`，13项生命周期
+  检查通过；实际未完成审计探测退出1且未产生结果，23项固定输入指纹匹配。
+  `manifest.json` SHA为`44238157ec51f238bcd697a482d92799317fb86262bd1010e4f1336b35797bc6`，
+  `runner.py` SHA为`334bdfe5e61058c285e0e86ff927be125048f3fe299179cdcbf66c2f5be52694`。
+  14:29:51在`/tmp/specembedding-a07-completion-20260910-1010/tmux.sock`单次启动，session
+  `audit`/pane`%0`，PID3592109/starttime1450996996；`launch.json` SHA为
+  `57f48c1ce452ae6cad0073c25d2d79bf51a0095b59c1b56796a7382fbedaa93f`。
+  14:31核验两个原进程及专用pane存活，审计进程CUDA不可见、绑定正确runtime；仍为
+  `waiting_parent`且`audit_started=false`，训练入口仍等待GPU。完成后预定输出为
+  `/data1/zyl/SpecEmbedding/audits/optimization_a07_20260910/receipt.json`，尚未生成。
+  不修改已运行源码，不重复创建GPU监测器；没有本轮模型成绩、晋升或论文更新。
 - 2026-09-10：A06 r3已实测完成首轮全量训练194,119条与验证19,423条，整轮186.71秒；
   PyTorch峰值分配1,721,496,064字节、预留2,044,723,200字节（约1.60/1.90 GiB），资源文件
   位于当前运行的`alignment42_topk256/resources/stage2_epoch001.json`。这是当前单轮测量，
@@ -1265,8 +1303,8 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
-- 验证结果：历史差值组件全仓539通过、1跳过、1个既有路径审计失败；结束检查修复相关43项通过，实际固定源码65eecfc全仓505通过、1跳过、1个相同既有路径审计失败；本次配置/文档变更相关33项测试、显存准入边界合成检查、完整r3预检及实际输入/设备核验通过，新CPU完成审计队列13项生命周期检查通过，Ruff与diff检查通过；此前完整输入缓存审计和预检记录保留
-- 当前训练状态（2026-09-10 13:27核验）：旧矩阵停止；A04完整25轮及独立审计通过，epoch20为当前incumbent；A05完成24轮全量训练及独立审计但未晋升；A04完整输入对照及D18/D19审计完成；A06原队列已修复结束检查，r2随后按用户授权在首次GPU阶段前停止并保留；r3采用10,000 MiB且不限利用率门槛、同一源码及模型训练配置，已完成基线验证并于13:26:24在GPU1启动训练子进程；新CPU完成审计队列绑定原入口并等待，尚无本轮模型结果或晋升决定；后续结构研究保持双塔共享嵌入对比学习，候选方向见R06
+- 验证结果：A07固定源码36e1b0c全仓561通过、1跳过、1个相同既有路径审计失败；条件及最终全量CPU预检、209项前序工件和实际入口/导入输入/配置/外部存储核验通过；独立CPU完成队列13项生命周期检查和未完成拒绝探测通过，Ruff与diff检查通过；此前完整输入缓存审计和预检记录保留
+- 当前训练状态（2026-09-10 14:31核验）：旧矩阵停止；A04 epoch20为当前incumbent；A05完整24轮和A06完整9轮及独立审计均未晋升，失败项已标记；A07已在前序训练期间预登记，完成审计后绑定A04并于14:20:38单次启动，实际输入/配置核验通过，当前仍等待双GPU准入；独立CPU完成审计队列已绑定本轮原入口并等待，尚无A07模型成绩；模型优化和SOTA达标未完成
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；
