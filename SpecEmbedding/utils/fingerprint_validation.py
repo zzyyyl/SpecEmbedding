@@ -27,10 +27,11 @@ class ValidationFingerprints(Dataset):
 
 class FingerprintRetrievalValidator(AlignmentRetrievalValidator):
     def __init__(self, index, settings, output_dir=None, *, fingerprint_root, fingerprint_provenance,
-                 index_sha256, spectrum_control=None, control_settings=None):
+                 index_sha256, spectrum_control=None, control_settings=None, spectrum_metadata=None):
         cache, self.fingerprint_receipt = load_validation_fingerprints(
             index, fingerprint_root, fingerprint_provenance, index_sha256)
-        super().__init__(index, settings, output_dir, spectrum_control=spectrum_control, control_settings=control_settings)
+        super().__init__(index, settings, output_dir, spectrum_control=spectrum_control, control_settings=control_settings,
+                         spectrum_metadata=spectrum_metadata)
         self.molecules = ValidationFingerprints(cache)
 
     def molecule_loader(self, generator):

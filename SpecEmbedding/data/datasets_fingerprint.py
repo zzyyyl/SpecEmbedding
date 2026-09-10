@@ -90,7 +90,8 @@ class CandidateFingerprintDataset(CandidateAlignDataset):
         anchor = self.base[index]
         sample = self.candidates.sample(raw, negative_count=self.negative_count, seed=self.seed, epoch=self.epoch)
         negatives = self.base.fingerprints.get_many(np.asarray(sample.molecule_indices, dtype=np.int64))
-        return CandidateExample(anchor, list(torch.from_numpy(negatives).unbind()), sample, raw)
+        adduct_id = int(self.adduct_ids_by_dataset[index]) if hasattr(self, 'spectrum_metadata') else None
+        return CandidateExample(anchor, list(torch.from_numpy(negatives).unbind()), sample, raw, adduct_id)
 
 
 def candidate_fingerprint_collate_fn(examples):

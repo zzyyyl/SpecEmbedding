@@ -20,6 +20,7 @@ class CandidateExample:
     negative_graphs: list
     sample: NegativeCandidates
     raw_query_index: int
+    adduct_id: int | None = None
 
 
 @dataclass
@@ -30,6 +31,7 @@ class CandidateAlignmentBatch:
     raw_query_indices: torch.Tensor
     candidate_indices: torch.Tensor
     source_positions: torch.Tensor
+    adduct_ids: torch.Tensor | None = None
 
 
 class CandidateAlignDataset(Dataset):
@@ -114,7 +116,8 @@ class CandidateAlignDataset(Dataset):
                 graphs.append(self.base.aug_mol(graph))
             else:
                 graphs.append(graph.clone())
-        return CandidateExample(anchor, graphs, sampled, raw_query)
+        adduct_id = int(self.adduct_ids_by_dataset[index]) if hasattr(self, 'spectrum_metadata') else None
+        return CandidateExample(anchor, graphs, sampled, raw_query, adduct_id)
 
 
 def candidate_align_collate_fn(examples):
@@ -129,6 +132,15 @@ def make_candidate_batch(examples, anchor, negative_molecules):
     """Bind graph or fingerprint tensors to the same observed candidate sample metadata."""
     if not examples:
         raise ValueError("Cannot collate an empty candidate batch")
+    adducts = [example.adduct_id for example in examples]
+    if any(value is not None for value in adducts):
+        if any(type(value) is not int or value not in (0, 1, 2) for value in adducts):
+            raise ValueError('Mixed or invalid adduct inputs in candidate batch')
+        if anchor[0].shape[0] != len(examples):
+            raise ValueError('Adduct candidate binding requires exactly one view per query')
+        adducts = torch.tensor(adducts, dtype=torch.long)
+    else:
+        adducts = None
     counts = [len(example.negative_graphs) for example in examples]
     if any(count != len(example.sample.molecule_indices) or count != len(example.sample.source_positions)
            or count != len(example.sample.identity_2d) for count, example in zip(counts, examples, strict=True)):
@@ -140,4 +152,5 @@ def make_candidate_batch(examples, anchor, negative_molecules):
         raw_query_indices=torch.tensor([example.raw_query_index for example in examples], dtype=torch.long),
         candidate_indices=torch.tensor([int(i) for example in examples for i in example.sample.molecule_indices], dtype=torch.long),
         source_positions=torch.tensor([int(i) for example in examples for i in example.sample.source_positions], dtype=torch.long),
+        adduct_ids=adducts,
     )

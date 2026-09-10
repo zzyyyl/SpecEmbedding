@@ -229,7 +229,8 @@ def retrieval_metrics(scores, positive, valid, top_k=(1, 5, 10, 20)):
 
 
 class AlignmentRetrievalValidator:
-    def __init__(self, index, settings, output_dir=None, *, spectrum_control=None, control_settings=None, graph_cache=None):
+    def __init__(self, index, settings, output_dir=None, *, spectrum_control=None, control_settings=None, graph_cache=None,
+                 spectrum_metadata=None):
         self.index = index
         self.settings = settings
         self.output_dir = Path(output_dir) if output_dir is not None else None
@@ -249,6 +250,13 @@ class AlignmentRetrievalValidator:
                 raise ValueError("Spectrum controls require explicit settings")
             self.spectra = ControlledValidationSpectra(index, spectrum_control, control_settings)
             self.control_metadata = self.spectra.metadata
+        self.spectrum_metadata_fingerprint = None
+        if spectrum_metadata is not None:
+            from SpecEmbedding.data.datasets_adduct import AdductValidationSpectra
+            if spectrum_control is not None:
+                raise ValueError('Adduct spectrum controls require a separately registered metadata policy')
+            self.spectra = AdductValidationSpectra(self.spectra, index, spectrum_metadata)
+            self.spectrum_metadata_fingerprint = spectrum_metadata.provenance
 
     def molecule_loader(self, generator):
         return DataLoader(self.molecules, batch_size=self.settings.mol_batch_size,
@@ -259,6 +267,8 @@ class AlignmentRetrievalValidator:
         extra = {"spectrum_control": self.control_metadata} if self.control_metadata is not None else {}
         if self.graph_cache_fingerprint is not None:
             extra['validation_graph_cache'] = self.graph_cache_fingerprint
+        if self.spectrum_metadata_fingerprint is not None:
+            extra['spectrum_metadata'] = self.spectrum_metadata_fingerprint
         return extra
 
     @torch.inference_mode()
@@ -290,8 +300,9 @@ class AlignmentRetrievalValidator:
         all_scores = torch.empty(index["candidate_indices"].shape, dtype=torch.float32)
         offset = 0
         for batch in spec_loader:
+            kwargs = {'adduct_ids': batch['adduct_id'].to(device)} if 'adduct_id' in batch else {}
             spec = model.encode_spec(batch["spec_mz"].to(device), batch["spec_intensity"].to(device),
-                                     batch["spec_mask"].to(device), normalize=True).float()
+                                     batch["spec_mask"].to(device), normalize=True, **kwargs).float()
             if not torch.isfinite(spec).all():
                 raise ValueError("Non-finite validation spectrum embeddings")
             n = len(spec)

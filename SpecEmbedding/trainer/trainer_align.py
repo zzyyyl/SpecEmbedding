@@ -9,6 +9,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from SpecEmbedding.data.datasets_adduct import AdductAlignmentBatch, forward_alignment_batch, validate_bound_adducts
 from SpecEmbedding.loss_align import ContrastiveAlignmentLoss
 from SpecEmbedding.models_align import SpecMolAlignModel
 from SpecEmbedding.utils.training_resources import EpochResources
@@ -41,10 +42,8 @@ class TrainerAlign:
         os.makedirs(self.save_dir, exist_ok=True)
 
     def training_batch_loss(self, batch):
-        mzs, ints, masks, mols, labels = batch
-        f_spec, f_mol, scale = self.model(mzs.to(self.device), ints.to(self.device),
-                                         masks.to(self.device), mols.to(self.device))
-        return self.criterion(f_spec, f_mol, scale, labels), mzs.shape[0]
+        (f_spec, f_mol, scale), labels, count = forward_alignment_batch(self.model, batch, self.device)
+        return self.criterion(f_spec, f_mol, scale, labels), count
 
     def train_epoch(self, optimizer, epoch, stage_name):
         self.model.train()
@@ -83,23 +82,29 @@ class TrainerAlign:
         self.model.eval()
         total_loss = 0
         seen = 0
+        metadata = getattr(self.val_loader.dataset, 'spectrum_metadata', None)
+        adduct_queries = []
         pbar = tqdm(self.val_loader, desc=f"[{stage_name}] Epoch {epoch} Validation", ascii=True)
         
-        for mzs, ints, masks, mols, labels in pbar:
-            spec_mz = mzs.to(self.device)
-            spec_intensity = ints.to(self.device)
-            spec_mask = masks.to(self.device)
-            mol_graph = mols.to(self.device)
-            
-            f_spec, f_mol, scale = self.model(spec_mz, spec_intensity, spec_mask, mol_graph)
+        for batch in pbar:
+            if metadata is not None:
+                if not isinstance(batch, AdductAlignmentBatch):
+                    raise ValueError('Validation lost its bound adduct input')
+                validate_bound_adducts(metadata, batch.raw_query_indices, batch.adduct_ids)
+                adduct_queries.extend(batch.raw_query_indices.tolist())
+            elif isinstance(batch, AdductAlignmentBatch):
+                raise ValueError('Unbound validation adduct input')
+            (f_spec, f_mol, scale), labels, count = forward_alignment_batch(self.model, batch, self.device)
             loss = self.criterion(f_spec, f_mol, scale, labels)
             if self.expected_epoch_counts is not None and not torch.isfinite(loss):
                 raise RuntimeError("Non-finite formal alignment validation loss")
             
             total_loss += loss.item()
-            seen += mzs.shape[0]
+            seen += count
             pbar.set_postfix({'loss': f"{loss.item():.4f}"})
             
+        if metadata is not None and sorted(adduct_queries) != metadata.raw_query_indices.tolist():
+            raise RuntimeError('Adduct validation did not visit each eligible query exactly once')
         if self.expected_epoch_counts is not None:
             if seen != self.expected_epoch_counts["val"]:
                 raise RuntimeError(f"Incomplete alignment validation: evaluated {seen} spectra")

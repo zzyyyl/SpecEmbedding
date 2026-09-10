@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from SpecEmbedding.data.datasets_adduct import forward_alignment_batch, validate_bound_adducts
 from SpecEmbedding.data.datasets_candidates import CandidateAlignDataset, CandidateAlignmentBatch
 from SpecEmbedding.loss_candidates import candidate_alignment_loss
 from SpecEmbedding.trainer.trainer_align import TrainerAlign
@@ -42,14 +43,19 @@ class CandidateTrainerAlign(TrainerAlign):
     def training_batch_loss(self, batch):
         if not isinstance(batch, CandidateAlignmentBatch):
             raise ValueError("Candidate trainer received an ordinary or malformed batch")
-        mzs, ints, masks, mols, labels = batch.anchor
-        n = mzs.shape[0]
+        n = batch.anchor[0].shape[0]
         raw = batch.raw_query_indices
         if (raw.dtype != torch.long or raw.ndim != 1 or len(raw) != n or raw.device.type != "cpu"
                 or raw.min() < 0 or raw.max() >= len(self._candidate_seen)):
             raise ValueError("Candidate batch has invalid original query indices")
-        f_spec, f_positive, scale = self.model(mzs.to(self.device), ints.to(self.device),
-                                             masks.to(self.device), mols.to(self.device))
+        metadata = getattr(self.train_loader.dataset, 'spectrum_metadata', None)
+        if metadata is not None:
+            validate_bound_adducts(metadata, raw, batch.adduct_ids)
+            self._adduct_order_hash.update(torch.stack((raw, batch.adduct_ids), dim=1).numpy().astype('<i8').tobytes())
+        elif batch.adduct_ids is not None:
+            raise ValueError('Unbound candidate adduct input')
+        (f_spec, f_positive, scale), labels, _ = forward_alignment_batch(
+            self.model, batch.anchor, self.device, adduct_ids=batch.adduct_ids)
         f_negative = (f_positive[:0] if batch.negative_graphs is None
                       else self.model.encode_mol(batch.negative_graphs.to(self.device)))
         if len(f_negative) != len(batch.candidate_indices) or len(f_negative) != len(batch.source_positions):
@@ -76,6 +82,7 @@ class CandidateTrainerAlign(TrainerAlign):
         self._candidate_loss_sum = 0.0
         self._candidate_query_order = []
         self._candidate_batch_sizes = []
+        self._adduct_order_hash = hashlib.sha256()
         loss = super().train_epoch(optimizer, epoch, stage_name)
         if not torch.all(self._candidate_seen == 1):
             raise RuntimeError("Candidate training did not visit each original training query exactly once")
@@ -95,6 +102,8 @@ class CandidateTrainerAlign(TrainerAlign):
             "batch_sizes": self._candidate_batch_sizes,
             "query_order_file": order_path.name, "query_order_sha256": sha256_file(order_path),
         }
+        if hasattr(dataset, 'spectrum_metadata'):
+            record['observed_adduct_order_sha256'] = self._adduct_order_hash.hexdigest()
         with order_path.with_suffix(".json").open("x") as handle:
             json.dump(record, handle, indent=2, allow_nan=False)
             handle.write("\n")
