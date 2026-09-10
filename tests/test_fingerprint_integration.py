@@ -163,3 +163,58 @@ def test_fingerprint_completion_rejects_mixed_unpinned_or_corrupt_evidence(finge
     }
     with pytest.raises((ValueError, RuntimeError), match=messages[damage]):
         audit_optimization_run(run)
+
+
+@pytest.mark.parametrize('kind', ['gine', 'fingerprint'])
+@pytest.mark.parametrize('wrong_training_cache', [False, True])
+def test_execution_distinguishes_baseline_graph_cache_from_candidate_inputs(tmp_path, monkeypatch, kind, wrong_training_cache):
+    """Run the real completion branches with synthetic GPU children, never launch training."""
+    from types import SimpleNamespace
+
+    import run_massspecgym_v15 as runner
+
+    runtime = runner.config.to_dict()
+    runtime['model'] = model_config(kind)
+    graph_cache = {'directory': 'synthetic-baseline-graphs'}
+    expected_cache = None if kind == 'fingerprint' else graph_cache
+    observed_cache = (graph_cache if kind == 'fingerprint' else None) if wrong_training_cache else expected_cache
+    query_count = runtime['fulltrain']['expected_counts']['val'] - len(runtime['fulltrain']['exclude_val_query_indices'])
+    parent = {'model_type': 'gine', 'model_config': model_config('gine')}
+    manifest = {'runtime_config': runtime, 'gpu_pool': {'0': 'GPU-synthetic'},
+                'validation_graph_cache': graph_cache, 'checkpoint_model': parent,
+                'inputs': {'baseline_checkpoint': {'sha256': 'a' * 64}},
+                'stages': [{'name': name, 'gpu': True, 'command': ['synthetic-child', name]}
+                           for name in ('baseline_validation', 'alignment42')]}
+    args = SimpleNamespace(output_root=tmp_path, gpus=[0], device='cuda:0', optimize_alignment=True)
+    monkeypatch.setattr(runner, 'gpu_inventory', lambda: {0: 'GPU-synthetic'})
+    monkeypatch.setattr(runner, 'preflight', lambda _: manifest)
+    monkeypatch.setattr(runner, 'wait_for_any_gpu', lambda *a, **k: {'uuid': 'GPU-synthetic', 'index': 0})
+    monkeypatch.setattr(runner, 'pool_environment', lambda selected, environment: environment)
+    monkeypatch.setattr(runner, 'audit_alignment', lambda *a: {'synthetic': True})
+    monkeypatch.setattr(inputs_module, 'audit_model_fingerprint_inputs',
+                        lambda *a: ({'synthetic': True} if kind == 'fingerprint' else None, {}))
+
+    def child(command, **kwargs):
+        if command[-1] == 'baseline_validation':
+            save(tmp_path / 'baseline_validation/metrics.json', {
+                'checkpoint_sha256': 'a' * 64, 'validation_graph_cache': graph_cache, 'checkpoint_model': parent,
+            })
+        else:
+            save(tmp_path / 'alignment42_topk256/alignment_selection.json', {
+                'model_config': runtime['model'], 'validation_graph_cache': observed_cache,
+                'stages': {'stage2': {'metric_for_best': 'validation_top1_then_mrr',
+                                      'best_retrieval': {'queries': query_count}}},
+            })
+
+    monkeypatch.setattr(runner.subprocess, 'run', child)
+    if wrong_training_cache:
+        with pytest.raises(ValueError, match='different validation graph cache'):
+            runner.execute(args, manifest)
+        status = json.loads((tmp_path / 'status.json').read_text())
+        assert status['state'] == status['stages'][-1]['state'] == 'failed_or_interrupted'
+    else:
+        runner.execute(args, manifest)
+        status = json.loads((tmp_path / 'status.json').read_text())
+        assert status['state'] == 'complete'
+        assert all(stage['state'] == 'complete' for stage in status['stages'])
+        assert status['stages'][0]['audit']['validation_graph_cache'] == graph_cache

@@ -416,7 +416,8 @@ def execute(args, manifest):
                             or summary["best_retrieval"]["queries"] != config.fulltrain.expected_counts.val - len(config.fulltrain.exclude_val_query_indices)):
                         raise ValueError("Alignment retrieval checkpoint-selection audit failed")
                     progress["retrieval_selection"] = summary
-                    if selection.get("validation_graph_cache") != manifest.get("validation_graph_cache"):
+                    training_graph_cache = None if fp_report is not None else manifest.get("validation_graph_cache")
+                    if selection.get("validation_graph_cache") != training_graph_cache:
                         raise ValueError("Training used a different validation graph cache")
             elif stage["name"] in ("prepare_validation", "import_validation"):
                 receipt = json.loads((args.output_root / "validation" / "mass_val_topk256.json").read_text())
