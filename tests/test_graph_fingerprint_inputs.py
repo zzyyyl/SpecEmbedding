@@ -42,12 +42,25 @@ def fixed_bits(smiles):
     return torch.from_numpy(generator.GetFingerprintAsNumPy(Chem.MolFromSmiles(smiles)).astype(np.float32))
 
 
-def make_dataset(tmp_path, monkeypatch, *, augment=False):
+def make_dataset(tmp_path, monkeypatch, *, augment=False, structural=False):
     original = candidate_dataset(monkeypatch, augment=augment)
     original.candidates.provenance['sha256'] = 'b' * 64
     smiles = original.candidates.metadata['mol_smiles']
     root = tmp_path / 'train_bits'
     provenance = make_cache(root, smiles)
+    if structural:
+        from SpecEmbedding.utils.structural_sampling import load_structural_training_candidates
+        from SpecEmbedding.utils.training_similarity import (
+            audit_training_similarity_cache,
+            build_training_similarity_cache,
+        )
+        cache = tmp_path / 'similarity'
+        build_training_similarity_cache(original.candidates, root, cache, radius=2, bits=2048)
+        audit_training_similarity_cache(original.candidates, cache, radius=2, bits=2048)
+        original.candidates = load_structural_training_candidates(original.candidates, {
+            'type': 'tanimoto_mixed', 'near_count': 8, 'near_pool_size': 32, 'fingerprint_radius': 2,
+            'fingerprint_bits': 2048, 'cache_directory': str(cache)})
+        original.provenance.update(original.candidates.provenance)
     options = dict(data=original.base._data, keys=original.base._keys, full_spectra=True, n_views=1,
                    is_augment=augment, graph_policy='rdkit_sanitized', graph_cache_size=2,
                    augment_config=copy.deepcopy(original.base.augment_config),
@@ -71,8 +84,9 @@ def same_graph(actual, expected):
 
 
 @pytest.mark.parametrize('augment', [False, True])
-def test_combined_samples_keep_graph_spectrum_augmentation_rng_and_exact_molecule_rows(tmp_path, monkeypatch, augment):
-    dataset, original, _ = make_dataset(tmp_path, monkeypatch, augment=augment)
+@pytest.mark.parametrize('structural', [False, True])
+def test_combined_samples_keep_graph_spectrum_augmentation_rng_and_exact_molecule_rows(tmp_path, monkeypatch, augment, structural):
+    dataset, original, _ = make_dataset(tmp_path, monkeypatch, augment=augment, structural=structural)
     with pytest.raises(RuntimeError, match='epoch'):
         dataset[0]
     dataset.set_epoch(7)
@@ -169,8 +183,9 @@ def test_combined_training_rejects_unbound_or_incomplete_inputs(tmp_path, monkey
         GraphFingerprintAlignmentDataset(**options)
 
 
-def test_spawn_workers_keep_every_query_graph_and_bit_row_across_epochs(tmp_path, monkeypatch):
-    dataset, _, _ = make_dataset(tmp_path, monkeypatch)
+@pytest.mark.parametrize('structural', [False, True])
+def test_spawn_workers_keep_every_query_graph_and_bit_row_across_epochs(tmp_path, monkeypatch, structural):
+    dataset, _, _ = make_dataset(tmp_path, monkeypatch, structural=structural)
     dataset.set_epoch(2)
     expected = list(DataLoader(dataset, batch_size=2, collate_fn=candidate_align_collate_fn))
     loader = DataLoader(dataset, batch_size=2, collate_fn=candidate_align_collate_fn, num_workers=2,
@@ -283,8 +298,9 @@ def test_fingerprint_collision_does_not_merge_2d_positives_or_candidate_rows(tmp
     assert result['queries'] == result['positive_queries'] == 2
 
 
-def test_synthetic_training_audits_full_query_coverage_and_reaches_both_molecule_branches(tmp_path, monkeypatch):
-    dataset, _, _ = make_dataset(tmp_path, monkeypatch, augment=True)
+@pytest.mark.parametrize('structural', [False, True])
+def test_synthetic_training_audits_full_query_coverage_and_reaches_both_molecule_branches(tmp_path, monkeypatch, structural):
+    dataset, _, _ = make_dataset(tmp_path, monkeypatch, augment=True, structural=structural)
     train = DataLoader(dataset, batch_size=2, collate_fn=candidate_align_collate_fn)
     validation_base = copy.copy(dataset.base)
     validation_base.is_augment = False
@@ -302,6 +318,7 @@ def test_synthetic_training_audits_full_query_coverage_and_reaches_both_molecule
         assert any(not torch.equal(value, before[name]) for name, value in model.state_dict().items() if name.startswith(prefix))
     records = trainer.stage_summaries['stage2']['candidate_training']
     assert records['data']['molecule_input'] == 'graph_with_fixed_morgan_bits'
+    assert ('structural_sampling' in records['data']) == structural
     assert records['data']['graph_cache_size'] == 1
     assert records['data']['negative_graph_augmentation'] == dataset.provenance['negative_graph_augmentation']
     for epoch, record in enumerate(records['epochs'], 1):

@@ -31,7 +31,11 @@ from SpecEmbedding.models_precursor_delta import build_spectrum_encoder
 from SpecEmbedding.trainer.trainer import set_seed
 from SpecEmbedding.trainer.trainer_align import TrainerAlign
 from SpecEmbedding.trainer.trainer_candidates import CandidateTrainerAlign
-from SpecEmbedding.utils.candidate_training import read_candidate_training_input, validate_candidate_settings
+from SpecEmbedding.utils.candidate_training import (
+    read_candidate_training_input,
+    validate_candidate_sampling_binding,
+    validate_candidate_settings,
+)
 from SpecEmbedding.utils.fingerprint_alignment_inputs import load_alignment_fingerprints
 from SpecEmbedding.utils.fingerprint_validation import FingerprintRetrievalValidator
 from SpecEmbedding.utils.formal_alignment import build_formal_alignment, fingerprint_input_bits, formal_model_type
@@ -90,6 +94,8 @@ def train_align(
         raise ValueError("Candidate supervision requires formal fresh training and full retrieval selection")
     if not candidate_settings["enabled"] and candidate_input_receipt is not None:
         raise ValueError("Unexpected candidate input in an inactive run")
+    if candidate_settings['enabled']:
+        validate_candidate_sampling_binding(training_candidates, candidate_settings, candidate_input_receipt)
     kind = getattr(config.model, 'type', 'gine')
     fingerprint_model = kind == 'fingerprint'
     uses_fingerprints = kind in ('fingerprint', 'gine_fingerprint')

@@ -1,5 +1,6 @@
 """Pinned inputs and complete observed-sampling audits for candidate alignment."""
 
+import copy
 import hashlib
 import json
 import logging
@@ -18,7 +19,8 @@ GRAPH_AUGMENTATION = "Same probability/node/edge settings as training positive g
 
 def validate_candidate_settings(settings):
     required = {"enabled", "negative_count", "loss_weight", "pool_cache_size", "graph_cache_size"}
-    if not isinstance(settings, dict) or set(settings) != required or not isinstance(settings["enabled"], bool):
+    if (not isinstance(settings, dict) or set(settings) not in (required, required | {"sampling"})
+            or not isinstance(settings["enabled"], bool)):
         raise ValueError("Incomplete candidate-supervision configuration")
     if _integer(settings["negative_count"], "negative_count", 1) > 255:
         raise ValueError("Natural top-256 supervision supports at most 255 distinct negative identities")
@@ -27,6 +29,21 @@ def validate_candidate_settings(settings):
     weight = settings["loss_weight"]
     if not isinstance(weight, Real) or isinstance(weight, bool) or not math.isfinite(weight) or weight <= 0:
         raise ValueError("Candidate loss weight must be finite and positive")
+    if 'sampling' in settings:
+        from SpecEmbedding.utils.structural_sampling import validate_structural_sampling
+        if not settings['enabled']:
+            raise ValueError('Structural sampling requires explicitly enabled candidate supervision')
+        validate_structural_sampling(settings['sampling'], settings['negative_count'])
+
+
+def validate_candidate_sampling_binding(index, settings, receipt):
+    from SpecEmbedding.utils.structural_sampling import StructuralTrainingCandidateIndex
+    structural = 'sampling' in settings
+    if structural != isinstance(index, StructuralTrainingCandidateIndex):
+        raise ValueError('Candidate sampling strategy differs from the explicitly configured index')
+    if structural and (index.sampling_settings != settings['sampling'] or receipt['settings'] != settings
+                       or receipt['provenance'] != index.provenance):
+        raise ValueError('Structural sampling settings/provenance do not match the pinned receipt')
 
 
 def grouped_query_order(index):
@@ -41,8 +58,12 @@ def build_candidate_training_input(metadata_path, data_path, settings, expected_
         raise ValueError("Candidate input preparation requires explicit activation")
     index = load_training_candidates(metadata_path, data_path, expected_counts, exclusions,
                                      pool_cache_size=settings["pool_cache_size"])
+    if 'sampling' in settings:
+        from SpecEmbedding.utils.structural_sampling import load_structural_training_candidates
+        index = load_structural_training_candidates(index, settings['sampling'])
     order = grouped_query_order(index)
-    receipt = {"schema_version": 1, "state": "verified_training_candidates", "settings": dict(settings),
+    receipt = {"schema_version": 2 if 'sampling' in settings else 1, "state": "verified_training_candidates",
+               "settings": copy.deepcopy(settings),
                "provenance": index.provenance,
                "dataset_to_raw_query_sha256": hashlib.sha256(order.astype("<i8").tobytes()).hexdigest()}
     return index, receipt
@@ -51,11 +72,15 @@ def build_candidate_training_input(metadata_path, data_path, settings, expected_
 def candidate_source_inputs(receipt):
     provenance = receipt["provenance"]
     path = Path(provenance["path"])
-    return {
+    result = {
         "training_candidates": {"path": str(path), "sha256": provenance["sha256"]},
         "training_candidate_preparation": {"path": str(path.parent / "receipt.json"), "sha256": provenance["receipt_sha256"]},
         "training_candidate_verification": {"path": str(path.parent / "verification.json"), "sha256": provenance["verification_sha256"]},
     }
+    if 'structural_sampling' in provenance:
+        from SpecEmbedding.utils.training_similarity import similarity_source_inputs
+        result.update(similarity_source_inputs(provenance['structural_sampling']['cache']))
+    return result
 
 
 def read_candidate_training_input(path, data_path, settings, expected_counts, exclusions):
@@ -85,6 +110,9 @@ def audit_candidate_training(directory, stage, input_path, settings, seed, batch
     if graph_fingerprint and fingerprint_cache is None:
         raise ValueError('Graph fingerprint candidate audit requires both input representations')
     index, input_receipt, input_fingerprint = read_candidate_training_input(input_path, data_path, settings, counts, exclusions)
+    validate_candidate_sampling_binding(index, settings, input_receipt)
+    if 'sampling' in settings:
+        from SpecEmbedding.utils.structural_sampling import reference_structural_sample
     expected_provenance = {**index.provenance, "negative_count": settings["negative_count"], "seed": seed,
                            "graph_cache_size": settings["graph_cache_size"],
                            "dataset_to_raw_query_sha256": input_receipt["dataset_to_raw_query_sha256"],
@@ -129,7 +157,11 @@ def audit_candidate_training(directory, stage, input_path, settings, seed, batch
             batch_sizes.append(len(queries))
             molecules, positions, ptr = [], [], [0]
             for query in queries:
-                sample = index.sample(int(query), negative_count=settings["negative_count"], seed=seed, epoch=epoch)
+                if 'sampling' in settings:
+                    sample = reference_structural_sample(index, int(query), negative_count=settings["negative_count"],
+                                                         seed=seed, epoch=epoch)
+                else:
+                    sample = index.sample(int(query), negative_count=settings["negative_count"], seed=seed, epoch=epoch)
                 negative_counts[query] = len(sample.molecule_indices)
                 molecules.extend(sample.molecule_indices)
                 positions.extend(sample.source_positions)

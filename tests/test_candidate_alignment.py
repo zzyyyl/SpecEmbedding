@@ -258,7 +258,7 @@ def test_candidate_trainer_refuses_persistent_workers_and_query_dropping(monkeyp
                                   candidate_loss_weight=1.0)
 
 
-def pinned_synthetic_candidate_input(monkeypatch, tmp_path):
+def pinned_synthetic_candidate_input(monkeypatch, tmp_path, *, structural=False):
     dataset = candidate_dataset(monkeypatch)
     index = dataset.candidates
     metadata = tmp_path / "metadata.pkl"
@@ -272,10 +272,31 @@ def pinned_synthetic_candidate_input(monkeypatch, tmp_path):
     # verified synthetic index connects input pinning to actual model training.
     monkeypatch.setattr(candidate_io, "load_training_candidates", lambda *a, **k: index)
     settings = {"enabled": True, "negative_count": 16, "loss_weight": 0.5, "pool_cache_size": 1, "graph_cache_size": 1}
-    _, receipt = candidate_io.build_candidate_training_input(metadata, tmp_path, settings, {"train": 3}, [])
+    if structural:
+        from SpecEmbedding.utils.fingerprint_cache import (
+            audit_fingerprint_cache,
+            build_fingerprint_cache,
+            fingerprint_provenance,
+        )
+        from SpecEmbedding.utils.training_similarity import (
+            audit_training_similarity_cache,
+            build_training_similarity_cache,
+        )
+        fp = tmp_path / 'sampling_fp'
+        source = fingerprint_provenance(index.metadata['mol_smiles'], index_sha256=index.provenance['sha256'],
+                                        dataset_manifest_sha256=index.provenance['dataset_manifest_sha256'], radius=2, bits=2048)
+        build_fingerprint_cache(index.metadata['mol_smiles'], fp, source, workers=1, chunk_size=2)
+        audit_fingerprint_cache(index.metadata['mol_smiles'], fp, source, workers=1, chunk_size=3)
+        root = tmp_path / 'sampling_cache'
+        build_training_similarity_cache(index, fp, root, radius=2, bits=2048)
+        audit_training_similarity_cache(index, root, radius=2, bits=2048)
+        settings['sampling'] = {'type': 'tanimoto_mixed', 'near_count': 8, 'near_pool_size': 32,
+                                'fingerprint_radius': 2, 'fingerprint_bits': 2048, 'cache_directory': str(root)}
+    prepared_index, receipt = candidate_io.build_candidate_training_input(metadata, tmp_path, settings, {"train": 3}, [])
     path = tmp_path / "candidate_training_input.json"
     path.write_text(json.dumps(receipt))
-    dataset.provenance.update(index.provenance)
+    dataset.candidates = prepared_index
+    dataset.provenance.update(prepared_index.provenance)
     return dataset, settings, receipt, path
 
 
@@ -294,11 +315,12 @@ def test_candidate_input_checks_actual_grouped_order_and_refuses_changed_receipt
 
 @pytest.mark.parametrize('precursor_delta', [False, True])
 @pytest.mark.parametrize('qk_norm', [False, True])
-def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monkeypatch, tmp_path, precursor_delta, qk_norm):
+@pytest.mark.parametrize('structural', [False, True])
+def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monkeypatch, tmp_path, precursor_delta, qk_norm, structural):
     import train_align as entry
     from SpecEmbedding.config import ConfigObject
 
-    dataset, settings, receipt, path = pinned_synthetic_candidate_input(monkeypatch, tmp_path)
+    dataset, settings, receipt, path = pinned_synthetic_candidate_input(monkeypatch, tmp_path, structural=structural)
     monkeypatch.setattr(config.train.align, "candidate_supervision", ConfigObject(settings))
     monkeypatch.setattr(config.train.align, "epochs_stage2", 2)
     monkeypatch.setattr(config.train.align, "num_workers", 0)
@@ -343,7 +365,7 @@ def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monke
     stage = selection["stages"]["stage2"]
     report, hashes = candidate_io.audit_candidate_training(output, stage, path, settings, 42, 2, tmp_path, {"train": 3}, [])
     assert report["state"] == "verified_full_candidate_replay" and report["epochs"] == 2
-    assert report["queries_per_epoch"] == 3 and len(hashes) == 8
+    assert report["queries_per_epoch"] == 3 and len(hashes) == (16 if structural else 8)
     for row in selection["fulltrain_audit"]["epochs"]:
         assert row["train"] == row["val"] == 3 and row["batching"]["unique_queries"] == 3
     record = stage["candidate_training"]["epochs"][0]

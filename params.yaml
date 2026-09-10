@@ -102,6 +102,13 @@ train:
       pool_cache_size: 128
       graph_cache_size: 10000 # bounded CPU cache of unaugmented candidate graphs
 
+training_candidate_sampling: # inactive A10 preset; copy explicitly into candidate_supervision.sampling with cache_directory
+  type: tanimoto_mixed
+  near_count: 8
+  near_pool_size: 32
+  fingerprint_radius: 2
+  fingerprint_bits: 2048
+
 molecule_fingerprints: # CPU input preparation only; not automatically used by alignment models
   radius: 2
   bits: 2048
