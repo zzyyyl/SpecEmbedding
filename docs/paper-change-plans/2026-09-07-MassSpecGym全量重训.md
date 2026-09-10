@@ -209,6 +209,11 @@ parent必须取A08完整审计后保留的唯一incumbent。组件、组合读�
 该文件的已报告最大值不是最终S_j。GLACIER的MRR未报告，不能因缺失就默认低于GLMR，
 因为相同分母/排名定义下MRR≥Top-1；完整排名与协议证据仍待补齐，详见优化索引R04。
 
+2026-09-11另完成已存在的GLACIER公开权重复现之保存分数核验，补齐该权重在明确执行
+协议下的完整Top-10/MRR，见[D24](../../analysis/glacier_reference_bridge_20260911.md)。
+这不补齐论文最优权重的MRR，也不覆盖原强参考快照；目标身份、CE及完整候选协议仍有
+未对齐项，因此S_j继续未冻结。本次只读外部完成工件，没有派发独立复现或本地test。
+
 GLMR的[正式出版页](https://ojs.aaai.org/index.php/AAAI/article/view/37132)已核验：AAAI 2026，
 40(2):1561–1569，DOI `10.1609/aaai.v40i2.37132`，发布日期2026-03-14；正式PDF已归档。
 上述数字与正式版Table 1一致，发表状态不再仅为预印本；其同协议复现状态仍为reported-only，
@@ -317,6 +322,37 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 - [ ] 论文修改后执行双语编译、引用/匿名扫描、发布 manifest 和仓库要求的复现检查。
 
 ## 10. 执行记录
+
+- 2026-09-11 01:20：完成D24外部保存分数核验。GLACIER独立复现原完成时间为
+  2026-09-09 06:45:18 UTC，源码`c0cb5bc0c81ca13c8390754bf23ae8c205f6e584`工作树干净，
+  公开checkpoint SHA为`5a47cecca707d3abd5a49c7dbac99d100aa2a586d5d4f848f1e8e35140d7db11`。
+  原工件根`/data1/zyl/GLACIER`的`audit/final_artifact_hashes.json`包含348项，重算全部
+  32,815,753,344字节及43分块的输入、113项模型源码、CUDA运行与输出绑定一致。
+  原清单SHA为`cd5e771cde06f3c1ec19af004fb42fab18d4f527067609df228ded4613fab6d0`。
+  新派生根`/data1/zyl/SpecEmbedding/audits/glacier_reference_bridge_20260911`保存
+  `inventory.py`、`inventory_bytes.json`及`inventory_receipt.json`，后者SHA为
+  `98aea418917aa5e3b1331bf827263682654bcb77e1218027625251d0107950bf`。
+  原环境与项目环境分别重算全部17,556条目标，3,170个不同SMILES的逐query结果一致；
+  五条query与TSV键不同，保留原标签和完整差集，不变更训练/测试协议。
+  `target_identities_glacier.json` SHA为
+  `dce70d475f0714eae76e26172200dd716ea3bf43f669a602a0e49a0a27915001`，
+  `target_identities_specembedding.json` SHA为
+  `1508d564db1eda57642ac2e70e61ec3a74e20ba64157b1c855db6c786c45a351`。
+  目标身份脚本已独立归档为`target_identity.py`，SHA为
+  `318093a9a4b940fc8b2d885107b88ea39345266cab0847dfec7c2a39e25760c2`。
+  `scores_r3`逐项匹配两候选JSON、全部候选条目及原评价，保存四组完整距离/标签/排名和
+  补算Top-10；`score_receipt.json` SHA为
+  `4bfdca15379e5ca014b39e27977e415afe40f28a1f9b2bf709d1ea17777dd33d`。
+  `verification_r3`以独立标量排序及实际项目评价器核对全部排名和MRR，保留不可评价
+  query为miss；`verification.json` SHA为
+  `f671a4bc80e6c53977f75fa8414e9d9cc8ab1b4ee0b6f62b6272cd5744b7bf0c`。
+  PyTorch2.6.0+cu124/2.5.1对各相同规则逐query一致，但跨规则存在并列差异，分别报告。
+  完整分数核验79.75秒、独立复核14.92秒，均exit0；辅助脚本的身份假设/列名错误和失败
+  日志保留于父目录，未覆盖旧派生目录，不算失败模型attempt。尚未重新编码全部候选身份
+  或核验论文最优checkpoint对应关系，SOTA门槛和强参考快照保持，计划继续执行中。
+  两个新分数脚本Ruff通过；归档摘要逐组比对原回执、五项回执SHA、实际项目评价源码
+  字节和新增报告链接均通过，diff检查通过。本次仅更新审计文档，不重复运行模型测试。
+  原A08/A09在01:13核对PID/starttime及日志仍分别训练/等待，没有新增GPU任务。
 
 - 2026-09-11 00:37：以`54b00e86d8af441508b9c1087206fe468d14376e`创建A11固定源码
   `/data1/zyl/repos/SpecEmbedding-opt-a11-20260911`，工作树干净；此前全仓/配置路径复查

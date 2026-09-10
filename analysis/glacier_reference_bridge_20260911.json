@@ -1,0 +1,285 @@
+{
+  "schema_version": 1,
+  "status": "verified_external_checkpoint_scores_common_protocol_pending",
+  "verified_at": "2026-09-11T01:20:02+08:00",
+  "external_reproduction_completed_at_utc": "2026-09-09T06:45:18Z",
+  "external_source_commit": "c0cb5bc0c81ca13c8390754bf23ae8c205f6e584",
+  "upstream_commit": "ed8311f22958cb37f055b663b5f56c5c77a2ee33",
+  "checkpoint_sha256": "5a47cecca707d3abd5a49c7dbac99d100aa2a586d5d4f848f1e8e35140d7db11",
+  "dataset": "MassSpecGym v1.5",
+  "dataset_tsv_sha256": "50cfdd1d22f79543c59555f9ce43c6893bd788a19a42b21fb4e2e3a54673c06a",
+  "fold": "test",
+  "full_query_denominator": 17556,
+  "verified_inventory": {
+    "inventory_files": 348,
+    "inventory_bytes": 32815753344,
+    "prediction_chunks": 43,
+    "prediction_inputs": 4291751,
+    "model_source_files": 113,
+    "runtime_devices_verified_cuda": true
+  },
+  "runtimes": {
+    "external": {
+      "torch": "2.6.0+cu124",
+      "numpy": "2.5.3",
+      "rdkit": "2025.03.6"
+    },
+    "project": {
+      "torch": "2.5.1",
+      "numpy": "2.2.6",
+      "rdkit": "2026.03.1"
+    }
+  },
+  "target_identity": {
+    "policy": "Unchanged external TSV target inchikey; candidate identities stored from original candidate SMILES",
+    "fresh_target_queries": 17556,
+    "fresh_target_unique_smiles": 3170,
+    "cross_runtime_target_records_equal": true,
+    "provided_vs_recomputed_mismatch_queries": 5,
+    "mismatch_query_ids": [
+      "MassSpecGymID0202045",
+      "MassSpecGymID0202046",
+      "MassSpecGymID0202274",
+      "MassSpecGymID0397915",
+      "MassSpecGymID0402198"
+    ],
+    "fresh_all_candidate_identities_reencoded": false
+  },
+  "metrics": {
+    "mass": {
+      "queries": 17556,
+      "candidate_rows": 4457058,
+      "statuses": {
+        "partial_candidate_predictions": 12531,
+        "missing_collision_energy": 406,
+        "complete": 4617,
+        "target_absent_from_candidates": 2
+      },
+      "metrics": {
+        "entropy": {
+          "upstream_float64_torch_topk": {
+            "top1": 0.4565390749601276,
+            "top5": 0.5899407609933925,
+            "top10": 0.6293005240373661,
+            "top20": 0.6684324447482343
+          },
+          "stable_original_order": {
+            "top1": 0.4565390749601276,
+            "top5": 0.5921052631578947,
+            "top10": 0.6308954203691046,
+            "top20": 0.6733310549100022,
+            "mrr": 0.5228593244940783,
+            "queries": 17556,
+            "ranked_queries": 17148
+          },
+          "conservative_ties": {
+            "top1": 0.4544315333789018,
+            "top5": 0.5885167464114832,
+            "top10": 0.628673957621326,
+            "top20": 0.6658122579175211,
+            "mrr": 0.5197225751559517,
+            "queries": 17556,
+            "ranked_queries": 17148
+          },
+          "project_torch_argsort_fp32": {
+            "top1": 0.4559125085440875,
+            "top5": 0.5906812485759854,
+            "top10": 0.6292435634540897,
+            "top20": 0.6682046024151287,
+            "mrr": 0.5215085846524984,
+            "queries": 17556,
+            "ranked_queries": 17148
+          },
+          "argsort_rank_changes_between_torch_versions": 0,
+          "upstream_topk_vs_project_argsort_hit_changes": {
+            "1": 11,
+            "5": 27,
+            "10": 5,
+            "20": 32
+          },
+          "topk_hit_changes_between_torch_versions": {
+            "1": 0,
+            "5": 0,
+            "10": 0,
+            "20": 0
+          }
+        },
+        "cos": {
+          "upstream_float64_torch_topk": {
+            "top1": 0.42897015265436317,
+            "top5": 0.5527455001139212,
+            "top10": 0.5930735930735931,
+            "top20": 0.6287309182046024
+          },
+          "stable_original_order": {
+            "top1": 0.42897015265436317,
+            "top5": 0.6484392800182274,
+            "top10": 0.7111528822055138,
+            "top20": 0.770619731146047,
+            "mrr": 0.530983840170841,
+            "queries": 17556,
+            "ranked_queries": 17148
+          },
+          "conservative_ties": {
+            "top1": 0.38699020277967644,
+            "top5": 0.5522898154477102,
+            "top10": 0.5930735930735931,
+            "top20": 0.6287309182046024,
+            "mrr": 0.4639688731346993,
+            "queries": 17556,
+            "ranked_queries": 17148
+          },
+          "project_torch_argsort_fp32": {
+            "top1": 0.3877306903622693,
+            "top5": 0.5528594212804739,
+            "top10": 0.5930735930735931,
+            "top20": 0.6287878787878788,
+            "mrr": 0.4647518217224137,
+            "queries": 17556,
+            "ranked_queries": 17148
+          },
+          "argsort_rank_changes_between_torch_versions": 0,
+          "upstream_topk_vs_project_argsort_hit_changes": {
+            "1": 724,
+            "5": 10,
+            "10": 0,
+            "20": 1
+          },
+          "topk_hit_changes_between_torch_versions": {
+            "1": 0,
+            "5": 0,
+            "10": 0,
+            "20": 0
+          }
+        }
+      }
+    },
+    "formula": {
+      "queries": 17556,
+      "candidate_rows": 2909859,
+      "statuses": {
+        "complete": 16838,
+        "missing_collision_energy": 406,
+        "partial_candidate_predictions": 311,
+        "target_absent_from_candidates": 1
+      },
+      "metrics": {
+        "entropy": {
+          "upstream_float64_torch_topk": {
+            "top1": 0.36038961038961037,
+            "top5": 0.5842447026657553,
+            "top10": 0.6666097060833903,
+            "top20": 0.742367281840966
+          },
+          "stable_original_order": {
+            "top1": 0.3624401913875598,
+            "top5": 0.594896331738437,
+            "top10": 0.6798815219867852,
+            "top20": 0.7566074276600593,
+            "mrr": 0.47072494719890723,
+            "queries": 17556,
+            "ranked_queries": 17149
+          },
+          "conservative_ties": {
+            "top1": 0.3526429710640237,
+            "top5": 0.5786625655046708,
+            "top10": 0.6605718842560948,
+            "top20": 0.7339940760993393,
+            "mrr": 0.45819591107239566,
+            "queries": 17556,
+            "ranked_queries": 17149
+          },
+          "project_torch_argsort_fp32": {
+            "top1": 0.36027568922305764,
+            "top5": 0.5904534062428799,
+            "top10": 0.6708817498291183,
+            "top20": 0.7431647300068353,
+            "mrr": 0.46708976508939515,
+            "queries": 17556,
+            "ranked_queries": 17149
+          },
+          "argsort_rank_changes_between_torch_versions": 0,
+          "upstream_topk_vs_project_argsort_hit_changes": {
+            "1": 54,
+            "5": 133,
+            "10": 119,
+            "20": 76
+          },
+          "topk_hit_changes_between_torch_versions": {
+            "1": 0,
+            "5": 0,
+            "10": 0,
+            "20": 0
+          }
+        },
+        "cos": {
+          "upstream_float64_torch_topk": {
+            "top1": 0.3523581681476418,
+            "top5": 0.5287650945545682,
+            "top10": 0.6144907723855092,
+            "top20": 0.6888243335611757
+          },
+          "stable_original_order": {
+            "top1": 0.3994076099339257,
+            "top5": 0.6586352244246981,
+            "top10": 0.7458418774208248,
+            "top20": 0.8241057188425609,
+            "mrr": 0.5164354910211599,
+            "queries": 17556,
+            "ranked_queries": 17149
+          },
+          "conservative_ties": {
+            "top1": 0.2887901572112098,
+            "top5": 0.5222146274777854,
+            "top10": 0.6081681476418318,
+            "top20": 0.6853497379813169,
+            "mrr": 0.3965348095610252,
+            "queries": 17556,
+            "ranked_queries": 17149
+          },
+          "project_torch_argsort_fp32": {
+            "top1": 0.31539074960127594,
+            "top5": 0.5408407382091592,
+            "top10": 0.6199020277967646,
+            "top20": 0.6944634313055366,
+            "mrr": 0.42023310475666986,
+            "queries": 17556,
+            "ranked_queries": 17149
+          },
+          "argsort_rank_changes_between_torch_versions": 0,
+          "upstream_topk_vs_project_argsort_hit_changes": {
+            "1": 1313,
+            "5": 228,
+            "10": 115,
+            "20": 143
+          },
+          "topk_hit_changes_between_torch_versions": {
+            "1": 0,
+            "5": 0,
+            "10": 0,
+            "20": 0
+          }
+        }
+      }
+    }
+  },
+  "audit_receipt_sha256": {
+    "inventory_receipt.json": "98aea418917aa5e3b1331bf827263682654bcb77e1218027625251d0107950bf",
+    "scores_r3/score_receipt.json": "4bfdca15379e5ca014b39e27977e415afe40f28a1f9b2bf709d1ea17777dd33d",
+    "verification_r3/verification.json": "f671a4bc80e6c53977f75fa8414e9d9cc8ab1b4ee0b6f62b6272cd5744b7bf0c",
+    "target_identities_glacier.json": "dce70d475f0714eae76e26172200dd716ea3bf43f669a602a0e49a0a27915001",
+    "target_identities_specembedding.json": "1508d564db1eda57642ac2e70e61ec3a74e20ba64157b1c855db6c786c45a351"
+  },
+  "project_evaluator_sha256": "adbaad9e299d884b924885765e347bd2ffdea5d2c4e31cbb5a348b7716326d3f",
+  "boundaries": {
+    "fresh_model_inference_in_this_audit": false,
+    "external_jobs_restarted": false,
+    "specembedding_test_evaluated": false,
+    "labels_modified": false,
+    "paper_best_checkpoint_mapping_verified": false,
+    "complete_common_protocol_verified": false,
+    "sota_threshold_lowered": false
+  },
+  "reported_reference_snapshot": "sota_reference_snapshot_20260910.json",
+  "artifact_locations": "See stage plan section 10; all derived arrays and raw source files remain outside the repository."
+}

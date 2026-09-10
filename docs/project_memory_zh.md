@@ -1,6 +1,6 @@
 # SpecEmbedding 项目记忆
 
-最后更新：2026-09-10。本文是内部状态摘要，不放入匿名补充包；事实以代码、配置和可校验工件为准。
+最后更新：2026-09-11。本文是内部状态摘要，不放入匿名补充包；事实以代码、配置和可校验工件为准。
 运行入口见 [文档地图](README_zh.md)，模型细节见 [reranker 说明](reranker_solution_zh.md)。
 
 ## 当前实现与证据
@@ -397,8 +397,13 @@ JESTR-style cosine 只是本地保存嵌入上的重实现打分控制，JESTR/G
   数据处理、重叠审计与实现 pilot 已记录，正式 GPU 矩阵尚未完成。该数据与 MassSpecGym
   有明显训练身份重叠，定位为第二套 in-domain 派生协议；去重 zero-shot 仅作小样本敏感性分析。
   中断的 CPU alignment 工件已隔离，不用于论文。
-- [GLACIER 交接](glacier_reproduction_handoff_zh.md)：代码、权重与开放输入已下载；尚未
-  安装独立环境或完成推理。来源与缺口见 [manifest](../analysis/glacier_reproduction_manifest.json)。
+- [GLACIER 交接](glacier_reproduction_handoff_zh.md)：2026-09-11只读核验发现独立复现已于
+  9月9日完成，348项完成清单文件重算SHA通过；两种候选协议的完整test保存分数、候选
+  顺序及跨环境排名已独立核验，补算Top-10/MRR。没有重启外部推理或运行本地test。
+  目标身份重算发现五条query与TSV键不同，原标签保留；完整候选身份、CE与论文最优权重
+  对应关系仍待对齐。此结果只作为明确协议下的公开权重参考，不降低SOTA门槛，详见
+  [D24分数对标审计](../analysis/glacier_reference_bridge_20260911.md)。首次下载
+  [manifest](../analysis/glacier_reproduction_manifest.json)保留历史来源，不作为当前状态。
 
 这些任务的状态不因文档整理而自动恢复或完成。正式训练必须全量且 GPU-only，详见仓库规则。
 
