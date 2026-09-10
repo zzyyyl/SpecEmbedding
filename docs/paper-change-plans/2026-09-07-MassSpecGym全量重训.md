@@ -323,6 +323,28 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-11 06:24：输入实现`9cf01af83e9467580623354130de08048cf25ea2`已推送，固定
+  detached源码在`/data1/${USER}/repos/SpecEmbedding-adduct-inputs-20260911`，工作树干净。
+  首次推送/创建worktree因自动审批连接中断未执行，核验本地提交尚未推送、目标目录尚未创建后相同
+  授权命令成功。此worktree只用于CPU输入准备，不是A13正式训练源码。
+  全量缓存位于`$SPECEMBEDDING_DATA_ROOT/spectrum_metadata_cache/massspecgym_v15_adduct_20260911_topk256`，
+  共60,301,625字节，manifest SHA `caccd370dfcdf34f0d2dcf2e9446ecff34457cc5b8ad3991628ec5f442f5ad77`，
+  audit SHA `bfdd6c6e385ada5e3bda3d888c66f31e89efb69fe035d991b2624441574543cd`。
+  准备根为`$SPECEMBEDDING_DATA_ROOT/audits/optimization_a13_metadata_preparation_20260911`，
+  receipt SHA `c8503a199ec1d1d7063e4a0627ad5cbce6b4da95f461b96c1c5f37ba5e41e89c`。
+  06:18:59独立程序核对全部train194,119/val19,423条观测加合物、原始行号、标识，
+  不调用项目Tokenizer而从原始峰重建token，并与原完整验证索引比较；全部一致。
+  `independent_verification.json` SHA
+  `a9df71b09b29f43808bb0247d3f590fe1e8adc196441dc9ea16bc4a4d62d5e4d`，14项绑定文件
+  在验证前后重算一致；另行读回准备/独立回执与全部缓存SHA通过。未知计数为0，全部
+  query保留。原图/Morgan/峰缓存未改，没有A13模型运行、正式CLI或最终parent绑定。
+  同次核验A10原入口已在06:13:20完成fresh A04验证，06:16:11启动实际训练，06:17:40
+  进入stage2；训练PID3805869/starttime1456674958，父进程仍为3756121。物理GPU1 UUID
+  映射cuda:0、严格CUDA及外部存储环境已核验，nvidia-smi确认该PID在目标GPU上使用
+  5,520 MiB（瞬时进程用量，不是峰值）。27项输入与最终文件、实际manifest/预检SHA
+  全部一致，runtime SHA `0df845a91b1c0f62e46e19d5b3315a392e83ef7920abe81f6417750593679c89`，
+  首轮完整计数仍待；A10独立完成审计及A11实际依赖队列尚未部署，下一步按真实PID绑定。
+
 - 2026-09-11 06:09：A13已接通加合物固定输入准备/新读回审计、原始query—token绑定，
   及两类分子塔的候选训练、普通验证与完整检索验证组件；正式CLI/构造/完成审计尚待。
   相关223项检查通过，根为`$SPECEMBEDDING_DATA_ROOT/audits/optimization_a13_input_checks_20260911_r1`，
@@ -1947,7 +1969,7 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
 - 验证结果：A13输入及训练/验证组件检查通过；全仓832通过、1跳过、15失败中的14项环境冲突复核全部通过，余下为相同既有路径审计，详见第10节；Ruff、compileall及diff检查通过。A09完成独立全量审计，不以实现检查代替实验结果。
-- 当前训练状态（2026-09-11 06:09核验）：A04仍为incumbent，A09完成审计未晋升；A10原队列已绑定A04并进入正式入口的CPU导入阶段，训练未启动；A11/A12已准备条件方案，A13实际缓存与正式接入仍待。各轮最新状态集中于[attempts.md](../../attempts.md)，模型优化和SOTA达标未完成。
+- 当前训练状态（2026-09-11 06:24核验）：A04仍为incumbent，A09完成审计未晋升；A10全量GPU训练中，独立完成审计及A11依赖队列尚待部署；A13全量固定输入和独立复核完成，正式接入与最终parent仍待。各轮最新状态集中于[attempts.md](../../attempts.md)，模型优化和SOTA达标未完成。
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；

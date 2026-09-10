@@ -9,6 +9,7 @@
 | `raw/MassSpecGym/v1/`、`raw/MassSpecGym/v1.5/` | 经SHA-256核验的原始文件副本 |
 | `processed/`、`train_cache/` | 通用处理数据及TokenSet缓存默认位置 |
 | `graph_cache/`、`fingerprint_cache/` | 已审计固定输入缓存，保持现有版本目录 |
+| `spectrum_metadata_cache/` | 逐原始query绑定的观测元数据及峰token来源，版本化准备与独立审计 |
 | `experiments/<run>/` | 每轮独立数据、验证索引、checkpoint、日志和运行配置 |
 | `audits/` | 准备、审计、迁移回执及条件启动草案 |
 | `cache/`、`tmp/` | 依赖下载/编译缓存、Python字节码及运行临时文件 |
