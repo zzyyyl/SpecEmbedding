@@ -79,7 +79,8 @@ coarse top-40 上做关系精排；`pointwise` 为容量匹配对照。分阶段
 | [编码器结构](../model_architecture.md) | Tokenizer、谱图塔、GINE 与对齐损失 |
 | [reranker 实现](reranker_solution_zh.md) | 第二阶段模型、cache、训练与评价接口 |
 | [GPU/tmux 监测器](gpu_tmux_monitor_zh.md) | 空闲门禁、单次派发、CUDA 映射、锁与安全边界 |
-| [候选指纹输入](fingerprint_cache_zh.md) | 完整Morgan特征的CPU构建、逐位审计和按需读取；尚未自动接入模型 |
+| [候选指纹输入](fingerprint_cache_zh.md) | 完整Morgan特征的CPU构建、逐位审计和按需读取；A06独立指纹塔已完成评价 |
+| [图与指纹残差](graph_fingerprint_encoder_zh.md) | A09预登记组件、输入绑定与正式接入的未完成边界 |
 | [分析索引](../analysis/README.md) | 实验系列、协议、报告和 manifest |
 | [论文计划](paper-change-plans/README.md) | 在途计划、模板和历史追溯 |
 | [投稿待办](../paper/TRANSFER_2026_PLAN.md) | 科学证据与最终提交检查 |

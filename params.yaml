@@ -34,6 +34,12 @@ fingerprint_encoder:
   dropout_rate: 0.2
   norm_eps: 0.00001
 
+# Inactive A09 component settings; combined data/audit support is required before formal use.
+graph_fingerprint_residual:
+  input_bits: 2048
+  hidden_dim: 256
+  norm_eps: 0.00001
+
 # Inactive downstream feature settings; activation requires an explicit copy into
 # model.spec_encoder.precursor_delta in a new run's pinned configuration.
 precursor_delta_encoder:
