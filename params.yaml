@@ -203,8 +203,9 @@ fulltrain:
   seeds: [42]
   expected_counts: {train: 194119, val: 19429, test: 17556}
   exclude_val_query_indices: [7686, 7687, 7688, 8464, 8465, 8466]
-  min_free_mib: 20000
-  max_utilization: 10
+  # Authorized memory-only admission for the current batch128 trial; remeasure after model/batch changes.
+  min_free_mib: 10000
+  max_utilization: 100
   poll_seconds: 30
   hold_seconds: 120
 

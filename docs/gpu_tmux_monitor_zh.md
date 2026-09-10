@@ -7,6 +7,13 @@
 监测器只使用 Python 标准库和仓库 GPU 公共逻辑，无需导入 PyTorch、NVML 或安装新依赖。
 运行平台为同一台 Linux 主机，依赖 `nvidia-smi`、tmux、`/proc`、POSIX shell 和 `flock`。
 
+2026-09-10 用户授权当前优化队列只按显存准入：`fulltrain.min_free_mib: 10000`、
+`fulltrain.max_utilization: 100`，后者表示利用率仍记录，但不会因高利用率拒绝派发。
+轮询30秒、连续满足120秒和派发前复查保留。10,000 MiB约为9.77 GiB，依据A04的batch128
+全轮预留峰值8.23 GiB设置；A06峰值仍待实测，模型或batch改变后重新评估。
+以下20,000 MiB/10%的示例与历史记录不代表当前优化队列配置；已有冻结配置不能原地改写，
+应先确认未进入GPU阶段并停止旧等待，再以新目录和新配置指纹单次派发、重新绑定完成审计。
+
 ## 查看目标 session 与 pane
 
 以下命令只读取 tmux 信息：
