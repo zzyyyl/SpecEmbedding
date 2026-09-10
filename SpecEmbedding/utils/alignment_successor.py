@@ -92,17 +92,27 @@ def choose_completed_parent(current, incumbent):
 
 
 def delta_successor_configuration(parent_runtime, selection, delta_settings, gpu_settings, *, storage_template):
+    return _spectral_successor_configuration(parent_runtime, selection, 'precursor_delta', delta_settings,
+                                            gpu_settings, storage_template=storage_template)
+
+
+def qk_successor_configuration(parent_runtime, selection, qk_settings, gpu_settings, *, storage_template):
+    return _spectral_successor_configuration(parent_runtime, selection, 'qk_norm', qk_settings,
+                                            gpu_settings, storage_template=storage_template)
+
+
+def _spectral_successor_configuration(parent_runtime, selection, feature, settings, gpu_settings, *, storage_template):
     """Inherit scientific settings, adding the feature and rebinding explicit external storage."""
     if (selection['model_config'] != parent_runtime['model']
             or selection['training_config'] != parent_runtime['train']['align']
             or selection['config_snapshot']['augmentation'] != parent_runtime['augmentation']):
         raise ValueError('Parent model/training/augmentation provenance differs')
-    if 'precursor_delta' in parent_runtime['model']['spec_encoder']:
-        raise ValueError('Parent already has the proposed delta feature')
+    if feature in parent_runtime['model']['spec_encoder']:
+        raise ValueError(f'Parent already has the proposed {feature} feature')
     if set(gpu_settings) != {'min_free_mib', 'max_utilization', 'poll_seconds', 'hold_seconds'}:
         raise ValueError('Incomplete explicitly authorized GPU policy')
     result = copy.deepcopy(parent_runtime)
-    result['model']['spec_encoder']['precursor_delta'] = copy.deepcopy(delta_settings)
+    result['model']['spec_encoder'][feature] = copy.deepcopy(settings)
     result['fulltrain'].update(gpu_settings)
     from SpecEmbedding.config import PATH_FIELDS
     from SpecEmbedding.models_precursor_delta import validate_spectrum_config

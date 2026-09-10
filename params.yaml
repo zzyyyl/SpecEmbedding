@@ -42,6 +42,10 @@ precursor_delta_encoder:
   min_wavelength: 0.01
   max_wavelength: 10000.0
 
+# Inactive downstream attention settings; activation requires model.spec_encoder.qk_norm.
+qk_norm_encoder:
+  eps: 0.000001
+
 model:
   spec_encoder:
     embedding_dim: 512

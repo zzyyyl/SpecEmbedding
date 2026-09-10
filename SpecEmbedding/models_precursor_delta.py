@@ -6,14 +6,18 @@ import torch
 from torch import nn
 
 from SpecEmbedding.models import SiameseModel
+from SpecEmbedding.models_qk_norm import enable_qk_norm, validate_qk_norm
 
 SPEC_FIELDS = {'embedding_dim', 'n_head', 'n_layer', 'dim_feedward', 'dim_target', 'feedward_activation'}
 DELTA_FIELDS = {'fourier_dim', 'hidden_dim', 'min_wavelength', 'max_wavelength'}
 
 
 def validate_spectrum_config(config):
-    if not isinstance(config, dict) or set(config) not in (SPEC_FIELDS, SPEC_FIELDS | {'precursor_delta'}):
+    if (not isinstance(config, dict) or not SPEC_FIELDS <= set(config)
+            or set(config) - SPEC_FIELDS - {'precursor_delta', 'qk_norm'}):
         raise ValueError('Incomplete spectral configuration')
+    if 'qk_norm' in config:
+        validate_qk_norm(config['qk_norm'])
     if 'precursor_delta' not in config:
         return
     delta = config['precursor_delta']
@@ -85,7 +89,9 @@ class PrecursorDeltaEncoder(SiameseModel):
 
 def build_spectrum_encoder(config):
     validate_spectrum_config(config)
+    base = {key: config[key] for key in SPEC_FIELDS}
     if 'precursor_delta' not in config:
-        return SiameseModel(**config)
-    return PrecursorDeltaEncoder(spec_config={key: config[key] for key in SPEC_FIELDS},
-                                 delta_config=config['precursor_delta'])
+        encoder = SiameseModel(**base)
+    else:
+        encoder = PrecursorDeltaEncoder(spec_config=base, delta_config=config['precursor_delta'])
+    return enable_qk_norm(encoder, config['qk_norm']) if 'qk_norm' in config else encoder

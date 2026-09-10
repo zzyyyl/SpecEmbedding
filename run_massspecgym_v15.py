@@ -105,8 +105,8 @@ def preflight(args):
     storage = storage_receipt(args.output_root)
     fingerprint_model = getattr(args, 'molecule_input', 'gine') == 'fingerprint'
     independent_baseline = getattr(args, 'checkpoint_model_config', False) or fingerprint_model
-    if hasattr(config.model.spec_encoder, 'precursor_delta') and not independent_baseline:
-        raise ValueError('Precursor delta optimization requires independent baseline checkpoint construction')
+    if any(hasattr(config.model.spec_encoder, key) for key in ('precursor_delta', 'qk_norm')) and not independent_baseline:
+        raise ValueError('Downstream spectral variants require independent baseline checkpoint construction')
     if independent_baseline and (not getattr(args, 'optimize_alignment', False)
                                   or getattr(args, 'prepared_validation_index', None) is None):
         raise ValueError('Independent baseline construction requires optimization and a prepared full validation index')
