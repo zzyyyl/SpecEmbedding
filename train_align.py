@@ -13,6 +13,7 @@ from rdkit import rdBase
 from torch.utils.data import DataLoader
 
 from SpecEmbedding.config import config
+from SpecEmbedding.data.datasets_adduct import AdductAlignmentDataset, adduct_align_collate_fn, bind_candidate_adducts
 from SpecEmbedding.data.datasets_align import AlignGraphDataset, align_collate_fn
 from SpecEmbedding.data.datasets_candidates import CandidateAlignDataset, candidate_align_collate_fn
 from SpecEmbedding.data.datasets_fingerprint import (
@@ -31,6 +32,12 @@ from SpecEmbedding.models_precursor_delta import build_spectrum_encoder
 from SpecEmbedding.trainer.trainer import set_seed
 from SpecEmbedding.trainer.trainer_align import TrainerAlign
 from SpecEmbedding.trainer.trainer_candidates import CandidateTrainerAlign
+from SpecEmbedding.utils.adduct_alignment_inputs import (
+    adduct_model_settings,
+    load_spectrum_metadata,
+    spectrum_metadata_files,
+)
+from SpecEmbedding.utils.adduct_metadata import SpectrumMetadata
 from SpecEmbedding.utils.candidate_training import (
     read_candidate_training_input,
     validate_candidate_sampling_binding,
@@ -81,6 +88,7 @@ def train_align(
     candidate_input_receipt=None,
     fingerprint_inputs=None,
     fingerprint_smiles=None,
+    spectrum_metadata=None,
 ):
     if seed < 0:
         raise ValueError("seed must be a non-negative integer")
@@ -96,6 +104,22 @@ def train_align(
         raise ValueError("Unexpected candidate input in an inactive run")
     if candidate_settings['enabled']:
         validate_candidate_sampling_binding(training_candidates, candidate_settings, candidate_input_receipt)
+    adduct_settings = adduct_model_settings(config.model.to_dict())
+    if (adduct_settings is not None) != (spectrum_metadata is not None):
+        raise ValueError('Adduct conditioning requires both explicit configuration and complete metadata inputs')
+    metadata_receipts = None
+    if adduct_settings is not None:
+        if (not formal_fulltrain or retrieval_validator is None or spec_encoder is not None
+                or not candidate_settings['enabled'] or set(spectrum_metadata) != {'train', 'val'}
+                or any(not isinstance(item, SpectrumMetadata) for item in spectrum_metadata.values())):
+            raise ValueError('Adduct conditioning requires fresh full candidate training and bound validation')
+        formal_model_type(config.model.to_dict())
+        metadata_receipts = {split: item.provenance for split, item in spectrum_metadata.items()}
+        spectrum_metadata_files(metadata_receipts)
+        if (metadata_receipts['train']['source']['settings'] != adduct_settings
+                or getattr(retrieval_validator, 'spectrum_metadata_fingerprint', None) != metadata_receipts['val']
+                or selection_metadata.get('spectrum_metadata', metadata_receipts) != metadata_receipts):
+            raise ValueError('Adduct model, selection and validation metadata bindings disagree')
     kind = getattr(config.model, 'type', 'gine')
     fingerprint_model = kind == 'fingerprint'
     uses_fingerprints = kind in ('fingerprint', 'gine_fingerprint')
@@ -196,7 +220,11 @@ def train_align(
                 != candidate_input_receipt["dataset_to_raw_query_sha256"]):
             raise ValueError("Actual training query order differs from candidate input preflight")
         logging.info("Formal natural candidate supervision: %s", train_dataset.provenance)
+    if spectrum_metadata is not None:
+        bind_candidate_adducts(train_dataset, spectrum_metadata['train'])
+        val_dataset = AdductAlignmentDataset(val_dataset, spectrum_metadata['val'])
     paired_collate = fingerprint_align_collate_fn if fingerprint_model else align_collate_fn
+    validation_collate = adduct_align_collate_fn if spectrum_metadata is not None else paired_collate
     candidate_collate = candidate_fingerprint_collate_fn if fingerprint_model else candidate_align_collate_fn
     train_loader = DataLoader(
         train_dataset,
@@ -210,7 +238,7 @@ def train_align(
         val_dataset, 
         batch_size=batch_size, 
         shuffle=False, 
-        collate_fn=paired_collate,
+        collate_fn=validation_collate,
         num_workers=config.train.align.num_workers,
         worker_init_fn=seed_worker,
         generator=g
@@ -322,6 +350,8 @@ def train_align(
         "rdkit_version": rdBase.rdkitVersion,
         "device": str(device),
     }
+    if metadata_receipts is not None:
+        selection_summary['spectrum_metadata'] = metadata_receipts
     if formal_fulltrain:
         selection_summary["fulltrain_audit"]["epochs"] = trainer.epoch_counts
         selection_summary["fulltrain_audit"]["validation_permutation_seed"] = seed
@@ -352,6 +382,8 @@ def main():
     parser.add_argument('--fingerprint-training-index', type=Path)
     parser.add_argument('--training-fingerprint-cache', type=Path)
     parser.add_argument('--validation-fingerprint-cache', type=Path)
+    parser.add_argument('--spectrum-metadata-cache', type=Path,
+                        help='Complete audited observed-adduct cache required by the conditioned spectrum tower')
     parser.add_argument(
         "--tokenset_cache",
         "--tokenset-cache",
@@ -370,6 +402,13 @@ def main():
     )
 
     args = parser.parse_args()
+    adduct_settings = adduct_model_settings(config.model.to_dict())
+    if (adduct_settings is not None) != bool(args.spectrum_metadata_cache):
+        parser.error('Adduct configuration and --spectrum-metadata-cache must be supplied together')
+    if adduct_settings is not None and (
+        not args.formal_fulltrain or not args.validation_index or args.pretrained_spec or not args.candidate_training_input
+    ):
+        parser.error('Adduct conditioning requires fresh formal candidate training and full retrieval selection')
     if hasattr(config.model.spec_encoder, 'attention_pool'):
         if not args.formal_fulltrain or not args.validation_index or args.pretrained_spec:
             parser.error('Attention pooling requires fresh formal training and full retrieval selection')
@@ -443,6 +482,12 @@ def main():
         )
     retrieval_validator = None
     graph_receipt = None
+    spectrum_metadata = metadata_receipts = None
+    if args.spectrum_metadata_cache:
+        spectrum_metadata, metadata_receipts = load_spectrum_metadata(
+            args.data_path, args.spectrum_metadata_cache, counts=config.fulltrain.expected_counts.to_dict(),
+            exclusions=args.exclude_val_query_indices, tokenizer_config=config.data.tokenizer.to_dict(), settings=adduct_settings)
+    metadata_extra = {} if spectrum_metadata is None else {'spectrum_metadata': spectrum_metadata['val']}
     fingerprint_inputs = fingerprint_smiles = None
     if uses_fingerprints:
         fingerprint_inputs, fingerprint_smiles = {}, {}
@@ -465,10 +510,12 @@ def main():
                 index, config.retrieval_validation, save_path / 'validation_retrieval',
                 fingerprint_root=receipt['directory'], fingerprint_provenance=receipt['provenance'],
                 index_sha256=sha256_file(args.validation_index),
+                **metadata_extra,
                 **({} if fingerprint_model else {'graph_cache': graph_cache}))
         else:
             retrieval_validator = AlignmentRetrievalValidator(index, config.retrieval_validation,
-                                                            save_path / "validation_retrieval", graph_cache=graph_cache)
+                                                            save_path / "validation_retrieval", graph_cache=graph_cache,
+                                                            **metadata_extra)
 
     fulltrain_audit = None
     if args.formal_fulltrain:
@@ -551,6 +598,7 @@ def main():
         candidate_input_receipt=candidate_input_receipt,
         fingerprint_inputs=fingerprint_inputs,
         fingerprint_smiles=fingerprint_smiles,
+        spectrum_metadata=spectrum_metadata,
         selection_metadata={
             "dataset_type": args.dataset_type,
             "candidate_training_input": candidate_input_fingerprint,
@@ -586,6 +634,12 @@ def main():
                 settings=config.molecule_fingerprints.to_dict(), pool_cache_size=candidate_settings['pool_cache_size'])
             if verified != fingerprint_inputs[split]:
                 raise ValueError('Fingerprint inputs changed during training')
+    if spectrum_metadata is not None:
+        _, observed = load_spectrum_metadata(args.data_path, args.spectrum_metadata_cache,
+            counts=config.fulltrain.expected_counts.to_dict(), exclusions=args.exclude_val_query_indices,
+            tokenizer_config=config.data.tokenizer.to_dict(), settings=adduct_settings, index=index)
+        if observed != metadata_receipts:
+            raise ValueError('Adduct inputs changed during training')
 
     logging.info("\nTraining complete! The final aligned model is returned and ready for evaluation/inference.")
 

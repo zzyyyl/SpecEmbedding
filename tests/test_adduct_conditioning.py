@@ -146,9 +146,11 @@ def test_unregistered_settings_fail(damage):
         validate_adduct_settings(settings)
 
 
-def test_formal_builder_still_refuses_unintegrated_adduct_input():
-    with pytest.raises(ValueError, match='Incomplete spectral configuration'):
-        build_spectrum_encoder({**parent_config(), 'adduct_conditioning': SETTINGS})
+def test_formal_builder_requires_complete_adduct_configuration():
+    encoder = build_spectrum_encoder({**parent_config(), 'adduct_conditioning': SETTINGS})
+    assert isinstance(encoder, AdductConditionedEncoder)
+    with pytest.raises(ValueError, match='explicit ordered'):
+        build_spectrum_encoder({**parent_config(), 'adduct_conditioning': {}})
 
 
 def test_empty_or_nonfinite_valid_spectra_and_unsupported_forward_fail():

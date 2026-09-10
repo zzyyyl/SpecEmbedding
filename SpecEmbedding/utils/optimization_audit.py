@@ -9,6 +9,12 @@ from pathlib import Path
 import torch
 import yaml
 
+from SpecEmbedding.utils.adduct_alignment_inputs import (
+    adduct_model_settings,
+    audit_model_spectrum_metadata,
+    load_spectrum_metadata,
+    spectrum_metadata_files,
+)
 from SpecEmbedding.utils.fulltrain import sha256_file
 from SpecEmbedding.utils.retrieval_validation import PROTOCOL, load_validation_graph_cache, load_validation_index
 from SpecEmbedding.utils.training_resources import audit_resource_profiles
@@ -72,7 +78,7 @@ def audit_snapshot(path, index, *, expected_spectrum_control=None, expected_grap
 
 
 def audit_trajectory(directory, index, stage, baseline, *, expected_graph_cache=None, expected_fingerprint_cache=None,
-                     expected_attention_pool=False):
+                     expected_attention_pool=False, expected_spectrum_metadata=None):
     history = stage["retrieval_history"]
     require([row["epoch"] for row in history] == list(range(1, stage["stop_epoch"] + 1)), "Incomplete epoch trajectory")
     require(bool(history) and stage["metric_for_best"] == "validation_top1_then_mrr", "Wrong selection protocol")
@@ -84,7 +90,8 @@ def audit_trajectory(directory, index, stage, baseline, *, expected_graph_cache=
         epoch = record["epoch"]
         path = directory / "validation_retrieval" / f"stage2_epoch{epoch:03d}.pt"
         metrics = audit_snapshot(path, index, expected_graph_cache=expected_graph_cache,
-                                 expected_fingerprint_cache=expected_fingerprint_cache)
+                                 expected_fingerprint_cache=expected_fingerprint_cache,
+                                 expected_spectrum_metadata=expected_spectrum_metadata)
         hashes[str(path)] = sha256_file(path)
         for key, value in metrics.items():
             require(math.isclose(value, record[key], rel_tol=0, abs_tol=1e-12), f"Trajectory metric mismatch: epoch {epoch} {key}")
@@ -110,8 +117,12 @@ def audit_trajectory(directory, index, stage, baseline, *, expected_graph_cache=
         path = directory / filename
         hashes[str(path)] = sha256_file(path)
     selected = torch.load(directory / "best_model_stage2.pth", map_location="cpu", weights_only=True)
-    require(any(key.startswith('spec_encoder.pool.') for key in selected) == expected_attention_pool,
+    adduct = expected_spectrum_metadata is not None
+    pool_prefix = 'spec_encoder.encoder.pool.' if adduct else 'spec_encoder.pool.'
+    require(any(key.startswith(pool_prefix) for key in selected) == expected_attention_pool,
             'Attention pooling weights and explicit model configuration disagree')
+    require(any(key.startswith('spec_encoder.conditioning.') for key in selected) == adduct,
+            'Adduct weights and explicit input configuration disagree')
     selected_candidate = directory / f"candidate_stage2_epoch{best['epoch']:03d}.pth"
     hashes[str(selected_candidate)] = sha256_file(selected_candidate)
     candidate = torch.load(selected_candidate, map_location="cpu", weights_only=True)
@@ -226,6 +237,9 @@ def audit_optimization_run(run):
     fingerprint_report, fingerprint_hashes = audit_model_fingerprint_inputs(
         manifest, selection, run / 'data/MassSpecGym', index_path)
     hashes.update(fingerprint_hashes)
+    metadata, metadata_receipts, metadata_hashes = audit_model_spectrum_metadata(
+        manifest, selection, run / 'data/MassSpecGym', index)
+    hashes.update(metadata_hashes)
     candidate_input = candidate_path if candidate_path.exists() else None
     candidate_fingerprint = ({"path": str(candidate_path), "sha256": fingerprint(candidate_path)}
                              if candidate_input is not None else None)
@@ -246,6 +260,7 @@ def audit_optimization_run(run):
         settings["batch_size"], run / "data" / "MassSpecGym", counts, exclusions,
         fingerprint_cache=selection.get('training_fingerprint_cache'),
         graph_fingerprint=selection['model_config'].get('type', 'gine') == 'gine_fingerprint',
+        **({} if metadata is None else {'spectrum_metadata': metadata['train']}),
     )
     hashes.update(candidate_hashes)
     baseline_receipt = read_json(run / "baseline_validation" / "metrics.json")
@@ -255,7 +270,9 @@ def audit_optimization_run(run):
     attention_pool = 'attention_pool' in selection['model_config'].get('spec_encoder', {})
     if attention_pool:
         require(checkpoint_model is not None, 'Attention pooling requires independently bound baseline construction')
-    if fingerprint_report is not None or attention_pool:
+    if metadata is not None:
+        require(checkpoint_model is not None, 'Adduct conditioning requires independently bound baseline construction')
+    if fingerprint_report is not None or attention_pool or metadata is not None:
         from SpecEmbedding.utils.formal_alignment import load_formal_alignment
         load_formal_alignment(directory / 'best_model_stage2.pth', torch.device('cpu'),
                               dataset_outputs=index['dataset_outputs'], dataset_manifest_sha256=index['dataset_manifest_sha256'],
@@ -270,6 +287,22 @@ def audit_optimization_run(run):
             expected_counts=expected, exclusions=exclusions,
         )
         require(verified_model == checkpoint_model, 'Baseline model or shared protocol changed since preflight')
+    baseline_metadata = manifest.get('baseline_spectrum_metadata')
+    require(baseline_receipt.get('spectrum_metadata') == baseline_metadata, 'Baseline adduct metadata differs from preflight')
+    baseline_adduct_settings = adduct_model_settings(checkpoint_model['model_config']) if checkpoint_model is not None else None
+    require((baseline_adduct_settings is not None) == (baseline_metadata is not None),
+            'Baseline adduct model and fixed inputs disagree')
+    if baseline_metadata is not None:
+        require(parent_selection.get('spectrum_metadata') == baseline_metadata, 'Baseline adduct checkpoint source changed')
+        files = spectrum_metadata_files(baseline_metadata, 'baseline_spectrum_metadata')
+        require(all(manifest['inputs'].get(name) == item for name, item in files.items()),
+                'Baseline adduct input files differ from preflight')
+        _, observed = load_spectrum_metadata(run / 'data/MassSpecGym', baseline_metadata['train']['directory'],
+            counts=counts, exclusions=exclusions, tokenizer_config=runtime['data']['tokenizer'],
+            settings=baseline_adduct_settings, index=index)
+        require(observed == baseline_metadata, 'Baseline adduct input changed')
+        for item in files.values():
+            fingerprint(item['path'], item['sha256'])
     baseline_fingerprint = manifest.get('baseline_fingerprint_input')
     baseline_fingerprint_cache = baseline_fingerprint['cache'] if baseline_fingerprint is not None else None
     if checkpoint_model is not None:
@@ -306,19 +339,23 @@ def audit_optimization_run(run):
                     'Graph cache file was not pinned in preflight')
             fingerprint(path, digest)
     baseline = audit_snapshot(baseline_path, index, expected_graph_cache=None if baseline_fingerprint_model else graph_fingerprint,
-                              expected_fingerprint_cache=baseline_fingerprint_cache)
+                              expected_fingerprint_cache=baseline_fingerprint_cache,
+                              expected_spectrum_metadata=None if baseline_metadata is None else baseline_metadata['val'])
     fingerprint(baseline_path)
     require(all(math.isclose(baseline[key], baseline_receipt["metrics"][key], rel_tol=0, abs_tol=1e-12) for key in baseline),
             "Baseline receipt metrics mismatch")
     report = audit_trajectory(directory, index, stage, baseline, expected_attention_pool=attention_pool,
                               expected_graph_cache=None if fingerprint_model else graph_fingerprint,
-                              expected_fingerprint_cache=selection.get('validation_fingerprint_cache'))
+                              expected_fingerprint_cache=selection.get('validation_fingerprint_cache'),
+                              expected_spectrum_metadata=None if metadata_receipts is None else metadata_receipts['val'])
     report['validation_graph_cache'] = graph_receipt
     resource_report, resource_hashes = audit_resource_profiles(directory, stage, expected, selection["device"])
     report["resource_measurements"] = resource_report
     report["candidate_training"] = candidate_report
     if fingerprint_report is not None:
         report['fingerprint_inputs'] = fingerprint_report
+    if metadata_receipts is not None:
+        report['spectrum_metadata'] = metadata_receipts
     hashes.update(resource_hashes)
     report["artifact_sha256"].update(hashes)
     report.update(run=str(run), source_commit=manifest["git_commit"], protocol=PROTOCOL,

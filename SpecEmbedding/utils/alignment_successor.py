@@ -110,6 +110,21 @@ def attention_pool_successor_configuration(parent_runtime, selection, pool_setti
                                             gpu_settings, storage_template=storage_template)
 
 
+def adduct_successor_configuration(parent_runtime, selection, adduct_settings, gpu_settings, *, storage_template):
+    """Keep the audited parent's towers and candidate objective, adding one observed-input conditioner."""
+    from SpecEmbedding.utils.candidate_training import validate_candidate_settings
+    from SpecEmbedding.utils.formal_alignment import formal_model_type
+
+    if formal_model_type(parent_runtime['model']) not in ('gine', 'gine_fingerprint'):
+        raise ValueError('Adduct successor requires a retained GINE parent branch')
+    candidates = parent_runtime['train']['align']['candidate_supervision']
+    validate_candidate_settings(candidates)
+    if not candidates['enabled']:
+        raise ValueError('Adduct successor requires the registered candidate supervision')
+    return _spectral_successor_configuration(parent_runtime, selection, 'adduct_conditioning', adduct_settings,
+                                            gpu_settings, storage_template=storage_template)
+
+
 def candidate_weight_successor_configuration(parent_runtime, selection, weight_settings, gpu_settings, *, storage_template):
     """Change only the candidate loss coefficient after checking the declared parent coefficient."""
     from SpecEmbedding.utils.candidate_training import validate_candidate_settings

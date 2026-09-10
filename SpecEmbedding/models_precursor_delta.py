@@ -6,6 +6,7 @@ import torch
 from torch import nn
 
 from SpecEmbedding.models import SiameseModel
+from SpecEmbedding.models_adduct import AdductConditionedEncoder, validate_adduct_settings
 from SpecEmbedding.models_attention_pool import AttentionPoolingEncoder, validate_attention_pool
 from SpecEmbedding.models_qk_norm import enable_qk_norm, validate_qk_norm
 
@@ -15,8 +16,12 @@ DELTA_FIELDS = {'fourier_dim', 'hidden_dim', 'min_wavelength', 'max_wavelength'}
 
 def validate_spectrum_config(config):
     if (not isinstance(config, dict) or not SPEC_FIELDS <= set(config)
-            or set(config) - SPEC_FIELDS - {'precursor_delta', 'qk_norm', 'attention_pool'}):
+            or set(config) - SPEC_FIELDS - {'precursor_delta', 'qk_norm', 'attention_pool', 'adduct_conditioning'}):
         raise ValueError('Incomplete spectral configuration')
+    if 'adduct_conditioning' in config:
+        validate_adduct_settings(config['adduct_conditioning'])
+        if 'precursor_delta' in config:
+            raise ValueError('Adduct conditioning does not support precursor delta forward overrides')
     if 'attention_pool' in config:
         validate_attention_pool(config['attention_pool'])
         if 'precursor_delta' in config:
@@ -101,4 +106,8 @@ def build_spectrum_encoder(config):
         encoder = PrecursorDeltaEncoder(spec_config=base, delta_config=config['precursor_delta'])
     if 'qk_norm' in config:
         encoder = enable_qk_norm(encoder, config['qk_norm'])
-    return AttentionPoolingEncoder(encoder, config['attention_pool']) if 'attention_pool' in config else encoder
+    if 'attention_pool' in config:
+        encoder = AttentionPoolingEncoder(encoder, config['attention_pool'])
+    if 'adduct_conditioning' in config:
+        encoder = AdductConditionedEncoder(encoder, config['adduct_conditioning'])
+    return encoder

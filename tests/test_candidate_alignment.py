@@ -258,9 +258,12 @@ def test_candidate_trainer_refuses_persistent_workers_and_query_dropping(monkeyp
                                   candidate_loss_weight=1.0)
 
 
-def pinned_synthetic_candidate_input(monkeypatch, tmp_path, *, structural=False, loss_weight=0.5):
+def pinned_synthetic_candidate_input(monkeypatch, tmp_path, *, structural=False, loss_weight=0.5, manifest_sha256=None):
     dataset = candidate_dataset(monkeypatch)
     index = dataset.candidates
+    if manifest_sha256 is not None:
+        index.provenance['dataset_manifest_sha256'] = manifest_sha256
+        dataset.provenance['dataset_manifest_sha256'] = manifest_sha256
     metadata = tmp_path / "metadata.pkl"
     metadata.write_bytes(pickle.dumps(index.metadata))
     for name in ("receipt.json", "verification.json"):

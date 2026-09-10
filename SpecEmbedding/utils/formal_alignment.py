@@ -35,6 +35,8 @@ def formal_model_type(model_config):
     if kind == 'gine_fingerprint':
         validate_fingerprint_residual(model_config['fingerprint_residual'])
     validate_spectrum_config(model_config['spec_encoder'])
+    if 'adduct_conditioning' in model_config['spec_encoder'] and kind == 'fingerprint':
+        raise ValueError('Adduct formal alignment supports the registered GINE parent branches')
     if (set(model_config['align']) != ALIGN_FIELDS
             or set(model_config['mol_encoder']) != (FINGERPRINT_FIELDS if kind == 'fingerprint' else GINE_FIELDS)
             or model_config['mol_encoder']['graph_policy'] != 'rdkit_sanitized'):
@@ -85,6 +87,10 @@ def read_formal_alignment_checkpoint(checkpoint, *, dataset_outputs, dataset_man
     if kind in ('fingerprint', 'gine_fingerprint') and (not selection.get('training_fingerprint_cache')
                                   or not selection.get('validation_fingerprint_cache')):
         raise ValueError('Fingerprint checkpoint is missing its fixed input provenance')
+    from SpecEmbedding.utils.adduct_alignment_inputs import validate_selection_spectrum_metadata
+    spectrum_metadata = validate_selection_spectrum_metadata(
+        selection, dataset_manifest_sha256=dataset_manifest_sha256, tokenizer_config=tokenizer_config,
+        expected_counts=expected_counts, exclusions=exclusions)
     if sha256_file(checkpoint) != before['checkpoint'] or sha256_file(selection_path) != before['selection']:
         raise ValueError('Formal checkpoint or selection changed during verification')
     receipt = {'checkpoint': str(checkpoint), 'checkpoint_sha256': before['checkpoint'],
@@ -93,6 +99,8 @@ def read_formal_alignment_checkpoint(checkpoint, *, dataset_outputs, dataset_man
                'dataset_manifest_sha256': dataset_manifest_sha256,
                'tokenizer_config': copy.deepcopy(tokenizer_config), 'expected_epoch_counts': dict(expected_counts),
                'exclude_val_query_indices': list(exclusions)}
+    if spectrum_metadata is not None:
+        receipt['spectrum_metadata'] = spectrum_metadata
     return selection, receipt
 
 

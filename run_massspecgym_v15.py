@@ -15,6 +15,12 @@ from pathlib import Path
 import yaml
 
 from SpecEmbedding.config import DEFAULT_CONFIG_PATH, config
+from SpecEmbedding.utils.adduct_alignment_inputs import (
+    adduct_model_settings,
+    audit_model_spectrum_metadata,
+    load_spectrum_metadata,
+    spectrum_metadata_files,
+)
 from SpecEmbedding.utils.candidate_training import (
     audit_candidate_training,
     build_candidate_training_input,
@@ -101,6 +107,10 @@ def commands(args, *, baseline_model_type='gine'):
             result[2]["command"] += ["--checkpoint-model-config"]
         if getattr(args, 'baseline_fingerprint_cache', None) is not None:
             result[2]['command'] += ['--fingerprint-cache', str(args.baseline_fingerprint_cache)]
+        if getattr(args, 'baseline_spectrum_metadata_cache', None) is not None:
+            result[2]['command'] += ['--spectrum-metadata-cache', str(args.baseline_spectrum_metadata_cache)]
+        if getattr(args, 'spectrum_metadata_cache', None) is not None:
+            result[3]['command'] += ['--spectrum-metadata-cache', str(args.spectrum_metadata_cache)]
         if uses_fingerprints:
             for flag in ('fingerprint_training_index', 'training_fingerprint_cache', 'validation_fingerprint_cache'):
                 result[3]['command'] += ['--' + flag.replace('_', '-'), str(getattr(args, flag))]
@@ -112,8 +122,19 @@ def preflight(args):
     fingerprint_model = getattr(args, 'molecule_input', 'gine') == 'fingerprint'
     uses_fingerprints = getattr(args, 'molecule_input', 'gine') in ('fingerprint', 'gine_fingerprint')
     independent_baseline = getattr(args, 'checkpoint_model_config', False) or uses_fingerprints
-    if any(hasattr(config.model.spec_encoder, key) for key in ('precursor_delta', 'qk_norm', 'attention_pool')) and not independent_baseline:
+    if any(hasattr(config.model.spec_encoder, key) for key in (
+        'precursor_delta', 'qk_norm', 'attention_pool', 'adduct_conditioning'
+    )) and not independent_baseline:
         raise ValueError('Downstream spectral variants require independent baseline checkpoint construction')
+    adduct_settings = adduct_model_settings(config.model.to_dict())
+    metadata_path = getattr(args, 'spectrum_metadata_cache', None)
+    if (adduct_settings is not None) != (metadata_path is not None):
+        raise ValueError('Adduct model configuration and explicit metadata cache must be provided together')
+    if metadata_path is not None and (not getattr(args, 'optimize_alignment', False)
+        or getattr(args, 'prepared_data', None) is None or getattr(args, 'alignment_training_candidates', None) is None):
+        raise ValueError('Adduct conditioning requires complete prepared inputs and formal candidate optimization')
+    if getattr(args, 'baseline_spectrum_metadata_cache', None) is not None and not independent_baseline:
+        raise ValueError('Baseline adduct metadata requires independent checkpoint construction')
     if independent_baseline and (not getattr(args, 'optimize_alignment', False)
                                   or getattr(args, 'prepared_validation_index', None) is None):
         raise ValueError('Independent baseline construction requires optimization and a prepared full validation index')
@@ -224,6 +245,18 @@ def preflight(args):
             extra['baseline_fingerprint_input'] = baseline_input
             inputs.update(fingerprint_input_files(baseline_input, 'baseline_fingerprint'))
         extra['checkpoint_model'] = model_receipt
+        baseline_settings = adduct_model_settings(model_receipt['model_config'])
+        baseline_metadata_path = getattr(args, 'baseline_spectrum_metadata_cache', None)
+        if (baseline_settings is not None) != (baseline_metadata_path is not None):
+            raise ValueError('Baseline adduct model requires its own explicit metadata inputs')
+        if baseline_metadata_path is not None:
+            _, receipts = load_spectrum_metadata(args.prepared_data, baseline_metadata_path,
+                counts=config.fulltrain.expected_counts.to_dict(), exclusions=config.fulltrain.exclude_val_query_indices,
+                tokenizer_config=config.data.tokenizer.to_dict(), settings=baseline_settings, index=baseline_index)
+            if receipts != parent_selection.get('spectrum_metadata'):
+                raise ValueError('Baseline adduct inputs differ from its own selected model')
+            extra['baseline_spectrum_metadata'] = receipts
+            inputs.update(spectrum_metadata_files(receipts, 'baseline_spectrum_metadata'))
     if graph_path is not None:
         if validation_path is None:
             raise ValueError("Validation graph cache requires a verified prepared validation index")
@@ -249,6 +282,12 @@ def preflight(args):
                                                    config.fulltrain.exclude_val_query_indices)
         extra["candidate_training_input"] = receipt
         inputs.update(candidate_source_inputs(receipt))
+    if metadata_path is not None:
+        _, receipts = load_spectrum_metadata(args.prepared_data, metadata_path,
+            counts=config.fulltrain.expected_counts.to_dict(), exclusions=config.fulltrain.exclude_val_query_indices,
+            tokenizer_config=config.data.tokenizer.to_dict(), settings=adduct_settings, index=baseline_index)
+        extra['spectrum_metadata'] = receipts
+        inputs.update(spectrum_metadata_files(receipts))
     if uses_fingerprints:
         extra['fingerprint_inputs'] = {}
         for split, index_path, cache_path in (('train', args.fingerprint_training_index, args.training_fingerprint_cache),
@@ -318,16 +357,27 @@ def audit_alignment(args, alignment_settings, augmentation_settings):
                       if candidate_input is not None else None)
     if selection.get("candidate_training_input") != expected_input:
         raise ValueError("Alignment used a different candidate training input")
+    metadata = metadata_receipts = None
+    metadata_hashes = {}
+    if adduct_model_settings(selection['model_config']) is not None or selection.get('spectrum_metadata') is not None:
+        manifest = json.loads((args.output_root / 'inputs_and_commands.json').read_text())
+        validation_index = load_validation_index(args.output_root / 'validation/mass_val_topk256.pt', data,
+            config.fulltrain.expected_counts.to_dict(), config.fulltrain.exclude_val_query_indices,
+            config.data.tokenizer.to_dict())
+        metadata, metadata_receipts, metadata_hashes = audit_model_spectrum_metadata(manifest, selection, data, validation_index)
     candidate_report, candidate_hashes = audit_candidate_training(
         directory, stage, candidate_input, alignment_settings.get("candidate_supervision"), selection["seed"],
         alignment_settings["batch_size"], data, config.fulltrain.expected_counts.to_dict(),
         config.fulltrain.exclude_val_query_indices,
         fingerprint_cache=selection.get('training_fingerprint_cache'),
         graph_fingerprint=selection['model_config'].get('type', 'gine') == 'gine_fingerprint',
+        **({} if metadata is None else {'spectrum_metadata': metadata['train']}),
     )
+    candidate_hashes.update(metadata_hashes)
     return {"checkpoint_sha256": selection["checkpoint_sha256"], "epochs": len(audit["epochs"]),
             "expected_epoch_counts": expected, "graph_policy": selection["graph_policy"],
-            "candidate_training": candidate_report, "candidate_artifact_sha256": candidate_hashes}
+            "candidate_training": candidate_report, "candidate_artifact_sha256": candidate_hashes,
+            **({} if metadata_receipts is None else {'spectrum_metadata': metadata_receipts})}
 
 
 def execute(args, manifest):
@@ -450,6 +500,8 @@ def execute(args, manifest):
                     raise ValueError("Baseline used a different validation graph cache")
                 if progress['audit'].get('checkpoint_model') != manifest.get('checkpoint_model'):
                     raise ValueError('Baseline model construction changed after preflight')
+                if progress['audit'].get('spectrum_metadata') != manifest.get('baseline_spectrum_metadata'):
+                    raise ValueError('Baseline adduct inputs changed after preflight')
                 baseline_fingerprint = manifest.get('baseline_fingerprint_input')
                 if progress['audit'].get('validation_fingerprint_cache') != (
                     baseline_fingerprint['cache'] if baseline_fingerprint else None
@@ -491,6 +543,8 @@ def main(argv=None):
     parser.add_argument('--training-fingerprint-cache', type=Path)
     parser.add_argument('--validation-fingerprint-cache', type=Path)
     parser.add_argument('--baseline-fingerprint-cache', type=Path)
+    parser.add_argument('--spectrum-metadata-cache', type=Path)
+    parser.add_argument('--baseline-spectrum-metadata-cache', type=Path)
     parser.add_argument("--alignment-batching", choices=["random", "mass_blocks"],
                         help="Optimization trial: override only the training batch assembly; block size comes from params.yaml")
     parser.add_argument("--alignment-mol-augmentation", action=argparse.BooleanOptionalAction, default=None,
@@ -510,7 +564,7 @@ def main(argv=None):
     if args.baseline_fingerprint_cache and not (args.checkpoint_model_config or uses_fingerprints):
         parser.error('Baseline fingerprints require independent model loading')
     for key in ('fingerprint_training_index', 'training_fingerprint_cache', 'validation_fingerprint_cache',
-                'baseline_fingerprint_cache'):
+                'baseline_fingerprint_cache', 'spectrum_metadata_cache', 'baseline_spectrum_metadata_cache'):
         if getattr(args, key) is not None:
             setattr(args, key, getattr(args, key).expanduser().resolve())
     try:

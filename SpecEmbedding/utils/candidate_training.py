@@ -96,13 +96,14 @@ def read_candidate_training_input(path, data_path, settings, expected_counts, ex
 
 
 def audit_candidate_training(directory, stage, input_path, settings, seed, batch_size, data_path, counts, exclusions,
-                             *, fingerprint_cache=None, graph_fingerprint=False):
+                             *, fingerprint_cache=None, graph_fingerprint=False, spectrum_metadata=None):
     """Replay every observed query's negative sample; never run a model or use test labels."""
     record = stage.get("candidate_training")
     if settings is not None:
         validate_candidate_settings(settings)
     if settings is None or not settings["enabled"]:
-        if record is not None or input_path is not None or (Path(directory) / "candidate_training").exists():
+        if (record is not None or input_path is not None or spectrum_metadata is not None
+                or (Path(directory) / "candidate_training").exists()):
             raise ValueError("Unexpected candidate supervision in an inactive/legacy run")
         return {"state": "disabled"}, {}
     if record is None or input_path is None:
@@ -129,6 +130,13 @@ def audit_candidate_training(directory, stage, input_path, settings, seed, batch
             raise ValueError('Candidate fingerprint source differs from the declared model inputs')
         expected_provenance = fingerprint_training_provenance(expected_provenance, verified,
                                                               graph_fingerprint=graph_fingerprint)
+    if spectrum_metadata is not None:
+        from SpecEmbedding.utils.adduct_metadata import SpectrumMetadata
+        if (not isinstance(spectrum_metadata, SpectrumMetadata) or spectrum_metadata.payload['split'] != 'train'
+                or spectrum_metadata.provenance['source']['dataset_manifest_sha256'] != index.provenance['dataset_manifest_sha256']
+                or not np.array_equal(spectrum_metadata.raw_query_indices, np.arange(len(index)))):
+            raise ValueError('Candidate audit requires the complete bound training adduct input')
+        expected_provenance['spectrum_metadata'] = spectrum_metadata.provenance
     if (record["loss"] != LOSS_NAME or record["candidate_loss_weight"] != settings["loss_weight"]
             or record["data"] != expected_provenance or len(record["epochs"]) != stage["stop_epoch"]):
         raise ValueError("Candidate loss, input or trajectory differs from the pinned experiment")
@@ -149,6 +157,14 @@ def audit_candidate_training(directory, stage, input_path, settings, seed, batch
                 or not np.array_equal(np.sort(order), np.arange(len(index)))):
             raise ValueError("Candidate observed order lost, duplicated or changed a raw query")
         hashes[str(order_path)] = order_sha
+        if spectrum_metadata is None:
+            if 'observed_adduct_order_sha256' in saved:
+                raise ValueError('Unexpected adduct order in an unconditioned candidate run')
+        else:
+            # Independently reconstruct from original query IDs, not the training Dataset mapping.
+            pairs = np.column_stack((order, spectrum_metadata.adduct_ids[order])).astype('<i8')
+            if saved.get('observed_adduct_order_sha256') != hashlib.sha256(pairs.tobytes()).hexdigest():
+                raise ValueError('Observed adduct order differs from the complete raw-query binding')
         observed_hash = hashlib.sha256()
         negative_counts = np.zeros(len(index), dtype=np.int64)
         batch_sizes = []

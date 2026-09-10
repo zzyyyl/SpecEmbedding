@@ -8,6 +8,7 @@ from pathlib import Path
 import torch
 
 from SpecEmbedding.config import config
+from SpecEmbedding.utils.adduct_alignment_inputs import adduct_model_settings, load_spectrum_metadata
 from SpecEmbedding.utils.align import load_align_model
 from SpecEmbedding.utils.fingerprint_alignment_inputs import load_alignment_fingerprints
 from SpecEmbedding.utils.fingerprint_validation import FingerprintRetrievalValidator
@@ -37,6 +38,8 @@ def main(argv=None):
     parser.add_argument("--device")
     parser.add_argument("--graph-cache", type=Path, help="Audited fixed molecule inputs, never model embeddings")
     parser.add_argument('--fingerprint-cache', type=Path, help='The fingerprint checkpoint\'s own audited validation inputs')
+    parser.add_argument('--spectrum-metadata-cache', type=Path,
+                        help='The conditioned checkpoint\'s own complete observed-adduct inputs')
     parser.add_argument("--checkpoint-model-config", action="store_true",
                         help="Construct the baseline from its own verified selection metadata; preserve shared data/tokenizer protocol")
     parser.add_argument("--spectrum-control", choices=("permuted", "constant", "precursor_only"),
@@ -48,6 +51,8 @@ def main(argv=None):
         parser.error("--checkpoint-model-config requires checkpoint evaluation")
     if args.fingerprint_cache and (args.prepare_only or not args.checkpoint_model_config):
         parser.error('Fingerprint validation requires independent checkpoint construction')
+    if args.spectrum_metadata_cache and (args.prepare_only or not args.checkpoint_model_config):
+        parser.error('Adduct validation requires independent checkpoint construction')
     if args.spectrum_control is not None and args.prepare_only:
         parser.error("Spectrum controls require checkpoint evaluation, not index preparation")
     if args.prepare_only:
@@ -72,6 +77,22 @@ def main(argv=None):
                                   config.fulltrain.exclude_val_query_indices, config.data.tokenizer.to_dict())
     selection = json.loads((args.checkpoint.parent / "alignment_selection.json").read_text())
     kind = formal_model_type(selection['model_config']) if args.checkpoint_model_config else 'gine'
+    adduct_settings = adduct_model_settings(selection['model_config'])
+    if (adduct_settings is not None) != bool(args.spectrum_metadata_cache):
+        raise ValueError('Baseline adduct model and explicit observed metadata disagree')
+    if not args.checkpoint_model_config and (
+        adduct_settings is not None or adduct_model_settings(config.model.to_dict()) is not None
+    ):
+        raise ValueError('Adduct validation requires independently bound checkpoint construction')
+    metadata = metadata_receipts = None
+    if args.spectrum_metadata_cache:
+        if args.spectrum_control is not None:
+            raise ValueError('Adduct spectrum controls require a separately registered metadata policy')
+        metadata, metadata_receipts = load_spectrum_metadata(args.data_path, args.spectrum_metadata_cache,
+            counts=config.fulltrain.expected_counts.to_dict(), exclusions=config.fulltrain.exclude_val_query_indices,
+            tokenizer_config=config.data.tokenizer.to_dict(), settings=adduct_settings, index=index)
+        if metadata_receipts != selection.get('spectrum_metadata'):
+            raise ValueError('Baseline adduct inputs differ from its own selected model')
     if (kind in ('fingerprint', 'gine_fingerprint')) != bool(args.fingerprint_cache):
         raise ValueError('Baseline model type and molecular inputs disagree')
     if kind == 'fingerprint' and args.graph_cache:
@@ -91,6 +112,8 @@ def main(argv=None):
         raise ValueError("Spectrum control checkpoint/configuration provenance mismatch")
     control = {'spectrum_control': args.spectrum_control,
                'control_settings': config.retrieval_validation.spectrum_controls if args.spectrum_control is not None else None}
+    if metadata is not None:
+        control['spectrum_metadata'] = metadata['val']
     fingerprint_input = None
     if args.fingerprint_cache:
         expected_cache = selection.get('validation_fingerprint_cache')
@@ -157,6 +180,13 @@ def main(argv=None):
         extra['checkpoint_model'] = model_receipt
     if fingerprint_input is not None:
         extra['validation_fingerprint_cache'] = fingerprint_input['cache']
+    if metadata is not None:
+        _, after = load_spectrum_metadata(args.data_path, args.spectrum_metadata_cache,
+            counts=config.fulltrain.expected_counts.to_dict(), exclusions=config.fulltrain.exclude_val_query_indices,
+            tokenizer_config=config.data.tokenizer.to_dict(), settings=adduct_settings, index=index)
+        if after != metadata_receipts:
+            raise ValueError('Adduct validation inputs changed during encoding')
+        extra['spectrum_metadata'] = metadata_receipts
     write_json(args.output / "metrics.json", {"metrics": metrics, "checkpoint_sha256": sha256_file(args.checkpoint),
                                               "index_sha256": sha256_file(args.index), "protocol": index["protocol"],
                                               "device": str(device), "split": "val", "test_evaluated": False,
