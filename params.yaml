@@ -52,7 +52,7 @@ precursor_delta_encoder:
 qk_norm_encoder:
   eps: 0.000001
 
-# Inactive A11 component preset; formal construction/audits must be connected before activation.
+# Inactive A11 preset; activation requires model.spec_encoder.attention_pool.
 attention_pool_encoder:
   norm_eps: 0.00001
 
