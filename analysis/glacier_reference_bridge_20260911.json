@@ -366,5 +366,248 @@
     "source_labels_changed": false,
     "new_retrieval_metrics_generated": false,
     "same_complete_paper_protocol_proven": false
+  },
+  "denominator_ce_followup": {
+    "state": "independently_verified_denominator_ce_groups_and_raw_score_ranks",
+    "verified_at": "2026-09-11T04:15:27+08:00",
+    "group_counts": {
+      "all_official_test": 17556,
+      "simulation_true": 9954,
+      "simulation_false": 7602,
+      "raw_ce_known_true": 10162,
+      "raw_ce_known_false": 7394,
+      "author_covered_true": 17147,
+      "author_covered_false": 409,
+      "ce_source_author_bundle_imputed_unverified": 6988,
+      "ce_source_author_bundle_known": 10159,
+      "ce_source_raw_rounded": 3,
+      "ce_source_unavailable": 406,
+      "known_ce_changed_beyond_rounding": 542,
+      "known_ce_not_changed_beyond_rounding": 9620
+    },
+    "ranking_rule": "project float32 descending argsort; external TSV target identity unchanged",
+    "entropy_group_metrics": {
+      "mass": {
+        "all_official_test": {
+          "queries": 17556,
+          "top1": 0.4559125085440875,
+          "top5": 0.5906812485759854,
+          "top10": 0.6292435634540897,
+          "top20": 0.6682046024151287,
+          "mrr": 0.5215085846524984
+        },
+        "simulation_true": {
+          "queries": 9954,
+          "top1": 0.6782198111312036,
+          "top5": 0.8445850914205345,
+          "top10": 0.8822583885875025,
+          "top20": 0.9142053445850914,
+          "mrr": 0.7544624769746306
+        },
+        "simulation_false": {
+          "queries": 7602,
+          "top1": 0.16482504604051565,
+          "top5": 0.2582215206524599,
+          "top10": 0.297947908445146,
+          "top20": 0.34609313338595105,
+          "mrr": 0.21648055989920922
+        },
+        "raw_ce_known_true": {
+          "queries": 10162,
+          "top1": 0.6677819326904153,
+          "top5": 0.832808502263334,
+          "top10": 0.8707931509545365,
+          "top20": 0.903267073410746,
+          "mrr": 0.7435131987447049
+        },
+        "raw_ce_known_false": {
+          "queries": 7394,
+          "top1": 0.1647281579659183,
+          "top5": 0.2579118203949148,
+          "top10": 0.2972680551798756,
+          "top20": 0.34514471192859075,
+          "mrr": 0.21639485887416426
+        },
+        "author_covered_true": {
+          "queries": 17147,
+          "top1": 0.46672887385548495,
+          "top5": 0.6046538753134659,
+          "top10": 0.644136000466554,
+          "top20": 0.6839680410567446,
+          "mrr": 0.5338670757127767
+        },
+        "author_covered_false": {
+          "queries": 409,
+          "top1": 0.0024449877750611247,
+          "top5": 0.004889975550122249,
+          "top10": 0.004889975550122249,
+          "top20": 0.007334963325183374,
+          "mrr": 0.0033886672671899795
+        },
+        "ce_source_author_bundle_imputed_unverified": {
+          "queries": 6988,
+          "top1": 0.17429879793932457,
+          "top5": 0.27289639381797365,
+          "top10": 0.31453921007441327,
+          "top20": 0.36519748139668,
+          "mrr": 0.2289673134681698
+        },
+        "ce_source_author_bundle_known": {
+          "queries": 10159,
+          "top1": 0.6678806969189881,
+          "top5": 0.8328575647209371,
+          "top10": 0.8708534304557535,
+          "top20": 0.9032385077271385,
+          "mrr": 0.7435963343568669
+        },
+        "ce_source_raw_rounded": {
+          "queries": 3,
+          "top1": 0.3333333333333333,
+          "top5": 0.6666666666666666,
+          "top10": 0.6666666666666666,
+          "top20": 1,
+          "mrr": 0.4619883040935672
+        },
+        "ce_source_unavailable": {
+          "queries": 406,
+          "top1": 0,
+          "top5": 0,
+          "top10": 0,
+          "top20": 0,
+          "mrr": 0
+        },
+        "known_ce_changed_beyond_rounding": {
+          "queries": 542,
+          "top1": 0.5092250922509225,
+          "top5": 0.7269372693726938,
+          "top10": 0.7952029520295203,
+          "top20": 0.8523985239852399,
+          "mrr": 0.606845482282706
+        },
+        "known_ce_not_changed_beyond_rounding": {
+          "queries": 9620,
+          "top1": 0.6767151767151767,
+          "top5": 0.8387733887733888,
+          "top10": 0.8750519750519751,
+          "top20": 0.9061330561330562,
+          "mrr": 0.7512131885911085
+        }
+      },
+      "formula": {
+        "all_official_test": {
+          "queries": 17556,
+          "top1": 0.36027568922305764,
+          "top5": 0.5904534062428799,
+          "top10": 0.6708817498291183,
+          "top20": 0.7431647300068353,
+          "mrr": 0.46708976508939515
+        },
+        "simulation_true": {
+          "queries": 9954,
+          "top1": 0.49216395418927067,
+          "top5": 0.7790837854128994,
+          "top10": 0.8547317661241712,
+          "top20": 0.9095840867992767,
+          "mrr": 0.6188540757389557
+        },
+        "simulation_false": {
+          "queries": 7602,
+          "top1": 0.1875822152065246,
+          "top5": 0.3434622467771639,
+          "top10": 0.43014996053670085,
+          "top20": 0.5252565114443567,
+          "mrr": 0.2683707505924568
+        },
+        "raw_ce_known_true": {
+          "queries": 10162,
+          "top1": 0.48523912615626846,
+          "top5": 0.7692383389096634,
+          "top10": 0.846388506199567,
+          "top20": 0.9027750442826216,
+          "mrr": 0.6111312107944229
+        },
+        "raw_ce_known_false": {
+          "queries": 7394,
+          "top1": 0.18853124154720044,
+          "top5": 0.34473897754936433,
+          "top10": 0.4296727076007574,
+          "top20": 0.5238030835812821,
+          "mrr": 0.26912531130869555
+        },
+        "author_covered_true": {
+          "queries": 17147,
+          "top1": 0.3688691899457631,
+          "top5": 0.6045372368344317,
+          "top10": 0.6867673645535662,
+          "top20": 0.7607744795007874,
+          "mrr": 0.47821616684429447
+        },
+        "author_covered_false": {
+          "queries": 409,
+          "top1": 0,
+          "top5": 0,
+          "top10": 0.004889975550122249,
+          "top20": 0.004889975550122249,
+          "mrr": 0.000624212788026969
+        },
+        "ce_source_author_bundle_imputed_unverified": {
+          "queries": 6988,
+          "top1": 0.1994848311390956,
+          "top5": 0.36476817401259304,
+          "top10": 0.4546365197481397,
+          "top20": 0.5542358328563252,
+          "mrr": 0.28476138406074625
+        },
+        "ce_source_author_bundle_known": {
+          "queries": 10159,
+          "top1": 0.48538241952948125,
+          "top5": 0.7694654985726942,
+          "top10": 0.8464415788955606,
+          "top20": 0.902844768185845,
+          "mrr": 0.6112865499618686
+        },
+        "ce_source_raw_rounded": {
+          "queries": 3,
+          "top1": 0,
+          "top5": 0,
+          "top10": 0.6666666666666666,
+          "top20": 0.6666666666666666,
+          "mrr": 0.08510101010101011
+        },
+        "ce_source_unavailable": {
+          "queries": 406,
+          "top1": 0,
+          "top5": 0,
+          "top10": 0,
+          "top20": 0,
+          "mrr": 0
+        },
+        "known_ce_changed_beyond_rounding": {
+          "queries": 542,
+          "top1": 0.3007380073800738,
+          "top5": 0.6568265682656826,
+          "top10": 0.7343173431734318,
+          "top20": 0.8413284132841329,
+          "mrr": 0.4528585028420785
+        },
+        "known_ce_not_changed_beyond_rounding": {
+          "queries": 9620,
+          "top1": 0.49563409563409566,
+          "top5": 0.7755717255717256,
+          "top10": 0.8527027027027027,
+          "top20": 0.9062370062370062,
+          "mrr": 0.620048446523131
+        }
+      }
+    },
+    "receipt_sha256": "da88b2e86629843688e2d274168865d4824a862bf1e579c0854cd19a57c9c52b",
+    "verification_sha256": "80de391c5f6b15e7072628f60f41852a9e29deb4989816907777c9ffd5914c6a",
+    "full_query_metric_pairs_reconstructed": 70224,
+    "paper_denominator_or_checkpoint_proven": false,
+    "imputation_causal_effect_proven": false,
+    "local_protocol_changed": false,
+    "sota_threshold_lowered": false,
+    "fresh_model_inference": false,
+    "artifact_locations": "Stage plan section 10: denominator_ce_r1 and verification_r2; full cosine and alternative-sort groups remain in the external receipt."
   }
 }
