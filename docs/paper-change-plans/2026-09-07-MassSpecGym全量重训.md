@@ -323,6 +323,38 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-11 06:51：核验A10原入口3756121/starttime1455331545及实际trainer
+  3805869/starttime1456674958仍活跃；前两轮资源JSON均记录train194,119/val19,423，
+  中途结果和资源只维护于A10卡，完整完成审计及晋升仍待。固定`a8ad5f2`源码未修改。
+  已准备独立CPU完成审计，13项生命周期/parser检查通过；真实未完成探测exit1并拒绝
+  创建完成目录，43项固定输入及原单次派发/最终预检证据重新核验。审计等待根为
+  `$SPECEMBEDDING_DATA_ROOT/audits/optimization_a10_completion_queue_20260911`，
+  manifest SHA `379b09d1fb1fed36bdee2c6508aaeee5e27dd367e2c0e09c181df838129bfa66`，
+  launch SHA `1d06301246c3efd981c95cc452d5e8b235df7069bde253d4215ec90c20d66fef`；
+  实际PID3810420/starttime1456826568，socket
+  `/tmp/specembedding-a10-completion-20260911-1010/tmux.sock`，audit/%0。06:43独立复核
+  环境/进程及43项输入通过，runtime_verification SHA
+  `5a040e2b18a41a81c2e19cf8d7a3f1c01a393ec1fca6e1f6dff899f0f12fe550`。
+  只在两原进程结束且所有阶段完成后，向同级`optimization_a10_20260911/receipt.json`
+  单次运行独立审计和严格CPU模型重载；当前该完成目录不存在。
+
+  A11实际绑定根为同级`optimization_a11_dependency_binding_20260911`，binding SHA
+  `4619af72ab8bc2be66788133274ea821286cb576c800639065d2da382f1b5c0d`；包含上述三项
+  实际进程身份、完整命令/环境及50项固定文件，原A10 manifest/launch/claim/runner_exec
+  均在绑定中。原归档部署脚本的实际check-only通过，再准备唯一队列，同级目录为
+  `optimization_a11_successor_queue_20260911`；preparation_receipt SHA
+  `7685900c4824c15dee266cb7d8228ece67a77fabf2ff23283867e85223730304`，manifest SHA
+  `a4796ab052758582010d2d91d81e80dfd2a85766a306c0adbc2e615abf839dc9`。
+  06:49:34单次启动原已验证衔接入口，实际PID3811702/starttime1456875263，socket
+  `/tmp/specembedding-opt-a11-20260911-1010/tmux.sock`，opt/%0；launch SHA
+  `ed489ca1af7df7a6ba68d37e7269e8140f268459b0d9805a4ea95eccfd1e27f6`。
+  06:51:44独立核对实际进程/claim、准备环境、前序身份及50项来源SHA通过，
+  runtime_verification SHA `54efaed12dee1e2b9b5381ad058005231859e778f1047d249acf1489541c0249`。
+  原进程保持waiting_parent、decision为空，没有A11最终配置/模型目录或runner_exec，
+  不是模型已启动或完成。准备、绑定、启动与独立复核脚本均归档并读回，Ruff及源码
+  compile通过；未改项目训练代码，不重复全仓测试。固定A11源码仍为`54b00e8`。
+  A13正式编排/构造/完成审计接入继续待办，SOTA及论文更新仍未完成。
+
 - 2026-09-11 06:24：输入实现`9cf01af83e9467580623354130de08048cf25ea2`已推送，固定
   detached源码在`/data1/${USER}/repos/SpecEmbedding-adduct-inputs-20260911`，工作树干净。
   首次推送/创建worktree因自动审批连接中断未执行，核验本地提交尚未推送、目标目录尚未创建后相同
@@ -1969,7 +2001,7 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
 - 验证结果：A13输入及训练/验证组件检查通过；全仓832通过、1跳过、15失败中的14项环境冲突复核全部通过，余下为相同既有路径审计，详见第10节；Ruff、compileall及diff检查通过。A09完成独立全量审计，不以实现检查代替实验结果。
-- 当前训练状态（2026-09-11 06:24核验）：A04仍为incumbent，A09完成审计未晋升；A10全量GPU训练中，独立完成审计及A11依赖队列尚待部署；A13全量固定输入和独立复核完成，正式接入与最终parent仍待。各轮最新状态集中于[attempts.md](../../attempts.md)，模型优化和SOTA达标未完成。
+- 当前训练状态（2026-09-11 06:51核验）：A04仍为incumbent，A09完成审计未晋升；A10全量GPU训练中，其独立完成审计与A11衔接均已绑定实际依赖并在后台等待；A13全量固定输入和独立复核完成，正式接入与最终parent仍待。各轮最新状态集中于[attempts.md](../../attempts.md)，模型优化和SOTA达标未完成。
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；
