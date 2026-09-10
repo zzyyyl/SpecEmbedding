@@ -321,6 +321,28 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-11 05:03：A12最终绑定与单次衔接组件准备完成，固定训练源码仍为`0234610`。
+  最终绑定128项检查通过（28.87秒），覆盖GINE/指纹、Q/K/注意力汇聚、均匀/结构采样，
+  权重1→2且其余科学配置不变、父模型原构造/权重baseline、CLI与阶段命令、完整审计
+  依赖、来源错配及失败保留。检查根为
+  `$SPECEMBEDDING_DATA_ROOT/audits/optimization_a12_finalizer_checks_20260911_r1`，receipt SHA
+  `801c659e7075fc49fb2c1aba3d965dc393484457189afc099cee643a5a9ef595`。
+  最终绑定组件根为同级`optimization_a12_finalization_preparation_20260911`，receipt SHA
+  `2dc8572387eec9af35e4585ff8662ce379ea2e28dd8dbb3b8c9725ed3063bbf9`，`finalize.py` SHA
+  `f3646a7ce3e7380d5b2fec6f0681117bd9231f06f6951875a3c0104f5d128642`。
+  单次衔接组件根为同级`optimization_a12_successor_preparation_20260911`，26项检查通过，
+  包含真实隔离tmux字面参数/环境传递、单次派发及缺实际绑定拒绝；receipt SHA
+  `e6c40fcf2ef7af30430dbf62762a7aa640899caccc752247895e62da2d9a93f0`，verification SHA
+  `c061daec762cfceb30639302f2ef5ae00574710b950890d64bfd797b8d6233ea`，`successor.py` SHA
+  `d211bc83c36c4e57d8d7e1ca870719c2644f57fad597b99565fc2620c6941e37`，`deploy_queue.py` SHA
+  `026ed9278b5ca6b2b23624db2cd09021a407a01468dacfd48c30f8af45e7d8a9`。
+  24项准备及来源文件独立重算SHA一致，Ruff和源码compile通过；初次只读源码核验的
+  路径拼接TypeError已修正，重查A09/A12实际HEAD与干净状态通过，未修改运行源码。
+  尚无实际A11绑定、A12最终目录或队列；未来绑定需包含A11原manifest/launch/claim/
+  runner_exec和真实入口/训练/审计身份，完成审计后才最终预检与单次派发。
+  05:03主机确认A09原入口/训练/审计及A10等待进程仍存活，A09日志记录第12轮已结束，
+  后台训练继续；本次仅CPU准备，没有额外模型派发、训练结果或论文修改。
+
 - 2026-09-11 04:42：D25完成A09固定第1–9轮及本run fresh A04基线的完整分数诊断，
   每份19,423条有效val，逐query重新计算主/稳定排名并与保存指标匹配；来源索引、
   图/指纹回执、基线权重及九轮完整计数/设备记录通过。独立以标量排序、集合、
