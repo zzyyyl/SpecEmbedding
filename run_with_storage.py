@@ -12,6 +12,8 @@ from SpecEmbedding.utils.storage import external_storage_root, storage_environme
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--storage-root", default=getattr(getattr(config, "storage", None), "root", None))
+    parser.add_argument("--runtime-root", type=Path,
+                        help="Dedicated subdirectory under storage root for this run's caches and temporary files")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
@@ -19,7 +21,7 @@ def main():
     if not args.storage_root or not command:
         parser.error("An external storage root and a command after -- are required")
     root = external_storage_root(args.storage_root)
-    overrides = storage_environment(root)
+    overrides = storage_environment(root, args.runtime_root)
     print(json.dumps({"storage_root": str(root), "environment": overrides, "command": command}, indent=2), flush=True)
     if args.dry_run:
         return
@@ -28,6 +30,8 @@ def main():
         if key not in {"SPECEMBEDDING_STORAGE_ROOT", "SPECEMBEDDING_DATA_ROOT"}:
             Path(value).mkdir(parents=True, exist_ok=True)
     environment = os.environ.copy()
+    # An omitted option deliberately restores the historical shared-cache mode.
+    environment.pop("SPECEMBEDDING_RUNTIME_ROOT", None)
     environment.update(overrides)
     os.chdir(root)
     os.execvpe(command[0], command, environment)

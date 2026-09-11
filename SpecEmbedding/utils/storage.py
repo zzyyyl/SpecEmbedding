@@ -49,12 +49,17 @@ def storage_path(value: str | Path, root: Path) -> Path:
     return resolved
 
 
-def storage_environment(root: Path) -> dict[str, str]:
+def storage_environment(root: Path, runtime_root: Path | None = None) -> dict[str, str]:
+    """Keep shared inputs at root, optionally isolate all writable runtime caches."""
     root = external_storage_root(root)
+    runtime = root if runtime_root is None else storage_path(runtime_root, root)
+    if runtime_root is not None and runtime == root:
+        raise ValueError("Runtime root must be a dedicated subdirectory of storage root")
     return {
         "SPECEMBEDDING_STORAGE_ROOT": str(root),
         "SPECEMBEDDING_DATA_ROOT": str(root),
-        **{name: str(storage_path(relative, root)) for name, relative in CACHE_DIRECTORIES.items()},
+        **({"SPECEMBEDDING_RUNTIME_ROOT": str(runtime)} if runtime_root is not None else {}),
+        **{name: str(storage_path(relative, runtime)) for name, relative in CACHE_DIRECTORIES.items()},
     }
 
 
@@ -64,7 +69,8 @@ def storage_receipt(output_root: Path) -> dict | None:
     if configured is None:
         return None  # Historical configurations retain their original semantics.
     root = external_storage_root(configured)
-    environment = storage_environment(root)
+    runtime_root = os.environ.get("SPECEMBEDDING_RUNTIME_ROOT")
+    environment = storage_environment(root, runtime_root)
     if any(os.environ.get(key) != value for key, value in environment.items()):
         raise ValueError("Storage environment mismatch; launch through run_with_storage.py")
     return {"root": str(root), "output_root": str(storage_path(output_root, root)), "environment": environment}

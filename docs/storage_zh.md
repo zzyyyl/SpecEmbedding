@@ -13,6 +13,7 @@
 | `experiments/<run>/` | 每轮独立数据、验证索引、checkpoint、日志和运行配置 |
 | `audits/` | 准备、审计、迁移回执及条件启动草案 |
 | `cache/`、`tmp/` | 依赖下载/编译缓存、Python字节码及运行临时文件 |
+| `runtime/<attempt>/cache/`、`runtime/<attempt>/tmp/` | 新并行批次各自的依赖/编译缓存与临时文件 |
 
 `params.yaml`的`storage.root`可由`SPECEMBEDDING_STORAGE_ROOT`覆盖，必须是绝对外部路径。
 未定义的环境变量、home路径和越出根目录的输出/缓存符号链接会报错；不静默回退到仓库目录。
@@ -40,3 +41,26 @@ python run_with_storage.py -- python "$PWD/train_align.py" --help
 修改来源、构造参数或版本后，新任务拒绝失效缓存，重新构建并审计新版本；只有确认没有
 活跃训练、准备或审计引用后，才清理旧缓存载荷，保留来源、manifest和审计/清理记录。
 仅改存储位置且字节与来源均相同，不使固定分子输入失效；迁移后的新启动回执须重新生成。
+
+## 并行批次隔离
+
+新批次显式增加`--runtime-root "$SPECEMBEDDING_STORAGE_ROOT/runtime/<attempt>"`，把HF、
+Torch扩展/Inductor、Triton、CUDA、Numba、Python字节码、Matplotlib和TMPDIR统一指向
+该批次目录。公共数据根与已有固定输入路径保留。正式预检将运行缓存根及所有环境项
+写入存储回执，任何环境不匹配都拒绝；不传该选项时保持历史共享缓存行为，并清除继承的
+旧命名空间变量。仅设置这个选项不隔离模型输出或配置，启动方仍必须逐项检查。
+
+每个批次使用新建的detached worktree及固定commit，`PYTHONPATH`、绝对入口脚本与
+子进程cwd均指向它；`SPECEMBEDDING_CONFIG`指向该批冻结配置，正式入口再保存独立的
+`runtime_params.yaml`。实验数据副本、日志、checkpoint、验证分数/embedding、训练输入
+回执和legacy `data.cache_path`均使用该批目录，不指向其他批次的可写目录。禁止运行中
+切换源码、改配置、修改共享环境或清理被引用的文件；提交主仓库不会更新已冻结worktree。
+
+当前正式`train_align.py --formal-fulltrain`走`classified_full_spectra`，读取原始谱图后
+在进程内tokenize，不调用legacy `get_classified_data`的TokenSet缓存读写。验证固定图
+缓存由`MoleculeGraphCache`以`np.memmap(mode='r')`加载，每次返回复制的tensor，允许
+来源指纹一致的并行只读复用。构图/构造规则改变时必须另建版本；不共享学习embedding。
+
+启动回执须记录解析后的目录、源码与配置SHA、模块导入位置、共享输入SHA及只读加载
+依据。派发后另查实际PID/starttime、cwd、argv、配置和GPU UUID，完成审计再复核来源。
+这些约束防止批次读错代码或覆盖工件；CPU、RAM和磁盘带宽仍共享，速度可能互相影响。
