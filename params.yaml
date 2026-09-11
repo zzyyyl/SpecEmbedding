@@ -150,6 +150,10 @@ training_candidate_weight: # inactive A12 preset; apply only after binding the a
   expected_parent_weight: 1.0
   loss_weight: 2.0
 
+training_candidate_budget: # inactive A17 preset; requires a bound uniform parent and renewed resource/input preflight
+  expected_parent_negative_count: 16
+  negative_count: 32
+
 training_candidate_sampling: # inactive A10 preset; copy explicitly into candidate_supervision.sampling with cache_directory
   type: tanimoto_mixed
   near_count: 8

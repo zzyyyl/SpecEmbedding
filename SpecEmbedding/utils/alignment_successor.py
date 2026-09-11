@@ -171,6 +171,30 @@ def candidate_weight_successor_configuration(parent_runtime, selection, weight_s
     return result
 
 
+def candidate_budget_successor_configuration(parent_runtime, selection, budget_settings, gpu_settings, *, storage_template):
+    """Increase a declared uniform candidate budget without inheriting a changed sampling policy."""
+    from SpecEmbedding.utils.candidate_training import validate_candidate_settings
+    from SpecEmbedding.utils.formal_alignment import formal_model_type
+
+    if formal_model_type(parent_runtime['model']) not in ('gine', 'gine_fingerprint'):
+        raise ValueError('Candidate budget successor requires a retained GINE parent')
+    if not isinstance(budget_settings, dict) or set(budget_settings) != {'expected_parent_negative_count', 'negative_count'}:
+        raise ValueError('Incomplete explicit candidate budget change')
+    settings = parent_runtime['train']['align']['candidate_supervision']
+    validate_candidate_settings(settings)
+    if 'sampling' in settings:
+        raise ValueError('Uniform candidate budget successor cannot inherit structural sampling')
+    for count in budget_settings.values():
+        validate_candidate_settings({**settings, 'negative_count': count})
+    if not settings['enabled'] or settings['negative_count'] != budget_settings['expected_parent_negative_count']:
+        raise ValueError('Parent candidate budget differs from the declared baseline')
+    if budget_settings['negative_count'] <= settings['negative_count']:
+        raise ValueError('Candidate budget successor requires a larger negative budget')
+    result = _inherited_successor_configuration(parent_runtime, selection, gpu_settings, storage_template=storage_template)
+    result['train']['align']['candidate_supervision']['negative_count'] = budget_settings['negative_count']
+    return result
+
+
 def spectrum_auxiliary_successor_configuration(parent_runtime, selection, auxiliary_settings, gpu_settings, *, storage_template):
     """Keep the completed parent's scientific settings and add only the registered auxiliary objective."""
     from SpecEmbedding.utils.candidate_training import validate_candidate_settings
