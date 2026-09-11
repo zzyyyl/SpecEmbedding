@@ -131,7 +131,8 @@ checkpoint/版本、来源表格、分母和评价设置。各项的最好值可
 [A13](../../attempt_13.md)已预登记只对峰表示加入观测加合物条件仿射层，全量固定输入和
 正式接入检查通过；最终parent须等A12完整审计，准备状态与证据见第10节。
 [A14](../../attempt_14.md)已按D26/R12预登记分子内全局上下文反馈；最终parent待A13完整
-审计，独立组件、正式接入及A04条件全量预检通过，最终绑定/衔接、资源测量和训练结果仍待。
+审计，独立组件、正式接入、A04条件全量预检及后续绑定/衔接组件通过检查，实际依赖、
+最终parent、资源测量和训练结果仍待。
 
 ### 4.1 第一优先：评价与选优对齐
 
@@ -325,6 +326,30 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-11：A14最终绑定249项及单次衔接45项CPU检查通过，固定源码仍为`4a2c3bd`。
+  继承原GINE/图+指纹、谱图汇聚/QK/加合物与候选采样/权重时只增加上下文分支，
+  加合物输入按继承配置同时绑定候选与基线；真实CLI阶段命令、前序进程/完整审计、
+  失败保留和隔离tmux真实参数传递均已检查。详细行为与范围只维护于A14卡。
+  最终绑定检查根`/data1/${USER}/SpecEmbedding/audits/optimization_a14_finalizer_checks_20260911_r1`，
+  `receipt.json` SHA为`889be0911d14b02537a5231a4a6b82c602737374c022b9495602bb37b285a186`。
+  归档根`/data1/${USER}/SpecEmbedding/audits/optimization_a14_finalization_preparation_20260911`，
+  `receipt.json` SHA为`7d311929ca44f1c1571a8d4b339c2b6c0f72de288a928d57388439756d2a8db9`，
+  `finalize.py` SHA为`1b2d63f8b1339add0bc9e07f8b3866cdc6cd0e3fc75115ca2802a0f8deaa613c`。
+  单次衔接检查根`/data1/${USER}/SpecEmbedding/audits/optimization_a14_successor_checks_20260911_r1`，
+  `receipt.json` SHA为`d5d57e48cfdc8443d7b78cc01fb8be7e3d8da20ec71562460799450dd1c73331`。
+  归档根`/data1/${USER}/SpecEmbedding/audits/optimization_a14_successor_preparation_20260911`，
+  `receipt.json` SHA为`a7cc85892f4708d4ab06c3c3c5dab519215a5e8da02fd4e4514a8c3e996766ee`，
+  `successor.py` SHA为`0c4ce181c8a50e8fd762a7382906de52e03613f6d65c0fb503322d486222f987`，
+  `deploy_queue.py` SHA为`e32c85a628b52b320f665b4d2b19c6676a25f68a1dd7cf41cc5e5e0ab5ff380a`。
+  真实缺少A13绑定的探测未创建最终配置、队列、正式socket或模型目录，验证回执
+  `verification.json` SHA为`4cd54ee2b7d4501370353f0ee56b7b0c697ff8e8d2d5d4eda014f8d687da5a34`。
+  10:01:01独立重算39项检查/准备/来源SHA一致，`independent_verification.json` SHA为
+  `aba2d4b896661f138dd46faf855619e00dec1e23ab4572ad393867fdf51dbfc7`。Ruff和源码编译通过；
+  本轮未改仓库生产源码，沿用上一条正式接入提交的全仓回归，不重复运行无关测试。
+  实际仍缺A13入口/trainer/独立完成审计身份，尚无A14依赖绑定、最终parent或派发。
+  10:03主机复核A10原入口/训练、完成审计及A11等待PID/starttime和三个原专用pane
+  均一致，A10/A11/A13/A14固定源码干净。A10前十九轮完整计数和资源日志已核验，
+  中途验证指标只回填同一实验卡，不作最终晋升或SOTA结论。
 - 2026-09-11：A14正式构造、fresh全量候选训练CLI和完整完成审计以`4a2c3bd`提交并推送，
   冻结源码`/data1/${USER}/repos/SpecEmbedding-opt-a14-20260911`，detached
   `4a2c3bd35096b282bc40ddd9ec024f1a521e756d`。继承分支和独立基线配置均严格绑定，
@@ -2121,8 +2146,8 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
-- 验证结果：A14独立组件及正式接入检查、A04条件全量CPU预检和独立读回通过；最近全仓972通过、1跳过、1个相同既有路径审计失败，详见第10节；Ruff、源码编译及diff检查通过。不以实现检查代替实验结果。
-- 当前训练状态（2026-09-11 09:36进程核验）：A04仍为incumbent，A10全量GPU训练中，其独立完成审计与A11衔接在后台等待；A13全量输入、正式接入、条件预检及后续衔接组件已准备并核验，实际A12依赖、最终parent与队列仍待；A14正式接入与条件预检通过，最终绑定/衔接、资源测量及训练尚待。各轮最新状态集中于[attempts.md](../../attempts.md)，模型优化和SOTA达标未完成。
+- 验证结果：A14独立组件及正式接入检查、A04条件全量预检、249项最终绑定和45项单次衔接检查及独立读回通过；最近生产源码全仓972通过、1跳过、1个相同既有路径审计失败，详见第10节；Ruff、源码编译及diff检查通过。不以实现检查代替实验结果。
+- 当前训练状态（2026-09-11 10:03进程核验）：A04仍为incumbent，A10全量GPU训练中，其独立完成审计与A11衔接在后台等待；A13/A14全量输入、正式接入、条件预检及后续衔接组件已准备并核验，实际前序训练/审计依赖与最终parent仍待，尚无实际队列；A14真实GPU成本及训练仍待。各轮最新状态集中于[attempts.md](../../attempts.md)，模型优化和SOTA达标未完成。
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；
