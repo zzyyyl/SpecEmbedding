@@ -326,6 +326,25 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-11 11:37：完成新共同A04分支的批次隔离与实际派发核验；源码提交`e4b6ca5`
+  已推送，A12使用新的独立固定worktree，原A10/A12条件/A13/A14 worktree均未改动。
+  99项相关CPU测试、Ruff、compileall和diff通过，检查回执SHA为
+  `751b004cf8503136137e4ebfbe9809c517a4e30b574d886419aab6ae100d28b9`。
+  A12以A04 epoch20为唯一已审计对照，保留均匀CE16/seed42/batch128，仅CE权重1→2；
+  19项输入全量预检、30个实际本地模块导入来源及197项源码/YAML部署读回通过。
+  准备根`/data1/zyl/SpecEmbedding/audits/optimization_a12_parallel_a04_20260911/`：
+  `receipt.json` SHA `baeb1d1ad82e50e28175578b32639189f0017330ea9f825938cbcbb7db1fff71`，
+  `preflight.json` SHA `7b3f98a2f2fd029b1443141f3f8542f3524a828df395db4fb3390f7a2b2f0b9d`。
+  派发根`/data1/zyl/SpecEmbedding/audits/optimization_a12_parallel_launch_20260911/`：
+  `launch.json` SHA `abba41c06bf74f6a8210941eb3d6b584d29cca5e71fc8f85fc36a587a9e68502`，
+  `verification.json` SHA `fd2afc7cd32b5167710761a2141e440dbb95048872f35cb0a8e4f442c0965576`，
+  `verification.py` SHA `47e66cb7a6b18eb9b069cdb81f16b323689b4508521b78968324a45d25854414`。
+  运行配置SHA `4eb0dbc35245f01703c1ea4255ea0d1eb5ebbb6a43d0caf3dd76afa30cbec81d`。
+  独立入口PID3885413/start1458588106，CPU数据与验证索引导入完成，现已后台等待物理
+  GPU0；11:37:34空闲6177MiB，低于10,000MiB准入线，没有GPU评价或模型训练。实际
+  socket/目录及后续完成审计待办见A12卡。A10原训练仍在物理GPU1，A11旧CPU队列已
+  停止，A13等待槽位与独立绑定，A14/A15延后；这不是新模型完成或SOTA达标。
+
 - 2026-09-11：以`850fd32`预登记A15后，以`bd4d156`提交独立按头SDPA输出门控及未激活
   配置。实际新增32,768个参数，恒等初始化保留原权重/随机数流，原预训练共享结构与
   峰/图/指纹缓存构造未改。首次相关检查115通过、6失败，原因为汇聚/加合物外层封装
@@ -2188,7 +2207,7 @@ legacy TokenSet写缓存，验证固定图以只读mmap打开并返回tensor副�
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
 - 验证结果：A15独立组件121项相关CPU检查和28项SHA独立读回通过，最近全仓1,018通过、1跳过、1个相同既有路径审计失败；A14正式接入、条件全量预检及最终绑定/衔接验证记录保留，详见第10节；Ruff、源码编译及diff检查通过。不以实现检查代替实验结果。
-- 当前训练状态（2026-09-11 11:14进程核验）：A04仍为incumbent，A10全量GPU训练及独立完成审计等待正常，A11旧等待已停止；A12第一优先、A13其次，等待各自隔离预检与GPU条件，A14/A15延后。尚无新模型最终结果。各轮最新状态集中于[attempts.md](../../attempts.md)，模型优化和SOTA达标未完成。
+- 当前训练状态（2026-09-11 11:37进程核验）：A04仍为incumbent，A10全量GPU训练及独立完成审计等待正常，A11旧等待已停止；A12隔离与CPU准备完成、后台等待物理GPU0，A13待槽位与独立绑定，A14/A15延后。尚无新模型最终结果。各轮最新状态集中于[attempts.md](../../attempts.md)，模型优化和SOTA达标未完成。
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；
