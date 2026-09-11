@@ -71,6 +71,23 @@ attention_output_gate_encoder:
   initialization: zero_weight
   bias: false
 
+# Inactive A16 preset. Train-only target preparation is supported; formal training is not yet wired.
+molecule_spectrum_auxiliary:
+  weight: 1.0
+  model:
+    embedding_dim: 512
+    hidden_dim: 64
+    normalization_eps: 0.000000000001
+    initialization_seed: 42
+  target:
+    bins_per_da: 10
+    max_mz: 2955
+    intensity_transform: linear_sum_l2
+    overflow_policy: single_bin
+    adducts: ["[M+H]+", "[M+Na]+"]
+    unknown_id: 2
+    unknown_policy: zero_condition
+
 # Inactive A14 preset; activation requires model.graph_global_context in a new pinned run.
 graph_global_context_encoder:
   hidden_dim: 64
