@@ -62,6 +62,14 @@ adduct_conditioning_encoder:
   unknown_id: 2
   unknown_policy: identity
 
+# Inactive A14 component preset; formal construction/runner support is not enabled yet.
+graph_global_context_encoder:
+  hidden_dim: 64
+  pooling: mean
+  normalization: layernorm_no_affine
+  initialization: zero_output
+  placement: between_local_layers
+
 model:
   spec_encoder:
     embedding_dim: 512

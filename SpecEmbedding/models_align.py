@@ -79,6 +79,10 @@ class GINEEncoder(nn.Module):
         )
         self.fc = nn.Linear(emb_dim + size_feature_dim, emb_dim)
 
+    def _after_local_update(self, h_node, batch, layer_index, num_graphs):
+        """Downstream variants may exchange graph context between local layers."""
+        return h_node
+
     def forward(self, x, edge_index, edge_attr, batch, graph_size_features):
         # 1. 节点与边特征的拼接与投影
         h_node = torch.cat([
@@ -92,13 +96,16 @@ class GINEEncoder(nn.Module):
         h_edge = self.bond_proj(h_edge)
 
         # 2. GINE 消息传递
-        for conv, norm in zip(self.convs, self.norms):
+        num_graphs = graph_size_features.numel() // 2
+        for layer_index, (conv, norm) in enumerate(zip(self.convs, self.norms)):
             h_res = h_node
             h_node = norm(h_node)
             h_node = conv(h_node, edge_index, edge_attr=h_edge)
             h_node = F.relu(h_node)
             h_node = F.dropout(h_node, p=self.dropout_rate, training=self.training)
             h_node = h_node + h_res
+            if layer_index + 1 < len(self.convs):
+                h_node = self._after_local_update(h_node, batch, layer_index, num_graphs)
 
         # 3. 全局池化 (Graph-level representation): Mean + explicit size feature
         graph_mean = global_mean_pool(h_node, batch)
