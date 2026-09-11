@@ -149,7 +149,8 @@ def make_bits(root, smiles, index_sha, manifest_sha):
 
 @pytest.mark.parametrize('combined,pool,structural', [(False, False, False), (False, True, True),
                                                    (True, False, True), (True, True, False)])
-def test_real_fresh_training_replays_adducts_and_strictly_reloads_every_input(tmp_path, monkeypatch, combined, pool, structural):
+@pytest.mark.parametrize('graph_context', [False, True])
+def test_real_fresh_training_replays_adducts_and_strictly_reloads_every_input(tmp_path, monkeypatch, combined, pool, structural, graph_context):
     import train_align as entry
 
     data, root = tmp_path / 'data', tmp_path / 'adducts'
@@ -178,6 +179,11 @@ def test_real_fresh_training_replays_adducts_and_strictly_reloads_every_input(tm
     metadata, receipts = load_spectrum_metadata(data, root, counts=counts, exclusions=[], tokenizer_config=tokenizer,
                                                settings=SETTINGS, index=index)
     definition_config = definition(combined, pool)
+    if graph_context:
+        from tests.test_graph_global_context import context_config
+
+        definition_config['graph_global_context'] = context_config()
+        definition_config['mol_encoder']['n_layers'] = 4
     monkeypatch.setattr(config, 'model', ConfigObject(definition_config))
     monkeypatch.setattr(config.data, 'tokenizer', ConfigObject(tokenizer))
     for key, value in {'candidate_supervision': ConfigObject(candidate_settings), 'epochs_stage2': 2,
@@ -215,6 +221,9 @@ def test_real_fresh_training_replays_adducts_and_strictly_reloads_every_input(tm
     assert all(row['train'] == row['val'] == row['batching']['unique_queries'] == 3 for row in selection['fulltrain_audit']['epochs'])
     weights = torch.load(output / 'best_model_stage2.pth', weights_only=True)
     assert weights['spec_encoder.conditioning.affine'].abs().sum() > 0
+    if graph_context:
+        for layer in range(3):
+            assert weights[f'mol_encoder.context_branches.{layer}.output.weight'].abs().sum() > 0
     restored, _, receipt = load_formal_alignment(output / 'best_model_stage2.pth', torch.device('cpu'),
         dataset_outputs=outputs, dataset_manifest_sha256=manifest_sha, tokenizer_config=tokenizer,
         expected_counts={'train': 3, 'val': 3}, exclusions=[])
@@ -257,6 +266,7 @@ def verify_complete_gine_fixture(monkeypatch, directory, data, index, selection,
     runtime['fulltrain']['exclude_val_query_indices'] = []
     parent_config = copy.deepcopy(runtime['model'])
     parent_config['spec_encoder'].pop('adduct_conditioning')
+    parent_config.pop('graph_global_context', None)
     parent = build_formal_alignment(parent_config).eval()
     parent_dir = run / 'synthetic_parent'
     parent_dir.mkdir()
@@ -301,6 +311,20 @@ def verify_complete_gine_fixture(monkeypatch, directory, data, index, selection,
     assert report['state'] == 'complete_validation_audit' and report['full_epoch_counts'] == {'train': 3, 'val': 3}
     assert report['spectrum_metadata'] == receipts and report['candidate_training']['negative_sampling_replayed']
     assert not report['test_evaluated_by_this_audit']
+    if 'graph_global_context' in runtime['model']:
+        # Updating the byte hash must not disguise an incomplete molecular architecture.
+        weight_path, selection_path = directory / 'best_model_stage2.pth', directory / 'alignment_selection.json'
+        original_weights, original_selection = weight_path.read_bytes(), selection_path.read_bytes()
+        damaged = torch.load(weight_path, weights_only=True)
+        damaged.pop('mol_encoder.context_branches.1.output.weight')
+        torch.save(damaged, weight_path)
+        changed = copy.deepcopy(selection)
+        changed['checkpoint_sha256'] = sha256_file(weight_path)
+        selection_path.write_text(json.dumps(changed))
+        with pytest.raises(RuntimeError, match='Missing key'):
+            audit.audit_optimization_run(run)
+        weight_path.write_bytes(original_weights)
+        selection_path.write_bytes(original_selection)
     for damage in ('unbound', 'wrong_snapshot', 'missing_weights'):
         with monkeypatch.context():
             if damage == 'unbound':

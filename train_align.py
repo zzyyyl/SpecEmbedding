@@ -102,6 +102,14 @@ def train_align(
         raise ValueError("Candidate supervision requires formal fresh training and full retrieval selection")
     if not candidate_settings["enabled"] and candidate_input_receipt is not None:
         raise ValueError("Unexpected candidate input in an inactive run")
+    graph_context = hasattr(config.model, 'graph_global_context')
+    if graph_context:
+        if (not formal_fulltrain or retrieval_validator is None or spec_encoder is not None
+                or not candidate_settings['enabled']):
+            raise ValueError('Graph context requires fresh full candidate training and bound validation')
+        formal_model_type(config.model.to_dict())
+        if mol_norm_type != config.model.mol_encoder.norm_type or mol_norm_eps != config.model.mol_encoder.norm_eps:
+            raise ValueError('Graph context normalization must match the pinned molecular configuration')
     if candidate_settings['enabled']:
         validate_candidate_sampling_binding(training_candidates, candidate_settings, candidate_input_receipt)
     adduct_settings = adduct_model_settings(config.model.to_dict())
@@ -247,7 +255,7 @@ def train_align(
     logging.info("2. 初始化模型...")
 
     has_pretrained_spec = spec_encoder is not None
-    if uses_fingerprints:
+    if uses_fingerprints or graph_context:
         model = build_formal_alignment(config.model.to_dict())
     else:
         # Preserve the original GINE initialization order and legacy pretrained path.
@@ -402,6 +410,11 @@ def main():
     )
 
     args = parser.parse_args()
+    if hasattr(config.model, 'graph_global_context'):
+        if (not args.formal_fulltrain or not args.validation_index or args.pretrained_spec
+                or not args.candidate_training_input or not config.train.align.candidate_supervision.enabled):
+            parser.error('Graph context requires fresh formal candidate training and full retrieval selection')
+        formal_model_type(config.model.to_dict())
     adduct_settings = adduct_model_settings(config.model.to_dict())
     if (adduct_settings is not None) != bool(args.spectrum_metadata_cache):
         parser.error('Adduct configuration and --spectrum-metadata-cache must be supplied together')

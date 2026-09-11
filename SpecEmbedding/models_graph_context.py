@@ -1,4 +1,4 @@
-"""Prepared graph-local/global molecular tower; formal runner integration is separate."""
+"""Independent graph-local/global molecular tower with explicit formal construction metadata."""
 
 import copy
 import math
@@ -85,12 +85,14 @@ class GlobalContextGraphFingerprintEncoder(_GraphContextLayers, GraphFingerprint
 
 
 class GraphGlobalContextAlignmentModel(SpecMolAlignModel):
-    """Independent contrastive towers with explicit, not-yet-formal construction metadata."""
+    """Independent contrastive towers with complete inherited construction metadata."""
 
     def __init__(self, *, parent_model_config, context_config):
         from SpecEmbedding.utils.formal_alignment import formal_model_type
 
         validate_graph_context(context_config)
+        if 'graph_global_context' in parent_model_config:
+            raise ValueError('Parent already has graph global context')
         kind = formal_model_type(parent_model_config)
         if kind not in ('gine', 'gine_fingerprint'):
             raise ValueError('Graph context requires a GINE parent')

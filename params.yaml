@@ -62,7 +62,7 @@ adduct_conditioning_encoder:
   unknown_id: 2
   unknown_policy: identity
 
-# Inactive A14 component preset; formal construction/runner support is not enabled yet.
+# Inactive A14 preset; activation requires model.graph_global_context in a new pinned run.
 graph_global_context_encoder:
   hidden_dim: 64
   pooling: mean

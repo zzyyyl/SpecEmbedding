@@ -30,6 +30,13 @@ def formal_model_type(model_config):
         fields.add('type')
     if kind == 'gine_fingerprint':
         fields.add('fingerprint_residual')
+    if 'graph_global_context' in model_config:
+        from SpecEmbedding.models_graph_context import validate_graph_context
+
+        if kind not in ('gine', 'gine_fingerprint'):
+            raise ValueError('Graph context formal alignment requires a GINE parent branch')
+        validate_graph_context(model_config['graph_global_context'])
+        fields.add('graph_global_context')
     if set(model_config) != fields:
         raise ValueError('Incomplete formal model configuration')
     if kind == 'gine_fingerprint':
@@ -41,6 +48,10 @@ def formal_model_type(model_config):
             or set(model_config['mol_encoder']) != (FINGERPRINT_FIELDS if kind == 'fingerprint' else GINE_FIELDS)
             or model_config['mol_encoder']['graph_policy'] != 'rdkit_sanitized'):
         raise ValueError('Incomplete formal model construction fields or graph policy')
+    if 'graph_global_context' in model_config:
+        molecule = model_config['mol_encoder']
+        if type(molecule['n_layers']) is not int or molecule['n_layers'] < 2:
+            raise ValueError('Graph context requires at least two local GINE layers')
     return kind
 
 
@@ -53,6 +64,12 @@ def fingerprint_input_bits(model_config):
 
 def build_formal_alignment(model_config):
     kind = formal_model_type(model_config)
+    if 'graph_global_context' in model_config:
+        from SpecEmbedding.models_graph_context import GraphGlobalContextAlignmentModel
+
+        parent = {key: copy.deepcopy(value) for key, value in model_config.items() if key != 'graph_global_context'}
+        return GraphGlobalContextAlignmentModel(parent_model_config=parent,
+                                               context_config=model_config['graph_global_context'])
     molecule = {key: value for key, value in model_config['mol_encoder'].items() if key != 'graph_policy'}
     spec, align = model_config['spec_encoder'], model_config['align']
     if kind == 'fingerprint':

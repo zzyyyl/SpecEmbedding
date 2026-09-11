@@ -122,6 +122,12 @@ def preflight(args):
     fingerprint_model = getattr(args, 'molecule_input', 'gine') == 'fingerprint'
     uses_fingerprints = getattr(args, 'molecule_input', 'gine') in ('fingerprint', 'gine_fingerprint')
     independent_baseline = getattr(args, 'checkpoint_model_config', False) or uses_fingerprints
+    if hasattr(config.model, 'graph_global_context'):
+        if not independent_baseline:
+            raise ValueError('Graph context requires independent baseline checkpoint construction')
+        if (not getattr(args, 'optimize_alignment', False) or getattr(args, 'prepared_data', None) is None
+                or getattr(args, 'alignment_training_candidates', None) is None):
+            raise ValueError('Graph context requires complete prepared inputs and formal candidate optimization')
     if any(hasattr(config.model.spec_encoder, key) for key in (
         'precursor_delta', 'qk_norm', 'attention_pool', 'adduct_conditioning'
     )) and not independent_baseline:

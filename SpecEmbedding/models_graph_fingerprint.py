@@ -60,6 +60,8 @@ class GraphFingerprintAlignmentModel(SpecMolAlignModel):
         from SpecEmbedding.utils.formal_alignment import formal_model_type
 
         validate_fingerprint_residual(fingerprint_config)
+        if 'graph_global_context' in parent_model_config:
+            raise ValueError('Graph context parents require the combined formal model constructor')
         if formal_model_type(parent_model_config) != 'gine':
             raise ValueError('Graph fingerprint residual requires a GINE parent')
         parent = copy.deepcopy(parent_model_config)

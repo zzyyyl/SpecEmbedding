@@ -290,7 +290,7 @@ def test_two_step_contrastive_updates_all_branches_and_strict_save_reload(tmp_pa
         restored.load_state_dict(saved['state_dict'], strict=True)
 
 
-def test_production_width_parameter_cost_and_metadata_are_explicit_without_formal_activation():
+def test_production_width_parameter_cost_and_metadata_are_explicit_for_formal_reload():
     graph = {'emb_dim': 128, 'n_layers': 4, 'dropout_rate': .2, 'size_feature_dim': 32,
              'norm_type': 'layernorm', 'norm_eps': 1e-5}
     settings = {**context_config(), 'hidden_dim': 64}
@@ -304,9 +304,11 @@ def test_production_width_parameter_cost_and_metadata_are_explicit_without_forma
     returned['mol_encoder']['n_layers'] = 1
     assert model.construction_config()['mol_encoder']['n_layers'] == 4
     assert model.construction_config()['graph_global_context']['hidden_dim'] == 64
-    # Component preparation must not be mistaken for complete formal runner support.
-    with pytest.raises(ValueError, match='formal model configuration'):
-        build_formal_alignment(model.construction_config())
+    restored = build_formal_alignment(model.construction_config())
+    restored.load_state_dict(model.state_dict(), strict=True)
+    assert restored.construction_config() == model.construction_config()
+    with pytest.raises(ValueError, match='already'):
+        GraphGlobalContextAlignmentModel(parent_model_config=model.construction_config(), context_config=context_config())
 
 
 @pytest.mark.parametrize('damage', ['missing', 'extra', 'bool_hidden', 'zero_hidden', 'placement', 'pooling', 'normalization', 'initialization'])

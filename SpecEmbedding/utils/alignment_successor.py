@@ -125,6 +125,29 @@ def adduct_successor_configuration(parent_runtime, selection, adduct_settings, g
                                             gpu_settings, storage_template=storage_template)
 
 
+def graph_context_successor_configuration(parent_runtime, selection, context_settings, gpu_settings, *, storage_template):
+    """Add only the preregistered global-context branch to the audited four-layer GINE parent."""
+    from SpecEmbedding.utils.candidate_training import validate_candidate_settings
+    from SpecEmbedding.utils.formal_alignment import formal_model_type
+
+    parent = parent_runtime['model']
+    if 'graph_global_context' in parent:
+        raise ValueError('Parent already has graph global context')
+    if (formal_model_type(parent) not in ('gine', 'gine_fingerprint')
+            or parent['mol_encoder']['emb_dim'] != 128 or parent['mol_encoder']['n_layers'] != 4):
+        raise ValueError('Graph context successor requires the registered width128 four-layer GINE parent')
+    candidates = parent_runtime['train']['align']['candidate_supervision']
+    validate_candidate_settings(candidates)
+    if not candidates['enabled']:
+        raise ValueError('Graph context successor requires the registered candidate supervision')
+    result = _inherited_successor_configuration(parent_runtime, selection, gpu_settings, storage_template=storage_template)
+    result['model']['graph_global_context'] = copy.deepcopy(context_settings)
+    formal_model_type(result['model'])
+    if context_settings['hidden_dim'] != 64:
+        raise ValueError('Graph context successor requires the registered hidden width64')
+    return result
+
+
 def candidate_weight_successor_configuration(parent_runtime, selection, weight_settings, gpu_settings, *, storage_template):
     """Change only the candidate loss coefficient after checking the declared parent coefficient."""
     from SpecEmbedding.utils.candidate_training import validate_candidate_settings

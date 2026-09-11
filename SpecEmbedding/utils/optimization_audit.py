@@ -78,7 +78,7 @@ def audit_snapshot(path, index, *, expected_spectrum_control=None, expected_grap
 
 
 def audit_trajectory(directory, index, stage, baseline, *, expected_graph_cache=None, expected_fingerprint_cache=None,
-                     expected_attention_pool=False, expected_spectrum_metadata=None):
+                     expected_attention_pool=False, expected_spectrum_metadata=None, expected_graph_context=False):
     history = stage["retrieval_history"]
     require([row["epoch"] for row in history] == list(range(1, stage["stop_epoch"] + 1)), "Incomplete epoch trajectory")
     require(bool(history) and stage["metric_for_best"] == "validation_top1_then_mrr", "Wrong selection protocol")
@@ -123,6 +123,8 @@ def audit_trajectory(directory, index, stage, baseline, *, expected_graph_cache=
             'Attention pooling weights and explicit model configuration disagree')
     require(any(key.startswith('spec_encoder.conditioning.') for key in selected) == adduct,
             'Adduct weights and explicit input configuration disagree')
+    require(any(key.startswith('mol_encoder.context_branches.') for key in selected) == expected_graph_context,
+            'Graph context weights and explicit model configuration disagree')
     selected_candidate = directory / f"candidate_stage2_epoch{best['epoch']:03d}.pth"
     hashes[str(selected_candidate)] = sha256_file(selected_candidate)
     candidate = torch.load(selected_candidate, map_location="cpu", weights_only=True)
@@ -272,11 +274,23 @@ def audit_optimization_run(run):
         require(checkpoint_model is not None, 'Attention pooling requires independently bound baseline construction')
     if metadata is not None:
         require(checkpoint_model is not None, 'Adduct conditioning requires independently bound baseline construction')
-    if fingerprint_report is not None or attention_pool or metadata is not None:
+    graph_context = 'graph_global_context' in selection['model_config']
+    if graph_context:
+        require(checkpoint_model is not None, 'Graph context requires independently bound baseline construction')
+        require(candidate_input is not None and settings.get('candidate_supervision', {}).get('enabled') is True
+                and candidate_report.get('state') == 'verified_full_candidate_replay',
+                'Graph context requires audited full candidate supervision')
+    if fingerprint_report is not None or attention_pool or metadata is not None or graph_context:
         from SpecEmbedding.utils.formal_alignment import load_formal_alignment
-        load_formal_alignment(directory / 'best_model_stage2.pth', torch.device('cpu'),
+        restored, _, _ = load_formal_alignment(directory / 'best_model_stage2.pth', torch.device('cpu'),
                               dataset_outputs=index['dataset_outputs'], dataset_manifest_sha256=index['dataset_manifest_sha256'],
                               tokenizer_config=runtime['data']['tokenizer'], expected_counts=expected, exclusions=exclusions)
+        if graph_context:
+            for record in stage['pareto_frontier']:
+                checkpoint = directory / f"candidate_stage2_epoch{record['epoch']:03d}.pth"
+                fingerprint(checkpoint)
+                restored.load_state_dict(torch.load(checkpoint, map_location='cpu', weights_only=True), strict=True)
+                require(sha256_file(checkpoint) == hashes[str(checkpoint)], 'Graph context candidate changed during reload')
     require(baseline_receipt.get('checkpoint_model') == checkpoint_model,
             'Baseline model construction differs from preflight')
     if checkpoint_model is not None:
@@ -345,6 +359,7 @@ def audit_optimization_run(run):
     require(all(math.isclose(baseline[key], baseline_receipt["metrics"][key], rel_tol=0, abs_tol=1e-12) for key in baseline),
             "Baseline receipt metrics mismatch")
     report = audit_trajectory(directory, index, stage, baseline, expected_attention_pool=attention_pool,
+                              expected_graph_context=graph_context,
                               expected_graph_cache=None if fingerprint_model else graph_fingerprint,
                               expected_fingerprint_cache=selection.get('validation_fingerprint_cache'),
                               expected_spectrum_metadata=None if metadata_receipts is None else metadata_receipts['val'])

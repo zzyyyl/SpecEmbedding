@@ -316,7 +316,7 @@ def test_candidate_input_checks_actual_grouped_order_and_refuses_changed_receipt
         candidate_io.read_candidate_training_input(path, tmp_path, {**settings, "loss_weight": 2.0}, {"train": 3}, [])
 
 
-@pytest.mark.parametrize('spectrum_variant', [None, 'precursor_delta', 'attention_pool'])
+@pytest.mark.parametrize('spectrum_variant', [None, 'precursor_delta', 'attention_pool', 'graph_global_context'])
 @pytest.mark.parametrize('qk_norm', [False, True])
 @pytest.mark.parametrize('structural', [False, True])
 @pytest.mark.parametrize('loss_weight', [0.5, 2.0])
@@ -344,6 +344,11 @@ def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monke
     monkeypatch.setattr(config.model, "mol_encoder", ConfigObject({
         "emb_dim": 8, "n_layers": 2, "dropout_rate": 0., "size_feature_dim": 4,
         "norm_type": "layernorm", "norm_eps": 1e-5, "graph_policy": "rdkit_sanitized"}))
+    if spectrum_variant == 'graph_global_context':
+        from tests.test_graph_global_context import context_config
+
+        monkeypatch.setattr(config.model, 'graph_global_context', ConfigObject(context_config()), raising=False)
+        monkeypatch.setattr(config.model.mol_encoder, 'n_layers', 4)
     monkeypatch.setattr(config.model.align, "final_dim", 8)
     monkeypatch.setattr(config.augmentation, "prob", 0.)
     # Synthetic CPU wiring test: keep the actual trainer and optimizer; only
@@ -357,7 +362,7 @@ def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monke
         return {"top1": 0.5, "top5": 1., "top10": 1., "top20": 1., "mrr": 0.75}
     metadata = {"fulltrain_audit": {"expected_epoch_counts": {"train": 3, "val": 3},
                                    "dataset_manifest_sha256": "a" * 64}}
-    if spectrum_variant == 'attention_pool':
+    if spectrum_variant in ('attention_pool', 'graph_global_context'):
         from types import SimpleNamespace
 
         from SpecEmbedding.utils.retrieval_validation import AlignmentRetrievalValidator
@@ -383,13 +388,19 @@ def test_formal_training_wiring_saves_replayable_full_candidate_trajectory(monke
     assert ('precursor_delta' in selection['model_config']['spec_encoder']) == (spectrum_variant == 'precursor_delta')
     assert ('attention_pool' in selection['model_config']['spec_encoder']) == (spectrum_variant == 'attention_pool')
     assert ('qk_norm' in selection['model_config']['spec_encoder']) == qk_norm
+    assert ('graph_global_context' in selection['model_config']) == (spectrum_variant == 'graph_global_context')
     weights = torch.load(output / 'best_model_stage2.pth', map_location='cpu', weights_only=True)
-    if spectrum_variant == 'attention_pool':
+    if spectrum_variant in ('attention_pool', 'graph_global_context'):
         from SpecEmbedding.utils.formal_alignment import load_formal_alignment
         from SpecEmbedding.utils.optimization_audit import audit_snapshot
 
-        assert torch.isfinite(weights['spec_encoder.pool.query']).all()
-        assert weights['spec_encoder.pool.query'].abs().sum() > 0
+        if spectrum_variant == 'attention_pool':
+            assert torch.isfinite(weights['spec_encoder.pool.query']).all()
+            assert weights['spec_encoder.pool.query'].abs().sum() > 0
+        else:
+            for layer in range(3):
+                value = weights[f'mol_encoder.context_branches.{layer}.output.weight']
+                assert torch.isfinite(value).all() and value.abs().sum() > 0
         restored, _, receipt_model = load_formal_alignment(output / 'best_model_stage2.pth', torch.device('cpu'),
             dataset_outputs=index['dataset_outputs'], dataset_manifest_sha256='a' * 64,
             tokenizer_config=index['tokenizer_config'], expected_counts={'train': 3, 'val': 3}, exclusions=[])
