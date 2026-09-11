@@ -6,7 +6,7 @@
 | 系列 | 协议与用途 | 来源 |
 | --- | --- | --- |
 | v1.5 全量迁移 | 原矩阵已按用户要求中断，已有部分全量结果；转为单 baseline 优化，论文更新暂停 | [执行计划](../docs/paper-change-plans/2026-09-07-MassSpecGym全量重训.md)、[准确率排查](massspecgym_v15_regression_audit.md)、[身份转换修复](massspecgym_v15_inchi_fix.md) |
-| v1.5 单 baseline 优化 | A01 完整验证检索选优已实现，正式结果待运行；Top-k/MRR 的 SOTA 目标未完成 | [实验卡与决策索引](massspecgym_optimization.md) |
+| v1.5 单 baseline 优化 | 全量单seed迭代中，已完成尝试和后续预登记分别记录；Top-k/MRR 的 SOTA 目标未完成 | [逐轮状态](../attempts.md)、[实验卡与决策索引](massspecgym_optimization.md) |
 | Mentor 主矩阵与 relative 消融 | 36 个主运行、30 个消融；alignment 42--44，reranker 42--44；训练 cap=20,000、top-40，训练 forcing=true，val/test=false | [运行/哈希索引](../reproducibility/mentor2026_experiment_index.json)、[主矩阵](mentor2026_experiments/alignment_summary/manifest.json)、[消融](mentor2026_experiments/ablation_summary/manifest.json) |
 | 无 forcing 方法 pilot | pre-overlap-clean alignment；5,000 query、3 epochs、top-256；先单 seed，再三 reranker seeds | [单 seed](transfer2026_scholargpt_method/pilot-results.md)、[第二阶段报告](transfer2026_scholargpt_review/second_stage_report.md)、[manifest](transfer2026_scholargpt_review/second_stage_manifest.json) |
 | 旧 Transformer 跨 alignment | 固定旧 top-40 协议，Pointwise/Transformer 描述性对比 | [报告](transfer2026_alignment_multiseed/report.md)、[manifest](transfer2026_alignment_multiseed/analysis_manifest.json) |
