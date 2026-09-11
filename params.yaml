@@ -62,6 +62,15 @@ adduct_conditioning_encoder:
   unknown_id: 2
   unknown_policy: identity
 
+# Inactive A15 component preset; formal construction does not accept this feature yet.
+attention_output_gate_encoder:
+  granularity: headwise
+  placement: sdpa_output
+  activation: sigmoid
+  scale: 2.0
+  initialization: zero_weight
+  bias: false
+
 # Inactive A14 preset; activation requires model.graph_global_context in a new pinned run.
 graph_global_context_encoder:
   hidden_dim: 64
