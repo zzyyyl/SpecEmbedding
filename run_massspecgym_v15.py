@@ -15,6 +15,7 @@ from pathlib import Path
 import yaml
 
 from SpecEmbedding.config import DEFAULT_CONFIG_PATH, config
+from SpecEmbedding.models_spectrum_aux import auxiliary_model_settings
 from SpecEmbedding.utils.adduct_alignment_inputs import (
     adduct_model_settings,
     audit_model_spectrum_metadata,
@@ -54,6 +55,9 @@ from SpecEmbedding.utils.retrieval_validation import (
     load_validation_index,
     prepared_validation_input,
 )
+from SpecEmbedding.utils.spectrum_auxiliary_audit import audit_model_spectrum_targets, audit_spectrum_auxiliary_training
+from SpecEmbedding.utils.spectrum_auxiliary_inputs import auxiliary_training_weight, verify_spectrum_target_files
+from SpecEmbedding.utils.spectrum_targets import load_spectrum_target_cache
 from SpecEmbedding.utils.storage import storage_receipt
 
 ROOT = Path(__file__).resolve().parent
@@ -111,6 +115,8 @@ def commands(args, *, baseline_model_type='gine'):
             result[2]['command'] += ['--spectrum-metadata-cache', str(args.baseline_spectrum_metadata_cache)]
         if getattr(args, 'spectrum_metadata_cache', None) is not None:
             result[3]['command'] += ['--spectrum-metadata-cache', str(args.spectrum_metadata_cache)]
+        if getattr(args, 'spectrum_target_cache', None) is not None:
+            result[3]['command'] += ['--spectrum-target-cache', str(args.spectrum_target_cache)]
         if uses_fingerprints:
             for flag in ('fingerprint_training_index', 'training_fingerprint_cache', 'validation_fingerprint_cache'):
                 result[3]['command'] += ['--' + flag.replace('_', '-'), str(getattr(args, flag))]
@@ -122,6 +128,14 @@ def preflight(args):
     fingerprint_model = getattr(args, 'molecule_input', 'gine') == 'fingerprint'
     uses_fingerprints = getattr(args, 'molecule_input', 'gine') in ('fingerprint', 'gine_fingerprint')
     independent_baseline = getattr(args, 'checkpoint_model_config', False) or uses_fingerprints
+    auxiliary_settings = auxiliary_model_settings(config.model.to_dict())
+    auxiliary_training_weight(config.model.to_dict(), config.train.align.to_dict())
+    target_path = getattr(args, 'spectrum_target_cache', None)
+    if (auxiliary_settings is not None) != (target_path is not None):
+        raise ValueError('Spectrum auxiliary configuration and explicit target cache must be provided together')
+    if target_path is not None and (not independent_baseline or not getattr(args, 'optimize_alignment', False)
+            or getattr(args, 'prepared_data', None) is None or getattr(args, 'alignment_training_candidates', None) is None):
+        raise ValueError('Spectrum auxiliary requires complete prepared candidate inputs and an independent baseline')
     if hasattr(config.model, 'graph_global_context'):
         if not independent_baseline:
             raise ValueError('Graph context requires independent baseline checkpoint construction')
@@ -294,6 +308,11 @@ def preflight(args):
             tokenizer_config=config.data.tokenizer.to_dict(), settings=adduct_settings, index=baseline_index)
         extra['spectrum_metadata'] = receipts
         inputs.update(spectrum_metadata_files(receipts))
+    if target_path is not None:
+        targets = load_spectrum_target_cache(args.prepared_data, target_path, config.fulltrain.expected_counts.to_dict(),
+            config.fulltrain.exclude_val_query_indices, config.data.tokenizer.to_dict(), auxiliary_settings['target'])
+        extra['spectrum_targets'] = targets.provenance
+        inputs.update(verify_spectrum_target_files(targets.provenance))
     if uses_fingerprints:
         extra['fingerprint_inputs'] = {}
         for split, index_path, cache_path in (('train', args.fingerprint_training_index, args.training_fingerprint_cache),
@@ -380,10 +399,19 @@ def audit_alignment(args, alignment_settings, augmentation_settings):
         **({} if metadata is None else {'spectrum_metadata': metadata['train']}),
     )
     candidate_hashes.update(metadata_hashes)
+    target_cache = auxiliary_weight = None
+    if (auxiliary_model_settings(selection['model_config']) is not None or selection.get('spectrum_targets') is not None
+            or hasattr(config.model, 'spectrum_auxiliary')):
+        manifest = json.loads((args.output_root / 'inputs_and_commands.json').read_text())
+        target_cache, auxiliary_weight, target_hashes = audit_model_spectrum_targets(manifest, selection, data)
+        candidate_hashes.update(target_hashes)
+    auxiliary_report, auxiliary_hashes = audit_spectrum_auxiliary_training(directory, stage, target_cache, auxiliary_weight)
+    candidate_hashes.update(auxiliary_hashes)
     return {"checkpoint_sha256": selection["checkpoint_sha256"], "epochs": len(audit["epochs"]),
             "expected_epoch_counts": expected, "graph_policy": selection["graph_policy"],
             "candidate_training": candidate_report, "candidate_artifact_sha256": candidate_hashes,
-            **({} if metadata_receipts is None else {'spectrum_metadata': metadata_receipts})}
+            **({} if metadata_receipts is None else {'spectrum_metadata': metadata_receipts}),
+            **({} if auxiliary_report is None else {'spectrum_auxiliary': auxiliary_report})}
 
 
 def execute(args, manifest):
@@ -550,6 +578,7 @@ def main(argv=None):
     parser.add_argument('--validation-fingerprint-cache', type=Path)
     parser.add_argument('--baseline-fingerprint-cache', type=Path)
     parser.add_argument('--spectrum-metadata-cache', type=Path)
+    parser.add_argument('--spectrum-target-cache', type=Path)
     parser.add_argument('--baseline-spectrum-metadata-cache', type=Path)
     parser.add_argument("--alignment-batching", choices=["random", "mass_blocks"],
                         help="Optimization trial: override only the training batch assembly; block size comes from params.yaml")
@@ -570,7 +599,7 @@ def main(argv=None):
     if args.baseline_fingerprint_cache and not (args.checkpoint_model_config or uses_fingerprints):
         parser.error('Baseline fingerprints require independent model loading')
     for key in ('fingerprint_training_index', 'training_fingerprint_cache', 'validation_fingerprint_cache',
-                'baseline_fingerprint_cache', 'spectrum_metadata_cache', 'baseline_spectrum_metadata_cache'):
+                'baseline_fingerprint_cache', 'spectrum_metadata_cache', 'baseline_spectrum_metadata_cache', 'spectrum_target_cache'):
         if getattr(args, key) is not None:
             setattr(args, key, getattr(args, key).expanduser().resolve())
     try:

@@ -1,4 +1,4 @@
-"""Prepared training-only spectrum predictor; no formal alignment activation yet."""
+"""Training-only spectrum prediction from the shared molecular embedding."""
 
 import copy
 import math
@@ -10,18 +10,41 @@ from torch.nn import functional as F
 from SpecEmbedding.utils.spectrum_targets import require, validate_target_settings
 
 
+def validate_head_settings(settings):
+    require(isinstance(settings, dict) and set(settings) == {
+        'embedding_dim', 'hidden_dim', 'normalization_eps', 'initialization_seed'}, 'Incomplete auxiliary head settings')
+    require(all(type(settings[k]) is int and settings[k] > 0 for k in ('embedding_dim', 'hidden_dim'))
+            and type(settings['initialization_seed']) is int and 0 <= settings['initialization_seed'] < 2**63,
+            'Invalid auxiliary head dimensions or seed')
+    eps = settings['normalization_eps']
+    require(type(eps) in (int, float) and math.isfinite(eps) and eps > 0, 'Invalid auxiliary normalization epsilon')
+
+
+def auxiliary_model_settings(model_config):
+    if 'spectrum_auxiliary' not in model_config:
+        return None
+    settings = model_config['spectrum_auxiliary']
+    require(isinstance(settings, dict) and set(settings) == {'model', 'target'}, 'Incomplete spectrum auxiliary definition')
+    validate_head_settings(settings['model'])
+    validate_target_settings(settings['target'])
+    require(settings['model']['embedding_dim'] == model_config['align']['final_dim'],
+            'Auxiliary head width differs from the shared molecular embedding')
+    return copy.deepcopy(settings)
+
+
+def attach_spectrum_auxiliary(model, settings):
+    """Attach after constructing every parent parameter; retrieval does not call this head."""
+    require(not hasattr(model, 'spectrum_auxiliary'), 'Spectrum auxiliary head already attached')
+    model.spectrum_auxiliary = MoleculeSpectrumAuxiliaryHead(settings['model'], settings['target'])
+    return model
+
+
 class MoleculeSpectrumAuxiliaryHead(nn.Module):
     """Predict a conditional spectrum from the molecule's shared embedding."""
 
     def __init__(self, settings, target_settings):
         super().__init__()
-        require(isinstance(settings, dict) and set(settings) == {
-            'embedding_dim', 'hidden_dim', 'normalization_eps', 'initialization_seed'}, 'Incomplete auxiliary head settings')
-        require(all(type(settings[k]) is int and settings[k] > 0 for k in ('embedding_dim', 'hidden_dim'))
-                and type(settings['initialization_seed']) is int and 0 <= settings['initialization_seed'] < 2**63,
-                'Invalid auxiliary head dimensions or seed')
-        eps = settings['normalization_eps']
-        require(type(eps) in (int, float) and math.isfinite(eps) and eps > 0, 'Invalid auxiliary normalization epsilon')
+        validate_head_settings(settings)
         self.settings, self.target_settings = copy.deepcopy(settings), copy.deepcopy(target_settings)
         self.output_dim = validate_target_settings(target_settings)
         # Seed only the CPU generator and restore it. Do not touch any CUDA RNG stream.

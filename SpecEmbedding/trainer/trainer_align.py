@@ -45,6 +45,9 @@ class TrainerAlign:
         (f_spec, f_mol, scale), labels, count = forward_alignment_batch(self.model, batch, self.device)
         return self.criterion(f_spec, f_mol, scale, labels), count
 
+    def after_backward(self, gradient_norm):
+        """Optional diagnostics after the inherited global clipping operation."""
+
     def train_epoch(self, optimizer, epoch, stage_name):
         self.model.train()
         total_loss = 0
@@ -58,7 +61,8 @@ class TrainerAlign:
                 raise RuntimeError("Non-finite formal alignment training loss")
             
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            gradient_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            self.after_backward(gradient_norm)
             optimizer.step()
             
             total_loss += loss.item()

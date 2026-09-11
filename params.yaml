@@ -71,7 +71,7 @@ attention_output_gate_encoder:
   initialization: zero_weight
   bias: false
 
-# Inactive A16 preset. Train-only target preparation is supported; formal training is not yet wired.
+# Inactive A16 preset. Activation requires model/training spectrum_auxiliary fields and an audited target cache.
 molecule_spectrum_auxiliary:
   weight: 1.0
   model:

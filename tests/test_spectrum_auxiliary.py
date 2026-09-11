@@ -157,11 +157,11 @@ def test_strict_roundtrip_batch_order_and_registered_parameter_budget():
     assert torch.isfinite(full_embeddings.grad).all()
 
 
-def test_formal_alignment_still_refuses_unintegrated_auxiliary_feature():
+def test_formal_alignment_requires_matching_shared_embedding_width():
     from SpecEmbedding.utils.formal_alignment import build_formal_alignment
     from tests.test_formal_alignment import model_config
-    with pytest.raises(ValueError, match='Incomplete formal model'):
-        build_formal_alignment({**model_config(), 'spectrum_auxiliary': {'model': HEAD, 'target': TARGET}})
+    with pytest.raises(ValueError, match='head width'):
+        build_formal_alignment({**model_config(), 'spectrum_auxiliary': {'model': {**HEAD, 'embedding_dim': 9}, 'target': TARGET}})
 
 
 @pytest.mark.parametrize('ids', [None, torch.tensor([0., 1.]), torch.tensor([0, 3]), torch.tensor([0])])

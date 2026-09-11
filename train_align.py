@@ -29,9 +29,11 @@ from SpecEmbedding.data.datasets_graph_fingerprint import (
 from SpecEmbedding.data.overlap import filter_classified_validation
 from SpecEmbedding.models_align import GINEEncoder, SpecMolAlignModel
 from SpecEmbedding.models_precursor_delta import build_spectrum_encoder
+from SpecEmbedding.models_spectrum_aux import attach_spectrum_auxiliary, auxiliary_model_settings
 from SpecEmbedding.trainer.trainer import set_seed
 from SpecEmbedding.trainer.trainer_align import TrainerAlign
 from SpecEmbedding.trainer.trainer_candidates import CandidateTrainerAlign
+from SpecEmbedding.trainer.trainer_spectrum_aux import SpectrumAuxiliaryTrainer
 from SpecEmbedding.utils.adduct_alignment_inputs import (
     adduct_model_settings,
     load_spectrum_metadata,
@@ -58,6 +60,8 @@ from SpecEmbedding.utils.retrieval_validation import (
     load_validation_index,
 )
 from SpecEmbedding.utils.runtime import resolve_device, setup_logging, startup_logging
+from SpecEmbedding.utils.spectrum_auxiliary_inputs import auxiliary_training_weight
+from SpecEmbedding.utils.spectrum_targets import SpectrumTargetCache, load_spectrum_target_cache
 from train import add_base_argument, get_classified_data
 
 
@@ -89,6 +93,7 @@ def train_align(
     fingerprint_inputs=None,
     fingerprint_smiles=None,
     spectrum_metadata=None,
+    spectrum_targets=None,
 ):
     if seed < 0:
         raise ValueError("seed must be a non-negative integer")
@@ -102,6 +107,22 @@ def train_align(
         raise ValueError("Candidate supervision requires formal fresh training and full retrieval selection")
     if not candidate_settings["enabled"] and candidate_input_receipt is not None:
         raise ValueError("Unexpected candidate input in an inactive run")
+    auxiliary_settings = auxiliary_model_settings(config.model.to_dict())
+    auxiliary_weight = auxiliary_training_weight(config.model.to_dict(), config.train.align.to_dict())
+    if (auxiliary_settings is not None) != (spectrum_targets is not None):
+        raise ValueError('Auxiliary training requires explicit model, weight and full target cache together')
+    if auxiliary_settings is not None:
+        if (not formal_fulltrain or retrieval_validator is None or spec_encoder is not None
+                or not candidate_settings['enabled'] or not isinstance(spectrum_targets, SpectrumTargetCache)):
+            raise ValueError('Spectrum auxiliary requires fresh full candidate training and retrieval selection')
+        source = spectrum_targets.provenance['source']
+        if (source['settings'] != auxiliary_settings['target']
+                or source['dataset_manifest_sha256'] != selection_metadata['fulltrain_audit']['dataset_manifest_sha256']
+                or source['tokenizer_config'] != config.data.tokenizer.to_dict()
+                or source['exclude_val_query_indices'] != selection_metadata['exclude_val_query_indices']
+                or source['queries'] != selection_metadata['fulltrain_audit']['expected_epoch_counts']['train']):
+            raise ValueError('Spectrum auxiliary targets disagree with the actual full training protocol')
+        formal_model_type(config.model.to_dict())
     graph_context = hasattr(config.model, 'graph_global_context')
     if graph_context:
         if (not formal_fulltrain or retrieval_validator is None or spec_encoder is not None
@@ -256,7 +277,8 @@ def train_align(
 
     has_pretrained_spec = spec_encoder is not None
     if uses_fingerprints or graph_context:
-        model = build_formal_alignment(config.model.to_dict())
+        model = build_formal_alignment({key: value for key, value in config.model.to_dict().items()
+                                        if key != 'spectrum_auxiliary'})
     else:
         # Preserve the original GINE initialization order and legacy pretrained path.
         mol_encoder = GINEEncoder(
@@ -278,7 +300,11 @@ def train_align(
             dropout_rate=config.model.align.dropout_rate,
             tau=config.model.align.tau
         )
+    if auxiliary_settings is not None:
+        attach_spectrum_auxiliary(model, auxiliary_settings)
     trainer_class = CandidateTrainerAlign if candidate_settings["enabled"] else TrainerAlign
+    if auxiliary_settings is not None:
+        trainer_class = SpectrumAuxiliaryTrainer
     trainer = trainer_class(
         model,
         train_loader,
@@ -288,6 +314,8 @@ def train_align(
         retrieval_validator=retrieval_validator,
         record_resources=formal_fulltrain,
         **({"candidate_loss_weight": candidate_settings["loss_weight"]} if candidate_settings["enabled"] else {}),
+        **({'spectrum_targets': spectrum_targets, 'auxiliary_loss_weight': auxiliary_weight}
+           if auxiliary_settings is not None else {}),
     )
     if formal_fulltrain:
         trainer.expected_epoch_counts = expected
@@ -335,6 +363,8 @@ def train_align(
         {'params': model.mol_proj.parameters(), 'lr': lr},
         {'params': [model.logit_scale], 'lr': lr},
     ]
+    if auxiliary_settings is not None:
+        stage2_params.append({'params': model.spectrum_auxiliary.parameters(), 'lr': lr})
 
     optimizer2 = optim.AdamW(stage2_params, weight_decay=config.train.align.weight_decay)
     scheduler2 = optim.lr_scheduler.CosineAnnealingLR(optimizer2, T_max=epochs_stage2)
@@ -360,6 +390,8 @@ def train_align(
     }
     if metadata_receipts is not None:
         selection_summary['spectrum_metadata'] = metadata_receipts
+    if spectrum_targets is not None:
+        selection_summary['spectrum_targets'] = spectrum_targets.provenance
     if formal_fulltrain:
         selection_summary["fulltrain_audit"]["epochs"] = trainer.epoch_counts
         selection_summary["fulltrain_audit"]["validation_permutation_seed"] = seed
@@ -392,6 +424,8 @@ def main():
     parser.add_argument('--validation-fingerprint-cache', type=Path)
     parser.add_argument('--spectrum-metadata-cache', type=Path,
                         help='Complete audited observed-adduct cache required by the conditioned spectrum tower')
+    parser.add_argument('--spectrum-target-cache', type=Path,
+                        help='Audited complete train-only peak targets required by the auxiliary prediction head')
     parser.add_argument(
         "--tokenset_cache",
         "--tokenset-cache",
@@ -410,6 +444,14 @@ def main():
     )
 
     args = parser.parse_args()
+    auxiliary_settings = auxiliary_model_settings(config.model.to_dict())
+    auxiliary_training_weight(config.model.to_dict(), config.train.align.to_dict())
+    if (auxiliary_settings is not None) != bool(args.spectrum_target_cache):
+        parser.error('Auxiliary configuration and --spectrum-target-cache must be supplied together')
+    if auxiliary_settings is not None and (
+        not args.formal_fulltrain or not args.validation_index or args.pretrained_spec or not args.candidate_training_input
+    ):
+        parser.error('Spectrum auxiliary requires fresh formal candidate training and full retrieval selection')
     if hasattr(config.model, 'graph_global_context'):
         if (not args.formal_fulltrain or not args.validation_index or args.pretrained_spec
                 or not args.candidate_training_input or not config.train.align.candidate_supervision.enabled):
@@ -496,6 +538,11 @@ def main():
     retrieval_validator = None
     graph_receipt = None
     spectrum_metadata = metadata_receipts = None
+    spectrum_targets = None
+    if args.spectrum_target_cache:
+        spectrum_targets = load_spectrum_target_cache(args.data_path, args.spectrum_target_cache,
+            config.fulltrain.expected_counts.to_dict(), args.exclude_val_query_indices,
+            config.data.tokenizer.to_dict(), auxiliary_settings['target'])
     if args.spectrum_metadata_cache:
         spectrum_metadata, metadata_receipts = load_spectrum_metadata(
             args.data_path, args.spectrum_metadata_cache, counts=config.fulltrain.expected_counts.to_dict(),
@@ -612,6 +659,7 @@ def main():
         fingerprint_inputs=fingerprint_inputs,
         fingerprint_smiles=fingerprint_smiles,
         spectrum_metadata=spectrum_metadata,
+        spectrum_targets=spectrum_targets,
         selection_metadata={
             "dataset_type": args.dataset_type,
             "candidate_training_input": candidate_input_fingerprint,
@@ -653,6 +701,12 @@ def main():
             tokenizer_config=config.data.tokenizer.to_dict(), settings=adduct_settings, index=index)
         if observed != metadata_receipts:
             raise ValueError('Adduct inputs changed during training')
+    if spectrum_targets is not None:
+        observed = load_spectrum_target_cache(args.data_path, args.spectrum_target_cache,
+            config.fulltrain.expected_counts.to_dict(), args.exclude_val_query_indices,
+            config.data.tokenizer.to_dict(), auxiliary_settings['target'])
+        if observed.provenance != spectrum_targets.provenance:
+            raise ValueError('Spectrum auxiliary targets changed during training')
 
     logging.info("\nTraining complete! The final aligned model is returned and ready for evaluation/inference.")
 

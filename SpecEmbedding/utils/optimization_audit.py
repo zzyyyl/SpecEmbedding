@@ -17,6 +17,7 @@ from SpecEmbedding.utils.adduct_alignment_inputs import (
 )
 from SpecEmbedding.utils.fulltrain import sha256_file
 from SpecEmbedding.utils.retrieval_validation import PROTOCOL, load_validation_graph_cache, load_validation_index
+from SpecEmbedding.utils.spectrum_auxiliary_audit import audit_model_spectrum_targets, audit_spectrum_auxiliary_training
 from SpecEmbedding.utils.training_resources import audit_resource_profiles
 
 METRICS = ("top1", "top5", "top10", "top20", "mrr")
@@ -78,7 +79,8 @@ def audit_snapshot(path, index, *, expected_spectrum_control=None, expected_grap
 
 
 def audit_trajectory(directory, index, stage, baseline, *, expected_graph_cache=None, expected_fingerprint_cache=None,
-                     expected_attention_pool=False, expected_spectrum_metadata=None, expected_graph_context=False):
+                     expected_attention_pool=False, expected_spectrum_metadata=None, expected_graph_context=False,
+                     expected_spectrum_auxiliary=False):
     history = stage["retrieval_history"]
     require([row["epoch"] for row in history] == list(range(1, stage["stop_epoch"] + 1)), "Incomplete epoch trajectory")
     require(bool(history) and stage["metric_for_best"] == "validation_top1_then_mrr", "Wrong selection protocol")
@@ -125,6 +127,8 @@ def audit_trajectory(directory, index, stage, baseline, *, expected_graph_cache=
             'Adduct weights and explicit input configuration disagree')
     require(any(key.startswith('mol_encoder.context_branches.') for key in selected) == expected_graph_context,
             'Graph context weights and explicit model configuration disagree')
+    require(any(key.startswith('spectrum_auxiliary.') for key in selected) == expected_spectrum_auxiliary,
+            'Spectrum auxiliary weights and explicit model configuration disagree')
     selected_candidate = directory / f"candidate_stage2_epoch{best['epoch']:03d}.pth"
     hashes[str(selected_candidate)] = sha256_file(selected_candidate)
     candidate = torch.load(selected_candidate, map_location="cpu", weights_only=True)
@@ -265,6 +269,11 @@ def audit_optimization_run(run):
         **({} if metadata is None else {'spectrum_metadata': metadata['train']}),
     )
     hashes.update(candidate_hashes)
+    target_cache, auxiliary_weight, target_hashes = audit_model_spectrum_targets(
+        manifest, selection, run / 'data/MassSpecGym')
+    hashes.update(target_hashes)
+    auxiliary_report, auxiliary_hashes = audit_spectrum_auxiliary_training(directory, stage, target_cache, auxiliary_weight)
+    hashes.update(auxiliary_hashes)
     baseline_receipt = read_json(run / "baseline_validation" / "metrics.json")
     checkpoint_model = manifest.get('checkpoint_model')
     if fingerprint_report is not None:
@@ -274,23 +283,25 @@ def audit_optimization_run(run):
         require(checkpoint_model is not None, 'Attention pooling requires independently bound baseline construction')
     if metadata is not None:
         require(checkpoint_model is not None, 'Adduct conditioning requires independently bound baseline construction')
+    if target_cache is not None:
+        require(checkpoint_model is not None, 'Spectrum auxiliary requires independently bound baseline construction')
     graph_context = 'graph_global_context' in selection['model_config']
     if graph_context:
         require(checkpoint_model is not None, 'Graph context requires independently bound baseline construction')
         require(candidate_input is not None and settings.get('candidate_supervision', {}).get('enabled') is True
                 and candidate_report.get('state') == 'verified_full_candidate_replay',
                 'Graph context requires audited full candidate supervision')
-    if fingerprint_report is not None or attention_pool or metadata is not None or graph_context:
+    if fingerprint_report is not None or attention_pool or metadata is not None or graph_context or target_cache is not None:
         from SpecEmbedding.utils.formal_alignment import load_formal_alignment
         restored, _, _ = load_formal_alignment(directory / 'best_model_stage2.pth', torch.device('cpu'),
                               dataset_outputs=index['dataset_outputs'], dataset_manifest_sha256=index['dataset_manifest_sha256'],
                               tokenizer_config=runtime['data']['tokenizer'], expected_counts=expected, exclusions=exclusions)
-        if graph_context:
+        if graph_context or target_cache is not None:
             for record in stage['pareto_frontier']:
                 checkpoint = directory / f"candidate_stage2_epoch{record['epoch']:03d}.pth"
                 fingerprint(checkpoint)
                 restored.load_state_dict(torch.load(checkpoint, map_location='cpu', weights_only=True), strict=True)
-                require(sha256_file(checkpoint) == hashes[str(checkpoint)], 'Graph context candidate changed during reload')
+                require(sha256_file(checkpoint) == hashes[str(checkpoint)], 'Candidate changed during reload')
     require(baseline_receipt.get('checkpoint_model') == checkpoint_model,
             'Baseline model construction differs from preflight')
     if checkpoint_model is not None:
@@ -360,6 +371,7 @@ def audit_optimization_run(run):
             "Baseline receipt metrics mismatch")
     report = audit_trajectory(directory, index, stage, baseline, expected_attention_pool=attention_pool,
                               expected_graph_context=graph_context,
+                              expected_spectrum_auxiliary=target_cache is not None,
                               expected_graph_cache=None if fingerprint_model else graph_fingerprint,
                               expected_fingerprint_cache=selection.get('validation_fingerprint_cache'),
                               expected_spectrum_metadata=None if metadata_receipts is None else metadata_receipts['val'])
@@ -371,6 +383,8 @@ def audit_optimization_run(run):
         report['fingerprint_inputs'] = fingerprint_report
     if metadata_receipts is not None:
         report['spectrum_metadata'] = metadata_receipts
+    if auxiliary_report is not None:
+        report['spectrum_auxiliary'] = auxiliary_report
     hashes.update(resource_hashes)
     report["artifact_sha256"].update(hashes)
     report.update(run=str(run), source_commit=manifest["git_commit"], protocol=PROTOCOL,

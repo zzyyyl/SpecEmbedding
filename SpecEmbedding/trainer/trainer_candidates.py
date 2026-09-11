@@ -40,6 +40,10 @@ class CandidateTrainerAlign(TrainerAlign):
         self.candidate_loss_weight = float(candidate_loss_weight)
         self.candidate_epoch_audits = []
 
+    def additional_training_loss(self, batch, f_positive, base_loss, candidate_loss):
+        """An explicitly configured training-only objective may reuse positive embeddings."""
+        return None
+
     def training_batch_loss(self, batch):
         if not isinstance(batch, CandidateAlignmentBatch):
             raise ValueError("Candidate trainer received an ordinary or malformed batch")
@@ -71,7 +75,9 @@ class CandidateTrainerAlign(TrainerAlign):
             self._candidate_sample_hash.update(len(value).to_bytes(8, "little"))
             self._candidate_sample_hash.update(value.numpy().astype("<i8").tobytes())
         self._candidate_loss_sum += float(candidate_loss.detach()) * n
-        return base_loss + self.candidate_loss_weight * candidate_loss, n
+        total = base_loss + self.candidate_loss_weight * candidate_loss
+        additional = self.additional_training_loss(batch, f_positive, base_loss, candidate_loss)
+        return (total if additional is None else total + additional), n
 
     def train_epoch(self, optimizer, epoch, stage_name):
         dataset = self.train_loader.dataset

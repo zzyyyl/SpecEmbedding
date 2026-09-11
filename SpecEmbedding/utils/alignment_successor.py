@@ -171,6 +171,30 @@ def candidate_weight_successor_configuration(parent_runtime, selection, weight_s
     return result
 
 
+def spectrum_auxiliary_successor_configuration(parent_runtime, selection, auxiliary_settings, gpu_settings, *, storage_template):
+    """Keep the completed parent's scientific settings and add only the registered auxiliary objective."""
+    from SpecEmbedding.utils.candidate_training import validate_candidate_settings
+    from SpecEmbedding.utils.formal_alignment import formal_model_type
+    from SpecEmbedding.utils.spectrum_auxiliary_inputs import auxiliary_training_weight
+
+    formal_model_type(parent_runtime['model'])
+    if ('spectrum_auxiliary' in parent_runtime['model']
+            or 'spectrum_auxiliary' in parent_runtime['train']['align']):
+        raise ValueError('Parent already has spectrum auxiliary training')
+    candidates = parent_runtime['train']['align']['candidate_supervision']
+    validate_candidate_settings(candidates)
+    if not candidates['enabled']:
+        raise ValueError('Spectrum auxiliary successor requires the registered candidate supervision')
+    if not isinstance(auxiliary_settings, dict) or set(auxiliary_settings) != {'weight', 'model', 'target'}:
+        raise ValueError('Incomplete registered auxiliary objective')
+    result = _inherited_successor_configuration(parent_runtime, selection, gpu_settings, storage_template=storage_template)
+    result['model']['spectrum_auxiliary'] = {key: copy.deepcopy(auxiliary_settings[key]) for key in ('model', 'target')}
+    result['train']['align']['spectrum_auxiliary'] = {'loss_weight': auxiliary_settings['weight']}
+    formal_model_type(result['model'])
+    auxiliary_training_weight(result['model'], result['train']['align'])
+    return result
+
+
 def _spectral_successor_configuration(parent_runtime, selection, feature, settings, gpu_settings, *, storage_template):
     """Inherit scientific settings, adding the feature and rebinding explicit external storage."""
     from SpecEmbedding.models_precursor_delta import validate_spectrum_config

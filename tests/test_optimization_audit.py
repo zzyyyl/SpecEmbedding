@@ -106,6 +106,18 @@ def test_complete_audit_preserves_full_denominator_and_reports_topk_tradeoff(com
     assert len(report["pareto_candidates"]) == 2 and not report["test_evaluated_by_this_audit"]
 
 
+def test_completion_rejects_undeclared_auxiliary_weights_even_with_consistent_hashes(completed_run):
+    run, _, selection = completed_run
+    directory = run / 'alignment42_topk256'
+    state = {'weight': torch.tensor([2.]), 'spectrum_auxiliary.output.bias': torch.tensor([1.])}
+    for name in ('best_model_stage2.pth', 'candidate_stage2_epoch002.pth'):
+        torch.save(state, directory / name)
+    selection['checkpoint_sha256'] = sha256_file(directory / 'best_model_stage2.pth')
+    write_json(directory / 'alignment_selection.json', selection)
+    with pytest.raises(ValueError, match='Spectrum auxiliary weights'):
+        audit.audit_optimization_run(run)
+
+
 @pytest.mark.parametrize('damage', [None, 'baseline', 'selection', 'snapshot', 'cache_bytes', 'unpinned'])
 def test_completion_checks_full_graph_cache_and_every_usage_receipt(completed_run, damage):
     from SpecEmbedding.utils.molecule_graph_cache import audit_graph_cache, build_graph_cache, graph_cache_provenance

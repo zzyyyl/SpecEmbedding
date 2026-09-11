@@ -30,6 +30,11 @@ def formal_model_type(model_config):
         fields.add('type')
     if kind == 'gine_fingerprint':
         fields.add('fingerprint_residual')
+    if 'spectrum_auxiliary' in model_config:
+        from SpecEmbedding.models_spectrum_aux import auxiliary_model_settings
+
+        auxiliary_model_settings(model_config)
+        fields.add('spectrum_auxiliary')
     if 'graph_global_context' in model_config:
         from SpecEmbedding.models_graph_context import validate_graph_context
 
@@ -64,6 +69,11 @@ def fingerprint_input_bits(model_config):
 
 def build_formal_alignment(model_config):
     kind = formal_model_type(model_config)
+    if 'spectrum_auxiliary' in model_config:
+        from SpecEmbedding.models_spectrum_aux import attach_spectrum_auxiliary
+
+        parent = {key: copy.deepcopy(value) for key, value in model_config.items() if key != 'spectrum_auxiliary'}
+        return attach_spectrum_auxiliary(build_formal_alignment(parent), model_config['spectrum_auxiliary'])
     if 'graph_global_context' in model_config:
         from SpecEmbedding.models_graph_context import GraphGlobalContextAlignmentModel
 
@@ -108,6 +118,10 @@ def read_formal_alignment_checkpoint(checkpoint, *, dataset_outputs, dataset_man
     spectrum_metadata = validate_selection_spectrum_metadata(
         selection, dataset_manifest_sha256=dataset_manifest_sha256, tokenizer_config=tokenizer_config,
         expected_counts=expected_counts, exclusions=exclusions)
+    from SpecEmbedding.utils.spectrum_auxiliary_inputs import validate_selection_spectrum_targets
+    spectrum_targets = validate_selection_spectrum_targets(
+        selection, dataset_manifest_sha256=dataset_manifest_sha256, tokenizer_config=tokenizer_config,
+        expected_counts=expected_counts, exclusions=exclusions)
     if sha256_file(checkpoint) != before['checkpoint'] or sha256_file(selection_path) != before['selection']:
         raise ValueError('Formal checkpoint or selection changed during verification')
     receipt = {'checkpoint': str(checkpoint), 'checkpoint_sha256': before['checkpoint'],
@@ -118,6 +132,8 @@ def read_formal_alignment_checkpoint(checkpoint, *, dataset_outputs, dataset_man
                'exclude_val_query_indices': list(exclusions)}
     if spectrum_metadata is not None:
         receipt['spectrum_metadata'] = spectrum_metadata
+    if spectrum_targets is not None:
+        receipt['spectrum_targets'] = spectrum_targets
     return selection, receipt
 
 
