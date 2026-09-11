@@ -329,6 +329,36 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-11 13:03：A10于13:00:44完成独立审计和164项工件哈希/严格重载验证。
+  epoch25的Top-1/MRR改善，但Top-10/20退步，epoch18/19/22/23/25全部Pareto候选均有
+  超过原容差的退步；独立重算全部差值后决定不晋升，保留A04，attempts.md已加删除线。
+  目录`/data1/zyl/SpecEmbedding/audits/optimization_a10_20260911/`中receipt SHA
+  `b999985c5d602ac75456ccd3e9d10e2d5b21945c5d2f7545b245e29520253512`，verification SHA
+  `57d39135136ef8457702c95a9ada94eff37ae3dd5796bf168b4c906aaa03fcf0`，decision SHA
+  `6e1713d1d7133bd214e90e78d189ac73e8286b3d82966aa4cbf5e2f14f914fc5`；完整结果与资源见A10卡。
+  A12继续物理GPU0训练，已完成六轮；A13在12:47启动实际trainer并完成首轮，全量
+  计数和参数量见A13卡。新的GPU实际绑定核验保存于A13派发目录的`verification_gpu.json`，
+  SHA `02dc89daa59ab25a44262e3b5f0455986504a85eb6901535934efa0b5f2091ac`。
+  A13独立完成审计队列`/data1/zyl/SpecEmbedding/audits/optimization_a13_completion_queue_20260911/`
+  通过13项生命周期检查、真实未完成入口拒绝及236项固定输入哈希，实际CPU等待进程
+  PID3903536/start1459097963和两原依赖进程已核验；manifest SHA
+  `27759f1c45b85204d059b68ca1c1d315195fa405082440d7b549250cc0a3680c`，launch SHA
+  `5c080db1562ca117fa2640ed2af58c9a36ba664958ed3d77523a13063e4cfcd0`，runtime verification SHA
+  `d33247e444a3c006efb593d5fed161542fd3cfc0328c688faf9fcf854289313b`。不把队列核验当作完成实验。
+- 2026-09-11：A16完整train目标可行性诊断及独立逐query复算完成。首版误用原TSV身份
+  字段，与训练实际SMILES二维身份有260条差异；全部标识/峰载荷一致，拒绝原聚合指纹后
+  按现有训练定义另建r2诊断，未修改数据或协议。复算脚本另修复重复读取NPZ数组的性能
+  问题，仅停止并重跑明确绑定的CPU诊断，原件与两次拒绝/修复原因保留于
+  `/data1/zyl/SpecEmbedding/audits/optimization_a16_target_feasibility_20260911/`。
+  有效r2目录`/data1/zyl/SpecEmbedding/audits/optimization_a16_target_feasibility_20260911_r2/`的
+  receipt SHA `7a3b269cbf217a9b85f27c6224ebcc1e0dc137d77f7b8aed0f37a156d076e962`，
+  verification SHA `ef0a8b2dc5706e670b658348ef06dab13e0380c6c242162651247598bc33fc72`。
+  覆盖全部194,119条train，与独立train.pkl的逐query标识、二维身份及峰字节一致；
+  scalar分箱计数/母离子强度比例逐条复算通过，分组余弦公式通过独立小型标量配对检查。
+  据覆盖、条件异质性及成本登记0.1 Da/隐藏64/λ1.0的条件辅助头，仅在训练头输入adduct，
+  原A04双塔不变；详细依据、成本和反证集中于A16卡。组件/正式缓存仍未实现，没有GPU
+  派发或检索结果，本计划和SOTA目标保持执行中。
+
 - 2026-09-11 12:32复查：A10原入口已完成全部四阶段及30轮候选重放并退出，独立队列
   于12:29:38开始CPU完成审计（PID3896600）；尚无完成审计或晋升结论。A13仍在等待
   GPU1，12:31日志空闲显存7,229 MiB，未达到10,000 MiB门槛，保留后台等待。
@@ -2250,8 +2280,8 @@ legacy TokenSet写缓存，验证固定图以只读mmap打开并返回tensor副�
 
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
-- 验证结果：A15独立组件121项相关CPU检查和28项SHA独立读回通过，最近全仓1,018通过、1跳过、1个相同既有路径审计失败；A14正式接入、条件全量预检及最终绑定/衔接验证记录保留，详见第10节；Ruff、源码编译及diff检查通过。不以实现检查代替实验结果。
-- 当前训练状态（2026-09-11 12:28核验）：A04仍为incumbent；A10训练结束、CPU审计中，A12在物理GPU0训练且完成审计等待器已部署，A13单次派发后等待GPU1；A11/A14/A15延后，A16仅设计中。尚无新模型最终结论。各轮最新状态集中于[attempts.md](../../attempts.md)，模型优化和SOTA达标未完成。
+- 验证结果：本次A13审计队列13项生命周期检查、实际进程绑定与236项来源哈希通过，A16完成全部train输入独立复算及标量公式检查；Ruff、8个诊断/队列脚本编译、文档链接和diff检查通过。本次未重跑全仓测试；此前1,018通过、1跳过、1个既有路径审计失败及各组件验证均保留于第10节。不以实现检查代替实验结果。
+- 当前训练状态（2026-09-11 13:03核验）：A10完整审计未晋升，A04仍为incumbent；A12/A13分别在物理GPU0/1训练，两批独立完成审计等待器均已核验；A11/A14/A15延后，A16完整train可行性诊断通过、组件设计已登记但未实现。各轮最新状态集中于[attempts.md](../../attempts.md)，模型优化和SOTA达标未完成。
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；
