@@ -76,6 +76,7 @@ coarse top-40 上做关系精排；`pointwise` 为容量匹配对照。分阶段
 | 文档 | 维护内容 |
 | --- | --- |
 | [项目记忆](project_memory_zh.md) | 当前任务、运行约束入口、证据缺口 |
+| [MassSpecGym 数据泄露报告](massspecgym_data_leakage_report_zh.md) | 旧候选表示泄露的证据、v1.5 缓存核验、结果归因边界与验收要求 |
 | [编码器结构](../model_architecture.md) | Tokenizer、谱图塔、GINE 与对齐损失 |
 | [reranker 实现](reranker_solution_zh.md) | 第二阶段模型、cache、训练与评价接口 |
 | [GPU/tmux 监测器](gpu_tmux_monitor_zh.md) | 空闲门禁、单次派发、CUDA 映射、锁与安全边界 |
