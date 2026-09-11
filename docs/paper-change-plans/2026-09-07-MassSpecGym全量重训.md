@@ -323,6 +323,31 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 ## 10. 执行记录
 
+- 2026-09-11：A13最终parent绑定与单次衔接组件准备完成，固定模型源码继续使用
+  `23d05c946a5150e447cfe957f3822d28666e9e51`，未改A10/A11活跃源码或队列。
+  最终绑定检查176通过，覆盖完整parent分支、CE权重1/2和采样继承、真实CLI/阶段命令、
+  加合物输入独立绑定、前序完整审计依赖、原进程仍活跃时等待与选优歧义拒绝；检查回执
+  `audits/optimization_a13_finalizer_checks_20260911_r1/receipt.json` SHA
+  `9a426163362bb0045a40bf9403702435352b0d4ebb619eb4a2e0db12f3268ca5`。
+  归档根为`$SPECEMBEDDING_DATA_ROOT/audits/optimization_a13_finalization_preparation_20260911`，
+  receipt SHA `fc0ebd5de396f0d4754c2665d704c1b2b2a09dfaf5474511a71469f4f7bb2234`，
+  `finalize.py` SHA `650234d46cd5b2c7af654df8dc51c421397b284a45fb38081058beae14343771`。
+  真实check-only返回等待A12完成和实际绑定，没有生成最终parent或模型输出。
+  单次衔接31项检查通过，含全新隔离tmux真实参数/环境传递及加合物命令丢失、重复或
+  错传基线的拒绝。归档根为
+  `$SPECEMBEDDING_DATA_ROOT/audits/optimization_a13_successor_preparation_20260911`，receipt SHA
+  `eb05fcf064ad06d98d998fe214d94ca6aaae8d4c9bbbbbdfc484c7ba3173ed7b`，verification SHA
+  `01c9006dedc9f27e69d95d880b1864d73732bd5a07b4fbca839f13cbbf884406`；
+  `successor.py` SHA `a3df68f59ebcda72fc30d60459d7e77a7d24e4ebe0f50b9408cfdc1fbf50cc4c`，
+  `deploy_queue.py` SHA `424cbf79e502d34ef04c0488d661c73caf9cad277323b4927291ce3b4452b621`。
+  真实缺绑定探测拒绝创建队列、最终配置、专用socket或模型目录。25项准备与固定来源
+  文件独立读回一致，`independent_verification.json` SHA
+  `354cea1ba0fe07507c89aa968c3a525f9010a0f2b74fe0ea04653ebf78c9083b`；Ruff及脚本编译通过。
+  未来实际绑定路径为`audits/optimization_a13_dependency_binding_20260911/binding.json`，
+  须待真实A12入口、trainer和独立审计出现后才写入；当前没有A13队列或模型训练。
+  A10已记录前八轮完整计数和验证；08:07主机复核原训练、完成审计与A11等待均存活，
+  三份固定源码干净，中途指标和成本只维护于A10卡。
+
 - 2026-09-11：A13正式模型构造、训练/验证CLI、基线自身元数据绑定、checkpoint重载和
   完整完成审计接入，代码提交`23d05c946a5150e447cfe957f3822d28666e9e51`。
   每轮实际query—ID顺序可独立重建；输入指纹、完整训练/验证分母、候选重放及选优权重
@@ -2029,8 +2054,8 @@ test ID；因此它也不是单纯的 simulation 子集。缺失原因和对论�
 
 - 完成日期：尚未完成
 - 最终状态：`执行中`；单 baseline 配置与计划已完成，模型优化和 SOTA 达标未完成
-- 验证结果：A13正式接入相关221项通过，全仓876通过、1跳过、1个相同既有路径审计失败，详见第10节；Ruff、compileall及diff检查通过。不以实现检查代替实验结果。
-- 当前训练状态（2026-09-11 07:43核验）：A04仍为incumbent，A09完成审计未晋升；A10全量GPU训练中，其独立完成审计与A11衔接在后台等待；A13全量固定输入、正式接入检查及A04条件全量预检/独立复核通过，最终parent与队列仍待。各轮最新状态集中于[attempts.md](../../attempts.md)，模型优化和SOTA达标未完成。
+- 验证结果：A13正式接入相关221项通过，随后最终绑定176项与单次衔接31项通过；固定源码最近全仓876通过、1跳过、1个相同既有路径审计失败，详见第10节；Ruff、源码编译及diff检查通过。不以实现检查代替实验结果。
+- 当前训练状态（2026-09-11 08:07核验）：A04仍为incumbent，A09完成审计未晋升；A10全量GPU训练中，其独立完成审计与A11衔接在后台等待；A13全量输入、正式接入、条件预检及后续衔接组件已准备并核验，实际A12依赖、最终parent与队列仍待。各轮最新状态集中于[attempts.md](../../attempts.md)，模型优化和SOTA达标未完成。
 - 论文修改 commit：尚未提交；本轮不修改论文
 - 计划归档 commit：无需在本文件中自我引用
 - 相对原计划的偏差：用户已授权从立即跑 12 组矩阵改为单方案持续优化，成熟后再做稳定性与矩阵；
